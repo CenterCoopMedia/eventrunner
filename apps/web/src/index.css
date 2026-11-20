@@ -315,36 +315,6 @@
     border-block-end-color: rgb(var(--rule-hairline-rgb));
   }
 
-  /* THE PUBLIC DIALOG (expansion record §2.1).
-     ------------------------------------------------------------------
-     A native <dialog> opened with showModal(). The browser puts it in the
-     top layer, so it needs no z-index and cannot be trapped under a
-     stacking context; the User-Agent stylesheet centres it and gives it a
-     border and a margin, which is what these rules undo so the frame is the
-     system's strong rule and nothing else.
-
-     THE SCRIM IS TINTED INK, NOT BLUR. A blur is glassmorphism (§2.4) and it
-     costs a full-screen filter on every frame. The ink is the page's own
-     text colour at low alpha, so the scrim follows the mode and the preset
-     without a token of its own. */
-  dialog.public-dialog {
-    /* The UA stylesheet sizes a dialog to its content and lets it run off a
-       short viewport. The dialog holds a form, so it scrolls inside itself
-       and leaves the page behind it still. */
-    max-block-size: calc(100dvh - 2 * var(--space-xl));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    inline-size: min(32rem, calc(100% - 2 * var(--space-md)));
-    color: rgb(var(--color-text-primary-rgb));
-  }
-  /* The backdrop is in the top layer. A modern browser lets it inherit from
-     the dialog, so the token resolves and the scrim follows the mode; the
-     fallback in the var() covers an implementation that does not, where the
-     declaration would otherwise be dropped and no scrim would paint. */
-  .public-dialog::backdrop {
-    background-color: rgb(var(--color-text-primary-rgb, 24 27 32) / 0.45);
-  }
-
   /* THE TWO MOVES (expansion record §2.2).
      ------------------------------------------------------------------
      An element that arrives fades up over a short distance; an element that
@@ -1689,35 +1659,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* PROGRESS (record §3.2): a native <progress> with the fraction stated
-     beside it. The native paint is turned off and the bar is drawn from the
-     tokens: a track inside a hairline on the alternate ground, and a flat
-     fill in the accent. Never a ring, and nothing moves. */
-  .progress-bar {
-    appearance: none;
-    -webkit-appearance: none;
-    display: block;
-    inline-size: 100%;
-    block-size: var(--progress-block-size);
-    overflow: hidden;
-    border: var(--progress-rule-width) solid rgb(var(--progress-rule-rgb));
-    border-radius: var(--progress-radius);
-    background-color: var(--progress-track);
-    color: var(--progress-fill);
-  }
-  .progress-bar::-webkit-progress-bar {
-    background-color: var(--progress-track);
-  }
-  .progress-bar::-webkit-progress-value {
-    background-color: var(--progress-fill);
-  }
-  .progress-bar::-moz-progress-bar {
-    background-color: var(--progress-fill);
-  }
-  .progress-label {
-    font-family: var(--progress-label-font);
-  }
-
   /* THE NOTICE BAR (record §3.2): a site-wide message with a level, as a
      ruled band under the header. The level is a word and a rule weight:
      information takes the hairline, urgent takes the strong rule. Nothing
@@ -1736,64 +1677,6 @@
   .notice-bar__word {
     font-family: var(--notice-bar-word-font);
     text-transform: var(--notice-bar-word-transform);
-  }
-
-  /* THE RULED TABLE (record §3.1): a real <table>, ruled between rows,
-     inside a region that scrolls sideways at narrow widths so the page
-     never does. The head does not stick: the region is the scroll
-     container, and a head pinned inside a container that scrolls only
-     sideways pins to nothing the reader scrolls (adversarial review of the
-     wave). The three widths are what the Table rules option moves:
-     hairline rows, a ruled head, or the full grid. Figures sit in tabular
-     numerals so a column of them lines up. */
-  .ruled-table {
-    inline-size: 100%;
-    border-collapse: collapse;
-    border-spacing: 0;
-  }
-  .ruled-table caption {
-    text-align: start;
-    caption-side: top;
-  }
-  .ruled-table th,
-  .ruled-table td {
-    padding-block: var(--table-cell-pad-block);
-    padding-inline: var(--table-cell-pad-inline);
-    text-align: start;
-    vertical-align: top;
-    border-block-start: var(--table-rule-width) solid rgb(var(--table-rule-rgb));
-    border-inline-start: var(--table-column-rule-width) solid rgb(var(--table-rule-rgb));
-  }
-  .ruled-table th:first-child,
-  .ruled-table td:first-child {
-    padding-inline-start: 0;
-    border-inline-start: 0;
-  }
-  .ruled-table thead th {
-    border-block-start: 0;
-    border-block-end: var(--table-head-rule-width) solid rgb(var(--table-head-rule-rgb));
-    background-color: var(--table-head-ground);
-    font-family: var(--table-head-font);
-    text-transform: var(--table-head-transform);
-    letter-spacing: var(--table-head-tracking);
-  }
-  .ruled-table tbody tr:first-child > * {
-    border-block-start: 0;
-  }
-  .ruled-table [data-numeric] {
-    text-align: end;
-    font-variant-numeric: tabular-nums;
-  }
-  /* The sort control is the head's own word, so it takes no box of its
-     own: the whole word is the target, at the row's height. */
-  .ruled-table__sort {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-2xs);
-    font: inherit;
-    letter-spacing: inherit;
-    text-transform: inherit;
-    text-align: inherit;
   }
 
   /* THE AVATAR (record §3.3): a person's picture, or their initial where
@@ -1827,48 +1710,6 @@
   .avatar--lg {
     inline-size: 6rem;
     font-size: var(--text-h2);
-  }
-
-  /* THE DROPZONE (record §3.3): a ruled region around a real file input.
-     The rule is the control boundary, dashed at rest and solid while a file
-     is held over it, and the region shows the one focus ring when the input
-     inside it has focus, because the input itself is off screen. */
-  .dropzone {
-    position: relative;
-    padding: var(--dropzone-pad);
-    border: var(--dropzone-rule-width) var(--dropzone-rule-style) rgb(var(--dropzone-rule-rgb));
-    border-radius: var(--dropzone-radius);
-    background-color: var(--dropzone-ground);
-  }
-  /* Held over: solid AND at the drag width, so a style whose rest rule is
-     already solid (Atlas) or already strong (Zine, which doubles the drag
-     width) still shows the state by more than its colour. */
-  .dropzone[data-dragging='true'] {
-    border-style: solid;
-    border-width: var(--dropzone-drag-rule-width);
-    border-color: rgb(var(--color-accent-rgb));
-  }
-  /* The alarm rule (state grammar, error): the strong width in the danger
-     ink, the same rule a checkbox in error draws, so a refusal is never the
-     red sentence under the region alone. */
-  .dropzone[data-invalid='true'] {
-    border-style: solid;
-    border-width: var(--rule-strong-width);
-    border-color: rgb(var(--semantic-danger-rgb));
-  }
-  .dropzone:focus-within {
-    outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
-    outline-offset: var(--focus-ring-offset);
-  }
-  .dropzone__sent {
-    border-block-start: var(--dropzone-rule-width) solid rgb(var(--rule-hairline-rgb));
-  }
-
-  /* THE REPEATER (record §3.3): a short list of rows a person adds and
-     removes, ruled between rows. */
-  .repeater__row {
-    padding-block: var(--repeater-row-pad-block);
-    border-block-start: var(--repeater-rule-width) solid rgb(var(--repeater-rule-rgb));
   }
 
   /* THE COUNT (record §3.2): a labelled figure beside the thing it counts.
@@ -1932,53 +1773,6 @@
   .state-marker--past {
     color: var(--state-marker-past-ink);
     border-block-end-width: var(--rule-hairline-width);
-  }
-
-  /* THE STANDFIRST (record §3.1): the one sentence under a heading that says
-     what the page is. Below the heading, never above it. */
-  .standfirst {
-    font-family: var(--standfirst-font);
-    font-size: var(--standfirst-size);
-    line-height: var(--standfirst-leading);
-    font-style: var(--standfirst-style);
-    font-weight: var(--standfirst-weight);
-    color: var(--standfirst-ink);
-    padding-block-end: var(--standfirst-pad-block-end);
-    border-block-end: var(--standfirst-rule-width) solid rgb(var(--standfirst-rule-rgb));
-    text-wrap: pretty;
-  }
-
-  /* THE BYLINE AND THE DATELINE (record §3.1): who, in what role, and when,
-     in the data face. A dateline carries the event's clock. */
-  .byline {
-    font-family: var(--byline-font);
-    font-size: var(--byline-size);
-    line-height: var(--text-caption-leading);
-    font-weight: var(--byline-weight);
-    color: var(--byline-ink);
-    text-transform: var(--byline-transform);
-    letter-spacing: var(--byline-tracking);
-    font-variant-numeric: tabular-nums;
-  }
-}
-
-@layer components {
-  /* The specimen book (apps/web/src/pages/specimen/). Demo and development
-     only: the route is never registered in a client production build.
-
-     ONE RULE, AND IT EXISTS BECAUSE THE BOOK DRAWS EVERY SET AT ONCE. The
-     illustration section gives each row its own `data-motif-set`, so all
-     four sets can be compared without switching. That works for the slot
-     tokens, which cascade — but `[data-motif-set='none'] .motif` matches
-     from the DOCUMENT ELEMENT, so a deployment on the `none` set hides
-     every motif on the page, nested attribute or not. This re-states the
-     display for a row that names a set of its own, at a specificity that
-     wins, and nowhere else. */
-  .specimen-motif-row:not([data-motif-set='none']) .motif {
-    display: inline-block;
-  }
-  .specimen-motif-row:not([data-motif-set='none']) .motif--divider {
-    display: block;
   }
 }
 

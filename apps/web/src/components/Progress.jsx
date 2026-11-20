@@ -7,10 +7,11 @@
 // it. <meter> is not used: it measures a quantity in a range, not
 // completion. Never a ring, and nothing here moves.
 //
-// The bar is drawn from the tokens (`.progress-bar` in index.css): a track
+// The bar is drawn from the tokens (`.progress-bar` in Progress.css): a track
 // inside a hairline on the alternate ground and a flat fill in the accent,
 // which a style retunes through the `progress` contract.
 import { useId } from 'react';
+import './Progress.css';
 
 /**
  * The stated fraction: "3 of 5 tasks done".

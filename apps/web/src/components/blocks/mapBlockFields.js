@@ -1,6 +1,6 @@
 import { isStarterContent } from 'shared/seed';
 import { googleMapsEmbedUrl } from 'shared/urlSafety';
-import { venueAddress } from 'shared/venue';
+import { venueAddress } from 'shared/venueFields';
 
 function trim(value) {
   return typeof value === 'string' ? value.trim() : '';

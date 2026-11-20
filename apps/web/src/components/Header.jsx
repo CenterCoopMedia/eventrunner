@@ -4,7 +4,7 @@
 //
 // The four treatments and their rules: docs/interface-guidelines.md, Headers.
 import { PublicLink as Link } from './PublicLink.jsx';
-import { DEFAULT_HEADER, THEME_HEADERS } from 'shared/theme';
+import { DEFAULT_HEADER, THEME_HEADERS } from 'shared/themeAppearance';
 import Nameplate from './editorial/Nameplate.jsx';
 
 /**

@@ -476,7 +476,7 @@ describe('direct entry while the preset remaps load', () => {
       delayedRemaps = undefined;
       remaps.resolve();
     });
-    expect(root.dataset.theme).toBe('zine');
+    await waitFor(() => expect(root.dataset.theme).toBe('zine'));
     expect(runtimeStyle.textContent).toContain('--callout-angle: -2.5deg;');
     expect(heading).toBeInTheDocument();
   });

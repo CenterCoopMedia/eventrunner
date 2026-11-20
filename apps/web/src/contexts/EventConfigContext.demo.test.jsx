@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { subscriptions } = vi.hoisted(() => ({ subscriptions: new Map() }));
@@ -73,7 +73,7 @@ describe('EventConfigProvider demo theme override', () => {
     expect(screen.getByTestId('theme-body')).toHaveTextContent('merriweather');
     expect(screen.getByTestId('theme-surface')).toHaveTextContent('255 255 255');
   });
-  it('uses the normal resolver and stays separate from live configuration', () => {
+  it('uses the normal resolver and stays separate from live configuration', async () => {
     render(
       <EventConfigProvider demoMode>
         <DemoThemeProbe />
@@ -85,7 +85,7 @@ describe('EventConfigProvider demo theme override', () => {
     expect(screen.getByTestId('theme-preset')).toHaveTextContent('field-guide');
     expect(screen.getByTestId('theme-mode')).toHaveTextContent('dark');
     expect(screen.getByTestId('config-source')).toHaveTextContent('snapshot');
-    expect(document.documentElement.dataset.theme).toBe('field-guide');
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('field-guide'));
     expect(document.documentElement.dataset.mode).toBe('dark');
     expect(runtimeStyle().textContent).toContain("--font-heading: 'Besley'");
     expect(runtimeStyle().textContent).toContain(
@@ -111,7 +111,7 @@ describe('EventConfigProvider demo theme override', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear demo theme' }));
     expect(screen.getByTestId('theme-preset')).toHaveTextContent('zine');
-    expect(document.documentElement.dataset.theme).toBe('zine');
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('zine'));
   });
 
   it('does not expose a demo setter in a client build', () => {

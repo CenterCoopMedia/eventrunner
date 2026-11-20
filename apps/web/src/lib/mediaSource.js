@@ -37,7 +37,7 @@
 // require the server's validation stamp. `session-materials/` stays closed,
 // and a thumbnail costs no metadata round trip.
 import { imageSizePaths, readImageSizeManifest } from 'shared/imageSizes';
-import { isMediaLibraryPath, storageObjectPath } from 'shared/venue';
+import { isMediaLibraryPath, storageObjectPath } from 'shared/venueFields';
 import { storageBucketName, storageDownloadOrigin } from './firebaseSettings.js';
 import { IS_DEMO } from './demoMode.js';
 import { bundledDemoAssetUrl } from './bundledAssets.js';

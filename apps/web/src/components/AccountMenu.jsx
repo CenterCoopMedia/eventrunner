@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import RoleSwitcher from './RoleSwitcher.jsx';
 import { quietActionClass } from './controlClasses.js';
+import './PublicDialog.css';
 
 const PHONE_VIEWPORT = '(max-width: 767px)';
 

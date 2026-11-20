@@ -214,7 +214,12 @@ describe('the built stylesheet', () => {
     const startup = initialCss.files.map(({ file }) =>
       fs.readFileSync(path.join(scratch, file), 'utf8'),
     ).join('\n');
-    for (const selector of ['.pull-quote__mark', '.long-read-opening', '.venue-map__frame', '.admin-rich-text', '.admin-proof-row']) {
+    for (const selector of [
+      '.pull-quote__mark', '.long-read-opening', '.venue-map__frame', '.ruled-table__sort',
+      '.dropzone__sent', '.repeater__row', '.specimen-motif-row', '.admin-rich-text',
+      '.admin-proof-row', '.bg-admin-ground-proof', '.progress-bar', '.standfirst',
+      '.byline', '.public-dialog',
+    ]) {
       expect(bundled).toContain(selector);
       expect(startup).not.toContain(selector);
     }

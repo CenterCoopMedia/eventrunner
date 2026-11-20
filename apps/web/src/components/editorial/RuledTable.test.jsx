@@ -89,7 +89,7 @@ describe('RuledTable', () => {
   });
 
   it('claims no sticky head: the stylesheet pins nothing inside the scroll region', () => {
-    const css = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
+    const css = fs.readFileSync(path.join(here, 'RuledTable.css'), 'utf8');
     const rule = css.match(/\.ruled-table thead th \{[^}]*\}/u)?.[0] ?? '';
     expect(rule).not.toBe('');
     expect(rule).not.toContain('position: sticky');

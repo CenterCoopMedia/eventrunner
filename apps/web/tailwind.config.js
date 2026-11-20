@@ -21,6 +21,11 @@ const fontStep = (step) => [
   { lineHeight: `var(--text-${step}-leading)`, letterSpacing: `var(--text-${step}-tracking)` },
 ];
 
+export const ADMIN_CONTENT = './src/admin/**/*.{js,jsx}';
+export const ADMIN_SPECIMEN_CONTENT = './src/pages/specimen/AdminSpecimen.jsx';
+export const SPECIMEN_CONTENT = './src/pages/specimen/**/*.{js,jsx}';
+export const EXCLUDE_TEST_CONTENT = '!./src/**/*.test.{js,jsx}';
+
 export default {
   // A TAP IS NOT A HOVER. `hoverOnlyWhenSupported` puts every `hover:`
   // utility inside `@media (hover: hover)`, so a touch screen — which
@@ -45,7 +50,10 @@ export default {
   //
   // Excluding the tests makes the build reflect the app alone, which is
   // what the test was written to measure.
-  content: ['./index.html', './src/**/*.{js,jsx}', '!./src/**/*.test.{js,jsx}'],
+  content: [
+    './index.html', './src/**/*.{js,jsx}', `!${ADMIN_CONTENT}`,
+    `!${SPECIMEN_CONTENT}`, EXCLUDE_TEST_CONTENT,
+  ],
   theme: {
     extend: {
       colors: {

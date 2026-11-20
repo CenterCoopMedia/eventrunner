@@ -14,7 +14,7 @@ import InfoCards, { groupIntoCards } from '../components/InfoCards.jsx';
 import EventHero from '../components/EventHero.jsx';
 import { demoHero } from '../lib/demoHero.js';
 import { uploadedBrandingSrc } from '../lib/mediaSource.js';
-import { THEME_HERO_LOGOS } from 'shared/theme';
+import { THEME_HERO_LOGOS } from 'shared/themeAppearance';
 import { buildNameplate } from '../components/editorial/Nameplate.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import {

@@ -10,6 +10,8 @@
 //
 // It is a paragraph at the measure. A page has one; a section may have one.
 
+import './Standfirst.css';
+
 /**
  * @param {{
  *   children: import('react').ReactNode,

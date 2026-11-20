@@ -20,7 +20,10 @@ Name new renderer modules `<Type>Block.jsx` and register them with
 `lazy(() => import(...))` in `src/components/blocks/registry.jsx`. Import
 block-specific CSS from the renderer. Only the Home hero, information
 cards, and opening copy renderers and the unknown-block fallback are
-eager. Keep admin styles with their route or component.
+eager. Keep admin screens under `src/admin/` and import their styles from
+the route or component. Tailwind puts utilities found only in admin modules
+in the admin workspace stylesheet. The design specimen has its own
+stylesheet for utilities used only in specimen modules.
 
 ## How the app reads its config (spec §2.4)
 

@@ -17,7 +17,7 @@
 // disabled for the length of the swap (interface guidelines, Animation), so
 // the change reads as one instant repaint rather than as a wave of
 // independent fades.
-import { DEFAULT_MODE_POLICY, resolveMode } from 'shared/theme';
+import { DEFAULT_MODE_POLICY, resolveMode } from 'shared/themeAppearance';
 
 const SUPPRESS_STYLE_ID = 'event-mode-switch';
 const DARK_QUERY = '(prefers-color-scheme: dark)';

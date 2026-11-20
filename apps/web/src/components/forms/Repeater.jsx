@@ -23,6 +23,7 @@
 // control gone.
 import { useEffect, useRef } from 'react';
 import { quietActionClass } from '../controlClasses.js';
+import './Repeater.css';
 
 /**
  * @param {object} props

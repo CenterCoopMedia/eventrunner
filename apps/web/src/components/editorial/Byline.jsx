@@ -12,6 +12,7 @@
 //
 // Neither is an eyebrow: both sit below or beside the title they credit.
 import { PublicLink as Link } from '../PublicLink.jsx';
+import './Byline.css';
 
 /** A string with something in it, or null. */
 function text(value) {

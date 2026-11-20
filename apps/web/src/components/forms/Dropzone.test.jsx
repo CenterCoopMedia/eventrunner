@@ -9,7 +9,7 @@ import Dropzone from './Dropzone.jsx';
 import { renderInEveryStyle } from '../../test/everyStyle.jsx';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const indexCss = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
+const dropzoneCss = fs.readFileSync(path.join(here, 'Dropzone.css'), 'utf8');
 
 const file = (name) => new File(['x'], name, { type: 'application/pdf' });
 
@@ -123,7 +123,7 @@ describe('Dropzone', () => {
     expect(region).not.toHaveAttribute('data-invalid');
     // The rule is the state grammar's: the strong width in the danger ink,
     // the same alarm a checkbox in error draws (index.css).
-    const rule = indexCss.match(/\.dropzone\[data-invalid='true'\] \{[^}]*\}/u)?.[0] ?? '';
+    const rule = dropzoneCss.match(/\.dropzone\[data-invalid='true'\] \{[^}]*\}/u)?.[0] ?? '';
     expect(rule).toContain('border-width: var(--rule-strong-width)');
     expect(rule).toContain('--semantic-danger-rgb');
   });
@@ -131,7 +131,7 @@ describe('Dropzone', () => {
   it('widens the rule as well as solidifying it while a file is held over the region', () => {
     // A style whose rest rule is already solid (Atlas, Zine) would otherwise
     // show the drag-over state by colour alone.
-    const rule = indexCss.match(/\.dropzone\[data-dragging='true'\] \{[^}]*\}/u)?.[0] ?? '';
+    const rule = dropzoneCss.match(/\.dropzone\[data-dragging='true'\] \{[^}]*\}/u)?.[0] ?? '';
     expect(rule).toContain('border-style: solid');
     expect(rule).toContain('border-width: var(--dropzone-drag-rule-width)');
   });
