@@ -93,4 +93,29 @@ describe('console waiting feedback', () => {
     act(() => vi.advanceTimersByTime(60000));
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
+  it('moves focus to the recovery control when the retried read fails', async () => {
+    vi.useFakeTimers();
+    const answers = [];
+    const read = vi.fn(() => new Promise((resolve, reject) => answers.push(reject)));
+    function Page() {
+      const [error, setError] = useState('');
+      const [attempt, setAttempt] = useState(0);
+      useEffect(() => {
+        let live = true;
+        read().catch((err) => { if (live) setError(err.message); });
+        return () => { live = false; };
+      }, [attempt]);
+      if (error) return <div><p role="alert">{error}</p><button type="button">Refresh the team</button></div>;
+      return <LoadingState onRetry={() => setAttempt((value) => value + 1)}>Loading the team.</LoadingState>;
+    }
+    render(<main tabIndex={-1}><Page /></main>);
+    act(() => vi.advanceTimersByTime(10000));
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    await act(async () => answers[1](new Error('The team could not be loaded.')));
+    expect(screen.getByRole('alert')).toHaveTextContent('The team could not be loaded.');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Refresh the team' }));
+  });
 });

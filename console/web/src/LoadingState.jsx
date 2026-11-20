@@ -10,8 +10,9 @@ import WaitingBuddy from './WaitingBuddy.jsx';
  * it. The caller makes the new read win over the one that has not answered
  * (a fresh effect run); the wait starts again from the press. The control
  * stays where the keyboard is, busy, until the new read answers or reaches
- * ten seconds itself. When the content replaces it, focus moves to the
- * page's heading rather than falling to the document.
+ * ten seconds itself. When the content or an error replaces it, focus moves
+ * to the page's heading, else the first control there (a failed read's
+ * refresh), else the main region, rather than falling to the document.
  * A write never gets one, because a second write could race the first.
  */
 export default function LoadingState({ children, className = '', long = false, onRetry }) {
@@ -20,7 +21,10 @@ export default function LoadingState({ children, className = '', long = false, o
   const retryRef = useRef(null);
   useLayoutEffect(() => () => {
     if (document.activeElement !== retryRef.current || !retryRef.current) return;
-    queueMicrotask(() => document.querySelector('main h1')?.focus());
+    queueMicrotask(() => {
+      const main = document.querySelector('main');
+      (main?.querySelector('h1') || main?.querySelector('button:not([disabled]), a[href]') || main)?.focus();
+    });
   }, []);
   useEffect(() => {
     const timers = [
