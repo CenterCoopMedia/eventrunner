@@ -19,7 +19,7 @@
  * - A changed record updates only the proposal fields. Status, private
  *   notes, conversion and notices stay. `reviewRevision` goes up by one, so
  *   a review form opened on the old text reports a conflict, and
- *   `sourceUpdatedAt` drives the "Updated in Airtable" marker.
+ *   `sourceUpdatedAt` drives the "Updated from source" marker.
  * - A record that leaves the view is never deleted here. A complete run
  *   sets `sourceRemovedAt`; the record coming back clears it.
  * - A record without a ticked consent checkbox is skipped and counted. An
@@ -162,10 +162,10 @@ function presentersWithLead(stored, row) {
   }, ...rest];
 }
 
-/** What a pitch stored before sourceValues reads as, for the comparison. */
-function legacyBaseline(stored) {
-  const [lead] = readPresenters(stored);
-  return { ...stored, leadName: lead?.name ?? null, leadRole: lead?.role ?? null };
+/** Read the lead fields from a CSV presenter list or mapped Airtable fields. */
+function withLeadFields(values) {
+  const [lead] = readPresenters(values);
+  return { leadName: lead?.name ?? null, leadRole: lead?.role ?? null, ...values };
 }
 
 function sameAirtable(stored, current) {
@@ -239,7 +239,7 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
       // sourceValues existed compares with itself, as it always did. The
       // legacy fields always count, and each mapped stepper field the row
       // carries; values compare as JSON so a presenter list compares by value.
-      const baseline = stored.sourceValues && typeof stored.sourceValues === 'object' ? stored.sourceValues : legacyBaseline(stored);
+      const baseline = withLeadFields(stored.sourceValues && typeof stored.sourceValues === 'object' ? stored.sourceValues : stored);
       const keys = [...CONTENT_KEYS, ...Object.keys(row).filter((key) => !CONTENT_KEYS.includes(key))];
       const changed = keys.filter((key) => !sameValue(baseline[key], row[key]));
       const flagged = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ImportPitches from './ImportPitches.jsx';
+import airtableCsv from '../../../../../e2e/fixtures/airtable-pitches.csv?raw';
 
 const CSV = 'externalId,email,title,description,organization,format,consent\nrec-17,one@example.test,Local together,Serve readers.,,Panel,checked';
 const ACKNOWLEDGEMENT = 'I reviewed these proposals and verified consent in the source form';
@@ -31,10 +32,23 @@ describe('guided proposal import', () => {
     expect(screen.getByRole('button', { name: 'Import reviewed proposals' })).toBeDisabled();
     fireEvent.click(screen.getByLabelText(ACKNOWLEDGEMENT));
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed proposals' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 pitch added. 0 were already here. No emails were sent.'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Added 1. Updated 0. Unchanged 0. No emails were sent.'));
     expect(call).toHaveBeenCalledWith('importSessionPitches', { source: 'source-form', rows: [
-      { externalId: 'rec-17', email: 'one@example.test', title: 'Local together', description: 'Serve readers.', organization: '', format: '', consent: true },
+      { externalId: 'rec-17', email: 'one@example.test', title: 'Local together', description: 'Serve readers.', consent: true },
     ] });
+  });
+
+  it('shows the problem on each failed proposal from an Airtable export', async () => {
+    const call = start();
+    await choose(file(airtableCsv.replace('external-pitch@example.test', 'bad-address').replace('Panel,checked', 'Panel,')));
+    for (const [label, value] of [['Source ID', 'Record identifier'], ['Email', 'Presenter contact'], ['Proposal title', 'Working title'], ['Description', 'Proposal text'], ['Consent', 'Permission']]) {
+      fireEvent.change(screen.getByLabelText(`${label} (required)`), { target: { value } });
+    }
+    review();
+    expect(screen.getByText('Row 1 — Enter a valid email address.')).toBeInTheDocument();
+    expect(screen.getByText(/Row 2 — Consent must be true or checked/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Import reviewed proposals' })).not.toBeInTheDocument();
+    expect(call).not.toHaveBeenCalled();
   });
 
   it('requires a new review and consent after changing the source, mapping or file', async () => {

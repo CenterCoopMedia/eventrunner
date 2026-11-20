@@ -18,7 +18,7 @@ test('external-form import requires real consent and stable unique source identi
 
 test('an import row carries the pitch stepper fields it has, and a legacy row stays as it was', () => {
   const legacy = readImport({ source: 'external-form', rows: [row] }).rows[0];
-  assert.deepEqual(Object.keys(legacy).sort(), ['description', 'email', 'externalId', 'format', 'id', 'organization', 'source', 'title']);
+  assert.deepEqual(Object.keys(legacy).sort(), ['description', 'email', 'externalId', 'id', 'source', 'title']);
   const full = readImport({ source: 'external-form', rows: [{
     ...row, summary: 'One line.', lengthMinutes: '60', track: 'Audience', audienceLevel: 'beginner', leadName: 'Ada',
     presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test',
@@ -29,19 +29,63 @@ test('an import row carries the pitch stepper fields it has, and a legacy row st
   assert.match(readImport({ source: 'external-form', rows: [{ ...row, lengthMinutes: 'long' }] }).error, /Row 1: lengthMinutes/);
 });
 
-test('re-importing the same row with presenters is unchanged, and a changed presenter conflicts', async () => {
+test('re-importing a pitch updates its content and retains review decisions and notes', async () => {
   const db = makeFakeDb({ 'config/bootstrap': bootstrap });
-  const handler = createQueueHandler({ db, auth, getConfig: async () => ({ bootstrap }), now: () => 1000, log: { error() {} } }, 'import');
-  const body = { source: 'external-form', rows: [{ ...row, leadName: 'Ada', presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test' }] };
-  const send = async (payload) => {
-    const res = { statusCode: 0, body: null, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return this; }, set() { return this; } };
-    await handler({ method: 'POST', headers: { authorization: 'Bearer staff' }, body: payload }, res);
-    return res;
-  };
-  assert.deepEqual((await send(body)).body, { imported: 1, unchanged: 0 });
-  assert.deepEqual((await send(body)).body, { imported: 0, unchanged: 1 });
+  const body = { source: 'external-form', rows: [{ ...row, organization: 'Example newsroom', format: 'Panel', leadName: 'Ada', presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test' }] };
+  const send = (payload) => invoke(db, 'import', 'staff', payload);
+  assert.deepEqual((await send(body)).body, { imported: 1, updated: 0, unchanged: 0 });
+  assert.deepEqual((await send(body)).body, { imported: 0, updated: 0, unchanged: 1 });
+  const [id] = db.ids('session_pitches');
+  const [lead, ...coPresenters] = db.read('session_pitches', id).presenters;
+  await db.collection('session_pitches').doc(id).update({ title: 'Staff correction', status: 'accepted', reviewRevision: 4,
+    privateNotes: 'Staff notes', presenters: [{ ...lead, name: 'Staff lead correction' }, ...coPresenters] });
+  assert.deepEqual((await send(body)).body, { imported: 0, updated: 0, unchanged: 1 });
+  assert.equal(db.read('session_pitches', id).title, 'Staff correction');
   const changed = { ...body, rows: [{ ...body.rows[0], presenter_1_name: 'Someone else' }] };
-  assert.equal((await send(changed)).statusCode, 409);
+  assert.deepEqual((await send(changed)).body, { imported: 0, updated: 1, unchanged: 0 });
+  assert.deepEqual(db.ids('session_pitches'), [id]);
+  const updated = db.read('session_pitches', id);
+  assert.equal(updated.presenters[0].name, 'Staff lead correction');
+  assert.equal(updated.presenters[1].name, 'Someone else');
+  assert.equal(updated.title, 'Staff correction');
+  assert.equal(updated.status, 'accepted');
+  assert.equal(updated.privateNotes, 'Staff notes');
+  assert.equal(updated.reviewRevision, 5);
+  assert.deepEqual(updated.sourceChangedFields, ['presenters']);
+  assert.ok(updated.sourceUpdatedAt);
+
+  const contact = { ...body, rows: [{ ...row, email: 'new-contact@example.test' }] };
+  assert.deepEqual((await send(contact)).body, { imported: 0, updated: 1, unchanged: 0 });
+  const withContact = db.read('session_pitches', id);
+  assert.equal(withContact.email, 'new-contact@example.test');
+  assert.equal(withContact.presenters[0].email, withContact.email);
+  assert.equal(withContact.organization, 'Example newsroom');
+  assert.equal(withContact.presenters[0].organization, withContact.organization);
+  assert.equal(withContact.format, 'Panel');
+  assert.equal(withContact.presenters[1].name, 'Someone else');
+
+  const leadOnly = { ...body, rows: [{ ...contact.rows[0], leadRole: 'Presenter' }] };
+  assert.deepEqual((await send(leadOnly)).body, { imported: 0, updated: 1, unchanged: 0 });
+  assert.equal(db.read('session_pitches', id).presenters[1].name, 'Someone else');
+
+  const removed = { ...body, rows: [{ ...contact.rows[0], presenter_1_name: '', presenter_1_email: '' }] };
+  assert.deepEqual((await send(removed)).body, { imported: 0, updated: 1, unchanged: 0 });
+  const [remainingLead, ...remainingCoPresenters] = db.read('session_pitches', id).presenters;
+  assert.equal(remainingLead.name, 'Staff lead correction');
+  assert.equal(remainingLead.role, 'Presenter');
+  assert.deepEqual(remainingCoPresenters, []);
+  assert.deepEqual((await send(removed)).body, { imported: 0, updated: 0, unchanged: 1 });
+});
+
+test('a pitch imported before source tracking keeps the staff correction on replay', async () => {
+  const body = { source: 'external-form', rows: [row] };
+  const [{ id, ...original }] = readImport(body).rows;
+  const db = makeFakeDb({ 'config/bootstrap': bootstrap,
+    [`session_pitches/${id}`]: { ...original, title: 'Staff correction', submitted: { title: original.title } },
+  });
+  assert.deepEqual((await invoke(db, 'import', 'staff', body)).body, { imported: 0, updated: 0, unchanged: 1 });
+  assert.equal(db.read('session_pitches', id).title, 'Staff correction');
+  assert.equal(db.writes.length, 0);
 });
 
 const bootstrap = { adminEmails: ['operator@example.test'], staffEmails: ['staff@example.test'] };
@@ -128,12 +172,12 @@ test('an unchanged re-import stays unchanged after Firestore returns the present
     await handler({ method: 'POST', headers: { authorization: 'Bearer staff' }, body: payload }, res);
     return res;
   };
-  assert.deepEqual((await send(body)).body, { imported: 1, unchanged: 0 });
+  assert.deepEqual((await send(body)).body, { imported: 1, updated: 0, unchanged: 0 });
   const [id] = db.ids('session_pitches');
   const stored = db.read('session_pitches', id);
   const reordered = stored.presenters.map((p) => Object.fromEntries(Object.keys(p).sort().map((k) => [k, p[k]])));
   await db.collection('session_pitches').doc(id).update({ presenters: reordered });
-  assert.deepEqual((await send(body)).body, { imported: 0, unchanged: 1 });
+  assert.deepEqual((await send(body)).body, { imported: 0, updated: 0, unchanged: 1 });
 });
 
 // ADR 0008 §3: one speaker per presenter, linked by email, invited at once.

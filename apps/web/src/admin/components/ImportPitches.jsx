@@ -11,6 +11,8 @@ const MATCH_HINTS = {
   externalId: 'Keep the original ID from the source form. Never use a new ID for a retry.',
   consent: 'Values must be true or checked, with evidence in the source form.',
 };
+const MAIN_FIELDS = PITCH_IMPORT_FIELDS.filter(({ id }) => PITCH_COLUMNS.includes(id));
+const EXTRA_FIELDS = PITCH_IMPORT_FIELDS.filter(({ id }) => !PITCH_COLUMNS.includes(id));
 
 function ColumnMatches({ fields, headers, mapping, onChange }) {
   return <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
@@ -34,17 +36,18 @@ export default function ImportPitches({ call }) {
   const [file, setFile] = useState(null);
   const [mapping, setMapping] = useState({});
   const [reading, setReading] = useState(false);
-  const [rows, setRows] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState('');
   const errorRef = useRef(null);
   const readVersion = useRef(0);
+  const readyToImport = preview !== null && preview.every(({ row }) => row);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   useEffect(() => () => { readVersion.current += 1; }, []);
   function clearReview() {
-    setRows(null); setReviewed(false); setResult(''); setError(null);
+    setPreview(null); setReviewed(false); setResult(''); setError(null);
   }
   async function readFile(e) {
     const chosen = e.target.files?.[0];
@@ -65,7 +68,7 @@ export default function ImportPitches({ call }) {
     e.preventDefault();
     if (busy || reading || !file) return;
     clearReview();
-    try { setRows(readPitchCsv(file.text, mapping)); }
+    try { setPreview(readPitchCsv(file.text, mapping)); }
     catch (err) { setError(err); }
   }
   function changeMapping(key, header) {
@@ -73,45 +76,50 @@ export default function ImportPitches({ call }) {
   }
   async function importRows(e) {
     e.preventDefault();
-    if (busy || reading || !reviewed || !rows) return;
+    if (busy || reading || !reviewed || !readyToImport) return;
     setBusy(true); setError(null); setResult('');
     try {
-      const response = await call('importSessionPitches', { source, rows });
-      setResult(`${response.imported} ${response.imported === 1 ? 'pitch' : 'pitches'} added. ${response.unchanged} ${response.unchanged === 1 ? 'was' : 'were'} already here. No emails were sent.`);
-      setRows(null); setReviewed(false);
+      const { imported, updated = 0, unchanged } = await call('importSessionPitches', { source, rows: preview.map(({ row }) => row) });
+      setResult(`Added ${imported}. Updated ${updated}. Unchanged ${unchanged}. No emails were sent.`);
+      setPreview(null); setReviewed(false);
     } catch (err) { setError(err); }
     finally { setBusy(false); }
   }
   return <Panel help="Bring proposals from another form into the private queue. Nothing is published or emailed." title="Import proposals from CSV" description="Bring proposals from another form into the private queue. Nothing is published or emailed.">
-    <form onSubmit={rows ? importRows : reviewRows} className="space-y-md">
+    <form onSubmit={readyToImport ? importRows : reviewRows} className="space-y-md">
       <p className="text-admin-sm text-admin-ink-secondary">Choose a file, match its columns, then review the proposals before importing. Use 1-50 proposals per file. Unmatched columns are ignored.</p>
+      <p className="text-admin-sm text-admin-ink-secondary">Using Airtable? Download your view as CSV and upload it here.</p>
       <ServerErrorSummary error={error} errorRef={errorRef} />
       <fieldset disabled={busy} className="space-y-md">
-        <TextField help="A stable name for the original form. Reuse it for retries; changing it creates a separate source." label="Source name" value={source} onChange={(v) => { setSource(v); clearReview(); }} required maxLength={80} pattern="[A-Za-z0-9_-]+" hint="A stable name for the original form. Reuse it for retries; changing it creates a separate source." />
+        <TextField help="Use the same source name and source IDs to update existing proposals." label="Source name" value={source} onChange={(v) => { setSource(v); clearReview(); }} required maxLength={80} pattern="[A-Za-z0-9_-]+" hint="Use the same source name and source IDs to update existing proposals." />
         <label className="flex flex-col gap-xs font-semibold">Proposal CSV<input data-help-skip="File chooser; the surrounding import instructions describe the required CSV." type="file" accept=".csv,text/csv" onChange={readFile} className="min-h-admin-control min-w-0 max-w-full text-admin-sm" /></label>
         {reading ? <p role="status">Reading the CSV…</p> : null}
         {file ? <section aria-label="Match proposal columns" className="space-y-sm">
           <div className="flex items-center gap-2xs"><h3 className="font-admin-ui text-admin-lg font-bold">Match columns</h3><HelpTooltip label="Match columns">Match each proposal detail to a column from the uploaded file.</HelpTooltip></div>
           <p className="break-words text-admin-sm">{file.name} · {file.count} {file.count === 1 ? 'proposal' : 'proposals'}</p>
           <p className="text-admin-sm text-admin-ink-secondary">Check each match. A file column can be used once. Organization and format can be left out.</p>
-          <ColumnMatches fields={PITCH_IMPORT_FIELDS.filter(({ id }) => PITCH_COLUMNS.includes(id))} headers={file.headers} mapping={mapping} onChange={changeMapping} />
+          <ColumnMatches fields={MAIN_FIELDS} headers={file.headers} mapping={mapping} onChange={changeMapping} />
           <HelpDisclosure title="Other proposal answers" help={"Choose which extra source answers to keep with the imported proposal."} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold">
-            <div className="pt-sm"><ColumnMatches fields={PITCH_IMPORT_FIELDS.filter(({ id }) => !PITCH_COLUMNS.includes(id))} headers={file.headers} mapping={mapping} onChange={changeMapping} /></div>
+            <div className="pt-sm"><ColumnMatches fields={EXTRA_FIELDS} headers={file.headers} mapping={mapping} onChange={changeMapping} /></div>
           </HelpDisclosure>
         </section> : null}
-        {rows ? <>
-          <p>{rows.length} {rows.length === 1 ? 'proposal' : 'proposals'} ready for review.</p>
-          <ul className="space-y-sm">{rows.map((row) => <li key={row.externalId} className="break-words border-admin-hairline border-admin-rule-hairline p-sm">
-            <p className="font-bold">{row.title}</p>
-            <p className="text-admin-sm">{row.externalId} · {row.email} · {row.organization || 'No organization'} · {row.format || 'No format'}</p>
-            <p className="whitespace-pre-wrap text-admin-sm">{row.description}</p>
-            <p className="text-admin-sm">Consent: Recorded in source form</p>
+        {preview ? <>
+          {readyToImport ? <p>{preview.length} {preview.length === 1 ? 'proposal' : 'proposals'} ready for review.</p>
+            : <p role="alert">Correct the rows with errors, then review the proposals again.</p>}
+          <ul className="space-y-sm">{preview.map(({ number, row, error: problem }) => <li key={number} className="break-words border-admin-hairline border-admin-rule-hairline p-sm">
+            {problem ? <p>Row {number} — {problem}</p> : <>
+              <p className="font-bold">{row.title}</p>
+              <p className="text-admin-sm">{row.externalId} · {row.email} · {row.organization || 'No organization'} · {row.format || 'No format'}</p>
+              <p className="whitespace-pre-wrap text-admin-sm">{row.description}</p>
+              {EXTRA_FIELDS.map(({ id, label }) => row[id] && <p key={id} className="whitespace-pre-wrap text-admin-sm">{label} — {row[id]}</p>)}
+              <p className="text-admin-sm">Consent: Recorded in source form</p>
+            </>}
           </li>)}</ul>
-          <CheckboxField help="Confirm the original form gives permission to use these proposals and presenter details." label="I reviewed these proposals and verified consent in the source form" checked={reviewed} onChange={setReviewed} />
+          {readyToImport ? <CheckboxField help="Confirm the original form gives permission to use these proposals and presenter details." label="I reviewed these proposals and verified consent in the source form" checked={reviewed} onChange={setReviewed} /> : null}
         </> : null}
       </fieldset>
-      {rows ? <button className={primaryButtonClass} disabled={busy || !reviewed}>{busy ? 'Importing…' : 'Import reviewed proposals'}</button> : null}
-      {file && !rows ? <button className={primaryButtonClass} disabled={busy || reading}>Review proposals</button> : null}
+      {readyToImport ? <button className={primaryButtonClass} disabled={busy || !reviewed}>{busy ? 'Importing…' : 'Import reviewed proposals'}</button> : null}
+      {file && !readyToImport ? <button className={primaryButtonClass} disabled={busy || reading}>Review proposals</button> : null}
       {result ? <SaveStatus message={result} /> : null}
     </form>
   </Panel>;

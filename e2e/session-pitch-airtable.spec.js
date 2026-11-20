@@ -88,11 +88,11 @@ test('an operator connects Airtable, refreshes, and sees a changed record marked
   await expect(page.getByText(/Refresh complete: created 0, updated 1, unchanged 0, back in Airtable 0, skipped 1, flagged as removed 1\./)).toBeVisible();
   await page.getByRole('link', { name: 'Back to the queue' }).click();
   const revised = page.getByRole('link', { name: 'Airtable pitch 1, revised', exact: true }).locator('xpath=ancestor::li[1]');
-  await expect(revised.getByText('Updated in Airtable')).toBeVisible();
+  await expect(revised.getByText('Updated from source')).toBeVisible();
   const removed = page.getByRole('link', { name: 'Airtable pitch 2', exact: true }).locator('xpath=ancestor::li[1]');
   await expect(removed.getByText('Removed from Airtable')).toBeVisible();
   await page.getByRole('link', { name: 'Airtable pitch 1, revised', exact: true }).click();
-  await expect(page.getByRole('list', { name: 'Airtable changes' })).toContainText('The submitter changed title');
+  await expect(page.getByRole('list', { name: 'Source changes' })).toContainText('An import changed title');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await db.collection('session_pitches').where('source', '==', 'airtable').get()).size).toBe(2);
 });

@@ -213,12 +213,12 @@ describe('Airtable markers in the review queue', () => {
     ];
     renderAt('/admin/pitches');
     const item = (title) => screen.getByRole('link', { name: title }).closest('li');
-    expect(within(item('Changed pitch')).getByText('Updated in Airtable')).toBeInTheDocument();
-    expect(within(item('Reviewed after change')).queryByText('Updated in Airtable')).toBeNull();
+    expect(within(item('Changed pitch')).getByText('Updated from source')).toBeInTheDocument();
+    expect(within(item('Reviewed after change')).queryByText('Updated from source')).toBeNull();
     expect(within(item('Removed pitch')).getByText('Removed from Airtable')).toBeInTheDocument();
     expect(within(item('Unconsented pitch')).getByText('Consent unchecked in Airtable')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Changed pitch' }));
-    const changes = screen.getByRole('list', { name: 'Airtable changes' });
-    expect(changes).toHaveTextContent('The submitter changed title, description on Oct 12, 2026, 10:00 AM UTC.');
+    const changes = screen.getByRole('list', { name: 'Source changes' });
+    expect(changes).toHaveTextContent('An import changed title, description on Oct 12, 2026, 10:00 AM UTC.');
   });
 });

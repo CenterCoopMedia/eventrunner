@@ -8,7 +8,7 @@ const {
   mapRecord, runAirtableSync, airtableSecretNames, createUpdateAirtableSourceHandler, createRefreshAirtableHandler,
   internals: { pitchIdFor, MANUAL_GAP_MS, LEASE_MS },
 } = require('./airtableSync.cjs');
-const { readImport } = require('./pitchQueue.cjs');
+const { createQueueHandler, readImport } = require('./pitchQueue.cjs');
 
 const TOKEN = 'pat' + 'FAKEfake000000.' + '1'.repeat(64);
 const ENV = { EVENT_AIRTABLE_ENABLED: 'true', AIRTABLE_API_TOKEN: TOKEN };
@@ -251,14 +251,26 @@ test('a cleared consent box flags the existing pitch, and every record sharing a
 });
 
 test('a refresh adopts a row from an earlier CSV import under the same source name', async () => {
-  const csvRow = readImport({ source: 'airtable', rows: [{ externalId: recId(1), email: 'presenter1@example.test', title: 'Pitch 1', description: 'A practical session, number 1.', organization: 'Example newsroom', format: 'Workshop', consent: true }] }).rows[0];
-  assert.equal(csvRow.id, pitchIdFor(recId(1)), 'the same identity as the CSV import');
-  const db = makeDb({ [`session_pitches/${csvRow.id}`]: { ...csvRow, status: 'in_review', reviewRevision: 1 } });
+  const csv = { source: 'airtable', rows: [{ externalId: recId(1), email: 'presenter1@example.test', title: 'Pitch 1',
+    description: 'A practical session, number 1.', organization: 'Example newsroom', format: 'Workshop', consent: true,
+    leadName: 'Ada', leadRole: 'Editor' }] };
+  assert.equal(readImport(csv).rows[0].id, pitchIdFor(recId(1)), 'the same identity as the CSV import');
+  const [{ presenterMapping: _mapping, ...legacy }] = readImport({ source: 'airtable', rows: [{ ...csv.rows[0], externalId: recId(2),
+    email: 'presenter2@example.test', title: 'Pitch 2', description: 'A practical session, number 2.' }] }).rows;
+  const db = makeDb({ 'session_pitch_sources/airtable': { ...sourceDoc, fieldMap: { ...fieldMap, leadName: 'Lead', leadRole: 'Role' } },
+    [`session_pitches/${legacy.id}`]: { ...legacy, status: 'in_review', reviewRevision: 1 } });
+  const imported = await invoke((deps) => createQueueHandler(deps, 'import'), { db, now: () => tick }, 'staff', csv);
+  assert.equal(imported.statusCode, 200);
+  await db.collection('session_pitches').doc(pitchIdFor(recId(1))).update({ status: 'in_review', reviewRevision: 1 });
   tick = later();
-  const result = await run(db, fakeAirtable([record(1)]));
-  assert.equal(result.counts.unchanged, 1);
+  const result = await run(db, fakeAirtable([record(1, { Lead: 'Ada', Role: 'Editor' }), record(2, { Lead: 'Ada', Role: 'Editor' })]));
+  assert.equal(result.counts.unchanged, 2);
   assert.equal(pitch(db, 1).status, 'in_review');
+  assert.equal(pitch(db, 1).reviewRevision, 1);
+  assert.equal(pitch(db, 1).sourceUpdatedAt, undefined);
   assert.deepEqual(pitch(db, 1).airtable, { baseId: BASE, table: TABLE, recordId: recId(1) });
+  assert.equal(pitch(db, 2).reviewRevision, 1);
+  assert.deepEqual(pitch(db, 2).airtable, { baseId: BASE, table: TABLE, recordId: recId(2) });
 });
 
 test('runs never overlap, a manual refresh waits one minute, and schedules respect their timing', async () => {

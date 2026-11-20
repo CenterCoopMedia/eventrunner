@@ -238,31 +238,61 @@ test('staff reviews conflicts, exports without private notes, and converts accep
   }
 });
 
-test('CSV preview imports consented source rows once and refuses changed or unreviewed data', async ({ page }) => {
+test('an Airtable grid CSV previews mapped answers and updates a pitch by source ID', async ({ page }) => {
   const token = await adminIdToken();
-  const rows = [{ ...fixture, externalId: 'outside-1', email: 'external-pitch@example.test', consent: true }];
-  expect((await callFunction('importSessionPitches', { source: 'outside-form', rows: [{ ...rows[0], consent: false }] }, token)).status).toBe(400);
+  const source = 'airtable-grid';
+  const firstRow = {
+    externalId: 'recDemoPitch001', email: 'external-pitch@example.test', title: 'Reporting, together',
+    description: 'Share a plan and collect evidence.\nDiscuss "what comes next" with readers.',
+    organization: 'Example newsroom', format: 'Workshop', consent: true, track: 'Audience, Data',
+    accessNeeds: 'Access plan.pdf (https://files.example.test/access-plan.pdf)', notes: '10/19/2026 9:00am',
+  };
+  expect((await callFunction('importSessionPitches', { source, rows: [{ ...firstRow, consent: false }] }, token)).status).toBe(400);
   await signIn(page, 'e2e-admin@example.test');
   await page.goto('/admin/pitches/import');
   await expect(page.getByRole('heading', { name: 'Import proposals from CSV' })).toBeVisible();
-  await page.getByLabel('Source name', { exact: true }).fill('outside-form');
-  await page.getByLabel('Proposal CSV', { exact: true }).setInputFiles({ name: 'proposals.csv', mimeType: 'text/csv', buffer: Buffer.from('externalId,email,title,description,organization,format,consent\noutside-1,external-pitch@example.test,Reporting together,A practical workshop on shared local reporting. Learn to plan a project; share evidence; and reach new readers.,Example newsroom,Workshop,true') });
-  await expect(page.getByRole('region', { name: 'Match proposal columns' })).toBeVisible();
-  await expect(page.getByLabel('Source ID (required)', { exact: true })).toHaveValue('externalId');
-  await expect(page.getByLabel('Consent (required)', { exact: true })).toHaveValue('consent');
+  await expect(page.getByText('Using Airtable? Download your view as CSV and upload it here.')).toBeVisible();
+  await page.getByLabel('Source name', { exact: true }).fill(source);
+  const buffer = await fs.readFile(path.join(__dirname, 'fixtures', 'airtable-pitches.csv'));
+  await page.getByLabel('Proposal CSV', { exact: true }).setInputFiles({ name: 'airtable-pitches.csv', mimeType: 'text/csv', buffer });
+  const columns = page.getByRole('region', { name: 'Match proposal columns' });
+  await expect(columns).toBeVisible();
+  await page.getByRole('button', { name: 'Other proposal answers', exact: true }).click();
+  for (const [label, header] of [
+    ['Source ID (required)', 'Record identifier'], ['Email (required)', 'Presenter contact'],
+    ['Proposal title (required)', 'Working title'], ['Description (required)', 'Proposal text'],
+    ['Organization', 'Host organization'], ['Format', 'Session format'], ['Consent (required)', 'Permission'],
+    ['Track', 'Track selections'], ['Access needs', 'Access plan'], ['Notes', 'Available from'],
+  ]) {
+    await columns.getByLabel(label, { exact: true }).selectOption(header);
+  }
   await page.getByRole('button', { name: 'Review proposals', exact: true }).click();
-  await expect(page.getByText('1 proposal ready for review.')).toBeVisible();
+  await expect(page.getByText('2 proposals ready for review.')).toBeVisible();
+  await expect(page.getByText(firstRow.description, { exact: true })).toBeVisible();
+  await expect(page.getByText(`Track — ${firstRow.track}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`Access needs — ${firstRow.accessNeeds}`, { exact: true })).toBeVisible();
+  await expect(page.getByText('Notes — 2026-10-20 14:30', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Import reviewed proposals' })).toBeDisabled();
-  await page.getByRole('checkbox', { name: /I reviewed these proposals/ }).check();
-  await page.getByRole('button', { name: 'Import reviewed proposals' }).click();
-  await expect(page.getByText(/1 pitch added\. 0 were already here\./)).toBeVisible();
-  const db = adminDb();
-  const stored = await db.collection('session_pitches').where('source', '==', 'outside-form').get();
-  const original = stored.docs[0].data();
-  const importedRows = [{ ...rows[0], description: original.description }];
-  expect(await callFunction('importSessionPitches', { source: 'outside-form', rows: importedRows }, token)).toMatchObject({ status: 200, body: { imported: 0, unchanged: 1 } });
-  expect((await callFunction('importSessionPitches', { source: 'outside-form', rows: [{ ...importedRows[0], title: 'Changed' }] }, token)).status).toBe(409);
-  await stored.docs[0].ref.delete();
+  const pitches = adminDb().collection('session_pitches').where('source', '==', source);
+  try {
+    await page.getByRole('checkbox', { name: /I reviewed these proposals/ }).check();
+    await page.getByRole('button', { name: 'Import reviewed proposals' }).click();
+    await expect(page.getByText('Added 2. Updated 0. Unchanged 0. No emails were sent.')).toBeVisible();
+    const stored = await pitches.get();
+    expect(stored.size).toBe(2);
+    const original = stored.docs.find((doc) => doc.data().externalId === firstRow.externalId);
+    expect(original?.data()).toMatchObject({ ...firstRow, consent: { version: 'source-form' } });
+    expect(await callFunction('importSessionPitches', { source, rows: [firstRow] }, token)).toMatchObject({ status: 200, body: { imported: 0, updated: 0, unchanged: 1 } });
+    const changed = { ...firstRow, title: 'Reporting together, revised' };
+    expect(await callFunction('importSessionPitches', { source, rows: [changed] }, token)).toMatchObject({ status: 200, body: { imported: 0, updated: 1, unchanged: 0 } });
+    expect((await original.ref.get()).data()).toMatchObject({ title: changed.title, reviewRevision: 1 });
+    expect((await pitches.get()).size).toBe(2);
+    await page.getByRole('link', { name: 'Back to the queue' }).click();
+    const updated = page.getByRole('listitem').filter({ hasText: changed.title });
+    await expect(updated.getByText('Updated from source')).toBeVisible();
+  } finally {
+    await Promise.all((await pitches.get()).docs.map((doc) => doc.ref.delete()));
+  }
 });
 
 test('closed call retains entries and six themes work in both modes', async ({ page }) => {
