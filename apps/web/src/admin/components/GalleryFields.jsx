@@ -48,20 +48,6 @@ function LayoutPicture({ id }) {
   );
 }
 
-/**
- * A key per picture that survives a move: its path, plus how many earlier
- * pictures share that path. A row keyed by its index remounts on every
- * move, and that drops focus and the reorder grip's keyboard move.
- */
-function pictureKeys(images) {
-  const seen = new Map();
-  return images.map((image) => {
-    const n = seen.get(image.url) ?? 0;
-    seen.set(image.url, n + 1);
-    return `${image.url}#${n}`;
-  });
-}
-
 function thumbnailSrc(url) {
   return bundledDemoAssetUrl(url) ?? assetUrl(url);
 }
@@ -76,7 +62,6 @@ function thumbnailSrc(url) {
 export default function GalleryFields({ values, onChange, errorFor }) {
   const id = useId();
   const images = Array.isArray(values.images) ? values.images : [];
-  const keys = pictureKeys(images);
   const [choosing, setChoosing] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const chooseRef = useRef(null);
@@ -141,7 +126,9 @@ export default function GalleryFields({ values, onChange, errorFor }) {
           <ol className="admin-gallery-images__list">
             {images.map((image, index) => (
               <li
-                key={keys[index]}
+                // A picture appears once (the server refuses a repeat), so
+                // its path keys the row through every move.
+                key={image.url}
                 className="admin-gallery-images__row"
                 {...bindReorderDrop('gallery:', index, move)}
               >
@@ -164,6 +151,7 @@ export default function GalleryFields({ values, onChange, errorFor }) {
                     error={errorFor(`images.${index + 1}.alt`)}
                     required
                   />
+                  <FieldError id={`${id}-picture-${index + 1}-error`} message={errorFor(`images.${index + 1}.url`)} />
                 </div>
                 <AdminIconControl
                   label={`Remove picture ${index + 1}`}

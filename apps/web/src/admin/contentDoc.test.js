@@ -387,7 +387,9 @@ describe('gallery content', () => {
     const atMax = { ...longAlt, alt: 'x'.repeat(GALLERY_MAX_ALT_LENGTH) };
     expect(server.galleryErrors({ blockType: 'gallery', layout: 'grid', images: [atMax] })).toEqual([]);
     expect(validateRequiredContent(toEditableContent({ ...stored, images: [atMax] }))).toEqual([]);
-    const tooMany = toEditableContent({ ...stored, images: Array(GALLERY_MAX_IMAGES + 1).fill(stored.images[0]) });
+    const twice = toEditableContent({ ...stored, images: [stored.images[0], stored.images[0]] });
+    expect(validateRequiredContent(twice)).toEqual([{ field: 'images.2.url', message: 'Picture 2: is already in the gallery. Remove it.' }]);
+    const tooMany = toEditableContent({ ...stored, images: Array.from({ length: GALLERY_MAX_IMAGES + 1 }, (_, i) => ({ url: `cms-images/a${i}/x.webp`, alt: 'A' })) });
     expect(validateRequiredContent(tooMany)).toEqual([{ field: 'images', message: 'Pictures: a gallery holds at most 24.' }]);
   });
 });

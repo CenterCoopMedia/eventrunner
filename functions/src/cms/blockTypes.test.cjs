@@ -106,16 +106,18 @@ test('a gallery is written with a fixed layout and library pictures that each ha
     'images: must be a list of pictures.',
   ]);
   assert.deepEqual(gallery({ images: [{ ...picture, alt: '  ' }] }), ['images.1.alt: every picture needs alt text.']);
-  assert.deepEqual(gallery({ images: [picture, { url: picture.url }] }), ['images.2.alt: every picture needs alt text.']);
+  assert.deepEqual(gallery({ images: [picture, { url: 'cms-images/a2/panel.webp' }] }), ['images.2.alt: every picture needs alt text.']);
   for (const url of ['https://example.com/a.jpg', 'javascript:alert(1)', '/hero/a.webp', 'speakers/s1/a.jpg', 'cms-images/../x', 'cms-images/flat.png']) {
     assert.deepEqual(gallery({ images: [{ ...picture, url }] }), ['images.1.url: choose the picture from the media library.'], url);
   }
   assert.deepEqual(gallery({ images: [{ ...picture, href: 'https://example.com' }] }), ['images.1: unknown href.']);
   assert.deepEqual(gallery({ images: [null] }), ['images.1: must be a picture.']);
+  assert.deepEqual(gallery({ images: [picture, { ...picture, alt: 'Again' }] }), ['images.2.url: this picture is already in the gallery.']);
   assert.deepEqual(gallery({ images: [{ ...picture, alt: 'x'.repeat(501) }] }), ['images.1.alt: keep alt text under 500 characters.']);
   const most = internals.GALLERY_MAX_IMAGES;
-  assert.deepEqual(gallery({ images: Array(most).fill(picture) }), []);
-  assert.deepEqual(gallery({ images: Array(most + 1).fill(picture) }), [`images: a gallery holds at most ${most} pictures.`]);
+  const many = (n) => Array.from({ length: n }, (_, i) => ({ ...picture, url: `cms-images/a${i}/crowd.webp` }));
+  assert.deepEqual(gallery({ images: many(most) }), []);
+  assert.deepEqual(gallery({ images: many(most + 1) }), [`images: a gallery holds at most ${most} pictures.`]);
 });
 
 test('every block type is a well-formed contract', () => {

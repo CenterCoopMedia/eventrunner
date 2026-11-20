@@ -299,7 +299,12 @@ export function validateRequiredContent(content) {
     if (images.length > GALLERY_MAX_IMAGES) {
       errors.push({ field: 'images', message: `Pictures: a gallery holds at most ${GALLERY_MAX_IMAGES}.` });
     }
+    const seen = new Set();
     images.forEach((image, index) => {
+      if (seen.has(image?.url)) {
+        errors.push({ field: `images.${index + 1}.url`, message: `Picture ${index + 1}: is already in the gallery. Remove it.` });
+      }
+      seen.add(image?.url);
       const alt = typeof image?.alt === 'string' ? image.alt.trim() : '';
       if (!alt) {
         errors.push({ field: `images.${index + 1}.alt`, message: `Picture ${index + 1}: needs alt text.` });

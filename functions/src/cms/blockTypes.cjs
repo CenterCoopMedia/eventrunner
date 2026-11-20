@@ -225,8 +225,9 @@ const GALLERY_MAX_ALT_LENGTH = 500;
 const GALLERY_IMAGE_KEYS = Object.freeze(['url', 'alt']);
 
 /**
- * The gallery contract: a layout from the fixed set, and 1 to 24 pictures,
- * each a media library path with its own alt text and nothing else. The
+ * The gallery contract: a layout from the fixed set, and 1 to 24 different
+ * pictures, each a media library path with its own alt text and nothing
+ * else. A picture appears once, so the editor can key each row by its path. The
  * renderer draws only this shape, so a stored gallery cannot carry a link,
  * a script or a layout the page does not have.
  *
@@ -247,6 +248,7 @@ function galleryErrors(fields) {
   if (images.length > GALLERY_MAX_IMAGES) {
     errors.push(`images: a gallery holds at most ${GALLERY_MAX_IMAGES} pictures.`);
   }
+  const seen = new Set();
   images.forEach((image, index) => {
     const at = `images.${index + 1}`;
     if (!image || typeof image !== 'object' || Array.isArray(image)) {
@@ -258,7 +260,10 @@ function galleryErrors(fields) {
     const path = storageObjectPath(image.url);
     if (!path || path !== image.url || !isMediaLibraryPath(path) || path.split('/').length < 3) {
       errors.push(`${at}.url: choose the picture from the media library.`);
+    } else if (seen.has(path)) {
+      errors.push(`${at}.url: this picture is already in the gallery.`);
     }
+    if (path) seen.add(path);
     if (typeof image.alt !== 'string' || !image.alt.trim()) {
       errors.push(`${at}.alt: every picture needs alt text.`);
     } else if (image.alt.length > GALLERY_MAX_ALT_LENGTH) {
