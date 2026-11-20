@@ -26,27 +26,10 @@ on:
       - 'package.json'
       - '.npmrc'
       - 'package-lock.json'
+  # No path filter: the job always reports on pull requests so it can be a
+  # required check. The input selection step skips measurement when no web
+  # input changed.
   pull_request:
-    paths:
-      - '.github/workflows/lighthouse.yml'
-      - 'scripts/ci/lighthouse*'
-      - 'scripts/build-demo.cjs'
-      - 'scripts/lib/**'
-      - '!scripts/lib/**/*.test.*'
-      - '!scripts/lib/**/*.md'
-      - 'scripts/write-site-files.cjs'
-      - 'apps/web/**'
-      - '!apps/web/src/admin/**'
-      - '!apps/web/**/*.test.*'
-      - '!apps/web/src/test/**'
-      - '!apps/web/**/*.md'
-      - 'packages/shared/**'
-      - '!packages/shared/**/*.test.*'
-      - '!packages/shared/**/*.md'
-      - 'design/tokens/**'
-      - 'package.json'
-      - '.npmrc'
-      - 'package-lock.json'
 
 permissions:
   contents: read

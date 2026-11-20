@@ -2,7 +2,7 @@
 
 The Lighthouse workflow measures the static demo with mobile settings. It runs three times each on Home, Schedule and Speakers. Each metric uses its own median. Hash routes stay separate in the reports.
 
-The workflow runs weekly on Monday at 09:17 UTC, on manual dispatch, and on pull requests and main pushes that change the web app, shared package, tokens or demo build inputs. Web admin source, web/shared tests and web/shared Markdown are excluded. A change confined to `docs/` or `apps/web/src/admin/` does not start it. Superseded runs are cancelled. The workflow has read-only repository access and does not deploy.
+The workflow runs weekly on Monday at 09:17 UTC, on manual dispatch, on every pull request, and on main pushes that change the web app, shared package, tokens or demo build inputs. On a pull request the job always reports, so it can be a required check. It measures only when those inputs changed; otherwise it passes after the input selection step. Web admin source, web/shared tests and web/shared Markdown are not inputs, so a change confined to `docs/` or `apps/web/src/admin/` does not measure. Superseded runs are cancelled. The workflow has read-only repository access and does not deploy.
 
 ## Run locally
 
@@ -21,7 +21,15 @@ npm exec --yes --ignore-scripts --package=@lhci/cli@0.16.1 -- lhci assert --conf
 
 The demo build and reports stay in ignored directories. LHCI starts and stops its temporary static server. It serves compressed assets and selects the local port. The report command requires three valid mobile reports for each configured route; a missing run, failed load, wrong route or missing metric fails the command.
 
-The final assertion command currently exits 1 because the measured LCP exceeds 2500 ms. That result records the current performance gap. The separate workflow stays outside required CI until [#898](https://github.com/CenterCoopMedia/eventrunner/issues/898) is complete. It depends on [#625](https://github.com/CenterCoopMedia/eventrunner/issues/625). The existing required CI gate is unchanged.
+The assertion command passes on main. Hosted run [44666226082](https://github.com/CenterCoopMedia/eventrunner/actions/runs/44666226082) on Nov. 20, 2026 (main `5d286454`) recorded these medians with the limits below unchanged:
+
+| Route | Runs | Median LCP | Median TBT | Median CLS |
+| --- | ---: | ---: | ---: | ---: |
+| Home | 3 | 2404 ms | 13.5 ms | 0 |
+| Schedule | 3 | 2405 ms | 83.5 ms | 0 |
+| Speakers | 3 | 905 ms | 3.5 ms | 0 |
+
+Home and Schedule are less than 100 ms under the LCP limit. [#898](https://github.com/CenterCoopMedia/eventrunner/issues/898) tracks making the `lighthouse` check required.
 
 ## Limits and baseline
 
