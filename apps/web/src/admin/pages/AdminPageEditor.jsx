@@ -1,4 +1,3 @@
-import HelpTooltip from '../components/HelpTooltip.jsx';
 // Page editor (issue #13 — "creating a Scholarships page via the admin CMS").
 //
 // Maps onto the cmsPages contract exactly (spec §5.2, functions/src/cms/
@@ -23,9 +22,8 @@ import HelpTooltip from '../components/HelpTooltip.jsx';
 // as a hint only, read from that same registry so it cannot drift.
 //
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
-// the BLOCK_TYPES registry, and `defaultBlocks` are the blocks the section
-// seeds — each one a (field, blockType) pair whose per-type fields the
-// registry describes.
+// the BLOCK_TYPES registry, and `defaultBlocks` are the placeholders a new
+// site is seeded with. Neither is edited here; both pass through a save.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -38,10 +36,7 @@ import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
-import {
-  BLOCK_TYPE_IDS,
-  blockTypeLabel,
-} from '../blockTypes.js';
+import { contentSectionPath } from '../contentBrowser.js';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
 import { moveItem, nextStoredOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
@@ -198,6 +193,13 @@ function PageEditor({ mode }) {
   const reportDeleted = useDeletedRecord();
   const { rows, ready, error: listenerError, findRow } = useAdminPages();
   const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
+  // The count staff see is the content the section holds (both revisions of
+  // one block are one block), not its seed list.
+  const sectionBlockCount = (section) => {
+    if (!contentReady) return contentError ? '' : 'Counting blocks…';
+    const count = contentRows.filter((row) => row.current?.section === section.id).length;
+    return `${count} ${count === 1 ? 'block' : 'blocks'}`;
+  };
   // What the site is set to, so the "follow the site" option can say what
   // following it means instead of sending the operator to another tab to
   // find out.
@@ -235,6 +237,11 @@ function PageEditor({ mode }) {
   const rejectedPageIds = useRef(new Set());
 
   const row = mode === 'edit' ? findRow(pageId) : null;
+  // A section's content screen exists only once a save has stored it. Ids
+  // are assigned before the server answers, so a refused save leaves ids
+  // here that no stored revision has; those sections get no link.
+  const storedRow = findRow(savedId ?? pageId);
+  const savedSectionIds = new Set((storedRow?.current?.sections ?? []).map((section) => section.id));
   const localDraft = useLocalDraft({
     accountId: user?.uid,
     docPath: `cmsPages/${savedId ?? pageId ?? 'new'}`,
@@ -292,10 +299,7 @@ function PageEditor({ mode }) {
     const section = formRef.current?.querySelector(`[data-editor-section="${request.sectionKey}"]`);
     const target = request.kind === 'section-toggle'
       ? section?.querySelector('.admin-editor-disclosure__toggle')
-      : request.kind === 'block'
-        ? section?.querySelector(`[data-editor-block="${request.blockIndex}"] input:not([readonly]), [data-editor-block="${request.blockIndex}"] select`)
-          ?? section?.querySelector('[data-add-block]')
-        : section?.querySelector('input:not([readonly]), select');
+      : section?.querySelector('input:not([readonly]), select');
     (target ?? formRef.current?.querySelector('[data-add-section]'))?.focus();
   }, [page.sections]);
 
@@ -357,21 +361,6 @@ function PageEditor({ mode }) {
     update({ sections: next });
   }
 
-  function addBlock(sectionIndex) {
-    const section = page.sections[sectionIndex];
-    pendingItemFocus.current = { kind: 'block', sectionKey: section[EDITOR_SECTION_KEY], blockIndex: section.defaultBlocks.length };
-    updateSection(sectionIndex, { defaultBlocks: [...section.defaultBlocks, {
-      field: '', blockType: section.allowedBlocks[0] ?? BLOCK_TYPE_IDS[0], description: '',
-    }] });
-  }
-
-  function removeBlock(sectionIndex, blockIndex) {
-    const section = page.sections[sectionIndex];
-    const next = section.defaultBlocks.filter((_, at) => at !== blockIndex);
-    pendingItemFocus.current = { kind: 'block', sectionKey: section[EDITOR_SECTION_KEY], blockIndex: Math.min(blockIndex, next.length - 1) };
-    updateSection(sectionIndex, { defaultBlocks: next });
-  }
-
   function moveSections(from, to) {
     const next = moveItem(page.sections, from, to);
     if (next === page.sections) return false;
@@ -380,30 +369,6 @@ function PageEditor({ mode }) {
     setSpoken(`${label} moved to position ${to + 1} of ${page.sections.length}`);
     return true;
   }
-
-  function moveBlocks(sectionIndex, from, to) {
-    const blocks = page.sections[sectionIndex]?.defaultBlocks ?? [];
-    const next = moveItem(blocks, from, to);
-    if (next === blocks) return false;
-    updateSection(sectionIndex, { defaultBlocks: next });
-    setSpoken(`Block ${from + 1} in section ${sectionIndex + 1} moved to position ${to + 1} of ${blocks.length}`);
-    return true;
-  }
-
-  const updateBlock = (sectionIndex, blockIndex, patch) =>
-    setPage((current) => ({
-      ...current,
-      sections: current.sections.map((section, i) =>
-        i === sectionIndex
-          ? {
-              ...section,
-              defaultBlocks: section.defaultBlocks.map((block, j) =>
-                j === blockIndex ? { ...block, ...patch } : block,
-              ),
-            }
-          : section,
-      ),
-    }));
 
   async function save({ publish }) {
     if (localDraft.recovery) return;
@@ -805,9 +770,9 @@ function PageEditor({ mode }) {
 
       </div>
 
-      <Panel help="Open a section to change its name and blocks."
+      <Panel help="Open a section to change its name or where it sits on the page."
         title="Sections"
-        description="Open a section to change its name and blocks."
+        description="Open a section to change its name or where it sits on the page."
         actions={
           <button
             type="button"
@@ -835,9 +800,9 @@ function PageEditor({ mode }) {
                   className="min-w-0"
                   {...bindReorderDrop('section:', sectionIndex, moveSections)}
                 >
-                  <EditorDisclosure help="Open this section to change its label, content limits and block types."
+                  <EditorDisclosure help="Open this section to change its name, its place on the page and its guidance for staff."
                     title={section.label || `Section ${sectionIndex + 1}`}
-                    description={`${section.defaultBlocks.length} ${section.defaultBlocks.length === 1 ? 'block' : 'blocks'}`}
+                    description={sectionBlockCount(section)}
                     defaultOpen={!section.id}
                     reveal={[...fieldErrors.keys()].some((field) => field.startsWith(`${at}.`))}
                   >
@@ -920,87 +885,21 @@ function PageEditor({ mode }) {
                     </div>
                   </div>
 
+                  {/* What this section SAYS is written under Content. The page
+                      document's starter list only seeds a brand-new site
+                      (scripts/init-event.cjs), so it is not offered here: an
+                      "Add block" in this form changed nothing on a running
+                      site (issue #1153). Stored starter entries pass through
+                      a save unchanged. */}
                   <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2xs">
-                      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">Blocks</h4><HelpTooltip label="Blocks">Choose the kinds of content staff can add to this section.</HelpTooltip></div>
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        data-add-block=""
-                        onClick={() => addBlock(sectionIndex)}
-                      >
-                        Add block to section {sectionIndex + 1}
-                      </button>
-                    </div>
-                    {section.defaultBlocks.length === 0 ? (
-                      <p className="mt-2xs text-admin-sm text-admin-ink-secondary">
-                        No blocks yet.
-                      </p>
+                    {savedSectionIds.has(section.id) ? (
+                      <Link to={contentSectionPath(page.id, section.id)} className={linkButtonClass}>
+                        Add or edit the content in {section.label || `section ${sectionIndex + 1}`}
+                      </Link>
                     ) : (
-                      <ol className="admin-page-block-list mt-sm">
-                        {section.defaultBlocks.map((block, blockIndex) => {
-                          const bat = `${at}.defaultBlocks[${blockIndex}]`;
-                          const allowed = section.allowedBlocks.length
-                            ? section.allowedBlocks
-                            : BLOCK_TYPE_IDS;
-                          const options = (
-                            allowed.includes(block.blockType) || !block.blockType
-                              ? allowed
-                              : [block.blockType, ...allowed]
-                          ).map((id) => ({ value: id, label: blockTypeLabel(id) }));
-                          return (
-                            <li
-                              data-editor-block={blockIndex}
-                              key={blockIndex}
-                              className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-sm"
-                              {...bindReorderDrop(`block:${sectionIndex}:`, blockIndex, (from, to) => moveBlocks(sectionIndex, from, to))}
-                            >
-                              {/* The block's field key is the page's internal name for it and
-                                  never changes, so it is not shown. Type and description sit
-                                  on one row with no hints, so their boxes line up. */}
-                              <div className="grid items-start gap-xs sm:grid-cols-[minmax(10rem,14rem)_1fr]">
-                                <SelectField help="Choose which kind of content this block should contain."
-                                  label={`Block ${blockIndex + 1} type — section ${sectionIndex + 1}`}
-                                  value={block.blockType}
-                                  options={options}
-                                  onChange={(value) =>
-                                    updateBlock(sectionIndex, blockIndex, { blockType: value })
-                                  }
-                                  error={errorFor(`${bat}.blockType`) || errorFor(`${bat}.field`)}
-                                />
-                                <TextField help="Explain what staff should put in this content block."
-                                  label={`Block ${blockIndex + 1} description — section ${sectionIndex + 1}`}
-                                  value={block.description}
-                                  onChange={(value) =>
-                                    updateBlock(sectionIndex, blockIndex, { description: value })
-                                  }
-                                  error={errorFor(`${bat}.description`)}
-                                />
-                              </div>
-                              <div className="mt-xs flex flex-wrap gap-2xs">
-                                <ReorderControls
-                                  label={`block ${blockIndex + 1} in section ${sectionIndex + 1}`}
-                                  index={blockIndex}
-                                  count={section.defaultBlocks.length}
-                                  dragToken={`block:${sectionIndex}:${blockIndex}`}
-                                  upLabel={`Move block ${blockIndex + 1} up in section ${sectionIndex + 1}`}
-                                  downLabel={`Move block ${blockIndex + 1} down in section ${sectionIndex + 1}`}
-                                  dragLabel={`Drag block ${blockIndex + 1} in section ${sectionIndex + 1}`}
-                                  onMove={(from, to) => moveBlocks(sectionIndex, from, to)}
-                                />
-                                <button
-                                  type="button"
-                                  className={dangerButtonClass}
-                                  aria-label={`Remove block ${blockIndex + 1} from section ${sectionIndex + 1}`}
-                                  onClick={() => removeBlock(sectionIndex, blockIndex)}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ol>
+                      <p className="text-admin-sm text-admin-ink-secondary">
+                        Save the page, then add its content.
+                      </p>
                     )}
                   </div>
                   </EditorDisclosure>

@@ -55,12 +55,12 @@ import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../components/media/ImagePicker.jsx';
+import BlockTypePicker from '../components/BlockTypePicker.jsx';
 import {
   CheckboxField,
   DestructiveConfirm,
   Notice,
   Panel,
-  SelectField,
   ServerErrorSummary,
   TextField,
   TextAreaField,
@@ -579,13 +579,6 @@ export default function AdminContentBlockEditor({ mode }) {
     }
   }
 
-  const registryOptions = allowed.length ? allowed : BLOCK_TYPE_IDS;
-  const options = (
-    content.blockType && !registryOptions.includes(content.blockType)
-      ? [content.blockType, ...registryOptions]
-      : registryOptions
-  ).map((id) => ({ value: id, label: blockTypeFor(id)?.label ?? 'Content block' }));
-
   const settingsPanel = (
     <Panel help="Choose this block’s content type and whether it appears after publishing."
       key="settings"
@@ -607,14 +600,17 @@ export default function AdminContentBlockEditor({ mode }) {
         </div>
       ) : null}
       <div id="admin-content-block-settings" hidden={isExisting && !settingsOpen}>
-        <div className="mt-sm grid items-end gap-sm">
-          <SelectField help="Choose the kind of content to add, such as text, an image or a link."
-            label="Block type"
-            value={content.blockType}
-            options={options}
-            onChange={changeBlockType}
-            error={errorFor('blockType')}
-          />
+        <div className="mt-sm grid gap-sm">
+          {/* Mounted only when shown: its examples draw eleven public blocks. */}
+          {!isExisting || settingsOpen ? (
+            <BlockTypePicker
+              value={content.blockType}
+              allowed={allowed}
+              sectionName={section?.label}
+              onChange={changeBlockType}
+              error={errorFor('blockType')}
+            />
+          ) : null}
           <div className="flex items-center">
             <CheckboxField help="Include this content on the public site after publishing."
               label="Visible"
@@ -675,7 +671,7 @@ export default function AdminContentBlockEditor({ mode }) {
               Back to section
             </Link>
             <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
-              <BusyLabel busy={busy === 'draft'} pending="Saving the block…">Save</BusyLabel>
+              <BusyLabel busy={busy === 'draft'} pending="Saving the draft…">Save draft</BusyLabel>
             </button>
             <button
               type="button"
@@ -684,7 +680,7 @@ export default function AdminContentBlockEditor({ mode }) {
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              <BusyLabel busy={busy === 'publish'} pending="Publishing the block…">Publish</BusyLabel>
+              <BusyLabel busy={busy === 'publish'} pending="Publishing the block…">Save and publish</BusyLabel>
             </button>
           </>
         }

@@ -166,6 +166,11 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
       // handle null rather than assuming snapshot-first parity with the
       // other three docs.
       badges: overlay.badges,
+      // The theme document the public page itself applies: the live document
+      // alone over the build stylesheet, never merged with the snapshot (see
+      // runtimeThemeDoc below). Admin previews of public content read this so
+      // they draw what a reader sees.
+      publicTheme: effectiveDemoTheme || overlay.theme || snapshotTheme,
       source: live ? 'live' : 'snapshot',
       // Per-document readiness. `source` above is an aggregate — it flips to
       // 'live' as soon as ANY of the four docs reports — which is fine for

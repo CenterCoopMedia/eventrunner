@@ -173,6 +173,11 @@ async function replaceRichText(editor, html, text) {
   await waitFor(() => expect(editor.innerHTML).toBe(html));
 }
 
+/** Pick a block type the way staff do: by its radio in the picker. */
+async function chooseBlockType(label) {
+  fireEvent.click(await screen.findByRole('radio', { name: label }));
+}
+
 beforeEach(() => {
   sources = { cmsPages: [], cmsPages_drafts: [], cmsContent: [], cmsContent_drafts: [] };
   listenerError = null;
@@ -352,9 +357,9 @@ describe('the Home hero image slot', () => {
     await renderAt('/admin/content/home/hero');
     expect(screen.queryByLabelText('Hero image')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'The old picture' }));
-    fireEvent.change(await screen.findByLabelText('Image'), { target: { value: 'cms-images/new.jpg' } });
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Image' }), { target: { value: 'cms-images/new.jpg' } });
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'The new picture' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
     expect(bodyOf(0)).toMatchObject({ section: 'hero', field: 'photo', fields: { url: 'cms-images/new.jpg', alt: 'The new picture' } });
@@ -379,7 +384,7 @@ describe('content browsing', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Intro', exact: true }));
     expect(await screen.findByRole('link', { name: 'Scholarships open in spring.' })).toBeInTheDocument();
-    expect(screen.getByText('Rich text')).toBeInTheDocument();
+    expect(screen.getByText('Paragraphs')).toBeInTheDocument();
     // The title band names the section and its identifiers (the editor a
     // public "Edit section" link opens, issue #198).
     expect(screen.getByRole('heading', { level: 1, name: 'Intro' })).toBeInTheDocument();
@@ -577,7 +582,7 @@ describe('content browsing', () => {
     expect((await findRichText()).innerHTML).toBe('<p>Scholarships open in spring.</p>');
 
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__body', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).fields.value).toBe('<p>Scholarships open in spring.</p>');
   });
@@ -646,9 +651,9 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/_new');
 
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'richtext' } });
+    await chooseBlockType('Paragraphs');
     await replaceRichText(await findRichText(), '<p>Hello</p>', 'Hello');
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsCreateContent$/);
@@ -670,22 +675,23 @@ describe('creating and editing a block', () => {
     silentCollections = ['cmsContent_drafts'];
     await renderAt('/admin/content/scholarships/intro/_new');
     expect(await screen.findByText('Loading block…', { selector: '.loading-status__label' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
   });
 
   it('offers every block type for a custom section, driven by the registry', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     await renderAt('/admin/content/scholarships/intro/_new');
 
-    const picker = screen.getByLabelText('Block type');
+    const picker = await screen.findByRole('group', { name: 'Block type' });
     await waitFor(() => {
-      expect(within(picker).getAllByRole('option').map((option) => option.value)).toEqual(BLOCK_TYPE_IDS);
+      expect(within(picker).getAllByRole('radio').map((radio) => radio.value)).toEqual(BLOCK_TYPE_IDS);
     });
+    for (const radio of within(picker).getAllByRole('radio')) expect(radio).toBeEnabled();
 
     // Switching the block type swaps the value fields the registry declares.
-    fireEvent.change(picker, { target: { value: 'richtext' } });
+    fireEvent.click(within(picker).getByRole('radio', { name: 'Paragraphs' }));
     expect(await findRichText()).toBeInTheDocument();
-    fireEvent.change(picker, { target: { value: 'stat' } });
+    fireEvent.click(within(picker).getByRole('radio', { name: 'Number' }));
     expect(screen.getByLabelText(/^Caption/)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Figure' })).toBeInTheDocument();
     // stat declares its own registry 'order' field. The section list sets
@@ -704,7 +710,7 @@ describe('creating and editing a block', () => {
     const editor = await findRichText();
     expect(editor.innerHTML).toBe('<p>Scholarships open in spring.</p>');
     await replaceRichText(editor, '<p>Updated copy.</p>', 'Updated copy.');
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
@@ -732,7 +738,7 @@ describe('creating and editing a block', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(await screen.findByRole('button', { name: 'Publish', exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
@@ -745,8 +751,8 @@ describe('creating and editing a block', () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     await renderAt('/admin/content/scholarships/intro/_new');
 
-    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await chooseBlockType('Number');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Figure: is required.');
@@ -766,10 +772,10 @@ describe('creating and editing a block', () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     await renderAt('/admin/content/scholarships/intro/_new');
 
-    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
+    await chooseBlockType('Number');
     fireEvent.change(screen.getByLabelText(/^Figure/), { target: { value: '42' } });
     fireEvent.change(screen.getByLabelText(/^Caption/), { target: { value: 'scholarships awarded' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
     for (const label of ['Finding', 'What it counts', 'Source', 'Screen reader text']) {
@@ -790,7 +796,9 @@ describe('creating and editing a block', () => {
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__cta1', status: 'dirty' }));
 
     await renderAt('/admin/content/scholarships/intro/cta1');
-    fireEvent.change(await screen.findByLabelText('Block type'), { target: { value: 'stat' } });
+    // An existing block keeps its type behind the settings summary.
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
+    await chooseBlockType('Number');
     fireEvent.change(screen.getByLabelText(/^Figure/), { target: { value: '42' } });
     fireEvent.change(screen.getByLabelText(/^Caption/), { target: { value: 'scholarships awarded' } });
     // A stat carries its four-part contract (design brief §2.1.1), and the
@@ -807,7 +815,7 @@ describe('creating and editing a block', () => {
     fireEvent.change(screen.getByLabelText('Screen reader text'), {
       target: { value: 'The fund awarded 42 scholarships in 2026.' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     // cta's `url`/`external` are not part of stat's fields — cmsUpdateContent
@@ -860,9 +868,9 @@ describe('server errors and publish skips', () => {
     // Fill the required value field so this reaches the network call at
     // all — an empty one is caught by client-side validation first, which
     // has its own test.
-    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'richtext' } });
+    await chooseBlockType('Paragraphs');
     await replaceRichText(await findRichText(), '<p>Hi</p>', 'Hi');
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The change could not be saved. Try again.');
@@ -887,7 +895,7 @@ describe('server errors and publish skips', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(await screen.findByRole('button', { name: 'Publish', exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     expect(
       (await screen.findAllByText(/One item was edited while publishing/i)).length,
@@ -917,7 +925,7 @@ describe('server errors and publish skips', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(await screen.findByRole('button', { name: 'Publish', exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
 
     fireEvent.click(resume);

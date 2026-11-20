@@ -1,0 +1,52 @@
+/* Block type picker (issue #1153). Admin tokens draw the cards; the site's
+   theme reaches only the examples inside them. */
+.admin-block-picker { min-width: 0; margin: 0; padding: 0; border: 0; }
+.admin-block-picker__legend {
+  margin-bottom: var(--space-xs); font-family: var(--admin-font-ui);
+  font-size: var(--admin-text-base); font-weight: 600; color: rgb(var(--admin-ink-rgb));
+}
+.admin-block-picker__grid {
+  display: grid; gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+}
+.admin-block-picker__option {
+  display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0;
+  padding: var(--space-sm); cursor: pointer;
+  border: 1px solid rgb(var(--admin-rule-control-rgb)); border-radius: var(--admin-radius);
+  background: rgb(var(--admin-ground-raised-rgb));
+}
+.admin-block-picker__option[data-selected] {
+  border-color: rgb(var(--admin-action-rgb)); background: rgb(var(--admin-action-soft-rgb));
+  outline: 1px solid rgb(var(--admin-action-rgb)); outline-offset: -2px;
+}
+.admin-block-picker__option:focus-within {
+  outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
+  outline-offset: var(--admin-focus-offset);
+}
+.admin-block-picker__option[data-disabled] { cursor: not-allowed; opacity: 0.6; }
+@media (hover: hover) and (pointer: fine) {
+  .admin-block-picker__option:not([data-disabled]):hover { border-color: rgb(var(--admin-action-rgb)); }
+}
+.admin-block-picker__head { display: flex; align-items: center; gap: var(--space-xs); min-height: 1.5rem; }
+.admin-block-picker__head input { width: 1.125rem; height: 1.125rem; flex: none; accent-color: rgb(var(--admin-action-rgb)); }
+.admin-block-picker__name { font-family: var(--admin-font-ui); font-size: var(--admin-text-base); font-weight: 600; color: rgb(var(--admin-ink-rgb)); }
+/* A window on the real renderer: fixed height, scaled down, never scrolls. */
+.admin-block-picker__example {
+  position: relative; height: 6.5rem; overflow: hidden; pointer-events: none;
+  padding: var(--space-xs); border-radius: var(--admin-radius-small);
+  background: rgb(var(--color-surface-rgb, 250 250 249));
+  color: rgb(var(--color-text-primary-rgb, 28 28 28));
+  font-family: var(--font-body);
+}
+.admin-block-picker__example > * { transform: scale(0.72); transform-origin: top left; width: calc(100% / 0.72); }
+.admin-block-picker__example img { max-height: 7.5rem; width: 100%; object-fit: cover; }
+.admin-block-picker__summary { font-size: var(--admin-text-sm); line-height: 1.4; color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-block-picker__error { margin-top: var(--space-xs); font-size: var(--admin-text-sm); color: rgb(var(--admin-rule-alarm-rgb)); }
+/* Phones: two columns and shorter examples, so the content fields stay near. */
+@media (max-width: 40rem) {
+  .admin-block-picker__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs); }
+  .admin-block-picker__option { padding: var(--space-xs); }
+  .admin-block-picker__example { height: 4.5rem; }
+  .admin-block-picker__example > * { transform: scale(0.6); width: calc(100% / 0.6); }
+  .admin-block-picker__summary { font-size: var(--admin-text-xs); }
+}

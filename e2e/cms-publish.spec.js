@@ -218,6 +218,9 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/faq/faq_items/_new');
     await expect(page.getByRole('heading', { level: 1, name: 'New content block' })).toBeVisible();
+    // The picker names types in plain words and starts on the type this
+    // section's starter content uses.
+    await expect(page.getByRole('radio', { name: 'Question and answer', exact: true })).toBeChecked();
     await page.getByLabel('Question', { exact: true }).fill(question);
 
     const editor = page.getByRole('textbox', { name: 'Answer' });
@@ -226,7 +229,7 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
     await page.getByRole('button', { name: 'Bold' }).click();
     await expect(editor.locator('strong')).toHaveText(answer);
 
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(page.getByText('Draft saved. It is not public until you publish.')).toBeVisible();
     const draft = (await adminDb().collection('cmsContent_drafts').doc(docId).get()).data();
     expect(draft.answer).toBe(`<p><strong>${answer}</strong></p>`);
@@ -254,7 +257,7 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
         expect(await response.finished()).toBeNull();
         expect(response.ok()).toBe(true);
       });
-      await page.getByRole('button', { name: 'Publish', exact: true }).click();
+      await page.getByRole('button', { name: 'Save and publish', exact: true }).click();
       await Promise.all([updateFinished, publishFinished]);
       await expect(page.locator('#admin-content').getByRole('status').filter({
         hasText: 'Published.',
