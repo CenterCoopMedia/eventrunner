@@ -27,7 +27,8 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
-import LoadingState from '../components/LoadingState.jsx';
+import { LoadingStateView } from '../components/LoadingState.jsx';
+import LoadingAnnouncement from '../components/LoadingAnnouncement.jsx';
 import LoadingStatus from '../components/LoadingStatus.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
@@ -39,16 +40,15 @@ const Panel = ({ children }) => (
   </div>
 );
 
-function PreparingAccount({ retryPath, routeAttempt }) {
+const PREPARING_ACCOUNT = 'Setting up your account…';
+const RELOAD_CLAIM = 'Setting up your account. Check your connection and reload this page, or contact the organizers if this continues.';
+
+function PreparingAccount({ retryPath, stage }) {
   const retryHref = useHref(retryPath);
-  const { stage, clock } = useLoadingStage({ routeAttempt });
   const prolonged = stage === 'prolonged';
-  const label = prolonged
-    ? 'Setting up your account. Check your connection and reload this page, or contact the organizers if this continues.'
-    : 'Setting up your account…';
   return (
     <Panel>
-      <LoadingStatus label={label} stage={stage} clock={clock} prolongedAnnouncement={prolonged ? label : undefined} />
+      <LoadingStatus label={prolonged ? RELOAD_CLAIM : PREPARING_ACCOUNT} stage={stage} announce={false} />
       {prolonged ? (
         <a href={retryHref} className={primaryActionClass}>Reload claim page</a>
       ) : null}
@@ -71,23 +71,33 @@ export default function TicketClaim({ routeAttempt }) {
   // Also reject a prior account's profile during the subscription transition.
   const preparing = !authLoading && !needsSignIn && (status !== 'ready' || profile?.id !== user.uid);
   const waiting = authLoading || preparing;
+  const { stage, clock } = useLoadingStage({ active: waiting, routeAttempt });
+  const waitLabel = authLoading ? 'Checking your sign-in…' : PREPARING_ACCOUNT;
   useLayoutEffect(() => {
     if (routeAttempt && !waiting) routeAttempt.settled = true;
   }, [routeAttempt, waiting]);
 
   let feedback;
   if (authLoading) {
-    feedback = <LoadingState label="Checking your sign-in…" rows={0} routeAttempt={routeAttempt} />;
+    feedback = <LoadingStateView label={waitLabel} rows={0} stage={stage} announce={false} />;
   } else if (preparing) {
     const retryParams = new URLSearchParams(searchParams);
     if (orderNumber || retryParams.has('order')) retryParams.set('order', orderNumber);
-    feedback = <PreparingAccount key={identity} retryPath={`/ticket/claim?${retryParams.toString()}`} routeAttempt={routeAttempt} />;
+    feedback = <PreparingAccount retryPath={`/ticket/claim?${retryParams.toString()}`} stage={stage} />;
   }
 
   return (
     <article className="mx-auto max-w-md">
       {(waiting || needsSignIn) ? <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1> : null}
       {feedback}
+      <LoadingAnnouncement
+        label={waitLabel}
+        stage={stage}
+        clock={clock}
+        active={waiting}
+        completion={needsSignIn ? 'Sign-in options are ready to claim your ticket.' : 'The ticket claim form is ready.'}
+        prolongedAnnouncement={preparing ? RELOAD_CLAIM : undefined}
+      />
       <section aria-label="Ticket claim" aria-busy={waiting}>
         {waiting ? null : needsSignIn ? (
           <>

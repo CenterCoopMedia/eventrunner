@@ -55,9 +55,13 @@ export default function SpeakerActionItems({ speaker, scheduleData, eventConfig,
       <h2 id="speaker-action-items-heading" className="font-heading text-h3 font-semibold text-text-primary">
         Your next steps
       </h2>
-      {loading ? (
-        <LoadingState key={`${scope}:${attempt}`} label="Checking your next steps…" rows={0} />
-      ) : null}
+      <LoadingState
+        key={`${scope}:${attempt}`}
+        active={loading}
+        label="Checking your next steps…"
+        completion={completion ? 'Your next steps are ready.' : ''}
+        rows={0}
+      />
       <div role="region" aria-label="Speaker checklist" aria-busy={loading}>
         {completion ? (
           <Progress value={completion.completed} max={completion.total} unit="items" done="complete" className="mt-sm" />

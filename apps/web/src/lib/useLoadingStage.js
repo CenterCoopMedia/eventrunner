@@ -11,21 +11,22 @@ export function createLoadingClock(inheritNavigation) {
   return { boot, startedAt: boot ? 0 : performance.now() };
 }
 
-function beginWait(active, shared, inheritNavigation) {
+function beginWait(active, shared, phase, inheritNavigation) {
   const clock = shared || createLoadingClock(inheritNavigation);
   const stage = active ? stageAt(performance.now() - clock.startedAt) : 'initial';
-  return { active, shared, clock, stage };
+  return { active, shared, phase, clock, stage };
 }
 
 /**
  * Elapsed waiting time, never estimated progress. Callers own the request and
  * remove the loader (or set active=false) as soon as it finishes.
+ * A new phase starts a local clock while the live region stays mounted.
  */
-export default function useLoadingStage({ active = true, routeAttempt } = {}) {
+export default function useLoadingStage({ active = true, routeAttempt, phase } = {}) {
   const shared = !routeAttempt?.settled && routeAttempt?.clock;
-  const [wait, setWait] = useState(() => beginWait(active, shared, true));
-  if (wait.active !== active || wait.shared !== shared) {
-    setWait(beginWait(active, shared));
+  const [wait, setWait] = useState(() => beginWait(active, shared, phase, true));
+  if (wait.active !== active || wait.shared !== shared || wait.phase !== phase) {
+    setWait(beginWait(active, shared, phase));
   }
   const { clock, stage } = wait;
 
@@ -48,7 +49,7 @@ export default function useLoadingStage({ active = true, routeAttempt } = {}) {
 
   function restart() {
     if (shared) routeAttempt.clock = createLoadingClock();
-    setWait(beginWait(active, shared && routeAttempt.clock));
+    setWait(beginWait(active, shared && routeAttempt.clock, phase));
   }
 
   return { stage, clock, restart };

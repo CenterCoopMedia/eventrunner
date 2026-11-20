@@ -20,11 +20,11 @@ vi.mock('../lib/fieldVitals.js', async (original) => ({ ...await original(), rep
 const READER = { uid: 'reader', email: 'reader@example.test', emailVerified: true };
 const CASES = [
   { name: 'tickets', Page: MyTickets, path: '/tickets/mine', label: 'Loading your tickets…', region: 'Tickets', sharedWait: true,
-    result: { tickets: [], nextCursor: null }, ready: 'No tickets found for this account' },
+    result: { tickets: [], nextCursor: null }, ready: 'No tickets found for this account', completion: 'You have no tickets for this account.' },
   { name: 'order', Page: TicketStatus, path: '/tickets/status?orderId=order-1', label: 'Loading your order…', region: 'Order status content',
     result: { orderId: 'order-1', status: 'free', paymentStatus: 'succeeded', totalAmount: 0, currency: 'usd', lines: [], tickets: [] }, ready: 'Your order is confirmed' },
   { name: 'change requests', Page: MyChangeRequests, path: '/profile/change-requests', label: 'Loading your change requests…', region: 'Change requests',
-    result: { ok: true, requests: [] }, ready: 'You have not sent a change request.' },
+    result: { ok: true, requests: [] }, ready: 'You have not sent a change request.', completion: 'Your change requests are ready.' },
 ];
 
 let finish;
@@ -66,7 +66,9 @@ describe.each(CASES)('$name loading feedback', (page) => {
     expect(state.tickets.mock.calls.length + state.changes.mock.calls.length).toBe(1);
 
     await act(async () => finish(page.result));
-    expect(status).not.toBeInTheDocument();
+    if (page.completion) expect(status).toHaveTextContent(page.completion);
+    else expect(status).not.toBeInTheDocument();
+    expect(screen.queryByText(page.label)).not.toBeInTheDocument();
     expect(region).toHaveAttribute('aria-busy', 'false');
     expect(screen.getByText(page.ready, { exact: true })).toBeInTheDocument();
   });
@@ -99,7 +101,9 @@ describe.each(CASES)('$name loading feedback', (page) => {
       expect(data).toHaveTextContent('We haven’t received a result after a minute.');
     }
     await act(async () => finish(page.result));
-    expect(data).not.toBeInTheDocument();
+    if (page.completion) expect(data).toHaveTextContent(page.sharedWait ? page.completion : '');
+    else expect(data).not.toBeInTheDocument();
+    expect(screen.queryByText(page.label)).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: page.region })).toHaveAttribute('aria-busy', 'false');
   });
 });

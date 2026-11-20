@@ -170,7 +170,7 @@ export default function Tickets() {
 
   // After a form-changed refusal, take the live form once it is newer.
   useEffect(() => {
-    if (!formStale || !liveForm) return;
+    if (!formStale || liveForm === undefined) return;
     if (readRegistrationForm(liveForm).revision !== readRegistrationForm(pinnedForm).revision) {
       setPinnedForm(liveForm);
       setFormStale(false);
@@ -392,7 +392,7 @@ export default function Tickets() {
   if (catalogPending) waitLabel = 'Loading ticket information…';
   else if (stripeCatalog && catalog.salesEnabled && authLoading) waitLabel = 'Checking your sign-in…';
   else if (canShowPurchase && form === undefined) waitLabel = 'Loading registration questions…';
-  else if (canShowPurchase && unknown && formStale) waitLabel = 'Loading the updated questions…';
+  else if (canShowPurchase && formStale) waitLabel = 'Loading the updated questions…';
 
   function renderRegistrationDetails() {
     const registrationAction = resolveRegistrationAction(eventConfig);
@@ -668,9 +668,14 @@ export default function Tickets() {
         {stripeCatalog ? <p className="text-lead">{catalog.eventName || eventConfig.name}</p> : null}
         {stripeCatalog && catalog.mode === 'test' ? <p className="border-hairline border-rule-hairline bg-surface-alt p-sm">Test mode. These tickets do not represent a live purchase.</p> : null}
       </div>
-      {waitLabel ? (
-        <LoadingState key={waitLabel} label={waitLabel} rows={0} onRetry={catalogPending ? retryCatalog : undefined} />
-      ) : null}
+      <LoadingState
+        active={Boolean(waitLabel)}
+        phase={waitLabel}
+        label={waitLabel}
+        completion={loadError ? '' : canShowPurchase ? 'The ticket registration form is ready.' : 'Ticket information is ready.'}
+        rows={0}
+        onRetry={catalogPending ? retryCatalog : undefined}
+      />
       <div role="region" aria-label="Ticket information" aria-busy={Boolean(waitLabel)} className={stripeCatalog ? 'space-y-lg' : 'space-y-md'}>
         {loadError ? (
           <>

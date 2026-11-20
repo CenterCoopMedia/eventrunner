@@ -18,24 +18,26 @@ export function LoadingStateView({
   still,
   clock,
   announce,
+  active = true,
+  completion,
 }) {
   const layout = SHAPES.has(shape) ? shape : 'rows';
   const rowCount = Number.isFinite(rows) ? Math.max(0, Math.floor(rows)) : 3;
   return (
     <div
-      className="loading-state py-xl"
-      data-loading-stage={stage}
-      data-loading-shape={layout}
+      className={active ? 'loading-state py-xl' : 'sr-only'}
+      data-loading-stage={active ? stage : undefined}
+      data-loading-shape={active ? layout : undefined}
     >
-      <LoadingStatus label={label} stage={stage} figure={figure} still={still} clock={clock} announce={announce} />
-      {stage === 'prolonged' && typeof onRetry === 'function' ? (
+      <LoadingStatus label={label} stage={stage} figure={figure} still={still} clock={clock} announce={announce} active={active} completion={completion} />
+      {active && stage === 'prolonged' && typeof onRetry === 'function' ? (
         <div className="loading-state__actions mt-sm">
           <button type="button" className={secondaryActionClass} onClick={onRetry}>
             Try loading again
           </button>
         </div>
       ) : null}
-      {rowCount > 0 ? (
+      {active && rowCount > 0 ? (
         <div
           aria-hidden="true"
           className="loading-state__placeholder mt-md"
@@ -56,11 +58,13 @@ export function LoadingStateView({
 }
 
 /** Retry is available only when a caller supplies an explicit, safe request. */
-export default function LoadingState({ onRetry, routeAttempt, ...props }) {
-  const { stage, clock, restart } = useLoadingStage({ routeAttempt });
+export default function LoadingState({ onRetry, routeAttempt, active = true, phase, completion, ...props }) {
+  const { stage, clock, restart } = useLoadingStage({ active, routeAttempt, phase });
   const retry = typeof onRetry === 'function' ? () => {
     onRetry();
     restart();
   } : undefined;
-  return <LoadingStateView {...props} stage={stage} clock={clock} onRetry={retry} />;
+  // Completion uses the same live region that was present before the read.
+  // An empty completion lets the caller's existing alert announce a failure.
+  return <LoadingStateView {...props} stage={stage} clock={clock} onRetry={retry} active={active} completion={completion} />;
 }

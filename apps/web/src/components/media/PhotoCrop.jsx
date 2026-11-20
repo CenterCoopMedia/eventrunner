@@ -153,7 +153,7 @@ export default function PhotoCrop({ file, label, onApply, onCancel }) {
 
   return (
     <div className="mt-sm flex flex-col gap-sm">
-      {image ? null : <LoadingState label="Loading the image…" rows={0} />}
+      <LoadingState active={!image} label="Loading the image…" completion="The image is ready to crop." rows={0} />
       <div className="flex flex-wrap items-start gap-md">
         {/* The frame. One tab stop; the instructions are its accessible
             description, and every arrow is a real, stated move. */}

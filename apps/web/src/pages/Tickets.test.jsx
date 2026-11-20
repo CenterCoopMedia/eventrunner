@@ -127,7 +127,8 @@ describe('attendee ticket selection', () => {
       await act(async () => reads[0].reject(new Error('Stale catalog failure')));
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       await act(async () => reads[1].resolve(CATALOG));
-      expect(status).not.toBeInTheDocument();
+      expect(status).toBeEmptyDOMElement();
+      expect(status.closest('.loading-state')).toBeNull();
       expect(region).toHaveAttribute('aria-busy', 'false');
       expect(screen.getByRole('link', { name: 'View order status' })).toHaveAttribute('href', `/tickets/status?orderId=${reference}`);
       expect(screen.getByRole('button', { name: 'Resume existing checkout' })).toBeInTheDocument();
@@ -137,7 +138,7 @@ describe('attendee ticket selection', () => {
     }
   });
 
-  it('clears a failed catalog wait and starts fresh sign-in and registration waits', async () => {
+  it('clears a failed catalog wait and names the current work until registration is ready', async () => {
     const buyer = state.auth.user;
     state.auth = { user: null, loading: true };
     state.form = undefined;
@@ -156,10 +157,11 @@ describe('attendee ticket selection', () => {
     const questions = screen.getByRole('status');
     expect(questions.parentElement).toHaveAttribute('data-loading-stage', 'initial');
     expect(questions.closest('[aria-busy="true"]')).toBeNull();
-    expect(authWait).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your sign-in…')).not.toBeInTheDocument();
     act(() => state.pushForm(null));
     expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(questions).not.toBeInTheDocument();
+    expect(questions).toBeEmptyDOMElement();
+    expect(questions.closest('.loading-state')).toBeNull();
     expect(screen.getByLabelText('Quantity — General admission')).toBeInTheDocument();
     expect(checkoutCalls()).toHaveLength(0);
   });

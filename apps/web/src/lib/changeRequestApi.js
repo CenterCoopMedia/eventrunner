@@ -11,6 +11,14 @@
 import { resolveFunctionsOrigin } from './errorReporting.js';
 import { IS_DEMO } from './demoMode.js';
 
+// Use named build-time replacements. The deployed chunk can compile a bare
+// import.meta.env to an empty object even when these settings are defined.
+const DEPLOYMENT_ENV = {
+  VITE_FUNCTIONS_ORIGIN: import.meta.env.VITE_FUNCTIONS_ORIGIN,
+  VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  VITE_FIREBASE_REGION: import.meta.env.VITE_FIREBASE_REGION,
+};
+
 /**
  * POST one JSON body to a change request endpoint with the reader's token.
  *
@@ -22,7 +30,7 @@ import { IS_DEMO } from './demoMode.js';
  * @returns {Promise<{ ok: true, body: object|null } | { ok: false, error: string }>}
  */
 async function post(name, payload, deps) {
-  const { user, env = import.meta.env, fetchImpl = typeof fetch === 'function' ? fetch : null, words } = deps;
+  const { user, env = DEPLOYMENT_ENV, fetchImpl = typeof fetch === 'function' ? fetch : null, words } = deps;
   // The static demo has no endpoint. The flag is off in its snapshot, so the
   // footer control never shows there, but the seam must not depend on that.
   if (IS_DEMO) {

@@ -77,7 +77,8 @@ describe('speaker action items', () => {
     expect(listMaterials).toHaveBeenCalledTimes(2);
 
     await act(async () => finish([{ reviewStatus: 'approved' }]));
-    expect(status).not.toBeInTheDocument();
+    expect(status).toHaveTextContent('Your next steps are ready.');
+    expect(status.closest('.loading-state')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'false');
     expect(screen.getByRole('progressbar', { name: '2 of 4 items complete' })).toBeInTheDocument();
   });

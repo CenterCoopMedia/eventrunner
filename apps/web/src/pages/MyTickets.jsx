@@ -72,7 +72,13 @@ export default function MyTickets({ routeAttempt }) {
     {heading}
     <div className="space-y-sm no-print"><p>These tickets have been claimed by your verified account. Claim an assigned ticket with its order reference to add it here. Purchaser payment details remain private.</p><button type="button" className={secondaryActionClass} aria-busy={busy} aria-disabled={busy} onClick={() => { if (!busy) setRefresh((value) => value + 1); }}>{busy ? 'Refreshing tickets…' : 'Refresh tickets'}</button></div>
     {error ? <p role="alert" className="text-danger">{error}</p> : null}
-    {loadingTickets ? <LoadingState label="Loading your tickets…" rows={0} routeAttempt={routeAttempt} /> : null}
+    <LoadingState
+      active={loadingTickets}
+      label="Loading your tickets…"
+      completion={tickets ? (tickets.length ? 'Your tickets are ready.' : 'You have no tickets for this account.') : ''}
+      rows={0}
+      routeAttempt={routeAttempt}
+    />
     <section aria-label="Tickets" aria-busy={busy || loadingTickets} className="space-y-lg">
     {tickets?.length ? <TicketDocuments tickets={tickets} eventName={eventConfig.name} timezone={eventConfig.timezone} /> : tickets ? <section className="space-y-sm"><h2 className="font-heading text-h2">No tickets found for this account</h2><p>Use the email assigned by the purchaser. If you have an order reference, you can check it through the ticket claim form.</p><Link to="/ticket/claim" className={secondaryActionClass}>Claim an existing ticket</Link></section> : null}
     {loaded && user && loaded.uid === user.uid && loaded.nextCursor ? <button type="button" className={`${secondaryActionClass} no-print`} aria-busy={busy} aria-disabled={busy} onClick={loadMore}>{busy ? 'Loading tickets…' : 'Load more tickets'}</button> : null}

@@ -94,6 +94,19 @@ describe('LoadingState', () => {
     expect(container.querySelector('.held-figure')).toBeNull();
   });
 
+  it('clears a settled result when the current result changes without a new wait', () => {
+    const empty = 'You have no tickets for this account.';
+    const { rerender } = render(<LoadingState label="Loading your tickets…" completion="" />);
+    const status = screen.getByRole('status');
+    advance(400);
+    rerender(<LoadingState active={false} label="Loading your tickets…" completion={empty} />);
+    expect(status).toHaveTextContent(empty);
+    rerender(<LoadingState active={false} label="Loading your tickets…" completion="Your tickets are ready." />);
+    expect(status).toBeEmptyDOMElement();
+    rerender(<LoadingState active={false} label="Loading your tickets…" completion={empty} />);
+    expect(status).toBeEmptyDOMElement();
+  });
+
   it.each(['rows', 'schedule', 'directory'])('keeps %s placeholders decorative and reserves the requested rows', (shape) => {
     const { container } = render(<LoadingState label="Loading the schedule…" shape={shape} rows={3} />);
     const reserved = container.querySelector('.loading-state__placeholder');
