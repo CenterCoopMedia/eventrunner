@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent } from '@testing-library/react';
 import { act, render, screen, within } from '@testing-library/react';
+import { flushSync } from 'react-dom';
 import { MemoryRouter } from 'react-router';
 
 let features;
@@ -277,6 +278,47 @@ describe('Attendees', () => {
     expect(screen.queryByText('Private Person')).toBeNull();
     expect(screen.getByText('Loading the attendee directory…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(subscribeDirectoryMock.mock.calls.at(-1)[0]).toEqual({ includeAttendeesOnly: false });
+  });
+
+  it('keeps the count, wording and groups together while a live removal takes effect', () => {
+    renderPage();
+    const publicRow = { id: 'u2', displayName: 'Public Person' };
+    pushProfiles([{ id: 'u1', displayName: 'Hidden Person' }, publicRow]);
+    const input = screen.getByRole('searchbox', { name: 'Search the directory' });
+    fireEvent.change(input, { target: { value: 'Hidden' } });
+    expect(screen.getByText('1 attendee matches “Hidden”')).toBeVisible();
+
+    const [, onNext] = subscribeDirectoryMock.mock.calls.at(-1);
+    act(() => {
+      flushSync(() => fireEvent.change(input, { target: { value: 'Person' } }));
+      expect(input).toHaveValue('Person');
+      expect(screen.getByText('1 attendee matches “Hidden”')).toBeVisible();
+      expect(screen.getByRole('link', { name: 'Hidden Person' })).toBeVisible();
+
+      flushSync(() => onNext([publicRow]));
+      expect(screen.queryByRole('link', { name: 'Hidden Person' })).toBeNull();
+      expect(screen.getByText('0 attendees match “Hidden”')).toBeVisible();
+      expect(screen.getByText(/Nothing in the directory matches “Hidden”/)).toBeVisible();
+    });
+    expect(screen.getByText('1 attendee matches “Person”')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Public Person' })).toBeVisible();
+  });
+
+  it('waits for a fresh snapshot when the directory is disabled and re-enabled', () => {
+    const view = renderPage();
+    pushProfiles([{ id: 'u1', displayName: 'Hidden Person' }]);
+    expect(screen.getByRole('link', { name: 'Hidden Person' })).toBeVisible();
+    const [, previousOnNext] = subscribeDirectoryMock.mock.calls.at(-1);
+    const page = <MemoryRouter><Attendees /></MemoryRouter>;
+
+    features = { ...features, attendeeDirectory: false };
+    view.rerender(page);
+    expect(screen.queryByRole('link', { name: 'Hidden Person' })).toBeNull();
+    features = { ...features, attendeeDirectory: true };
+    view.rerender(<MemoryRouter><Attendees /></MemoryRouter>);
+    act(() => previousOnNext([{ id: 'u1', displayName: 'Hidden Person' }]));
+    expect(screen.queryByRole('link', { name: 'Hidden Person' })).toBeNull();
+    expect(screen.getByText('Loading the attendee directory…', { selector: '.loading-status__label' })).toBeVisible();
   });
 
   it('says the directory is unavailable when the listener fails, rather than showing it empty', () => {

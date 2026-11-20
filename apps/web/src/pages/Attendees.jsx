@@ -31,7 +31,7 @@
 // face, rather than claiming a column of their own. Nothing is boxed, and
 // the letter heads are the same folio-on-a-rule standing head the schedule
 // gives a day.
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { validateCustomBadges } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -46,6 +46,7 @@ import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
+import Avatar from '../components/editorial/Avatar.jsx';
 import SearchField from '../components/forms/SearchField.jsx';
 import FilterGroup from '../components/forms/FilterGroup.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
@@ -119,48 +120,154 @@ const homeLink = (
   </Link>
 );
 
+const DirectoryEntry = memo(function DirectoryEntry({ profile, badgesConfig, showBadges, showCustomBadges }) {
+  const badges = showBadges
+    ? visibleBadgeIds(profile.badges, badgesConfig)
+    : [];
+  const customBadges = showCustomBadges
+    ? validateCustomBadges(profile.customBadges, {
+        blockList: badgesConfig?.customBadgeBlockList,
+      }).valid
+    : [];
+  const affiliation = [text(profile.jobTitle), text(profile.organization)]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <li className="attendee-index__entry flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
+      {/* The index's own size: one line per person, so
+          a card-sized frame would set the row height and
+          undo the compactness this page is for. */}
+      {profile.photoPath ? (
+        <ProfilePhoto
+          size="sm"
+          uid={profile.id}
+          photoPath={profile.photoPath}
+          displayName={profile.displayName}
+          className="self-center"
+        />
+      ) : (
+        <Avatar name={profile.displayName} size="sm" className="self-center" />
+      )}
+      <h3 className="font-heading text-body font-semibold text-text-primary">
+        <Link to={`/attendees/${profile.id}`} className="hover:underline">
+          {profile.displayName}
+        </Link>
+      </h3>
+      {text(profile.pronouns) ? (
+        <span className="font-data text-caption text-text-secondary">
+          {text(profile.pronouns)}
+        </span>
+      ) : null}
+      {/* How you tell two people with the same name
+          apart — so it stays, on the same line, in the
+          data face rather than in a column of its own. */}
+      {affiliation ? (
+        <span className="min-w-0 font-data text-caption text-text-secondary">
+          {affiliation}
+        </span>
+      ) : null}
+      {profile.speakerId || badges.length > 0 || customBadges.length > 0 ? (
+        <ul className="flex flex-wrap gap-2xs">
+          {profile.speakerId ? (
+            <li>
+              <Tag>Speaker</Tag>
+            </li>
+          ) : null}
+          {badges.map((badgeId) => (
+            <li key={badgeId}>
+              <Tag>{badgeLabel(badgesConfig, badgeId)}</Tag>
+            </li>
+          ))}
+          {customBadges.map((badge) => (
+            <li key={`custom-${badge}`}>
+              <Tag>{badge}</Tag>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+});
+
+const DirectoryIndex = memo(function DirectoryIndex({ profiles, badgesConfig, showBadges, showCustomBadges }) {
+  return (
+    <div className="attendee-index mt-lg">
+      {groupByLetter(profiles).map((group) => (
+        <section
+          key={group.letter}
+          aria-labelledby={`attendee-letter-${group.letter}`}
+          className="mt-lg first:mt-0"
+        >
+          {/* The letter as a standing head, sticking while its group
+              is on screen. `#` files the names this alphabet does not
+              cover, and it says so rather than pretending. */}
+          <SectionHead
+            className="attendee-index__letter"
+            variant="folio"
+            level={2}
+            id={`attendee-letter-${group.letter}`}
+            title={group.letter}
+            rule="hairline"
+            folio={group.members.length === 1 ? '1 person' : `${group.members.length} people`}
+          />
+          <ul>
+            {group.members.map((profile) => (
+              <DirectoryEntry
+                key={profile.id}
+                profile={profile}
+                badgesConfig={badgesConfig}
+                showBadges={showBadges}
+                showCustomBadges={showCustomBadges}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+});
+
 export default function Attendees() {
   const { features, badges: badgesConfig } = useEventConfig();
-  const { status, attendeeAccess } = useProfile();
+  const { uid, status, attendeeAccess } = useProfile();
   const [snapshot, setSnapshot] = useState({ key: null, profiles: null, failed: false });
 
   const directoryEnabled = features.attendeeDirectory;
-  const includeAttendeesOnly = attendeeAccess;
   // A signed-out visitor at an event with no public profiles has nothing to
   // query for — they get the sign-in state below, so skip the listener
   // rather than running a query whose result is known to be empty.
   const signedOutWithNothingToSee =
     !IS_DEMO && status === 'signed-out' && !features.publicAttendeeProfiles;
-  const directoryKey = !directoryEnabled || signedOutWithNothingToSee
-    ? 'closed'
-    : includeAttendeesOnly
-      ? 'full'
-      : 'public';
-  // A passive effect runs after paint. Match the snapshot to this render's
-  // query so the downgrade itself cannot show the previous full directory.
-  const visible = visibleDirectorySnapshot(snapshot, directoryKey);
+  const directoryOpen = directoryEnabled && !signedOutWithNothingToSee;
+  // Each account or access change gets its own snapshot identity, including
+  // a return to the same access level before the current listener has read.
+  const directoryScope = useMemo(() => ({
+    uid, open: directoryOpen, includeAttendeesOnly: attendeeAccess,
+  }), [uid, directoryOpen, attendeeAccess]);
+  const visible = visibleDirectorySnapshot(snapshot, directoryScope);
   const profiles = visible.profiles;
   const failed = visible.failed;
 
   useEffect(() => {
-    if (directoryKey === 'closed') return undefined;
+    setSnapshot({ key: directoryScope, profiles: null, failed: false });
+    if (!directoryScope.open) return undefined;
     let current = true;
     const unsubscribe = subscribeDirectory(
-      { includeAttendeesOnly },
+      { includeAttendeesOnly: directoryScope.includeAttendeesOnly },
       (docs) => {
         if (!current) return;
-        setSnapshot({ key: directoryKey, profiles: docs, failed: false });
+        setSnapshot({ key: directoryScope, profiles: docs, failed: false });
       },
       () => {
         if (!current) return;
-        setSnapshot({ key: directoryKey, profiles: null, failed: true });
+        setSnapshot({ key: directoryScope, profiles: null, failed: true });
       },
     );
     return () => {
       current = false;
       unsubscribe();
     };
-  }, [directoryKey, includeAttendeesOnly]);
+  }, [directoryScope]);
 
   const sorted = useMemo(
     () =>
@@ -175,6 +282,9 @@ export default function Attendees() {
   // and role, and a filter by organization. Local state — the directory is
   // a lookup, not a view somebody shares, unlike the schedule's URL state.
   const [query, setQuery] = useState('');
+  // Only the text can lag. Every render filters its current authorized
+  // snapshot, including removals, using that render's committed query.
+  const resultQuery = useDeferredValue(query).trim();
   const [organizations, setOrganizations] = useState([]);
   const organizationOptions = useMemo(() => collectOrganizations(sorted), [sorted]);
   // The folded search text, rebuilt only when the directory changes — not
@@ -184,18 +294,13 @@ export default function Attendees() {
     for (const profile of sorted) index.set(profile.id, directorySearchText(profile));
     return index;
   }, [sorted]);
-  const filtered = useMemo(
-    () =>
-      sorted.filter((profile) =>
-        matchesDirectoryFilters(profile, {
-          q: query.trim(),
-          organizations,
-          searchIndex,
-        }),
-      ),
-    [sorted, query, organizations, searchIndex],
-  );
-  const narrowed = query.trim().length > 0 || organizations.length > 0;
+  const filtered = useMemo(() => {
+    if (resultQuery === '' && organizations.length === 0) return sorted;
+    const selection = { q: resultQuery, organizations, searchIndex };
+    const matches = sorted.filter((profile) => matchesDirectoryFilters(profile, selection));
+    return matches.length === sorted.length ? sorted : matches;
+  }, [sorted, resultQuery, organizations, searchIndex]);
+  const narrowed = resultQuery.length > 0 || organizations.length > 0;
   // null = no snapshot has arrived yet; [] = the directory really is empty.
   // Conflating them tells a visitor nobody signed up while the query is
   // still in flight.
@@ -282,8 +387,8 @@ export default function Attendees() {
                   value={query}
                   onChange={setQuery}
                   status={
-                    query.trim()
-                      ? `${filtered.length} ${filtered.length === 1 ? 'attendee matches' : 'attendees match'} “${query.trim()}”`
+                    resultQuery
+                      ? `${filtered.length} ${filtered.length === 1 ? 'attendee matches' : 'attendees match'} “${resultQuery}”`
                       : undefined
                   }
                   placeholder="Name, organization, role…"
@@ -308,7 +413,7 @@ export default function Attendees() {
                 <EmptyState
                   title="No attendees match"
                   description={`Nothing in the directory matches ${
-                    query.trim() ? `“${query.trim()}”` : 'that organization filter'
+                    resultQuery ? `“${resultQuery}”` : 'that organization filter'
                   }. Clear the search or the filter to see everybody.`}
                 />
               </div>
@@ -316,97 +421,12 @@ export default function Attendees() {
               // The index: letter groups, compact entries, nothing boxed —
               // derived from the narrowed list, so a letter nobody survives
               // into has no group at all.
-              <div className="attendee-index mt-lg">
-                {groupByLetter(filtered).map((group) => (
-              <section
-                key={group.letter}
-                aria-labelledby={`attendee-letter-${group.letter}`}
-                className="mt-lg first:mt-0"
-              >
-                {/* The letter as a standing head, sticking while its group
-                    is on screen. `#` files the names this alphabet does not
-                    cover, and it says so rather than pretending. */}
-                <SectionHead
-                  className="attendee-index__letter"
-                  variant="folio"
-                  level={2}
-                  id={`attendee-letter-${group.letter}`}
-                  title={group.letter}
-                  rule="hairline"
-                  folio={group.members.length === 1 ? '1 person' : `${group.members.length} people`}
-                />
-                <ul>
-                  {group.members.map((profile) => {
-                    const badges = features.badges
-                      ? visibleBadgeIds(profile.badges, badgesConfig)
-                      : [];
-                    const customBadges = features.customBadges === true
-                      ? validateCustomBadges(profile.customBadges, {
-                          blockList: badgesConfig?.customBadgeBlockList,
-                        }).valid
-                      : [];
-                    const affiliation = [text(profile.jobTitle), text(profile.organization)]
-                      .filter(Boolean)
-                      .join(' · ');
-                    return (
-                      <li
-                        key={profile.id}
-                        className="attendee-index__entry flex flex-wrap items-baseline gap-x-sm gap-y-3xs"
-                      >
-                        {/* The index's own size: one line per person, so
-                            a card-sized frame would set the row height and
-                            undo the compactness this page is for. */}
-                        <ProfilePhoto
-                          size="sm"
-                          uid={profile.id}
-                          photoPath={profile.photoPath}
-                          displayName={profile.displayName}
-                          className="self-center"
-                        />
-                        <h3 className="font-heading text-body font-semibold text-text-primary">
-                          <Link to={`/attendees/${profile.id}`} className="hover:underline">
-                            {profile.displayName}
-                          </Link>
-                        </h3>
-                        {text(profile.pronouns) ? (
-                          <span className="font-data text-caption text-text-secondary">
-                            {text(profile.pronouns)}
-                          </span>
-                        ) : null}
-                        {/* How you tell two people with the same name
-                            apart — so it stays, on the same line, in the
-                            data face rather than in a column of its own. */}
-                        {affiliation ? (
-                          <span className="min-w-0 font-data text-caption text-text-secondary">
-                            {affiliation}
-                          </span>
-                        ) : null}
-                        {profile.speakerId || badges.length > 0 || customBadges.length > 0 ? (
-                          <ul className="flex flex-wrap gap-2xs">
-                            {profile.speakerId ? (
-                              <li>
-                                <Tag>Speaker</Tag>
-                              </li>
-                            ) : null}
-                            {badges.map((badgeId) => (
-                              <li key={badgeId}>
-                                <Tag>{badgeLabel(badgesConfig, badgeId)}</Tag>
-                              </li>
-                            ))}
-                            {customBadges.map((badge) => (
-                              <li key={`custom-${badge}`}>
-                                <Tag>{badge}</Tag>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                 </ul>
-               </section>
-             ))}
-           </div>
+              <DirectoryIndex
+                profiles={filtered}
+                badgesConfig={badgesConfig}
+                showBadges={features.badges}
+                showCustomBadges={features.customBadges === true}
+              />
             )}
           </>
         )}

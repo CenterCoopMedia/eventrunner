@@ -150,8 +150,17 @@ describe('subscribeDirectory', () => {
       const onFail = vi.fn();
       const onNext = vi.fn();
       const denied = Object.assign(new Error('denied'), { code: 'permission-denied' });
-      subscribeDirectory({ includeAttendeesOnly: true }, onNext, onFail);
+      const stop = subscribeDirectory({ includeAttendeesOnly: true }, onNext, onFail);
+      const privateRows = [{ id: 'u1', data: () => ({ profileVisibility: 'attendees_only' }) }];
+      const publicRows = [{ id: 'u2', data: () => ({ profileVisibility: 'public' }) }];
+      listeners[0].next({ docs: privateRows });
+      expect(onNext).toHaveBeenLastCalledWith([{ id: 'u1', profileVisibility: 'attendees_only' }]);
+
       listeners[0].errorCb(denied);
+      expect(onNext).toHaveBeenLastCalledWith(null);
+      listeners[0].next({ docs: privateRows });
+      listeners[0].errorCb(denied);
+      expect(onNext).toHaveBeenCalledTimes(2);
       // The public listener and a one-row probe of the full directory.
       expect(listeners[1].target.constraints).toEqual([
         { field: 'profileVisibility', op: '==', value: 'public' },
@@ -161,16 +170,24 @@ describe('subscribeDirectory', () => {
         { limit: 1 },
       ]);
       expect(onFail).not.toHaveBeenCalled();
+      listeners[1].next({ docs: publicRows });
+      expect(onNext).toHaveBeenLastCalledWith([{ id: 'u2', profileVisibility: 'public' }]);
 
       listeners[2].errorCb(denied);
       vi.runOnlyPendingTimers();
+      listeners[2].next({ docs: [] });
+      expect(listeners).toHaveLength(4);
       listeners[3].next({ docs: [] });
       expect(listeners[4].target.constraints).toEqual([
         { field: 'profileVisibility', op: 'in', value: ['public', 'attendees_only'] },
       ]);
-      listeners[4].next({ docs: [{ id: 'u1', data: () => ({ profileVisibility: 'attendees_only' }) }] });
+      listeners[4].next({ docs: privateRows });
       expect(onNext).toHaveBeenLastCalledWith([{ id: 'u1', profileVisibility: 'attendees_only' }]);
       expect(onFail).not.toHaveBeenCalled();
+      stop();
+      listeners[4].next({ docs: privateRows });
+      listeners[4].errorCb(denied);
+      expect(onNext).toHaveBeenCalledTimes(4);
     } finally {
       vi.useRealTimers();
     }

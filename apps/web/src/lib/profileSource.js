@@ -104,7 +104,8 @@ export function saveOwnProfile(uid, fields) {
  * Subscribe to the attendee directory.
  *
  * @param {{ includeAttendeesOnly: boolean }} options
- * @param {(profiles: Array<object>) => void} onNext
+ * @param {(profiles: Array<object> | null) => void} onNext null clears the
+ *   refused full snapshot while waiting for the public directory.
  * @param {(error: unknown) => void} [onFail] called on every listener error,
  *   so the page can show "the directory is unavailable" instead of an empty
  *   directory that looks like nobody signed up.
@@ -125,13 +126,34 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
     const emit = (snapshot) => {
       onNext(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     };
+
+    function attach(target, options, onSnapshotNext, onSnapshotError) {
+      let active = true;
+      const next = (snapshot) => {
+        if (active) onSnapshotNext(snapshot);
+      };
+      const fail = (error) => {
+        if (!active) return;
+        active = false;
+        onSnapshotError(error);
+      };
+      const detach = options
+        ? onSnapshot(target, options, next, fail)
+        : onSnapshot(target, next, fail);
+      return () => {
+        active = false;
+        detach();
+      };
+    }
+
     // The full directory waits for the server (afterServerConfirms).
     const listen = (target, onRefused = null) => subscribeWithRetry(
       (onError) => onRefused
-        ? onSnapshot(target, SERVER_CONFIRMATION, afterServerConfirms(emit), onError)
-        : onSnapshot(target, emit, onError),
+        ? attach(target, SERVER_CONFIRMATION, afterServerConfirms(emit), onError)
+        : attach(target, null, emit, onError),
       (error) => {
         if (onRefused && error?.code === 'permission-denied') {
+          onNext(null);
           onRefused();
           return;
         }
@@ -147,7 +169,7 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
     return subscribeWithFallback({
       wide: (onRefused) => listen(fullDirectory(), onRefused),
       narrow: () => listen(publicDirectory),
-      probe: (onAllowed, onError) => onSnapshot(fullDirectory(limit(1)), SERVER_CONFIRMATION, onAllowed, onError),
+      probe: (onAllowed, onError) => attach(fullDirectory(limit(1)), SERVER_CONFIRMATION, onAllowed, onError),
     });
   }, onFail);
 }

@@ -8,7 +8,7 @@
 // sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
-import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { pageHeading } from 'shared/page';
@@ -59,6 +59,39 @@ import { SUPPRESS_STYLE_ID } from '../lib/modeRuntime.js';
 import { downloadSchedulePdf } from '../lib/schedulePdf.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
+
+const NO_SESSIONS = [];
+const ScheduleResultsGrid = memo(ScheduleGrid);
+
+const ScheduleResultsList = memo(function ScheduleResultsList({
+  entries, eventConfig, features, bookmarkedIds, backIssue, countsById, now,
+}) {
+  return (
+    <ul data-schedule-results="" className="schedule-route mt-sm">
+      {entries.map((entry, index) => (
+        <SessionCard
+          key={entry.session.id}
+          session={entry.session}
+          eventConfig={eventConfig}
+          features={features}
+          bookmarked={bookmarkedIds.has(entry.session.id)}
+          backIssue={backIssue}
+          callingPoints={entry.children}
+          savedCount={countsById.get(entry.session.id)}
+          state={sessionStateOf(eventConfig, entry.session, now)}
+          // The session's real place in the day, counted from
+          // one: the numbered-agenda Schedule style prints it,
+          // and the lead-and-rest style sets the first row
+          // larger. It counts ENTRIES, so a calling point does
+          // not take a number of its own — it is a stop inside
+          // its parent, not a row in the programme.
+          position={index + 1}
+          lead={index === 0}
+        />
+      ))}
+    </ul>
+  );
+});
 
 // One day of the programme. The active day is marked twice over — heavier
 // weight plus a strong rule under the word — because color alone never
@@ -131,7 +164,8 @@ export default function Schedule() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigationType = useNavigationType();
-  const resolvedLocation = useRef(location.key);
+  const pendingParams = useRef(null);
+  const [viewPending, startViewUpdate] = useTransition();
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -217,8 +251,7 @@ export default function Schedule() {
     { value: 'time', label: text('By time', 'Por hora') },
     ...(features.sessionBookmarks ? [{ value: 'saved', label: text('Most saved', 'Más guardadas') }] : []),
   ];
-  // The take-it-with-you controls (issue #166): the PDF request's state and
-  // the copy action's answer are the only local state on the page.
+  // The take-it-with-you controls (issue #166) track the PDF and copy actions.
   const [pdfState, setPdfState] = useState({ status: 'idle', message: '' });
   const [copyState, setCopyState] = useState('idle'); // idle | copied | error
   // The event's lines, in the client's own order (config/event.tracks). No
@@ -261,6 +294,8 @@ export default function Schedule() {
     setCopyState(copied ? 'copied' : 'error');
   }
   const query = view.q;
+  const [inputQuery, setInputQuery] = useState(query);
+  const resolvedLocation = useRef({ key: location.key, query });
   const formats = view.formats;
   const tracks = view.tracks;
   const activeFilterCount = formats.length + tracks.length;
@@ -270,11 +305,22 @@ export default function Schedule() {
   const activeDayId = view.day ?? days[0]?.id ?? null;
 
   useLayoutEffect(() => {
+    // Back can interrupt a pending update and return to the location
+    // React already rendered. Synchronize when the transition settles,
+    // even in that case.
+    if (viewPending) return;
+    pendingParams.current = null;
+    setInputQuery(query);
+  }, [location, query, viewPending]);
+
+  useLayoutEffect(() => {
     const interrupted = interruptedResolve.current;
     interruptedResolve.current = null;
-    if (resolvedLocation.current === location.key) return undefined;
-    resolvedLocation.current = location.key;
-    if (navigationType === 'POP' || !location.state?.scheduleResolve || !features.schedule || !activeDayId) return undefined;
+    const previous = resolvedLocation.current;
+    if (previous.key === location.key) return undefined;
+    resolvedLocation.current = { key: location.key, query };
+    if (previous.query !== query || navigationType === 'POP' ||
+        !location.state?.scheduleResolve || !features.schedule || !activeDayId) return undefined;
     const results = resultsSectionRef.current?.querySelector('[data-schedule-results]');
     const viewWindow = results?.ownerDocument.defaultView;
     const media = viewWindow?.matchMedia?.('(prefers-reduced-motion: no-preference)');
@@ -299,7 +345,7 @@ export default function Schedule() {
       interruptedResolve.current = opacity < 1 ? { element: results, opacity } : null;
       animation.cancel();
     };
-  }, [location.key, location.state, navigationType, features.schedule, activeDayId]);
+  }, [location.key, location.state, navigationType, features.schedule, activeDayId, query]);
 
   /**
    * Patch the view in the URL. Discrete control changes (a day, a filter, a
@@ -308,18 +354,39 @@ export default function Schedule() {
    * keystroke.
    */
   function updateView(patch, { replace = false } = {}) {
-    setSearchParams(
-      (prev) =>
-        writeScheduleView(
-          { ...readScheduleView(prev, knownView), ...patch },
-          { firstDayId: days[0]?.id ?? null },
-        ),
-      { replace, state: { scheduleResolve: ['q', 'formats', 'tracks', 'sort'].some((key) => Object.hasOwn(patch, key)) } },
+    const previous = pendingParams.current ?? searchParams;
+    const params = writeScheduleView(
+      { ...readScheduleView(previous, knownView), ...patch },
+      { firstDayId: days[0]?.id ?? null },
+      previous,
     );
+    pendingParams.current = params;
+    startViewUpdate(() => setSearchParams(params, {
+      replace,
+      state: { scheduleResolve: ['formats', 'tracks', 'sort'].some((key) => Object.hasOwn(patch, key)) },
+    }));
   }
 
-  // Every hook sits above this point: the branch below can end the
-  // component before any of the work further down runs.
+  function updateQuery(next) {
+    setInputQuery(next);
+    updateView({ q: next }, { replace: true });
+  }
+
+  const activeSessions = features.schedule ? sessionsByDay.get(activeDayId) ?? NO_SESSIONS : NO_SESSIONS;
+  // The router's committed query drives the list, grid and announcement.
+  // A matched calling point keeps its parent, and a matched parent keeps
+  // all of its calling points (lib/scheduleView.js).
+  const { entries, matchedCount } = useMemo(() => {
+    const matches = filterEntries(activeSessions, (session) =>
+      matchesQuery(searchIndex.get(session.id) ?? '', query) &&
+      matchesFilters(session, { formats, tracks }),
+    );
+    return {
+      entries: sortEntries(matches, sort, countsById),
+      matchedCount: matches.reduce((count, entry) => count + 1 + entry.children.length, 0),
+    };
+  }, [activeSessions, searchIndex, query, formats, tracks, sort, countsById]);
+
   if (!features.schedule) {
     return (
       <EmptyState
@@ -335,23 +402,6 @@ export default function Schedule() {
   }
 
   const activeDay = days.find((d) => d.id === activeDayId) ?? null;
-  const activeSessions = activeDayId ? (sessionsByDay.get(activeDayId) ?? []) : [];
-  // The day narrowed by the search and the facets (issues #162, #163), then
-  // ordered by the chosen sort (#164). An empty query and empty facets keep
-  // the whole day, so clearing restores it by construction. A calling point
-  // a predicate matches keeps its parent's row, and a matched parent keeps
-  // all of its calling points — lib/scheduleView.js owns those rules.
-  const entries = sortEntries(
-    filterEntries(activeSessions, (session) => {
-      if (query.trim() && !matchesQuery(searchIndex.get(session.id) ?? '', query)) return false;
-      return matchesFilters(session, { formats, tracks });
-    }),
-    sort,
-    countsById,
-  );
-  // What the count sentence says: every session still in the document,
-  // calling points included — they are sessions a reader can pick too.
-  const matchedCount = entries.reduce((count, entry) => count + 1 + entry.children.length, 0);
   // A time/track grid groups sessions and cannot preserve a popularity rank.
   const showGrid = sort === 'time' && wide && columns.length > 0 && entries.length > 0;
   // The back issue (brief §2.1): a day the event has moved past, or a whole
@@ -450,8 +500,8 @@ export default function Schedule() {
               <div ref={searchRef} className="schedule-search">
                 <SearchField
                   label={text('Search this day', 'Buscar en este día')}
-                  value={query}
-                  onChange={(next) => updateView({ q: next }, { replace: true })}
+                  value={inputQuery}
+                  onChange={updateQuery}
                   status={
                     query.trim()
                       ? text(`${matchedCount} sessions match “${query.trim()}”`, `${matchedCount} sesiones coinciden con «${query.trim()}»`)
@@ -652,7 +702,7 @@ export default function Schedule() {
                   data-schedule-results=""
                   className="mt-sm overflow-x-auto"
                 >
-                  <ScheduleGrid
+                  <ScheduleResultsGrid
                     day={activeDay}
                     entries={entries}
                     columns={columns}
@@ -667,29 +717,15 @@ export default function Schedule() {
                 // column order, tabular figures, every relationship stated.
                 // No gap: every row opens with its own hairline, so the rules
                 // are the separation a card border used to be.
-                <ul data-schedule-results="" className="schedule-route mt-sm">
-                  {entries.map((entry, index) => (
-                    <SessionCard
-                      key={entry.session.id}
-                      session={entry.session}
-                      eventConfig={eventConfig}
-                      features={features}
-                      bookmarked={bookmarkedIds.has(entry.session.id)}
-                      backIssue={backIssue}
-                      callingPoints={entry.children}
-                      savedCount={countsById.get(entry.session.id)}
-                      state={sessionStateOf(eventConfig, entry.session, now)}
-                      // The session's real place in the day, counted from
-                      // one: the numbered-agenda Schedule style prints it,
-                      // and the lead-and-rest style sets the first row
-                      // larger. It counts ENTRIES, so a calling point does
-                      // not take a number of its own — it is a stop inside
-                      // its parent, not a row in the programme.
-                      position={index + 1}
-                      lead={index === 0}
-                    />
-                  ))}
-                </ul>
+                <ScheduleResultsList
+                  entries={entries}
+                  eventConfig={eventConfig}
+                  features={features}
+                  bookmarkedIds={bookmarkedIds}
+                  backIssue={backIssue}
+                  countsById={countsById}
+                  now={now}
+                />
               )}
             </section>
           </div>

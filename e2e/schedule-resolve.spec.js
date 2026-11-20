@@ -127,7 +127,7 @@ test('real filter and sort resolve only the list, preserve focus, nodes and URL 
   expect(await resolveCount(page)).toBe(0);
 });
 
-test('rapid changes cancel the old effect and reduced motion stays instant, including empty search', async ({ page }) => {
+test('rapid facets interrupt the fade and search results stay instant at either motion setting', async ({ page }) => {
   await openSchedule(page);
   const facet = page.getByRole('checkbox', { name: /^panel \(/ });
   await facet.click();
@@ -159,9 +159,23 @@ test('rapid changes cancel the old effect and reduced motion stays instant, incl
   expect(await resolveCount(page)).toBe(2);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   expect(await resolveCount(page)).toBe(2);
-  await search.fill('still-no-matching-session-886');
-  await checkResolve(page, 3);
+  await search.fill('');
+  await search.pressSequentially('still-no-matching-session-886');
+  await search.press('Backspace');
+  await expect(search).toHaveValue('still-no-matching-session-88');
+  await expect(page).toHaveURL(/q=still-no-matching-session-88$/);
+  await expect(page.locator('.schedule-search [role="status"]')).toHaveText('0 sessions match “still-no-matching-session-88”');
+  await expect(page.locator(RESULTS)).toContainText('match “still-no-matching-session-88”');
   expect(await page.locator(RESULTS).evaluate((element) => element.tagName)).toBe('P');
+  expect(await resolveCount(page)).toBe(2);
+  await page.reload();
+  await expect(search).toHaveValue('still-no-matching-session-88');
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('');
+  await expect(page).not.toHaveURL(/[?&]q=/);
+  await expect(page.locator(`${RESULTS} .session-block`).first()).toBeVisible();
+  expect(await resolveCount(page)).toBe(0);
 });
 
 test('the grid resolves its current results and a real mode swap cancels native motion', async ({ page }) => {
