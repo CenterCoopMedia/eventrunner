@@ -21,6 +21,7 @@ import {
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import { useAdminSessions } from '../useAdminSessions.js';
+import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import {
@@ -37,6 +38,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
+import { AddItemButton, RemoveItemButton } from '../components/listItemControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -54,6 +56,7 @@ const EMPTY = {
   placeId: '',
   location: '',
   parentId: '',
+  speakerIds: [],
   recordingUrl: '',
   materialsNotNeeded: false,
   visible: true,
@@ -72,6 +75,7 @@ function toForm(row) {
     placeId: session.placeId ?? '',
     location: session.location ?? '',
     parentId: session.parentId ?? '',
+    speakerIds: Array.isArray(session.speakerIds) ? session.speakerIds : EMPTY.speakerIds,
     recordingUrl: session.recordingUrl ?? '',
     materialsNotNeeded: session.materialsNotNeeded === true,
     visible: session.visible !== false,
@@ -118,14 +122,14 @@ export default function AdminSessionEditor({ mode }) {
   const { showToast } = useToast();
   const { eventConfig } = useEventConfig();
   const { rows, ready, error: listenerError, findRow } = useAdminSessions();
+  const { speakers, loading: speakersLoading, error: speakersError, findSpeaker } = useAdminSpeakers();
   const [createdId, setCreatedId] = useState(null);
   const creating = mode === 'create' && !createdId;
   const currentId = mode === 'edit' ? sessionId : createdId;
   const row = !creating ? findRow(currentId) : null;
   const [form, setForm] = useState(EMPTY);
-  const [savedSnapshot, setSavedSnapshot] = useState(() => (
-    mode === 'create' ? editorSnapshot(EMPTY) : null
-  ));
+  const [savedForm, setSavedForm] = useState(mode === 'create' ? EMPTY : null);
+  const [speakerToAdd, setSpeakerToAdd] = useState('');
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
   const [action, setAction] = useState(null);
@@ -133,8 +137,16 @@ export default function AdminSessionEditor({ mode }) {
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
+  const speakerFieldRef = useRef(null);
   const adoptedRef = useRef(null);
-  const unsaved = savedSnapshot !== null && editorSnapshot(form) !== savedSnapshot;
+  const availableSpeakers = speakers.filter((speaker) => (
+    speaker.status !== 'removed' && !form.speakerIds.includes(speaker.id)
+  ));
+  const availableChoice = availableSpeakers.some((speaker) => speaker.id === speakerToAdd)
+    ? speakerToAdd : '';
+  const unsaved = savedForm !== null && (
+    Boolean(availableChoice) || editorSnapshot(form) !== editorSnapshot(savedForm)
+  );
   const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving });
 
   useEffect(() => {
@@ -142,7 +154,8 @@ export default function AdminSessionEditor({ mode }) {
     adoptedRef.current = currentId;
     const next = toForm(row);
     setForm(next);
-    setSavedSnapshot(editorSnapshot(next));
+    setSavedForm(next);
+    setSpeakerToAdd('');
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -214,6 +227,28 @@ export default function AdminSessionEditor({ mode }) {
       )
       .map((candidate) => ({ value: candidate.id, label: candidate.current.title || 'Untitled session' })),
   ];
+  const speakerNameCounts = new Map();
+  for (const speaker of speakers) {
+    speakerNameCounts.set(speaker.displayName, (speakerNameCounts.get(speaker.displayName) ?? 0) + 1);
+  }
+  const speakerLabel = (speaker) => (
+    speakerNameCounts.get(speaker.displayName) > 1 && speaker.email
+      ? `${speaker.displayName} (${speaker.email})` : speaker.displayName
+  );
+  const speakerOptions = [
+    { value: '', label: availableSpeakers.length ? 'Choose a speaker' : 'No speakers to add' },
+    ...availableSpeakers.map((speaker) => ({ value: speaker.id, label: speakerLabel(speaker) })),
+  ];
+  function addSpeaker() {
+    set({ speakerIds: [...form.speakerIds, availableChoice] });
+    setSpeakerToAdd('');
+    speakerFieldRef.current?.querySelector('select')?.focus();
+  }
+
+  function removeSpeaker(id) {
+    set({ speakerIds: form.speakerIds.filter((speakerId) => speakerId !== id) });
+    speakerFieldRef.current?.querySelector('select')?.focus();
+  }
 
   async function save({ publish = false } = {}) {
     if (saving) return;
@@ -225,10 +260,12 @@ export default function AdminSessionEditor({ mode }) {
       focusFirstError(formRef.current);
       return;
     }
+    const withSpeaker = availableChoice ? { ...form, speakerIds: [...form.speakerIds, availableChoice] } : form;
     const nextForm = creating
-      ? lockSessionId(form, rows.map((candidate) => candidate.id))
-      : form;
+      ? lockSessionId(withSpeaker, rows.map((candidate) => candidate.id))
+      : withSpeaker;
     if (nextForm !== form) setForm(nextForm);
+    setSpeakerToAdd('');
     const docId = creating ? nextForm.id : currentId;
     const endpoint = creating ? 'cmsCreateContent' : 'cmsUpdateContent';
     setAction(publish ? 'publish' : 'draft');
@@ -237,22 +274,27 @@ export default function AdminSessionEditor({ mode }) {
     setStatus('');
     let stage = 'save';
     try {
+      const fields = sessionFields(nextForm);
+      // An unrelated edit must preserve speaker links added or removed since this form opened.
+      if (creating || editorSnapshot(nextForm.speakerIds) !== editorSnapshot(savedForm?.speakerIds)) {
+        fields.speakerIds = nextForm.speakerIds;
+      }
       await call(endpoint, {
         collection: 'cmsSchedule',
         docId,
-        fields: sessionFields(nextForm),
+        fields,
         visible: nextForm.visible,
       });
       if (creating) {
         adoptedRef.current = docId;
         setCreatedId(docId);
       }
-      setSavedSnapshot(editorSnapshot(nextForm));
+      setSavedForm(nextForm);
       if (publish) {
         stage = 'publish';
         // Use the fields just saved. `row` still has the parent from before
         // this edit, so publishing from it can include an unrelated draft.
-        const publishRow = { id: docId, current: sessionFields(nextForm) };
+        const publishRow = { id: docId, current: fields };
         const ids = publishSetForSession(publishRow, rows);
         const response = await call('cmsPublish', { collection: 'cmsSchedule', docIds: ids });
         const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');
@@ -401,6 +443,40 @@ export default function AdminSessionEditor({ mode }) {
             />
             <ContentTranslations kind="session" record={form} onChange={(translations) => set({ translations })}
               labels={{ title: 'public title', description: 'public description' }} errorFor={errorFor} />
+            {speakersLoading ? <Notice message="Loading speakers…" /> : speakersError ? (
+              <Notice tone="caution" message="Speakers could not be loaded. Reconnecting." />
+            ) : (
+              <div ref={speakerFieldRef} className="flex flex-col gap-3xs">
+                <div className="flex flex-wrap items-end gap-xs">
+                  <div className="min-w-0 flex-1">
+                    <SelectField
+                      label="Speaker to add"
+                      help="Choose an existing speaker. This change goes live when you publish the session."
+                      value={availableChoice}
+                      onChange={setSpeakerToAdd}
+                      options={speakerOptions}
+                      error={errorFor('speakerIds')}
+                      disabled={saving}
+                    />
+                  </div>
+                  <AddItemButton unavailable={saving || !availableChoice} onClick={addSpeaker}>Add speaker</AddItemButton>
+                </div>
+                {form.speakerIds.length > 0 ? (
+                  <ul className="flex flex-col gap-3xs" aria-label="Session speakers">
+                    {form.speakerIds.map((id) => {
+                      const speaker = findSpeaker(id);
+                      const name = speaker ? speakerLabel(speaker) : 'Unavailable speaker';
+                      return (
+                        <li key={id} className="flex items-center justify-between gap-xs text-admin-base text-admin-ink">
+                          <span className="min-w-0 break-words">{name}</span>
+                          <RemoveItemButton name={`Remove ${name}`} unavailable={saving} onClick={() => removeSpeaker(id)} />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            )}
             <TextField help="Add the public recording when it is ready to watch."
               label="Recording link"
               type="url"
