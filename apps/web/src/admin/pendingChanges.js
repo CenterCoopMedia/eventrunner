@@ -137,7 +137,7 @@ export function summarizeAll(response) {
   if (Array.isArray(response?.failed)) {
     const failures = response.failed.length;
     return failures > 0
-      ? { ok: false, message: `${failures} ${failures === 1 ? 'image placement needs' : 'image placements need'} attention. Open the Media Library to review.` }
+      ? { ok: false, message: `${failures} ${failures === 1 ? 'image placement needs' : 'image placements need'} attention. Open Media to review.` }
       : { ok: true, message: 'Image replacement complete.' };
   }
   const results = response?.results && typeof response.results === 'object' ? response.results : {};

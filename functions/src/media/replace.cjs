@@ -88,9 +88,11 @@ async function replaceGroup({ db, queueRef, group, key, plan, bucket, targetExis
       });
     }
     const followsLive = revision !== undefined && draftData && draftData.basedOnRevision === liveData.revision;
-    if (draft.length > 0 || followsLive) {
+    if (draft.length > 0) {
       const basedOnRevision = followsLive ? { basedOnRevision: revision } : {};
       tx.set(draftRef, { ...nextDraft.next, ...basedOnRevision, updatedAt: at, updatedBy: actor.email });
+    } else if (followsLive) {
+      tx.update(draftRef, { basedOnRevision: revision });
     }
     settle(true);
   });

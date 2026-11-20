@@ -26,6 +26,10 @@ function fixture() {
       ...image, section: 'travel-arrival', field: 'photo', revision: 4, visible: true,
       descriptionOverride: { assetId: 'old', caption: '', credit: '' },
     },
+    'cmsContent_drafts/travel-arrival__photo': {
+      ...image, url: 'cms-images/other/photo.png', status: 'dirty', basedOnRevision: 4,
+      updatedBy: staff.email, updatedAt: '2026-11-19T19:00:00.000Z',
+    },
     'cmsContent/travel-arrival__link': { blockType: 'cta', url: source, label: 'Keep this destination' },
     'cmsUpdates/arrival': { title: 'Arrival', featuredImage: { url: hostedOld, alt: 'Feature alt' },
       content: [{ type: 'image', image: { url: source, alt: 'Body alt' } }], revision: 1, visible: true },
@@ -96,6 +100,11 @@ test('replacement resumes committed groups through the publish receipt without p
   const photo = db.read('cmsContent', 'travel-arrival__photo');
   assert.deepEqual([photo.url, photo.alt, photo.caption, photo.descriptionOverride],
     [target, 'Replacement alt', undefined, undefined]);
+  const untouchedDraft = db.read('cmsContent_drafts', 'travel-arrival__photo');
+  assert.equal(untouchedDraft.basedOnRevision, 5);
+  assert.equal(untouchedDraft.url, 'cms-images/other/photo.png');
+  assert.equal(untouchedDraft.updatedBy, staff.email);
+  assert.equal(untouchedDraft.updatedAt, '2026-11-19T19:00:00.000Z');
   assert.equal(db.read('cmsContent', 'travel-arrival__link').url, source);
   assert.equal(db.read('cmsUpdates', 'arrival').content[0].image.url, target);
   assert.equal(db.read('cmsUpdates', 'arrival').featuredImage.url, target);
