@@ -45,7 +45,7 @@ function Picture({ layout }) {
  * read the frame's width, so the phone frame is the phone page (the Branding
  * preview, ThemeProof, draws whole pages the same way).
  */
-function PreviewFrame({ width, label, scopeId, children }) {
+function PreviewFrame({ width, label, scopeId, sideNav, children }) {
   const outerRef = useRef(null);
   const iframeRef = useRef(null);
   const [host, setHost] = useState(null);
@@ -102,7 +102,15 @@ function PreviewFrame({ width, label, scopeId, children }) {
       </div>
       {host ? createPortal(
         <ViewportProvider view={host.view}>
-          <div ref={setContent} className="admin-section-layout__page">{children}</div>
+          <div ref={setContent} className="admin-section-layout__page">
+            {/* The page's own stage, and the side navigation's rail beside
+                it when the page has one (Layout.jsx), so blocks get the
+                width they get on the site. */}
+            <div className={sideNav ? 'stage flex flex-col lg:flex-row lg:gap-xl' : 'stage'}>
+              {sideNav ? <div aria-hidden="true" className="lg:w-48 lg:shrink-0" /> : null}
+              <div className="min-w-0 flex-1">{children}</div>
+            </div>
+          </div>
         </ViewportProvider>,
         host.body,
       ) : null}
@@ -122,6 +130,8 @@ function PreviewFrame({ width, label, scopeId, children }) {
  *   budget?: { sections: object[], getSectionBlocks: (id: string) => object[] },
  *   readingMeasure?: boolean,
  *   longReadOpening?: boolean,
+ *   sideNav?: boolean,
+ *   blocksError?: boolean,
  * }} props
  *   `readingMeasure` is true where the public page holds a Reading width
  *   section to the text measure (a system page in the list arrangement,
@@ -132,7 +142,7 @@ function PreviewFrame({ width, label, scopeId, children }) {
  *   `longReadOpening` is true for the section that opens a Long read page,
  *   so the preview draws the style's drop cap or standfirst there too.
  */
-export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false, longReadOpening = false }) {
+export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false, longReadOpening = false, sideNav = false, blocksError = false }) {
   const name = useId();
   // A closed section keeps its fields mounted; its preview documents are
   // made only once the preview is first shown.
@@ -196,14 +206,16 @@ export default function SectionLayoutChoice({ value, onChange, label, blocks, bl
         })}
       </fieldset>
       <div ref={previewRef} className="admin-section-layout__preview" aria-label={`Preview of ${label || 'this section'}`} role="group">
-        {!blocksReady ? (
+        {blocksError ? (
+          <p className="admin-section-layout__empty" role="alert">The preview could not load this section’s content. Reload the page to try again.</p>
+        ) : !blocksReady ? (
           <p className="admin-section-layout__empty">Loading this section’s content…</p>
         ) : blocks.length === 0 ? (
           <p className="admin-section-layout__empty">No block in this section can be drawn here yet. The preview draws published, visible blocks, without starter text or links to pages that are off.</p>
         ) : !shown ? null : (
           <div className="admin-section-layout__frames">
-            <PreviewFrame width={1152} label="On a computer" scopeId={`${previewId}-computer`}>{section('computer')}</PreviewFrame>
-            <PreviewFrame width={390} label="On a phone" scopeId={`${previewId}-phone`}>{section('phone')}</PreviewFrame>
+            <PreviewFrame width={1152} label="On a computer" scopeId={`${previewId}-computer`} sideNav={sideNav}>{section('computer')}</PreviewFrame>
+            <PreviewFrame width={390} label="On a phone" scopeId={`${previewId}-phone`} sideNav={sideNav}>{section('phone')}</PreviewFrame>
           </div>
         )}
       </div>

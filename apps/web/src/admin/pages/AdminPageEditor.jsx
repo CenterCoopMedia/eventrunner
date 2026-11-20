@@ -958,6 +958,8 @@ function PageEditor({ mode }) {
                         budget={quoteBudget}
                         readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
                         longReadOpening={section.id === longReadSectionId}
+                        sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side'}
+                        blocksError={Boolean(contentError) && !contentReady}
                       />
                     </div>
                   )}

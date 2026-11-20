@@ -30,7 +30,7 @@
 .admin-section-layout__stage { display: block; border: 0; transform-origin: top left; pointer-events: none; }
 /* Inside the preview document: the public surface, type and spacing. */
 .admin-section-layout__page {
-  padding: var(--space-lg);
+  padding-block: var(--space-lg);
   background: rgb(var(--color-surface-rgb, 250 250 249)); color: rgb(var(--color-text-primary-rgb, 28 28 28));
   font-family: var(--font-body);
 }
