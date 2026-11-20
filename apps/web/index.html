@@ -40,21 +40,26 @@
             const status = boot.querySelector('[role="status"]');
             const reload = boot.querySelector('button');
             let frame;
+            const wordsAt = (elapsed) => elapsed >= 10000
+              ? boot.dataset.snapshot
+                ? 'The page controls have not loaded yet. Keep waiting or reload this page.'
+                : 'This site is taking longer than usual to open. You can keep waiting or reload this page.'
+              : elapsed >= 1000 && !boot.dataset.snapshot ? 'Opening this site…' : '';
             const update = () => {
               const elapsed = performance.now();
               const late = elapsed >= 10000;
-              const snapshot = Boolean(boot.dataset.snapshot);
-              const message = late
-                ? snapshot
-                  ? 'The page controls have not loaded yet. Keep waiting or reload this page.'
-                  : 'This site is taking longer than usual to open. You can keep waiting or reload this page.'
-                : elapsed >= 1000 && !snapshot ? 'Opening this site…' : '';
+              const message = wordsAt(elapsed);
               if (message !== copy.textContent) {
                 copy.textContent = message;
                 // The region may have just been parsed after a stylesheet hold.
                 cancelAnimationFrame(frame);
                 frame = requestAnimationFrame(() => {
-                  frame = requestAnimationFrame(() => { status.textContent = message; });
+                  frame = requestAnimationFrame(() => {
+                    // The demo can install its painted snapshot during parsing.
+                    const current = wordsAt(elapsed);
+                    if (copy.textContent !== current) copy.textContent = current;
+                    if (status.textContent !== current) status.textContent = current;
+                  });
                 });
               }
               reload.hidden = !late;

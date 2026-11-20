@@ -72,4 +72,18 @@ describe('the static boot fallback', () => {
     expect(window.__eventHeldUpBoot).toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('waits for the late controls message when parsing installs a demo snapshot after one second', () => {
+    vi.advanceTimersByTime(1500);
+    const { boot, status } = mountBoot();
+    expect(boot.querySelector('p')).toHaveTextContent('Opening this site…');
+    boot.dataset.snapshot = 'true';
+    vi.advanceTimersByTime(50);
+    expect(status).toBeEmptyDOMElement();
+    expect(boot.querySelector('p')).toBeEmptyDOMElement();
+
+    vi.advanceTimersByTime(8500);
+    expect(status.textContent).toBe('The page controls have not loaded yet. Keep waiting or reload this page.');
+    expect(boot.querySelector('button').hidden).toBe(false);
+  });
 });
