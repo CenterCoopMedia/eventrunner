@@ -734,9 +734,8 @@ test('a preset that ships a motif set on gets it as the baseline too', () => {
 
 test('every component token has a rule that draws it', () => {
   // design/tokens/components.json states the rule itself, in its scope note:
-  // "Every token here is read by a render path in a stylesheet under apps/web/src — a
-  // token an option offers but nothing renders is a promise the interface
-  // does not keep, so a new contract lands with the rule that draws it."
+  // "Every token here is read by a rule in a stylesheet under apps/web/src.
+  // Add a new contract with the rule that draws it."
   //
   // That sentence held for the schedule row and stopped holding for the
   // masthead: eighteen Header styles were each setting a metadata placement

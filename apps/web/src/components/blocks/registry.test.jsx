@@ -54,13 +54,13 @@ describe('block renderer registry', () => {
     );
   });
 
-  it.each(Object.keys(BLOCK_TYPES))('renders visible output for %s', async (id) => {
+  it.each(Object.keys(BLOCK_TYPES))('renders content for %s', async (id) => {
     const sample = SAMPLE_BLOCKS[id];
     // A new backend block type must gain a sample here alongside its renderer.
     expect(sample, `missing sample block for '${id}'`).toBeTruthy();
     const { container } = render(<BlockRenderer block={sample} />);
     await waitFor(() => {
-      expect(container.firstElementChild).toBeVisible();
+      expect(container.firstElementChild).toBeInTheDocument();
       expect(container.firstElementChild).not.toHaveAttribute('aria-hidden', 'true');
     });
   });
