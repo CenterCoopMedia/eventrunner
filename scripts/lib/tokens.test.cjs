@@ -734,7 +734,7 @@ test('a preset that ships a motif set on gets it as the baseline too', () => {
 
 test('every component token has a rule that draws it', () => {
   // design/tokens/components.json states the rule itself, in its scope note:
-  // "Every token here is read by a render path in apps/web/src/index.css — a
+  // "Every token here is read by a render path in a stylesheet under apps/web/src — a
   // token an option offers but nothing renders is a promise the interface
   // does not keep, so a new contract lands with the rule that draws it."
   //
@@ -747,9 +747,11 @@ test('every component token has a rule that draws it', () => {
   const { components } = loadTokens();
   // Comments are stripped first. A token named in a note explaining why it
   // is not drawn yet would otherwise pass this test by being talked about.
-  const stylesheet = fs
-    .readFileSync(path.join(__dirname, '..', '..', 'apps', 'web', 'src', 'index.css'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const webSrc = path.join(__dirname, '..', '..', 'apps', 'web', 'src');
+  const stylesheet = fs.readdirSync(webSrc, { recursive: true })
+    .filter((file) => file.endsWith('.css') && !file.startsWith('generated' + path.sep))
+    .map((file) => fs.readFileSync(path.join(webSrc, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' '))
+    .join('\n');
   const names = [];
   const walk = (node) => {
     for (const [key, value] of Object.entries(node)) {
