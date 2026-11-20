@@ -15,11 +15,11 @@ const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
 const OPERATOR_ACTIONS = new Set(['saveCatalog', 'pauseSales', 'issueComp', 'issueCompCsv', 'allocateRefund', 'releaseHold']);
-const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets', 'promoCodes']);
+const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets', 'promoCodes', 'promoRedemptions']);
 // Promo codes are staff-editable (ADR 0008 §6); they live in promoCodes.cjs.
 const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile', 'savePromoCode', 'deletePromoCode']);
 const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
-const { isOrderFulfilled } = require('shared/ticketCommerce');
+const { isOrderFulfilled, normalizePromoCode } = require('shared/ticketCommerce');
 
 // An organizer check answers with its own status, 5xx included. A 5xx
 // CommerceError from the checkout or inventory code gets the generic answer.
@@ -228,6 +228,31 @@ async function listCommerce({ db, provider, body, kind }) {
   return { [kind]: rows, nextCursor: snap.docs.length > examined ? last : null };
 }
 
+async function listPromoRedemptions({ db, provider, body }) {
+  const code = normalizePromoCode(body.code);
+  if (!code) fail(400, 'bad-request', 'Choose a promo code.');
+  let query = db.collection(ORDERS).where('promo.code', '==', code).orderBy('__name__');
+  if (body.cursor) query = query.startAfter(idOf(body.cursor, 'Page reference'));
+  const snapshot = await query.limit(MAX_PAGE + 1).get();
+  const docs = snapshot.docs.slice(0, MAX_PAGE);
+  const redemptions = [];
+  for (const doc of docs) {
+    const order = doc.data();
+    if (!scopeMatches(order, provider) || !isOrderFulfilled(order)) continue;
+    // Each discounted line stores its original price at checkout. Current
+    // catalog names and current promo eligibility can change independently.
+    const types = (order.lines || []).filter((line) => Object.hasOwn(line, 'listUnitAmount')).map((line) => ({
+      id: line.ticketTypeId, name: line.name || line.ticketClass || line.ticketTypeId, quantity: line.quantity,
+    }));
+    const count = types.reduce((sum, type) => sum + type.quantity, 0);
+    if (!count || count !== order.promo.discountedSeats) {
+      fail(409, 'promo-report-incomplete', 'A completed order is missing its promo ticket breakdown.');
+    }
+    redemptions.push({ orderId: doc.id, purchaserEmail: order.purchaserEmail || '', count, types });
+  }
+  return { redemptions, nextCursor: snapshot.docs.length > docs.length ? docs.at(-1).id : null };
+}
+
 async function correctAttendee({ db, provider, actor, body, now }) {
   const ticketId = idOf(body.ticketId, 'Ticket');
   const reason = reasonOf(body);
@@ -385,6 +410,7 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
       else if (action === 'saveCatalog') result = await saveCatalog(deps);
       else if (action === 'pauseSales') result = await pauseSales(deps);
       else if (action === 'promoCodes') result = await listPromoCodes(deps);
+      else if (action === 'promoRedemptions') result = await listPromoRedemptions(deps);
       else if (action === 'savePromoCode') result = await savePromoCode(deps);
       else if (action === 'deletePromoCode') result = await deletePromoCode(deps);
       else if (action === 'orders' || action === 'tickets') result = await listCommerce({ ...deps, kind: action });
