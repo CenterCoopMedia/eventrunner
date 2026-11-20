@@ -40,12 +40,41 @@
  *                                        (scripts/publish-site.cjs)
  */
 
+const { openSiteOnFirstPublish } = require('./launch.cjs');
+
 const RUN_API_ROOT = 'https://run.googleapis.com/v2';
 const METADATA_TOKEN_URL =
   'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token';
 
 /** Hard cap on the whole invoke. The publish response waits on this. */
 const INVOKE_TIMEOUT_MS = 10_000;
+
+function publisherNotificationSecrets(env = process.env) {
+  const { defineSecret } = require('firebase-functions/params');
+  const notifier = (env.EVENT_OPERATOR_NOTIFIER || '').trim();
+  if (notifier === 'webhook') {
+    return ['OPERATOR_WEBHOOK_URL', 'OPERATOR_WEBHOOK_SECRET'].map(defineSecret);
+  }
+  if (notifier === 'email') {
+    const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+    return (SEND_SECRETS_BY_PROVIDER[(env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
+  }
+  return [];
+}
+
+function withPublisherNotifier(deps, env = process.env) {
+  const { createOperatorNotifier } = require('../notify/operator.cjs');
+  const notifier = createOperatorNotifier({
+    env,
+    getConfig: deps.getConfig,
+    sendEmail: async (message) => {
+      const { getEmailProvider } = require('../email/providers/index.cjs');
+      const { createEmailCore } = require('../email/send.cjs');
+      return createEmailCore({ db: deps.db, provider: getEmailProvider({ env }), getConfig: deps.getConfig }).send(message);
+    },
+  });
+  return { ...deps, env, notifyOperator: notifier.notify };
+}
 
 /**
  * Resolve the publisher from the runtime environment.
@@ -261,7 +290,16 @@ async function requestSitePublish({
   }
 }
 
+async function refreshSiteAfterPublish(deps) {
+  // Open a coming-soon site before the rebuilt snapshot reads its state.
+  await openSiteOnFirstPublish(deps);
+  return requestSitePublish(deps);
+}
+
 module.exports = {
+  publisherNotificationSecrets,
+  withPublisherNotifier,
+  refreshSiteAfterPublish,
   requestSitePublish,
   resolvePublisherConfig,
   invokeSitePublisher,

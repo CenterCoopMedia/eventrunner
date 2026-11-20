@@ -7,6 +7,7 @@
     "cmsCreateContent",
     "cmsUpdateContent",
     "cmsDeleteContent",
+    "cmsMoveContent",
     "cmsGetVersionHistory",
     "cmsSavePage",
     "cmsDeletePage",

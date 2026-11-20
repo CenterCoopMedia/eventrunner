@@ -7,6 +7,7 @@ const {
   createCmsCreateContentHandler,
   createCmsUpdateContentHandler,
   createCmsDeleteContentHandler,
+  createCmsMoveContentHandler,
   createGetSiteContentHandler,
   DELETE_FIELD_SENTINEL,
   internals,
@@ -113,6 +114,7 @@ test('mutation handlers: no token → 401, non-admin → 403, non-POST → 405',
     createCmsCreateContentHandler,
     createCmsUpdateContentHandler,
     createCmsDeleteContentHandler,
+    createCmsMoveContentHandler,
   ]) {
     const handler = create(deps(db));
 
@@ -643,6 +645,151 @@ test('cmsUpdateContent → 404 when neither draft nor live doc exists', async ()
     res,
   );
   assert.equal(res.statusCode, 404);
+});
+
+// --- cmsMoveContent -----------------------------------------------------------
+
+const ORPHAN = {
+  section: 'removed', field: 'answer', blockType: 'faq_item',
+  question: 'When do doors open?', answer: 'At nine.', order: 1, visible: true,
+};
+const MOVE_REQUEST = { docId: 'removed__answer', pageId: 'test-page', section: 'faq' };
+const PUBLISHER_ENV = { EVENT_SITE_PUBLISHER_JOB: 'publisher-fixture', EVENT_FIREBASE_PROJECT_ID: 'project-fixture' };
+
+test('cmsMoveContent publishes to the next available destination key and keeps edits private', async () => {
+  const db = makeFakeDb({
+    'cmsContent/removed__answer': { ...ORPHAN, revision: 4 },
+    'cmsContent_drafts/removed__answer': { ...ORPHAN, answer: 'At ten.', status: 'dirty', basedOnRevision: 4 },
+    'cmsContent/faq__answer': { ...ORPHAN, section: 'faq', order: 7, revision: 2 },
+    'cmsVersionHistory/previous-destination': { docPath: 'cmsContent/faq__answer-2', revision: 3 },
+    'cmsVersionHistory/source': { docPath: 'cmsContent/removed__answer', revision: 4 },
+    'config/launch': { comingSoon: true },
+  });
+  let publisherInvocations = 0;
+  const move = createCmsMoveContentHandler(deps(db, {
+    env: PUBLISHER_ENV,
+    fetchImpl: async (url, request) => {
+      if (url.includes('metadata.google.internal')) {
+        return { ok: true, json: async () => ({ access_token: 'fixture-token' }) };
+      }
+      publisherInvocations += 1;
+      const [queueId] = db.ids('cmsPublishQueue');
+      assert.equal(db.read('cmsPublishQueue', queueId).status, 'done');
+      assert.equal(db.read('cmsContent', 'faq__answer-2').answer, 'At nine.');
+      assert.equal(db.read('config', 'launch').comingSoon, false);
+      assert.deepEqual(JSON.parse(request.body).overrides.containerOverrides[0].env,
+        [{ name: 'PUBLISH_QUEUE_ID', value: queueId }]);
+      return { ok: true, json: async () => ({}) };
+    },
+  }));
+  const res = fakeRes();
+  await move(req({ body: MOVE_REQUEST }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.docId, 'faq__answer-2');
+  assert.equal(res.body.publisher.status, 'invoked');
+  assert.deepEqual(db.read('cmsPublishQueue', res.body.queueId).progress.cmsContent.published, ['faq__answer-2']);
+  assert.equal(db.read('cmsContent', 'removed__answer'), undefined);
+  assert.equal(db.read('cmsContent_drafts', 'removed__answer'), undefined);
+  const published = db.read('cmsContent', 'faq__answer-2');
+  assert.equal(published.answer, 'At nine.');
+  assert.equal(published.section, 'faq');
+  assert.equal(published.field, 'answer-2');
+  assert.equal(published.order, 8);
+  assert.equal(published.revision, 4);
+  assert.equal(db.read('cmsContent', 'faq__answer').order, 7);
+  const draft = db.read('cmsContent_drafts', 'faq__answer-2');
+  assert.equal(draft.answer, 'At ten.');
+  assert.equal(draft.status, 'dirty');
+  assert.equal(draft.basedOnRevision, 4);
+  assert.equal(db.read('cmsVersionHistory', 'source').revision, 4);
+  const versions = db.ids('cmsVersionHistory').map((id) => db.read('cmsVersionHistory', id));
+  assert.equal(versions.find((version) => version.docPath === 'cmsContent/faq__answer-2' && version.revision === 4).fields.answer, 'At nine.');
+
+  const repeated = fakeRes();
+  await move(req({ body: MOVE_REQUEST }), repeated);
+  assert.equal(repeated.statusCode, 404);
+  assert.equal(db.ids('cmsContent').length, 2);
+  assert.equal(publisherInvocations, 1);
+});
+
+test('cmsMoveContent keeps a draft-only publication committed when the snapshot refresh fails', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/removed__answer': { ...ORPHAN, status: 'dirty', visible: false },
+  });
+  const res = fakeRes();
+  const notifications = [];
+  await createCmsMoveContentHandler(deps(db, {
+    env: PUBLISHER_ENV,
+    fetchImpl: async () => ({ ok: false, status: 503 }),
+    notifyOperator: async (event) => { notifications.push(event); },
+  }))(req({ body: MOVE_REQUEST }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsContent', 'faq__answer').visible, false);
+  assert.equal(db.read('cmsContent_drafts', 'faq__answer').status, 'clean');
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 0);
+  assert.equal(res.body.publisher.status, 'failed');
+  assert.equal(db.read('cmsPublishQueue', res.body.queueId).publisher.invoke.status, 'failed');
+  assert.equal(notifications.length, 1);
+});
+
+test('cmsMoveContent uses open Home positions and leaves blocks intact when no position can display them', async () => {
+  const text = { section: 'removed', blockType: 'text', value: 'Recover this', visible: true };
+  const image = { section: 'removed', field: 'art', blockType: 'image', visible: true };
+  const db = makeFakeDb({
+    'cmsPages/home': { systemPage: true, sections: [{ id: 'hero', maxBlocks: 10 }, { id: 'sponsors', maxBlocks: 10 }] },
+    'cmsContent/hero__title': { ...text, section: 'hero', field: 'title' },
+    'cmsContent_drafts/hero__other-art': { ...image, section: 'hero', field: 'other-art' },
+    'cmsContent/sponsors__lede': { ...text, section: 'sponsors', field: 'lede' },
+    'cmsContent/removed__body': { ...text, field: 'body' },
+    'cmsContent/removed__title': { ...text, field: 'title' },
+    'cmsContent/removed__subtitle': { ...text, field: 'subtitle' },
+    'cmsContent/removed__art': image,
+  });
+  const move = createCmsMoveContentHandler(deps(db, { env: {} }));
+  for (const [docId, section] of [
+    ['removed__body', 'hero'], ['removed__title', 'hero'],
+    ['removed__art', 'hero'], ['removed__body', 'sponsors'],
+  ]) {
+    const res = fakeRes();
+    await move(req({ body: { docId, pageId: 'home', section } }), res);
+    assert.equal(res.statusCode, 400);
+    assert.ok(db.read('cmsContent', docId));
+  }
+  assert.equal(db.ids('cmsPublishQueue').length, 0);
+  const res = fakeRes();
+  await move(req({ body: { docId: 'removed__subtitle', pageId: 'home', section: 'hero' } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.docId, 'hero__subtitle');
+});
+
+test('cmsMoveContent protects assigned and Home hero blocks and rechecks capacity after a concurrent write', async () => {
+  const owned = makeFakeDb({
+    'cmsContent/removed__answer': ORPHAN,
+    'cmsContent/hero__title': { section: 'hero', field: 'title', blockType: 'text', value: 'Our event heading' },
+    'cmsPages/test-page': { sections: [{ id: 'faq', maxBlocks: 1 }] },
+    'cmsPages/removed-page': { sections: [{ id: 'removed' }] },
+    'cmsPages_drafts/removed-page': { sections: [] },
+  });
+  const move = createCmsMoveContentHandler(deps(owned));
+  const denied = fakeRes();
+  await move(req({ body: MOVE_REQUEST }), denied);
+  assert.equal(denied.statusCode, 409);
+  const hero = fakeRes();
+  await move(req({ body: { ...MOVE_REQUEST, docId: 'hero__title' } }), hero);
+  assert.equal(hero.statusCode, 409);
+  assert.deepEqual(owned.ids('cmsContent'), ['removed__answer', 'hero__title']);
+
+  const capped = makeFakeDb({
+    'cmsContent/removed__answer': ORPHAN,
+    'cmsPages/test-page': { sections: [{ id: 'faq', maxBlocks: 1 }] },
+  });
+  capped.beforeCommit = () => capped.collection('cmsContent_drafts').doc('faq__other').set({ ...ORPHAN, section: 'faq' });
+  const full = fakeRes();
+  await createCmsMoveContentHandler(deps(capped))(req({ body: MOVE_REQUEST }), full);
+  assert.equal(full.statusCode, 400);
+  assert.match(full.body.error.message, /maximum of 1 blocks/);
+  assert.deepEqual(capped.ids('cmsContent'), ['removed__answer']);
+  assert.deepEqual(capped.ids('cmsContent_drafts'), ['faq__other']);
 });
 
 // --- cmsDeleteContent ---------------------------------------------------------

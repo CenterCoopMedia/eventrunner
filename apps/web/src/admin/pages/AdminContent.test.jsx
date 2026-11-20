@@ -367,6 +367,89 @@ describe('the Home hero image slot', () => {
 });
 
 describe('content browsing', () => {
+  it('recovers a block once both page revisions confirm it has no section', async () => {
+    const sectionStillLive = {
+      ...SCHOLARSHIPS_PAGE.sections[0], id: 'still-live', label: 'Still live',
+    };
+    const orphan = {
+      ...BODY_BLOCK_DRAFT, id: 'removed__body', section: 'removed', status: undefined,
+      value: '<p>Bring a notebook.</p>',
+    };
+    const orphanDraft = { ...orphan, status: 'dirty', value: '<p>Bring two notebooks.</p>' };
+    const owned = { ...orphan, id: 'still-live__body', section: 'still-live', value: '<p>Keep this here.</p>' };
+    const hero = { ...HERO_TEXT[0], value: 'Our event heading' };
+    sources.cmsPages = [{ ...SCHOLARSHIPS_PAGE, sections: [...SCHOLARSHIPS_PAGE.sections, sectionStillLive] }];
+    sources.cmsContent = [owned, orphan, hero];
+    sources.cmsContent_drafts = [orphanDraft];
+    silentCollections = ['cmsPages_drafts'];
+    await renderAt('/admin/content');
+    expect(await screen.findByRole('heading', { name: 'Content' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Not on any page' })).not.toBeInTheDocument();
+
+    act(() => adminSubscriptions.get('cmsPages_drafts')([SCHOLARSHIPS_PAGE]));
+    const recovery = await screen.findByRole('region', { name: 'Not on any page' });
+    expect(within(recovery).getByText('Bring a notebook.')).toBeInTheDocument();
+    expect(within(recovery).queryByText('Keep this here.')).not.toBeInTheDocument();
+    expect(within(recovery).queryByText('Our event heading')).not.toBeInTheDocument();
+    fireEvent.click(within(recovery).getByRole('button', { name: 'Move to section…' }));
+    const submit = within(recovery).getByRole('button', { name: 'Move and publish' });
+    expect(submit).toBeDisabled();
+    expect(within(recovery).getByText('This moves the published block. Its saved changes stay in a draft.')).toBeInTheDocument();
+
+    const target = '/admin/content/scholarships/intro';
+    fireEvent.change(within(recovery).getByRole('combobox', { name: 'Destination section' }), { target: { value: target } });
+    globalThis.fetch.mockImplementationOnce(async () => errorResponse(409, 'conflict', 'Choose another section.'));
+    fireEvent.click(submit);
+    expect(await within(recovery).findByRole('alert')).toHaveTextContent('Choose another section.');
+    expect(within(recovery).getByText('Bring a notebook.')).toBeInTheDocument();
+
+    globalThis.fetch.mockImplementationOnce(async () => okResponse({ docId: 'intro__body' }));
+    fireEvent.click(submit);
+    expect(await screen.findByRole('link', { name: 'Open Scholarships · Intro' })).toHaveAttribute('href', target);
+    expect(urlOf(1)).toMatch(/\/cmsMoveContent$/);
+    expect(bodyOf(1)).toEqual({ docId: orphan.id, pageId: 'scholarships', section: 'intro' });
+    act(() => {
+      adminSubscriptions.get('cmsContent')([owned, hero, { ...orphan, id: 'intro__body', section: 'intro' }]);
+      adminSubscriptions.get('cmsContent_drafts')([{ ...orphanDraft, id: 'intro__body', section: 'intro' }]);
+    });
+    expect(screen.queryByRole('region', { name: 'Not on any page' })).not.toBeInTheDocument();
+    expect(screen.getByText('Moved “Bring a notebook.” and published the block.', { exact: false })).toBeInTheDocument();
+  });
+
+  it('offers Home destinations only when the section has a place that displays the block', async () => {
+    sources.cmsPages = [
+      SCHOLARSHIPS_PAGE,
+      {
+        ...HOME_PAGE, systemPage: true, sections: [
+          ...HOME_PAGE.sections, { id: 'sponsors', label: 'Sponsors', maxBlocks: 4 },
+        ],
+      },
+    ];
+    const text = (field, value) => ({ id: `removed__${field}`, section: 'removed', field, blockType: 'text', value });
+    sources.cmsContent = [
+      HERO_TEXT[0],
+      { ...text('lede', 'The existing sponsor introduction'), id: 'sponsors__lede', section: 'sponsors' },
+      text('body', 'Opening copy'), text('title', 'The old headline'), text('subtitle', 'The old subtitle'),
+      { id: 'removed__art', section: 'removed', field: 'art', blockType: 'image', alt: 'The old photo' },
+    ];
+    sources.cmsContent_drafts = [
+      { id: 'hero__art', section: 'hero', field: 'art', blockType: 'image', status: 'dirty' },
+    ];
+    await renderAt('/admin/content');
+    const recovery = await screen.findByRole('region', { name: 'Not on any page' });
+    for (const title of ['Opening copy', 'The old headline', 'The old subtitle', 'The old photo']) {
+      const row = within(within(recovery).getByText(title).closest('li'));
+      fireEvent.click(row.getByRole('button', { name: 'Move to section…' }));
+      expect(row.getByRole('option', { name: 'Scholarships · Intro' })).toBeInTheDocument();
+      expect(row.queryByRole('option', { name: 'Home · Sponsors' })).not.toBeInTheDocument();
+      if (title === 'The old subtitle') {
+        expect(row.getByRole('option', { name: 'Home · Hero' })).toBeInTheDocument();
+      } else {
+        expect(row.queryByRole('option', { name: 'Home · Hero' })).not.toBeInTheDocument();
+      }
+    }
+  });
+
   it('lists pages, then the sections of the one chosen, then its blocks', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
