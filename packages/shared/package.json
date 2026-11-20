@@ -48,7 +48,6 @@
     "./imageSizes": { "require": "./src/imageSizes.cjs", "import": "./src/imageSizes.mjs" },
     "./consoleRequest": { "require": "./src/consoleRequest.cjs", "import": "./src/consoleRequest.mjs" },
     "./webVitals": { "require": "./src/webVitals.cjs", "import": "./src/webVitals.mjs" },
-    "./webVitalsNotice": "./src/webVitalsNotice.json",
     "./contentLanguages": { "require": "./src/contentLanguages.cjs", "import": "./src/contentLanguages.mjs" },
     "./languageUrls": { "require": "./src/languageUrls.cjs", "import": "./src/languageUrls.mjs" }
   }

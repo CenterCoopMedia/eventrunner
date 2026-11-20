@@ -28,6 +28,22 @@ const RETENTION_DAYS = 30;
 const MAX_BODY_BYTES = 512;
 const SAMPLE_KEYS = ['device', 'name', 'route', 'value'];
 
+const WEB_VITALS_NOTICE = Object.freeze({
+  collection:
+    'When field performance monitoring is on, this site samples 10% of browser documents and sends ' +
+    'performance measurements to the site’s own Event Runner function. The application payload has only a ' +
+    'metric name and value, a categorical route pattern, and a mobile or desktop viewport class. The function ' +
+    'stores Core Web Vitals and counts of waits that show the site’s taking-longer message only in anonymous ' +
+    'daily aggregate value buckets. The application payload and aggregate store do not contain full page URLs, ' +
+    'page-element selectors, account identifiers, cookie identifiers, session identifiers, IP addresses, or IP ' +
+    'address hashes. Standard platform HTTP request logs are separate from these aggregates and are unchanged. ' +
+    'The measurements use no third-party analytics endpoint.',
+  retention:
+    'When field performance monitoring is on, each anonymous daily aggregate expires 30 days after the start ' +
+    'of its UTC day. An observation is therefore scheduled to expire after 29 to 30 days. Cleanup runs every ' +
+    '30 minutes, so an expired aggregate can remain until the next cleanup.',
+});
+
 /** Reject unknown fields rather than discarding possible identifiers. */
 function validSample(sample) {
   if (!sample || typeof sample !== 'object' || Array.isArray(sample)) return false;
@@ -93,5 +109,5 @@ function summarizeVitals(records) {
     .sort((a, b) => a.route.localeCompare(b.route) || a.device.localeCompare(b.device) || a.name.localeCompare(b.name));
 }
 
-module.exports = { ROUTE_PATTERNS, METRICS, FEATURE_KEY, COLLECTION, RETENTION_DAYS, MAX_BODY_BYTES,
+module.exports = { ROUTE_PATTERNS, METRICS, FEATURE_KEY, COLLECTION, RETENTION_DAYS, MAX_BODY_BYTES, WEB_VITALS_NOTICE,
   validSample, bucketFor, bucketUpperBound, summarizeVitals };

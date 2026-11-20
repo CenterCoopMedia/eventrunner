@@ -1,6 +1,6 @@
 'use strict';
 
-const webVitalsNotice = require('shared/webVitalsNotice');
+const { WEB_VITALS_NOTICE } = require('shared/webVitals');
 
 /**
  * Provider-aware privacy and terms templates (spec §5.5).
@@ -121,7 +121,7 @@ function buildPrivacyBlocks(ctx) {
       section: 'privacy_data',
       field: 'performance',
       blockType: 'richtext',
-      value: clause(webVitalsNotice.collection),
+      value: clause(WEB_VITALS_NOTICE.collection),
     },
     {
       section: 'privacy_sharing',
@@ -146,7 +146,7 @@ function buildPrivacyBlocks(ctx) {
       section: 'privacy_retention',
       field: 'performance',
       blockType: 'richtext',
-      value: clause(webVitalsNotice.retention),
+      value: clause(WEB_VITALS_NOTICE.retention),
     },
     {
       section: 'privacy_rights',

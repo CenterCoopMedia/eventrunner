@@ -21,7 +21,7 @@ import { useLocation } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
 import { pageHeading } from 'shared/page';
-import webVitalsNotice from 'shared/webVitalsNotice';
+import { WEB_VITALS_NOTICE } from 'shared/webVitals';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
@@ -241,7 +241,7 @@ export default function ContentPage() {
   // The deployed privacy route supplies the approved text even when its
   // published content predates the seed. Keep any existing CMS copy.
   const missingPerformanceClauses = page.path === '/privacy' && fieldVitalsEnabled()
-    ? Object.entries(webVitalsNotice).filter(([, clause]) =>
+    ? Object.entries(WEB_VITALS_NOTICE).filter(([, clause]) =>
       !baseSections.some(({ blocks }) => blocks.some((block) =>
         block.blockType === 'richtext' && (block.value === `<p>${clause}</p>`
           || block.value === `<p>${clause} [Client legal review required]</p>`))))
