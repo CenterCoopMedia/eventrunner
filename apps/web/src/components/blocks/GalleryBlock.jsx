@@ -9,9 +9,8 @@
 // to switch off. Scroll snap does the sliding: a swipe on a touch screen is
 // a native scroll, and the buttons only move the scroller.
 //
-// Every picture resolves through useSizedImageSources, as ImageBlock does,
-// so a library path loads its display sizes from the bucket. Each picture
-// sits in a fixed aspect box, so nothing shifts while it loads.
+// Each picture keeps a fixed aspect box for the artwork and uses the shared
+// image figure to show the library caption and credit below it.
 //
 // The stored block is data from the CMS. Only library paths with alt text
 // are drawn, and an unknown layout draws as a grid.
@@ -19,6 +18,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
 import { useSizedImageSources } from '../../lib/useImageSizeSrcSet.js';
 import { secondaryActionClass } from '../controlClasses.js';
+import ImageFigure from '../media/ImageFigure.jsx';
 import { galleryImages, galleryLayout } from './galleryBlockFields.js';
 import './gallery.css';
 
@@ -32,17 +32,24 @@ const SIZES = Object.freeze({
 function GalleryPicture({ image, layout }) {
   const sources = useSizedImageSources(image.url);
   return (
-    <img
-      src={bundledDemoAssetUrl(image.url) ?? sources.src}
-      srcSet={sources.srcSet}
-      sizes={sources.srcSet ? SIZES[layout] : undefined}
-      onError={sources.onError}
-      alt={image.alt.trim()}
-      loading="lazy"
-      decoding="async"
-      className={`gallery__image gallery__image--${layout}`}
-      style={sources.pending ? { visibility: 'hidden' } : undefined}
-    />
+    <ImageFigure
+      placement={{}}
+      assetPath={sources.path}
+      className="gallery__figure"
+      mediaClassName="gallery__frame"
+    >
+      <img
+        src={bundledDemoAssetUrl(image.url) ?? sources.src}
+        srcSet={sources.srcSet}
+        sizes={sources.srcSet ? SIZES[layout] : undefined}
+        onError={sources.onError}
+        alt={image.alt.trim()}
+        loading="lazy"
+        decoding="async"
+        className="gallery__image"
+        style={sources.pending ? { visibility: 'hidden' } : undefined}
+      />
+    </ImageFigure>
   );
 }
 
@@ -212,7 +219,7 @@ export default function GalleryBlock({ block }) {
       <section className="gallery gallery--grid" aria-label={name} lang={block.publicLanguage}>
         <ul className="gallery__grid" role="list">
           {images.map((image, index) => (
-            <li key={`${image.url}-${index}`} className="gallery__cell">
+            <li key={`${image.url}-${index}`}>
               <GalleryPicture image={image} layout="grid" />
             </li>
           ))}
