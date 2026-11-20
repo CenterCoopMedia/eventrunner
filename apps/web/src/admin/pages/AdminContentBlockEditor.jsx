@@ -531,7 +531,13 @@ export default function AdminContentBlockEditor({ mode }) {
   async function save({ publish }) {
     // Short text edited while this save runs keeps its own undo; the same
     // words cached again by a round trip of switches do not.
-    const shortTextKey = (form) => (form ? JSON.stringify(contentEditSnapshot('', form)) : null);
+    // Only the words and translations: a restore takes order and
+    // visibility from the current form.
+    const shortTextKey = (form) => {
+      if (!form) return null;
+      const { values, translations } = contentEditSnapshot('', form);
+      return JSON.stringify({ values, translations });
+    };
     const shortTextAtSave = shortTextKey(shortTextRef.current);
     setError(null);
     setErrorTitle(undefined);
