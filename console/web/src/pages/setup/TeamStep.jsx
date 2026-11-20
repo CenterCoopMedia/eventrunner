@@ -19,7 +19,7 @@ export default function TeamStep({ orgId, onOwnersNeeded }) {
   if (!team.data) {
     return team.error ? (
       <ActionFeedback kind="error"><p>{team.error}</p><IconControl icon="refresh" label="Reload team" onClick={team.refresh} disabled={team.refreshing} /></ActionFeedback>
-    ) : <LoadingState>Loading the team.</LoadingState>;
+    ) : <LoadingState onRetry={team.refresh}>Loading the team.</LoadingState>;
   }
   return (
     <div>

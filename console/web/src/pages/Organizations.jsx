@@ -52,7 +52,7 @@ export default function Organizations() {
 
   const refresh = <IconControl icon="refresh" label="Refresh organizations" disabled={loading} onClick={() => setRefreshKey((value) => value + 1)} />;
   if (error && !data) return <div className="console-workspace"><p className="message error" role="alert">{error}</p>{refresh}</div>;
-  if (!data) return <LoadingState className="console-workspace">Loading your organizations.</LoadingState>;
+  if (!data) return <LoadingState className="console-workspace" onRetry={() => setRefreshKey((value) => value + 1)}>Loading your organizations.</LoadingState>;
 
   return (
     <section aria-labelledby="orgs-title" className="console-workspace organizations-workspace">

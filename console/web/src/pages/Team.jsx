@@ -19,7 +19,7 @@ export default function Team() {
         <p className="message error" role="alert">{error}</p>
         <IconControl icon="refresh" label="Refresh team" disabled={team.refreshing} onClick={team.refresh} />
       </section>
-    ) : <LoadingState>Loading the team.</LoadingState>;
+    ) : <LoadingState onRetry={team.refresh}>Loading the team.</LoadingState>;
   }
 
   return (

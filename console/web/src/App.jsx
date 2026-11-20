@@ -157,7 +157,7 @@ function ConfirmEmail({ user }) {
 function RequireAuth() {
   const { user, ready } = useAuth();
   const location = useLocation();
-  if (!ready) return <LoadingState long>Loading.</LoadingState>;
+  if (!ready) return <LoadingState long>Checking your sign-in.</LoadingState>;
   if (!user?.emailVerified) rememberReturn(`${location.pathname}${location.search}${location.hash}`);
   if (!user) return <Navigate to="/signin" replace />;
   if (!user.emailVerified) return <ConfirmEmail user={user} />;

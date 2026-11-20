@@ -11,16 +11,20 @@ export default function AcceptedAgreement() {
   const { orgId, appId } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    callApi('getAgreement', { orgId, appId }).then(setData, (err) => setError(err.message));
-  }, [orgId, appId]);
+    let live = true;
+    callApi('getAgreement', { orgId, appId })
+      .then((body) => { if (live) setData(body); }, (err) => { if (live) setError(err.message); });
+    return () => { live = false; };
+  }, [orgId, appId, refreshKey]);
 
   return (
     <section className="stack">
       <PageHeading tabIndex={-1}>Your agreement</PageHeading>
       {error ? <p className="message error" role="alert">{error}</p> : null}
-      {!data && !error ? <LoadingState>Loading the agreement.</LoadingState> : null}
+      {!data && !error ? <LoadingState onRetry={() => setRefreshKey((value) => value + 1)}>Loading the agreement.</LoadingState> : null}
       {data?.accepted && data.agreement ? <section aria-labelledby="past-event-hosting-title" className="stack">
         <h2 id="past-event-hosting-title">After your event</h2>
         <p>Your public pages, schedule and archive stay online after the event at no extra cost. Ticket sales close when the event ends. The hosting team can make the past site read-only during handoff.</p>

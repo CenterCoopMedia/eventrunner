@@ -11,13 +11,19 @@ export function useTeam(orgId) {
   const [stale, setStale] = useState(false);
   const inFlight = useRef(false);
 
+  // A read repeated while an older one hangs: only the newest one lands.
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const attempt = ++latest.current;
     try {
-      setData(await callApi('getTeam', { orgId }));
+      const body = await callApi('getTeam', { orgId });
+      if (attempt !== latest.current) return '';
+      setData(body);
       setError('');
       setStale(false);
       return '';
     } catch (err) {
+      if (attempt !== latest.current) return '';
       setError(err.message);
       return err.message;
     }

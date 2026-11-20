@@ -57,7 +57,7 @@ export default function ReviewQueue() {
 
       <h2 id="queue-list-title">{STATUS_LABELS[status]}</h2>
       {error ? <p className="message error" role="alert">{error.message}</p> : null}
-      {!data && !error ? <LoadingState>Loading the requests.</LoadingState> : null}
+      {!data && !error ? <LoadingState onRetry={() => setRefreshKey((value) => value + 1)}>Loading the requests.</LoadingState> : null}
       {data && data.applications.length === 0 ? <div className="directory-empty">
         <p>No requests here. Choose another status or create a signup link.</p>
         <Link className="button" to="/review/links">Create signup link</Link>
