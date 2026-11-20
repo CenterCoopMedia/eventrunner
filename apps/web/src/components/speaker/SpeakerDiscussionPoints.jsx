@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MAX_DISCUSSION_POINTS_LENGTH, validateDiscussionPoints } from 'shared/speakerDiscussion';
 import { getSpeakerDiscussionPoints, saveSpeakerDiscussionPoints } from '../../lib/speakerDiscussionApi.js';
+import useLoadingStage from '../../lib/useLoadingStage.js';
 import { TextAreaField, focusFirstError } from '../forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from '../controlClasses.js';
-import LoadingState from '../LoadingState.jsx';
+import LoadingState, { LoadingStateView } from '../LoadingState.jsx';
 
 const INITIAL = {
   phase: 'loading', draft: '', submission: null, revision: null,
@@ -25,6 +26,7 @@ function accessFailure(error) {
 // keys its owner by account UID and canonical speaker ID before rendering it.
 export function useSpeakerDiscussion({ user, speakerId }) {
   const [state, setState] = useState(INITIAL);
+  const { stage: saveStage } = useLoadingStage({ active: state.phase === 'saving' });
   const latest = useRef(state);
   latest.current = state;
   const currentUser = useRef(user);
@@ -127,7 +129,7 @@ export function useSpeakerDiscussion({ user, speakerId }) {
   }
 
   return {
-    ...state, load, save,
+    ...state, load, save, saveStage,
     changeDraft: (draft) => setState((previous) => ({
       ...previous, draft, fieldError: '', phase: previous.phase === 'saved' ? 'ready' : previous.phase,
     })),
@@ -135,7 +137,7 @@ export function useSpeakerDiscussion({ user, speakerId }) {
 }
 
 export default function SpeakerDiscussionPoints({ discussion }) {
-  const { phase, draft, submission, revision, pending, error, fieldError, accessBlocked, load, save, changeDraft } = discussion;
+  const { phase, draft, submission, revision, pending, error, fieldError, accessBlocked, load, save, saveStage, changeDraft } = discussion;
   if (accessBlocked) {
     return (
       <div>
@@ -196,6 +198,7 @@ export default function SpeakerDiscussionPoints({ discussion }) {
   return (
     <>
       {phase === 'loading' ? <LoadingState label="Loading saved discussion points…" rows={0} /> : null}
+      {phase === 'saving' ? <LoadingStateView label="Saving discussion points…" rows={0} stage={saveStage} /> : null}
       {form}
     </>
   );
