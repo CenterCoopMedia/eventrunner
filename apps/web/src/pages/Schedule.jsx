@@ -22,6 +22,7 @@ import { useEventClock } from '../hooks/useEventClock.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
+import { fragmentId } from '../components/ScrollReset.jsx';
 import EventHero from '../components/EventHero.jsx';
 import { demoHero } from '../lib/demoHero.js';
 import { IS_DEMO } from '../lib/demoMode.js';
@@ -87,6 +88,7 @@ const ScheduleResultsList = memo(function ScheduleResultsList({
           // its parent, not a row in the programme.
           position={index + 1}
           lead={index === 0}
+          scheduleAnchor
         />
       ))}
     </ul>
@@ -302,7 +304,12 @@ export default function Schedule() {
   const hasFilters = formatOptions.length > 0 || trackOptions.length > 0;
   // The URL's day, or the first configured day. An id the event no longer
   // carries already fell back at read time.
-  const activeDayId = view.day ?? days[0]?.id ?? null;
+  const targetSessionId = fragmentId(location.hash);
+  const targetDayId = targetSessionId
+    ? visibleSessions.find((session) => session.id === targetSessionId)?.dayId
+    : null;
+  const fragmentDay = knownView.dayIds.has(targetDayId) ? targetDayId : null;
+  const activeDayId = view.day ?? fragmentDay ?? days[0]?.id ?? null;
 
   useLayoutEffect(() => {
     // Back can interrupt a pending update and return to the location
@@ -355,8 +362,11 @@ export default function Schedule() {
    */
   function updateView(patch, { replace = false } = {}) {
     const previous = pendingParams.current ?? searchParams;
+    const previousView = readScheduleView(previous, knownView);
+    // A query change leaves the fragment. Keep the day it opened in view.
+    const day = previousView.day ?? (pendingParams.current ? null : fragmentDay);
     const params = writeScheduleView(
-      { ...readScheduleView(previous, knownView), ...patch },
+      { ...previousView, day, ...patch },
       { firstDayId: days[0]?.id ?? null },
       previous,
     );

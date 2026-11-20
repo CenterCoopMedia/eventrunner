@@ -116,7 +116,7 @@ export function SpeakerNames({
 
 /**
  * @param {{ session: object, eventConfig: object, features?: object,
- *           bookmarked?: boolean, linkToDetail?: boolean,
+ *           bookmarked?: boolean, linkToDetail?: boolean, scheduleAnchor?: boolean,
  *           callingPoints?: object[], backIssue?: boolean,
  *           position?: number | null, lead?: boolean,
  *           savedCount?: number, state?: 'running' | 'finished' | null,
@@ -140,6 +140,7 @@ export default function SessionCard({
   features = {},
   bookmarked = false,
   linkToDetail = true,
+  scheduleAnchor = false,
   callingPoints = [],
   backIssue = false,
   position = null,
@@ -187,7 +188,7 @@ export default function SessionCard({
           been. */}
       <article className="session-block__face grid sm:grid-cols-[9.5rem,1fr]">
         <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
-          <h3 lang={session.publicLanguage} className="session-block__title font-heading font-semibold text-text-primary">
+          <h3 id={scheduleAnchor ? session.id : undefined} lang={session.publicLanguage} className="session-block__title font-heading font-semibold text-text-primary">
             {linkToDetail ? (
               <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
                 {session.title}
@@ -234,6 +235,7 @@ export default function SessionCard({
           {/* A parent session's children are calling points on the way
               through it (brief §4.6), never rows of their own. */}
           <CallingPoints
+            scheduleAnchor={scheduleAnchor}
             className="mt-sm"
             parent={session}
             points={callingPoints}

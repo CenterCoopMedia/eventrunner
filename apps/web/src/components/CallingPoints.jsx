@@ -39,10 +39,11 @@ import { formatSessionStart } from '../lib/eventTime.js';
  *   parent: object,
  *   points: object[],   // the parent's children, in programme order
  *   eventConfig: object,
+ *   scheduleAnchor?: boolean,
  *   className?: string,
  * }} props
  */
-export default function CallingPoints({ parent, points, eventConfig, className = '' }) {
+export default function CallingPoints({ parent, points, eventConfig, className = '', scheduleAnchor = false }) {
   const { language, text } = usePublicLanguage();
   const [open, setOpen] = useState(true);
   // The initially visible programme is still; only a reader's reopening enters.
@@ -85,7 +86,12 @@ export default function CallingPoints({ parent, points, eventConfig, className =
           // most calling points, and renders as nothing at all.
           const movement = sessionMovement(eventConfig, parent, child);
           return (
-            <li key={child.id} className="calling-points__item">
+            <li
+              key={child.id}
+              id={scheduleAnchor && open ? child.id : undefined}
+              tabIndex={scheduleAnchor && open ? -1 : undefined}
+              className="calling-points__item"
+            >
               <p className="font-mono text-caption text-text-secondary">
                 {range ? (
                   <time dateTime={range.startIso}>{range.startLabel}</time>

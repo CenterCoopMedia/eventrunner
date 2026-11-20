@@ -843,6 +843,18 @@
   .attendee-index__entry {
     padding-block: var(--directory-entry-pad-block);
   }
+  @media screen {
+    .attendee-index__entry {
+      content-visibility: auto;
+      /* The avatar sets the one-line row height. Keep the measured size
+         for a row that has wrapped once it scrolls out of view. */
+      contain-intrinsic-block-size: auto 1.75rem;
+    }
+    .attendee-index__entry:focus-within {
+      /* Leave room for the full focus ring when a name wraps to an edge. */
+      content-visibility: visible;
+    }
+  }
 
   /* ------------------------------------------------------------------
      SPONSORS — a logo wall, weighted by tier. A supporter's standing is

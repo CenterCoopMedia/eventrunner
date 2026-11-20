@@ -456,3 +456,192 @@ for (const viewport of Object.keys(VIEWPORTS)) {
     expect(report.actions.filter(({ skipped }) => !skipped).every(({ trustedInputs }) => trustedInputs > 0)).toBe(true);
   });
 }
+
+async function openListFixture(browser, pathname, viewport = VIEWPORTS.phone) {
+  const page = await browser.newPage({ viewport });
+  await page.route('**/*', (route) =>
+    new URL(route.request().url()).origin === origin ? route.continue() : route.abort(),
+  );
+  await page.goto(origin + pathname);
+  return page;
+}
+
+async function scrollDirectory(page) {
+  return page.evaluate(async () => {
+    await globalThis.document.fonts.ready;
+    const box = globalThis.document.scrollingElement;
+    const nextFrame = () => new Promise((resolve) => globalThis.requestAnimationFrame(resolve));
+    const range = () => box.scrollHeight - box.clientHeight;
+    const shifts = [];
+    const observer = globalThis.PerformanceObserver.supportedEntryTypes.includes('layout-shift')
+      ? new globalThis.PerformanceObserver((list) => shifts.push(...list.getEntries()))
+      : null;
+    observer?.observe({ type: 'layout-shift' });
+    const startRange = range();
+    let previousRange = startRange;
+    let maxCorrection = 0;
+    let maxRangeStep = 0;
+    const step = Math.floor(box.clientHeight * 0.8);
+    for (let y = step; y < range() + step; y += step) {
+      const requested = Math.min(y, range());
+      globalThis.scrollTo({ top: requested, behavior: 'instant' });
+      await nextFrame();
+      await nextFrame();
+      const currentRange = range();
+      maxCorrection = Math.max(maxCorrection, Math.abs(box.scrollTop - Math.min(requested, currentRange)));
+      maxRangeStep = Math.max(maxRangeStep, Math.abs(currentRange - previousRange));
+      previousRange = currentRange;
+    }
+    await nextFrame();
+    if (observer) shifts.push(...observer.takeRecords());
+    observer?.disconnect();
+    // CLS is the largest window, with <1s between shifts and <5s total.
+    let cls = 0;
+    let first = null;
+    let last = 0;
+    let sum = 0;
+    for (const shift of shifts.filter((entry) => !entry.hadRecentInput)) {
+      if (first === null || shift.startTime - last >= 1000 || shift.startTime - first >= 5000) {
+        first = shift.startTime;
+        sum = 0;
+      }
+      last = shift.startTime;
+      sum += shift.value;
+      cls = Math.max(cls, sum);
+    }
+    return { startRange, endRange: range(), maxCorrection, maxRangeStep, cls: observer ? cls : null };
+  });
+}
+
+for (const [name, viewport] of Object.entries(VIEWPORTS)) {
+  test('long-list directory scroll and focus on ' + name, async ({ browser, browserName }) => {
+    const reports = {};
+    for (const mode of ['visible', 'contained']) {
+      const page = await openListFixture(browser, '/attendees', viewport);
+      try {
+        if (mode === 'visible') {
+          await page.addStyleTag({ content: '.attendee-index__entry { content-visibility: visible !important; }' });
+        }
+        await expect(page.locator('.attendee-index__entry')).toHaveCount(fixtureData.fixture.directory.length);
+        reports[mode] = await scrollDirectory(page);
+        if (reports[mode].cls !== null) expect(reports[mode].cls).toBeLessThanOrEqual(0.1);
+        if (mode === 'visible') continue;
+
+        const { target, following, group } = await page.evaluate(() => {
+          const sections = [...globalThis.document.querySelectorAll('.attendee-index > section')];
+          const links = [...globalThis.document.querySelectorAll('.attendee-index h3 a')];
+          const counts = new Map();
+          for (const link of links) counts.set(link.textContent, (counts.get(link.textContent) ?? 0) + 1);
+          for (const section of sections.reverse()) {
+            const names = [...section.querySelectorAll('h3 a')].map((link) => link.textContent);
+            const index = names.findIndex((name, i) => counts.get(name) === 1 && i < names.length - 1);
+            if (index >= 0) return { target: names[index], following: names[index + 1], group: section.querySelector('h2').id };
+          }
+          throw new Error('The fixture needs an off-screen unique name and a following row.');
+        });
+        await page.evaluate(() => {
+          globalThis.getSelection().removeAllRanges();
+          globalThis.scrollTo({ top: 0, behavior: 'instant' });
+        });
+        const groupSection = page.locator('section[aria-labelledby="' + group + '"]');
+        const match = groupSection.getByRole('link', { name: target, exact: true });
+        await expect(match).not.toBeInViewport();
+        await match.focus();
+        await expect(match).toBeFocused();
+        await expect(match).toBeInViewport();
+        const accessible = await groupSection.ariaSnapshot();
+        expect(accessible).toContain(target);
+        expect(accessible.indexOf(following, accessible.indexOf(target))).toBeGreaterThan(accessible.indexOf(target));
+        await page.keyboard.press('Tab');
+        await expect(match.locator('xpath=ancestor::li[1]/following-sibling::li[1]').getByRole('link', {
+          name: following, exact: true,
+        })).toBeFocused();
+        const longName = page.getByRole('link', { name: /^Maximiliana Alejandra/ }).last();
+        await longName.focus();
+        await expect(longName).toBeFocused();
+        await expect(longName.locator('xpath=ancestor::li[1]')).toHaveCSS('content-visibility', 'visible');
+        await page.emulateMedia({ media: 'print' });
+        expect(await match.evaluate((link) => globalThis.getComputedStyle(link.closest('li')).contentVisibility)).toBe('visible');
+      } finally {
+        await page.close();
+      }
+    }
+    await fs.writeFile(path.join(EVIDENCE, 'containment-directory-' + browserName + '-' + name + '.json'),
+      JSON.stringify({ source, browser: browser.version(), viewport, ...reports }, null, 2));
+  });
+}
+
+test('long-list schedule fragments land on both layouts and keep the complete print schedule', async ({ browser }) => {
+  const dense = fixtureData.fixture.scheduleData.filter((session) => session.dayId === fixtureData.DENSE_DAY);
+  const parent = dense.filter((session) => !session.parentId).sort((a, b) => a.startTime.localeCompare(b.startTime)).at(-12);
+  const child = dense.filter((session) => session.parentId).sort((a, b) => a.startTime.localeCompare(b.startTime)).at(-12);
+  for (const [mount, viewport, session] of [['', VIEWPORTS.phone, parent], ['/fixture-event', VIEWPORTS.desktop, child]]) {
+    const page = await openListFixture(browser, mount
+      ? mount + '/schedule#' + encodeURIComponent(session.id)
+      : '/fragment-link', viewport);
+    try {
+      if (!mount) await page.getByRole('link', { name: 'Open a session fragment' }).click();
+      const target = page.locator('[id="' + session.id + '"]');
+      await expect(target).toBeFocused();
+      await expect(target).toBeInViewport();
+      const atLanding = await page.evaluate(() => globalThis.scrollY);
+      expect(atLanding).toBeGreaterThan(viewport.height);
+      await page.evaluate(async () => {
+        await globalThis.document.fonts.ready;
+        await new Promise((resolve) => globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve)));
+      });
+      expect(Math.abs(await page.evaluate(() => globalThis.scrollY) - atLanding)).toBeLessThanOrEqual(1);
+      await expect(page.getByRole('button', { name: 'Friday' })).toHaveAttribute('aria-pressed', 'true');
+
+      await searchBox(page).fill('~');
+      await expect(page.locator('[data-schedule-results]')).toContainText('No sessions');
+      expect(new URL(page.url()).pathname).toBe(mount + '/schedule');
+      expect(new URL(page.url()).searchParams.get('day')).toBe(fixtureData.DENSE_DAY);
+
+      await page.emulateMedia({ media: 'print' });
+      await expect(page.locator('.schedule-print')).toBeVisible();
+      await expect(page.locator('.schedule-screen')).toBeHidden();
+      await expect(page.locator('.schedule-print__day')).toHaveCount(fixtureData.eventDays.length);
+      await expect(page.locator('.schedule-print li')).toHaveCount(fixtureData.fixture.scheduleData.length);
+      await expect(page.locator('.schedule-print__calls li')).toHaveCount(
+        fixtureData.fixture.scheduleData.filter((entry) => entry.parentId).length,
+      );
+    } finally {
+      await page.close();
+    }
+  }
+});
+
+test('long-list admin table row containment keeps the layout work in Chromium', async ({ browser, browserName }) => {
+  test.skip(browserName !== 'chromium', 'The admin containment probe measures Chromium.');
+  const reports = {};
+  for (const mode of ['visible', 'contained']) {
+    const page = await openListFixture(browser, '/admin-table');
+    try {
+      const region = page.getByRole('region', { name: 'Synthetic attendee comparison' });
+      const header = region.getByRole('columnheader', { name: 'Attendee' });
+      await expect(region.getByRole('row')).toHaveCount(fixtureData.fixture.directory.length + 1);
+      await expect(header).toBeVisible();
+      if (mode === 'contained') {
+        await page.addStyleTag({ content: 'tbody tr { content-visibility: auto; contain-intrinsic-block-size: auto 2rem; }' });
+      }
+      await page.keyboard.press('Tab');
+      await expect(region).toBeFocused();
+      await page.keyboard.press('PageDown');
+      await expect.poll(() => region.evaluate((box) => box.scrollTop)).toBeGreaterThan(50);
+      await expect(header).toBeInViewport();
+      reports[mode] = await region.evaluate((box) => ({
+        skippedCells: [...box.querySelectorAll('tbody tr > td:first-child')]
+          .filter((cell) => !cell.checkVisibility({ contentVisibilityAuto: true })).length,
+        height: box.scrollHeight,
+        width: box.scrollWidth,
+        headerOffset: box.querySelector('th').getBoundingClientRect().top - box.getBoundingClientRect().top,
+      }));
+    } finally {
+      await page.close();
+    }
+  }
+  await fs.writeFile(path.join(EVIDENCE, 'containment-admin-table.json'),
+    JSON.stringify({ source, browser: browser.version(), ...reports }, null, 2));
+  expect(reports.contained).toEqual(reports.visible);
+});
