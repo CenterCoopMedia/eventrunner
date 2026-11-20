@@ -20,7 +20,16 @@ const WIDE_EDITOR_SECTIONS = new Set(['pages', 'content']);
  * @returns {'wide'|'form'}
  */
 export function adminScreenWidth(pathname) {
-  const segments = String(pathname ?? '').split('/').filter(Boolean);
+  // Read the path the way the router matches it (and AdminLayout's
+  // adminSection): decoded and case-blind.
+  const segments = [];
+  for (const raw of String(pathname ?? '').split('/').filter(Boolean)) {
+    try {
+      segments.push(decodeURIComponent(raw).toLowerCase());
+    } catch {
+      return 'form';
+    }
+  }
   if (segments[0] !== 'admin') return 'form';
   const [, section = '', ...rest] = segments;
   if (FORM_SECTIONS.has(section)) return 'form';

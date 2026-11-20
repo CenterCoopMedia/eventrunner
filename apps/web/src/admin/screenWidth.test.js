@@ -21,4 +21,11 @@ describe('adminScreenWidth', () => {
       expect(adminScreenWidth(path), path).toBe('form');
     }
   });
+
+  it('reads a path the way the router matches it', () => {
+    expect(adminScreenWidth('/Admin/pages/home')).toBe('wide');
+    expect(adminScreenWidth('/admin/%70ages/home')).toBe('wide');
+    expect(adminScreenWidth('/admin/Settings')).toBe('form');
+    expect(adminScreenWidth('/admin/%E0%A4%A')).toBe('form');
+  });
 });
