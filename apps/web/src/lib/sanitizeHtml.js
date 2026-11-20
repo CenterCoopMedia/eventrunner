@@ -26,16 +26,42 @@ const ALLOWED_TAGS = new Set(RICH_TEXT_ALLOWED_TAGS);
 // Removed entirely, contents included — script bodies and iframe fallbacks
 // must not leak into the page as text.
 const DROP_WITH_CONTENT = new Set(RICH_TEXT_DROP_WITH_CONTENT_TAGS);
-
-/** True for hrefs we allow on <a>: relative paths, fragments, http(s), mailto, tel. */
-export function isSafeHref(value) {
-  return isSafeRichTextHref(value);
-}
+const HEADING_TAGS = new Set(['h2', 'h3', 'h4']);
 
 // Defensive cap on total elements walked. A ~1MB Firestore doc could in
 // principle nest far deeper than any legitimate editor content would; this
 // keeps a pathological document bounded instead of pegging the main thread.
 const MAX_NODES_WALKED = 20000;
+
+function isEmbedSourceHeading(heading, doc) {
+  const walker = doc.createTreeWalker(heading, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  let text = '';
+  let walked = 0;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    // Leave code examples alone and never scan a nested heading twice.
+    if (++walked > MAX_NODES_WALKED || node.localName === 'code' || HEADING_TAGS.has(node.localName)) return false;
+    if (node.nodeType === Node.TEXT_NODE) text += node.data;
+  }
+  text = text.trim();
+  if (!text.startsWith('<')) return false;
+
+  // Read the shape of the decoded paste without activating its contents.
+  const template = doc.createElement('template');
+  template.innerHTML = text;
+  const embed = template.content.querySelector('iframe, object, embed, script');
+  if (!embed) return false;
+  // A tag name at the start of a heading can be ordinary prose. The HTML
+  // parser implicitly closes the element even when the author did not.
+  if (embed.localName !== 'embed' && !new RegExp(`</${embed.localName}\\s*>`, 'i').test(text)) return false;
+  return Array.from(template.content.childNodes).every((node) =>
+    node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.COMMENT_NODE
+    || (node.nodeType === Node.TEXT_NODE && !node.data.trim()));
+}
+
+/** True for hrefs we allow on <a>: relative paths, fragments, http(s), mailto, tel. */
+export function isSafeHref(value) {
+  return isSafeRichTextHref(value);
+}
 
 // Builds a *fresh* output tree rather than mutating the parsed one in
 // place. An earlier version unwrapped disallowed wrappers (div, span,
@@ -52,7 +78,7 @@ const MAX_NODES_WALKED = 20000;
 // element or a text node, so every appendChild is O(1) — nothing we ever
 // move carries an unprocessed subtree with it. Iterative (explicit stack)
 // rather than recursive so pathological depth can't blow the JS call stack.
-function cleanTree(sourceRoot, doc, routeLink) {
+function cleanTree(sourceRoot, doc, { routeLink, omitEmbedSourceHeadings }) {
   const rootFragment = doc.createDocumentFragment();
   const stack = [
     { children: Array.from(sourceRoot.childNodes), index: 0, target: rootFragment },
@@ -87,6 +113,9 @@ function cleanTree(sourceRoot, doc, routeLink) {
       stack.push({ children: Array.from(child.childNodes), index: 0, target: frame.target });
       continue;
     }
+    if (omitEmbedSourceHeadings && HEADING_TAGS.has(tag) && isEmbedSourceHeading(child, doc)) {
+      continue;
+    }
     // Allowed element: rebuild it with only the allowlisted attributes.
     const clean = doc.createElement(tag);
     if (tag === 'a') {
@@ -110,13 +139,13 @@ function cleanTree(sourceRoot, doc, routeLink) {
  * Sanitize a CMS richtext value to the allowlisted subset. Always returns a
  * string; non-strings and parse failures come back as ''.
  */
-export function sanitizeHtml(html, routeLink) {
+export function sanitizeHtml(html, options = {}) {
   if (typeof html !== 'string' || html === '') return '';
   try {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     if (!doc?.body) return '';
     const container = doc.createElement('div');
-    container.appendChild(cleanTree(doc.body, doc, routeLink));
+    container.appendChild(cleanTree(doc.body, doc, options));
     return container.innerHTML;
   } catch {
     // Never let a pathological document take the renderer down with it.
