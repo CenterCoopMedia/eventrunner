@@ -167,7 +167,9 @@ describe('signed out', () => {
 
       await act(async () => setAuthUser(signedInUser));
       const account = within(screen.getByRole('main')).getByRole('status');
-      expect(screen.getByText('Setting up your account…')).toBeVisible();
+      const accountLabel = screen.getByText('Setting up your account…');
+      expect(accountLabel).toBeVisible();
+      expect(accountLabel.closest('[aria-hidden="true"]')).toBeNull();
       expect(account).toBeEmptyDOMElement();
       expect(auth).not.toBeInTheDocument();
       act(() => vi.advanceTimersByTime(29_999));

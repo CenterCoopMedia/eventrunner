@@ -27,6 +27,7 @@ describe('LoadingState', () => {
     advance(1);
     const activity = container.querySelector('.held-figure');
     expect(activity).toHaveAttribute('aria-hidden', 'true');
+    expect(copy.closest('[aria-hidden="true"]')).toBeNull();
     expect(status).not.toContainElement(activity);
     expect(screen.getByRole('status')).toBe(status);
     expect(status.textContent).toBe('Loading the schedule…');
@@ -54,6 +55,7 @@ describe('LoadingState', () => {
     }
     mutations.disconnect();
     expect(container.querySelector('.loading-status')).toHaveAttribute('data-loading-stage', 'prolonged');
+    expect(container.querySelector('.loading-status__label').closest('[aria-hidden="true"]')).toBeNull();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     expect(status.textContent).not.toContain('%');
   });

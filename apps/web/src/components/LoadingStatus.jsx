@@ -31,7 +31,7 @@ export default function LoadingStatus({
           {waiting ? <HeldFigure stage={stage} still={still} /> : null}
         </span>
       ) : null}
-      <p aria-hidden={still ? undefined : 'true'} className="loading-status__copy">
+      <p aria-hidden={!still && !waiting ? 'true' : undefined} className="loading-status__copy">
         <span className="loading-status__label">{label}</span>
         {detail ? <span className="loading-status__detail">{detail}</span> : null}
       </p>
