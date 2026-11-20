@@ -19,6 +19,7 @@
 // IT IS NOT A SECOND COPY OF THE PAGE ON SCREEN. `display: none` outside
 // print media keeps it out of the layout AND out of the accessibility
 // tree, so a screen reader never meets a session twice (index.css).
+import { memo } from 'react';
 import { formatDayDate, formatSessionStart, formatSessionTimeRange } from '../lib/eventTime.js';
 import { withCallingPoints } from '../lib/scheduleGrid.js';
 
@@ -42,7 +43,7 @@ function metaLine(session, columns) {
  *   eventConfig: object,
  * }} props
  */
-export default function SchedulePrint({ days, sessionsByDay, columns, eventConfig }) {
+export default memo(function SchedulePrint({ days, sessionsByDay, columns, eventConfig }) {
   return (
     <div className="schedule-print">
       {days.map((day) => {
@@ -117,4 +118,4 @@ export default function SchedulePrint({ days, sessionsByDay, columns, eventConfi
       })}
     </div>
   );
-}
+});

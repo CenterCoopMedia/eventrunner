@@ -211,9 +211,11 @@ export function readScheduleView(searchParams, known = {}) {
  *
  * @param {{ q?: string, formats?: string[], tracks?: string[], day?: string | null, sort?: string }} view
  * @param {{ firstDayId?: string | null }} [defaults]
+ * @param {URLSearchParams} [previousParams] parameters from the current URL
  */
-export function writeScheduleView(view, defaults = {}) {
-  const params = new URLSearchParams();
+export function writeScheduleView(view, defaults = {}, previousParams) {
+  const params = new URLSearchParams(previousParams);
+  for (const key of ['q', 'format', 'track', 'day', 'sort']) params.delete(key);
   if (typeof view.q === 'string' && view.q) params.set('q', view.q);
   if (Array.isArray(view.formats) && view.formats.length > 0) {
     params.set('format', view.formats.join(','));

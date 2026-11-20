@@ -16,26 +16,50 @@ const TIME_24H_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 // The default keeps the existing English display and wall-clock arithmetic.
 const DISPLAY_LOCALE = 'en-US';
 
-function partsIn(timeZone, instant, options) {
-  return new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone, ...options })
-    .formatToParts(instant)
-    .reduce((acc, part) => {
-      if (part.type !== 'literal') acc[part.type] = part.value;
-      return acc;
-    }, {});
+// Each display format keeps its last zone. A schedule usually renders one
+// zone for every row, and switching events should not grow the cache.
+function formatterForZone(locale, options) {
+  let lastZone;
+  let formatter;
+  return (timeZone) => {
+    if (!formatter || timeZone !== lastZone) {
+      formatter = new Intl.DateTimeFormat(locale, { timeZone, ...options });
+      lastZone = timeZone;
+    }
+    return formatter;
+  };
+}
+
+const wallClockFormatter = formatterForZone(DISPLAY_LOCALE, {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+const clockFormatter = formatterForZone(DISPLAY_LOCALE, {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+const spanishClockFormatter = formatterForZone('es', { hour: 'numeric', minute: '2-digit' });
+const datelineFormatter = formatterForZone(DISPLAY_LOCALE, {
+  year: 'numeric', month: 'long', day: 'numeric',
+});
+
+function dateTimeFields(formatter, instant) {
+  const fields = {};
+  for (const { type, value } of formatter.formatToParts(instant)) {
+    if (type !== 'literal') fields[type] = value;
+  }
+  return fields;
 }
 
 // The UTC-ms value whose fields equal `instant`'s wall clock in `timeZone`.
 function wallClockAsUtcMs(instant, timeZone) {
-  const p = partsIn(timeZone, instant, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
+  const p = dateTimeFields(wallClockFormatter(timeZone), instant);
   // Some ICU builds render midnight as "24" in hour12:false mode.
   const hour = p.hour === '24' ? '00' : p.hour;
   return Date.UTC(+p.year, +p.month - 1, +p.day, +hour, +p.minute, +p.second);
@@ -91,11 +115,7 @@ export function zonedDateTime(dateStr, timeStr, timeZone) {
 }
 
 function clockParts(instant, timeZone) {
-  const p = partsIn(timeZone, instant, {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const p = dateTimeFields(clockFormatter(timeZone), instant);
   return { clock: `${p.hour}:${p.minute}`, period: p.dayPeriod ?? '' };
 }
 
@@ -166,7 +186,7 @@ export function formatSessionTimeRange(eventConfig, session, language) {
   if (!start) return null;
 
   if (language === 'es') {
-    const clock = new Intl.DateTimeFormat('es', { timeZone, hour: 'numeric', minute: '2-digit' });
+    const clock = spanishClockFormatter(timeZone);
     return {
       startIso: `${startDate}T${session.startTime}`,
       startLabel: clock.format(start),
@@ -402,9 +422,9 @@ export function formatEventDateRange(days, timeZone, language) {
     const date = new Intl.DateTimeFormat('es', { timeZone, dateStyle: 'long' });
     return date.formatRange(first, last);
   }
-  const parts = (instant, options) => partsIn(timeZone, instant, options);
-  const startParts = parts(first, { year: 'numeric', month: 'long', day: 'numeric' });
-  const endParts = parts(last, { year: 'numeric', month: 'long', day: 'numeric' });
+  const formatter = datelineFormatter(timeZone);
+  const startParts = dateTimeFields(formatter, first);
+  const endParts = dateTimeFields(formatter, last);
 
   const startFull = `${startParts.month} ${startParts.day}, ${startParts.year}`;
   if (first.getTime() === last.getTime()) return startFull;

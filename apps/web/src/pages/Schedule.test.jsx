@@ -167,6 +167,7 @@ function HistoryControls() {
   return (
     <>
       <button type="button" onClick={() => navigate(-1)}>Go back</button>
+      <button type="button" onClick={() => navigate(1)}>Go forward</button>
       <output aria-label="Current URL">{location.pathname}{location.search}</output>
     </>
   );
@@ -795,6 +796,31 @@ describe('schedule search', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
     expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeInTheDocument();
+  });
+
+  it('preserves a pending query across a day change and restores it on Back', () => {
+    renderSchedule({ initialEntries: ['/schedule?ref=fixture&q=morning'], historyControls: true });
+    const input = screen.getByRole('searchbox', { name: 'Search this day' });
+    expect(input).toHaveValue('morning');
+
+    act(() => {
+      type('editing');
+      fireEvent.click(screen.getByRole('button', { name: 'Day two' }));
+      type('roundtable');
+    });
+    const currentUrl = screen.getByLabelText('Current URL');
+    expect(currentUrl).toHaveTextContent('/schedule?ref=fixture&q=roundtable&day=fx-day-2');
+    expect(input).toHaveValue('roundtable');
+    expect(onScreen().getByText('[Fixture] Day-two roundtable')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    expect(currentUrl).toHaveTextContent('/schedule?ref=fixture&q=editing');
+    expect(input).toHaveValue('editing');
+    expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go forward' }));
+    expect(input).toHaveValue('roundtable');
+    expect(onScreen().getByText('[Fixture] Day-two roundtable')).toBeVisible();
   });
 
   it('narrows the grid too', () => {
