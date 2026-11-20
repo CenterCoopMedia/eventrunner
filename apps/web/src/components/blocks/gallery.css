@@ -1,7 +1,19 @@
 /* Gallery block (#1176). Each picture sits in a fixed aspect box, so the
    page does not shift while it loads. Nothing here moves on its own. */
 
+.gallery .gallery__figure {
+  inline-size: 100%;
+  margin: 0;
+}
+
+.gallery__frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+}
+
 .gallery__image {
+  position: absolute;
+  inset: 0;
   display: block;
   inline-size: 100%;
   block-size: 100%;
@@ -10,11 +22,6 @@
   outline: 1px solid rgb(var(--color-text-primary-rgb) / 0.08);
   outline-offset: -1px;
   background: rgb(var(--color-surface-alt-rgb));
-}
-
-.gallery__cell,
-.gallery__slide {
-  aspect-ratio: 4 / 3;
 }
 
 .gallery__grid {
@@ -58,6 +65,7 @@
 
 .gallery__slide {
   flex: 0 0 80%;
+  min-inline-size: 0;
   scroll-snap-align: start;
 }
 
@@ -76,9 +84,12 @@
 /* One picture at a time, shown whole on a quiet ground. */
 .gallery--slideshow .gallery__slide {
   flex-basis: 100%;
+}
+
+.gallery--slideshow .gallery__frame {
   aspect-ratio: 3 / 2;
 }
 
-.gallery__image--slideshow {
+.gallery--slideshow .gallery__image {
   object-fit: contain;
 }
