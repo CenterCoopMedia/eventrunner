@@ -215,6 +215,7 @@ it('opens footer editing from Content and saves a page selection beside existing
     SCHOLARSHIPS_PAGE,
     { ...SCHOLARSHIPS_PAGE, id: 'faq', path: '/faq', label: 'FAQ', order: 8 },
     { ...SCHOLARSHIPS_PAGE, id: 'hidden', path: '/hidden', label: 'Hidden page', visible: false },
+    { id: 'help-desk', label: 'Help desk', url: 'https://example.org/help', visible: true, systemPage: false },
   ];
   sources.cmsContent = [{
     id: 'footer__contact', section: 'footer', field: 'contact', blockType: 'link_group',
@@ -228,6 +229,7 @@ it('opens footer editing from Content and saves a page selection beside existing
   fireEvent.change(editor.getByRole('textbox', { name: 'Group heading' }), { target: { value: 'Explore' } });
   fireEvent.click(editor.getByRole('checkbox', { name: 'Choose which pages appear' }));
   expect(editor.queryByText('Hidden page')).toBeNull();
+  expect(editor.queryByText('Help desk')).toBeNull();
   fireEvent.click(editor.getByRole('button', { name: 'Remove Home' }));
   fireEvent.click(editor.getByRole('button', { name: 'Move FAQ up' }));
   fireEvent.click(editor.getByRole('button', { name: 'Save footer pages' }));

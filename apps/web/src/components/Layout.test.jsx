@@ -540,7 +540,7 @@ describe('Layout navigation (built from page documents)', () => {
     expect(side.container.querySelector('header')).toContainElement(signIn);
   });
 
-  it('puts external navigation links in More and the side rail but keeps them out of the footer', () => {
+  it('puts external navigation links in More and the side rail but keeps them out of the footer', async () => {
     const pageDocs = [...MANY_PAGES, { id: 'help-desk', label: 'Help desk', url: 'https://example.org/help', order: 20,
       visible: true, systemPage: false }];
     const top = renderShell({}, { pageDocs });
@@ -549,7 +549,7 @@ describe('Layout navigation (built from page documents)', () => {
     expect(link).toHaveAttribute('href', 'https://example.org/help');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(within(top.getByRole('navigation', { name: 'Site pages' })).queryByText(/Help desk/)).toBeNull();
+    expect(within(await top.findByRole('navigation', { name: 'Site pages' })).queryByText(/Help desk/)).toBeNull();
     top.unmount();
 
     const side = renderShell({}, { pageDocs, themeDoc: { navPlacement: 'side' } });
@@ -854,7 +854,10 @@ describe('Layout footer', () => {
 
   it('shows the configured group heading and ordered public pages only in the footer', async () => {
     const { container } = renderShell({}, {
-      event: { ...FIXTURE_EVENT, footerPageGroup: { heading: 'Plan your visit', pageIds: ['faq', 'schedule', 'travel', 'missing'] } },
+      event: { ...FIXTURE_EVENT, footerPageGroup: { heading: 'Plan your visit', pageIds: ['faq', 'schedule', 'travel', 'missing', 'help-desk'] } },
+      pageDocs: [...FIXTURE_PAGES, {
+        id: 'help-desk', label: 'Help desk', url: 'https://example.org/help', visible: true, systemPage: false,
+      }],
       featureFlags: {},
     });
     const group = await within(footer(container)).findByRole('navigation', { name: 'Plan your visit' });
