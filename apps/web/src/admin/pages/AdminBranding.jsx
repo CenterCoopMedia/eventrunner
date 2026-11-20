@@ -47,6 +47,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import {
   THEME_HEADERS,
+  THEME_HEADER_LOGOS,
+  THEME_LOGO_ALT_MAX,
   contrastRatio,
   getPreset,
   findThemeContrastFailures,
@@ -89,6 +91,7 @@ import { BRANDING_SPLIT_KEY, readSplit, writeSplit } from '../layoutPreference.j
 import { useMediaQuery } from '../../lib/viewport.js';
 import { choiceCopy, presetCopy } from '../presetCopy.js';
 import {
+  CheckboxField,
   DestructiveConfirm,
   Notice,
   Panel,
@@ -137,6 +140,27 @@ const LOGO_SLOT_HINTS = {
   ogDefault: 'The image link previews use when a page has none of its own.',
   favicon: 'The browser tab icon.',
 };
+
+/** What the header can show (#1167), in the words the control offers. */
+const HEADER_LOGO_OPTIONS = [
+  { value: 'name', label: 'Name only' },
+  { value: 'logo', label: 'Logo only' },
+  { value: 'both', label: 'Logo and name' },
+];
+
+/** Where the home hero can show the logo (#1167). */
+const HERO_LOGO_OPTIONS = [
+  { value: 'off', label: 'No logo' },
+  { value: 'above', label: 'Logo above the event name' },
+  { value: 'instead', label: 'Logo instead of the event name' },
+];
+
+/**
+ * A site that has not chosen keeps the header it always had: the logo or
+ * icon first, the name beside it on wider screens. It is offered only
+ * while nothing is chosen, so the control shows what the site draws.
+ */
+const HEADER_LOGO_AUTOMATIC = { value: '', label: 'Automatic: logo first, name on wider screens' };
 
 /**
  * The option groups the normal workflow asks about, in the order it asks.
@@ -220,6 +244,12 @@ function toForm(theme) {
     texture: pick(theme?.texture, TEXTURE_IDS),
     radius: pick(theme?.radius, RADIUS_IDS),
     density: pick(theme?.density, DENSITY_IDS),
+    // Blank means "not chosen": the header and footer follow the logos the
+    // site has, so uploading a first logo still shows it (#1167).
+    headerLogo: THEME_HEADER_LOGOS.includes(theme?.headerLogo) ? theme.headerLogo : '',
+    footerLogo: typeof theme?.footerLogo === 'boolean' ? theme.footerLogo : '',
+    logoAlt: typeof theme?.logoAlt === 'string' ? theme.logoAlt : '',
+    heroLogo: ['off', 'above', 'instead'].includes(theme?.heroLogo) ? theme.heroLogo : '',
     // Header style has no field in this editor, but config/theme is replaced
     // whole on publish. Carry the stored value so an unrelated phone-layout
     // change cannot reset the public header or make the draft preview lie.
@@ -277,6 +307,13 @@ export function toThemeDoc(form) {
     if (form[field]) doc[field] = form[field];
   }
   if (form.brandColor.trim()) doc.brandColor = form.brandColor.trim();
+  if (form.headerLogo) doc.headerLogo = form.headerLogo;
+  if (typeof form.footerLogo === 'boolean') doc.footerLogo = form.footerLogo;
+  // Written even when blank: the live document overlays the built
+  // snapshot field by field, so an omitted description would bring back
+  // the snapshot's old text. Blank means "use the event name".
+  doc.logoAlt = form.logoAlt.trim();
+  if (form.heroLogo) doc.heroLogo = form.heroLogo;
   if (form.navPlacement) doc.navPlacement = form.navPlacement;
   // Written every time, the brand default included. EventConfigProvider
   // overlays the live document on the built snapshot shallowly, so a saved
@@ -403,7 +440,8 @@ const STORED_PALETTE_LABEL = 'Stored palette';
 
 /** Route a rejected field back to its task, including nested overrides. */
 function brandingTaskForField(field) {
-  if (field === 'theme.brandColor' || field?.startsWith('theme.logos')) return 'identity';
+  if (field === 'theme.brandColor' || field?.startsWith('theme.logos')
+    || ['theme.headerLogo', 'theme.footerLogo', 'theme.logoAlt', 'theme.heroLogo'].includes(field)) return 'identity';
   if (/^theme\.tokens\.(light|dark)\.(surfaceAlt|accent)$/.test(field)) return 'identity';
   if (field === 'theme.adminScheme') return 'workspace';
   if (['theme.preset', 'theme.mode', 'theme.header', 'theme.navPlacement', 'theme.optionPicks.nameplate',
@@ -412,7 +450,7 @@ function brandingTaskForField(field) {
 }
 
 export default function AdminBranding() {
-  const { theme, sources } = useEventConfig();
+  const { theme, sources, eventConfig } = useEventConfig();
   const call = useAdminApi();
   const { rows: pageRows, ready: pagesReady } = useAdminPages();
   const { rows: contentRows, ready: contentReady } = useAdminContent();
@@ -449,6 +487,8 @@ export default function AdminBranding() {
   }, [sources.theme, theme, reseedFromTheme]);
 
   const candidate = useMemo(() => toThemeDoc(form), [form]);
+  // Whether the saved theme has a header choice (#1167).
+  const savedHeaderLogo = THEME_HEADER_LOGOS.includes(theme?.headerLogo);
   const saved = useMemo(() => JSON.stringify(toThemeDoc(toForm(theme))), [theme]);
   const isDirty = JSON.stringify(candidate) !== saved;
 
@@ -673,6 +713,41 @@ export default function AdminBranding() {
                     error={fieldErrors.get(`theme.logos.${slot}`)}
                   />
                 ))}
+              </div>
+              {/* Where the logo shows (#1167). The preview beside this
+                  editor draws the header and footer as the site will. */}
+              <div className="admin-branding-grid mt-md grid gap-md">
+                <SelectField
+                  label="Header shows"
+                  value={form.headerLogo}
+                  options={savedHeaderLogo ? HEADER_LOGO_OPTIONS : [HEADER_LOGO_AUTOMATIC, ...HEADER_LOGO_OPTIONS]}
+                  onChange={(value) => setForm((c) => ({ ...c, headerLogo: value }))}
+                  hint="The logo is the primary logo. Without one, the header shows the name."
+                  error={fieldErrors.get('theme.headerLogo')}
+                />
+                <SelectField
+                  label="Homepage hero shows"
+                  value={form.heroLogo || 'off'}
+                  options={HERO_LOGO_OPTIONS}
+                  onChange={(value) => setForm((c) => ({ ...c, heroLogo: value }))}
+                  hint="The primary logo, in the hero at the top of the home page. Screen readers and search engines still get the event name."
+                  error={fieldErrors.get('theme.heroLogo')}
+                />
+                <TextField
+                  label="Logo description"
+                  value={form.logoAlt}
+                  onChange={(value) => setForm((c) => ({ ...c, logoAlt: value }))}
+                  placeholder={eventConfig?.name ?? ''}
+                  maxLength={THEME_LOGO_ALT_MAX}
+                  hint="Read aloud to people who use a screen reader. Leave it blank to use the event name."
+                  error={fieldErrors.get('theme.logoAlt')}
+                />
+                <CheckboxField
+                  label="Show the logo in the footer"
+                  checked={form.footerLogo !== false}
+                  onChange={(checked) => setForm((c) => ({ ...c, footerLogo: checked }))}
+                  hint="Uses the footer logo, or the primary logo when there is no footer logo."
+                />
               </div>
               <div className="mt-sm">
                 <button

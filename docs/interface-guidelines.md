@@ -98,7 +98,7 @@ A public page renders one of four headers (design brief §2.5.1). `config/theme.
 - The identity repeats on every page, so it is never a heading. Every page owns its own `<h1>`.
 - `masthead` places a compact event name beside navigation. The home page keeps its visible h1 in its own hero.
 - No treatment puts text over an image, and none of them is a hero banner.
-- Header titles use one line with ellipsis when needed. At widths below 640px, a title beside a logo is screen-reader-only; the home link keeps its full accessible name. A header without a logo keeps its visible title.
+- Header titles use one line with ellipsis when needed. At widths below 640px, a title beside an icon is screen-reader-only; the home link keeps its full accessible name. A header without a logo keeps its visible title. The organizer chooses what the header shows (`config/theme.headerLogo`): **Name only**, **Logo only** (the title is screen-reader-only at every width, so the home link is still named by the event), or **Logo and name** (the title stays visible, under the logo below 640px). A logo that is missing or fails to load leaves the visible title.
 - Never make one treatment mandatory across every deployment.
 
 ## The base and the theme

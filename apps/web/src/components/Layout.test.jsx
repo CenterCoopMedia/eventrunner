@@ -311,6 +311,80 @@ describe('Layout footer logo', () => {
   });
 });
 
+describe('Layout header logo, issue 1167', () => {
+  const PRIMARY = 'branding/abc123/logo.png';
+  const homeLink = (root) => root.querySelector('header a[href="/"]');
+  const headerLogo = (root) => root.querySelector('header img.site-logo');
+
+  it('draws the uploaded primary logo from Storage, never the stored path', () => {
+    const { container } = renderShell({ primary: PRIMARY }, { themeDoc: { headerLogo: 'logo' } });
+    const src = headerLogo(container).getAttribute('src');
+    expect(src).toContain('firebasestorage.googleapis.com');
+    expect(src).toContain(encodeURIComponent(PRIMARY));
+    expect(src).not.toBe(PRIMARY);
+  });
+
+  it('keeps the earlier rule when nothing is chosen: the logo leads, the name yields on phones', () => {
+    const { container } = renderShell({ primary: PRIMARY });
+    expect(headerLogo(container)).not.toBeNull();
+    expect(container.querySelector('.site-header-title').className).toContain('site-header-title--with-mark');
+  });
+
+  it('shows only the name for "Name only", even with an uploaded logo and an icon', () => {
+    const { container } = renderShell({ primary: PRIMARY, mark: 'branding/mark.svg' }, { themeDoc: { headerLogo: 'name' } });
+    expect(headerLogo(container)).toBeNull();
+    const title = container.querySelector('.site-header-title');
+    expect(title).toHaveTextContent(FIXTURE_EVENT.name);
+    expect(title.className).not.toContain('sr-only');
+    // The icon may stay beside it, but never in its place on a phone.
+    expect(title.className).not.toContain('site-header-title--with-mark');
+  });
+
+  it('keeps the event name as the home link name for "Logo only"', () => {
+    const { container } = renderShell({ primary: PRIMARY }, { themeDoc: { headerLogo: 'logo' } });
+    expect(headerLogo(container)).toHaveAttribute('alt', '');
+    const title = container.querySelector('.site-header-title');
+    expect(title.className).toContain('sr-only');
+    expect(homeLink(container)).toHaveAccessibleName(FIXTURE_EVENT.name);
+  });
+
+  it('shows the logo with a visible name for "Logo and name"', () => {
+    const { container } = renderShell({ primary: PRIMARY }, { themeDoc: { headerLogo: 'both' } });
+    expect(headerLogo(container)).not.toBeNull();
+    const title = container.querySelector('.site-header-title');
+    expect(title.className).not.toContain('sr-only');
+    expect(title.className).not.toContain('site-header-title--with-mark');
+    expect(homeLink(container)).toHaveAccessibleName(FIXTURE_EVENT.name);
+  });
+
+  it('falls back to the visible name when the logo fails or is missing', () => {
+    const failed = renderShell({ primary: 'branding/abc123/deleted.png' }, { themeDoc: { headerLogo: 'logo' } });
+    fireEvent.error(headerLogo(failed.container));
+    expect(headerLogo(failed.container)).toBeNull();
+    expect(failed.container.querySelector('.site-header-title').className).not.toContain('sr-only');
+    expect(homeLink(failed.container)).toHaveAccessibleName(FIXTURE_EVENT.name);
+    failed.unmount();
+    const missing = renderShell({}, { themeDoc: { headerLogo: 'logo' } });
+    expect(headerLogo(missing.container)).toBeNull();
+    expect(missing.container.querySelector('.site-header-title').className).not.toContain('sr-only');
+  });
+});
+
+describe('Layout footer logo switch, issue 1167', () => {
+  it('draws no footer logo when the organizer turns it off', () => {
+    const { container } = renderShell({ footer: 'branding/abc123/footer.png' }, { themeDoc: { footerLogo: false } });
+    expect(container.querySelector('footer img')).toBeNull();
+  });
+
+  it('describes the footer logo with the stored text, or the event name', () => {
+    const described = renderShell({ footer: 'branding/abc123/footer.png' }, { themeDoc: { footerLogo: true, logoAlt: 'Summit logo' } });
+    expect(described.container.querySelector('footer img')).toHaveAttribute('alt', 'Summit logo');
+    described.unmount();
+    const blank = renderShell({ footer: 'branding/abc123/footer.png' });
+    expect(blank.container.querySelector('footer img')).toHaveAttribute('alt', FIXTURE_EVENT.name);
+  });
+});
+
 describe('Layout header', () => {
   it('takes the base header when the theme names none', () => {
     const { container } = renderShell({});

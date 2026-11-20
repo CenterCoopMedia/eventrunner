@@ -899,6 +899,28 @@ test('validateTheme accepts a site navigation placement, and rejects a stranger'
   assert.ok(errors.some((e) => e.startsWith('theme.navPlacement:') && e.includes('"floating"')));
 });
 
+test('validateTheme accepts the header logo choice, footer switch and logo description, issue 1167', () => {
+  const base = { colors: {} };
+  for (const headerLogo of ['name', 'logo', 'both']) {
+    assert.equal(validateTheme({ ...base, headerLogo }).ok, true);
+  }
+  assert.equal(validateTheme({ ...base, footerLogo: false, logoAlt: 'Summit logo' }).ok, true);
+  // Blank is a stored answer: the event name describes the logo.
+  assert.equal(validateTheme({ ...base, logoAlt: '' }).ok, true);
+  for (const heroLogo of ['off', 'above', 'instead']) {
+    assert.equal(validateTheme({ ...base, heroLogo }).ok, true);
+  }
+  assert.ok(validateTheme({ ...base, heroLogo: 'behind' }).errors.some((e) => e.startsWith('theme.heroLogo:')));
+  const { ok, errors } = validateTheme({
+    ...base, headerLogo: 'banner', footerLogo: 'yes', logoAlt: ' padded',
+  });
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('theme.headerLogo:') && e.includes('"banner"')));
+  assert.ok(errors.some((e) => e.startsWith('theme.footerLogo:')));
+  assert.ok(errors.some((e) => e.startsWith('theme.logoAlt:')));
+  assert.ok(validateTheme({ ...base, logoAlt: 'x'.repeat(151) }).errors.some((e) => e.startsWith('theme.logoAlt:')));
+});
+
 test('validateTheme accepts a house admin scheme or the brand colour, and names a stranger', () => {
   /* eslint-disable no-restricted-syntax */
   const base = { colors: { primary: '#336699' } };

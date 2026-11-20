@@ -804,6 +804,39 @@ describe('publishing the theme', () => {
     expect(await screen.findByText(/no deploy needed/i)).toBeInTheDocument();
   });
 
+  it('posts the header logo choice and footer switch only once chosen, issue 1167', async () => {
+    // Unchosen stays unwritten, so a first uploaded logo still leads the
+    // header the way it always has. The description is always written, so
+    // clearing it overrides the built snapshot's text.
+    await renderBranding({ ...PRESET_THEME, logos: { primary: 'branding/abc/logo.png' } });
+    // Nothing chosen: the control says so instead of naming a mode the
+    // public header does not draw on phones.
+    expect(screen.getByLabelText('Header shows')).toHaveValue('');
+    expect(within(screen.getByLabelText('Header shows')).getAllByRole('option')).toHaveLength(4);
+    expect(screen.getByLabelText('Show the logo in the footer')).toBeChecked();
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    let { theme } = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(theme).not.toHaveProperty('headerLogo');
+    expect(theme).not.toHaveProperty('footerLogo');
+    expect(theme.logoAlt).toBe('');
+    expect(theme).not.toHaveProperty('heroLogo');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+    fireEvent.change(screen.getByLabelText('Header shows'), { target: { value: 'logo' } });
+    fireEvent.click(screen.getByLabelText('Show the logo in the footer'));
+    fireEvent.change(screen.getByLabelText('Logo description'), { target: { value: ' Summit logo ' } });
+    fireEvent.change(screen.getByLabelText('Homepage hero shows'), { target: { value: 'instead' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    ({ theme } = JSON.parse(fetch.mock.calls[1][1].body));
+    expect(theme.headerLogo).toBe('logo');
+    expect(theme.footerLogo).toBe(false);
+    expect(theme.logoAlt).toBe('Summit logo');
+    expect(theme.heroLogo).toBe('instead');
+  });
+
   it('says brand outright when a stored house scheme is switched back', async () => {
     // EventConfigProvider overlays the live document on the built snapshot
     // shallowly. A document that dropped the field would inherit whatever

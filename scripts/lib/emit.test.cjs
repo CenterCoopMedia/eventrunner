@@ -320,3 +320,17 @@ test('the theme snapshot preserves deployment palette and density overrides for 
   assert.deepEqual(JSON.parse(JSON.stringify(context.theme.tokens)), snapshot.theme.tokens);
   assert.equal(context.theme.density, 'comfortable');
 });
+
+test('the theme snapshot carries the logo placement choices, issue 1167', () => {
+  const { demoSnapshot } = require('./demo-event.cjs');
+  const snapshot = demoSnapshot();
+  snapshot.theme = { ...snapshot.theme, headerLogo: 'logo', footerLogo: false, heroLogo: 'above', logoAlt: 'Summit logo' };
+  const js = emitEventConfig(snapshot);
+  const vm = require('node:vm');
+  const context = {};
+  vm.runInNewContext(js.replace(/export const /g, 'var ').replace(/export default eventConfig;/, ''), context);
+  assert.equal(context.theme.headerLogo, 'logo');
+  assert.equal(context.theme.footerLogo, false);
+  assert.equal(context.theme.heroLogo, 'above');
+  assert.equal(context.theme.logoAlt, 'Summit logo');
+});

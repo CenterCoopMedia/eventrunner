@@ -35,6 +35,9 @@ const {
   THEME_FONT_ROLES,
   THEME_FONT_SET_IDS,
   THEME_HEADERS,
+  THEME_HEADER_LOGOS,
+  THEME_HERO_LOGOS,
+  THEME_LOGO_ALT_MAX,
   THEME_LOGO_SLOTS,
   THEME_MODE_POLICIES,
   THEME_RADIUS_IDS,
@@ -937,6 +940,10 @@ function validateTheme(theme) {
     // the default.
     ['navPlacement', THEME_NAV_PLACEMENTS],
     ['header', THEME_HEADERS],
+    // What the header shows: the name, the primary logo, or both (#1167).
+    ['headerLogo', THEME_HEADER_LOGOS],
+    // Where the home hero shows the logo (#1167).
+    ['heroLogo', THEME_HERO_LOGOS],
     // The admin's colours: the brand colour, or one house scheme by id.
     // Optional: a document that says nothing follows the brand colour.
     ['adminScheme', ADMIN_SCHEME_IDS],
@@ -963,6 +970,20 @@ function validateTheme(theme) {
           errors.push(`theme.logos.${slot}: must be a nonempty storage path`);
         }
       }
+    }
+  }
+
+  // The footer logo switch and the logo's description (#1167). A blank
+  // description is stored as '' so it overrides an older snapshot's text;
+  // the event name stands in for it.
+  if (theme.footerLogo != null && typeof theme.footerLogo !== 'boolean') {
+    errors.push(`theme.footerLogo: must be true or false, got ${JSON.stringify(theme.footerLogo)}`);
+  }
+  if (theme.logoAlt != null) {
+    if (typeof theme.logoAlt !== 'string' || theme.logoAlt.trim() !== theme.logoAlt) {
+      errors.push('theme.logoAlt: must be a string without surrounding spaces');
+    } else if (theme.logoAlt.length > THEME_LOGO_ALT_MAX) {
+      errors.push(`theme.logoAlt: must be at most ${THEME_LOGO_ALT_MAX} characters`);
     }
   }
 

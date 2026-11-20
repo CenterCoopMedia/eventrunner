@@ -54,6 +54,10 @@ async function pastEvent() {
     ...theme,
     radius: 'round',
     navPlacement: 'side',
+    headerLogo: 'logo',
+    footerLogo: false,
+    heroLogo: 'above',
+    logoAlt: 'Example Newsroom Network logo',
     logos: { ...theme.logos, primary: 'branding/client-logo.svg' },
     placeholderLogos: theme.placeholderLogos.filter((slot) => slot !== 'primary'),
   });
@@ -250,6 +254,11 @@ test('a new event made from the template keeps its own project, records and chec
   assert.equal(Object.hasOwn(target.read('config', 'features'), 'coreWebVitals'), false, 'the target keeps its own monitoring default');
   assert.equal(target.read('config', 'theme').radius, 'round', 'approved branding is reused');
   assert.equal(target.read('config', 'theme').navPlacement, 'side');
+  // Where the logo shows is a layout choice; its description goes with the file.
+  assert.equal(target.read('config', 'theme').headerLogo, 'logo');
+  assert.equal(target.read('config', 'theme').footerLogo, false);
+  assert.equal(target.read('config', 'theme').heroLogo, 'above');
+  assert.equal(Object.hasOwn(target.read('config', 'theme'), 'logoAlt'), false);
   assert.ok(target.read('config', 'theme').placeholderLogos.includes('primary'), 'the logo file is not carried');
   assert.deepEqual(target.read('config', 'bootstrap').adminEmails, ['next-ops@example.test', 'next-owner@example.test']);
   assert.deepEqual(target.read('config', 'template').owner, { name: 'Next Owner', email: 'next-owner@example.test' });

@@ -2186,6 +2186,14 @@
     padding-inline: var(--hero-copy-pad-inline-start) var(--space-lg);
     border-inline-start: var(--hero-copy-border-inline-start);
   }
+  /* The organizer's logo in the hero (#1167): a fixed height so the copy
+     below it never moves when the image arrives; the width follows the
+     image, capped at the copy column by the base img rule. Phones get the
+     smaller step. */
+  .event-hero__logo {
+    block-size: clamp(var(--space-2xl), 12vw, var(--space-3xl));
+    object-fit: contain;
+  }
   .event-hero__title {
     font-size: min(var(--hero-title-size), var(--hero-title-fit));
     line-height: .98;
@@ -2329,6 +2337,10 @@
     .site-header-title--with-mark {
       @apply sr-only;
     }
+    /* Logo and name on a phone: the name sits under the logo rather than
+       beside it, so neither is cut short (#1167). The title's max-w-full
+       ends a long name in an ellipsis before the Menu button. */
+    .site-header-wordmark--both { flex-direction: column; }
     .site-masthead__bar,
     .site-header-identity-row {
       display: flex;

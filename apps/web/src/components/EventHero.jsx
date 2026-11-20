@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import WayfindingIcon from './editorial/WayfindingIcon.jsx';
 import { focalPosition, useSizedImageSources } from './LeadImage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
@@ -14,8 +15,16 @@ export default function EventHero({
   compact = false,
   nameAs: Name = 'p',
   nameId,
+  logo = null,
+  logoPlacement = 'off',
   children,
 }) {
+  // The organizer's logo above the name, or in its place (#1167). The name
+  // stays in the document as the heading either way, so assistive tech and
+  // search read the event name. A logo that fails leaves the name in view.
+  const [failedLogo, setFailedLogo] = useState(null);
+  const showLogo = Boolean(logo) && logoPlacement !== 'off' && failedLogo !== logo;
+  const nameHidden = showLogo && logoPlacement === 'instead';
   const alt = typeof image?.alt === 'string' ? image.alt.trim() : '';
   const src = image?.url && isSafeHref(image.url) && alt ? image.url : null;
   // The artwork can fill the whole hero on a phone, and a style can give it
@@ -53,7 +62,10 @@ export default function EventHero({
       {src ? <div className="event-hero__veil" aria-hidden="true" /> : null}
       {figure}
       <div className="event-hero__copy">
-        {name ? <Name id={nameId} className="event-hero__title font-heading">{name}</Name> : null}
+        {showLogo ? (
+          <img className="event-hero__logo mb-sm block" src={logo} alt="" onError={() => setFailedLogo(logo)} />
+        ) : null}
+        {name ? <Name id={nameId} className={`event-hero__title font-heading${nameHidden ? ' sr-only' : ''}`}>{name}</Name> : null}
         {dates || place ? (
           <p className="event-hero__dateline font-data">
             {dates ? <span>{dates}</span> : null}
