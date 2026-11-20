@@ -6,6 +6,7 @@
 import { lazy, Suspense } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { mapBlockFields, mapVenueFields } from './mapBlockFields.js';
+import { galleryImages, galleryLayout } from './galleryBlockFields.js';
 import TextBlock from './TextBlock.jsx';
 import RichTextBlock from './RichTextBlock.jsx';
 import ImageBlock from './ImageBlock.jsx';
@@ -49,6 +50,30 @@ function VenueMapPlaceholder({ address }) {
   return venue ? <MapPlaceholder address={address || venue.address} /> : null;
 }
 
+// Hold the gallery's final size while its chunk loads: the same fixed boxes
+// as gallery.css, one per picture for a grid, and the control row plus one
+// row of slides for a carousel or slideshow.
+function GalleryPlaceholder({ block }) {
+  const count = galleryImages(block).length;
+  if (count === 0) return null;
+  const layout = galleryLayout(block);
+  if (layout === 'grid') {
+    return (
+      <div aria-hidden="true" className="invisible grid grid-cols-2 gap-sm sm:grid-cols-3">
+        {Array.from({ length: count }, (_, index) => (
+          <div key={index} className="aspect-[4/3]" />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div aria-hidden="true" className="invisible">
+      <div className="touch-target mb-xs" />
+      <div className={layout === 'slideshow' ? 'aspect-[3/2]' : 'aspect-[4/3] w-4/5 sm:w-[calc((100%-var(--space-sm))/2)] lg:w-[calc((100%-2*var(--space-sm))/3)]'} />
+    </div>
+  );
+}
+
 function BlockPlaceholder({ block }) {
   if (block.blockType === 'map') {
     const fields = mapBlockFields(block);
@@ -70,8 +95,7 @@ function BlockPlaceholder({ block }) {
     );
   }
   if (block.blockType === 'gallery') {
-    // The gallery draws its pictures in fixed boxes; hold a box's height.
-    return <div aria-hidden="true" className="invisible aspect-[3/2] w-full" />;
+    return <GalleryPlaceholder block={block} />;
   }
   // Prose and quotations have variable height. Leave room for their first
   // lines while the chunk loads, without adding a wrapper to the final DOM.

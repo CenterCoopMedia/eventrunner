@@ -16,37 +16,18 @@
 // The stored block is data from the CMS. Only library paths with alt text
 // are drawn, and an unknown layout draws as a grid.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { isSafeHref } from '../../lib/sanitizeHtml.js';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
 import { useSizedImageSources } from '../LeadImage.jsx';
 import { secondaryActionClass } from '../controlClasses.js';
+import { galleryImages, galleryLayout } from './galleryBlockFields.js';
 import './gallery.css';
 
-export const GALLERY_LAYOUTS = Object.freeze(['grid', 'carousel', 'slideshow']);
 
 const SIZES = Object.freeze({
   grid: '(min-width: 64rem) 20rem, (min-width: 40rem) 33vw, 50vw',
   carousel: '(min-width: 64rem) 22rem, (min-width: 40rem) 45vw, 80vw',
   slideshow: '(min-width: 64rem) 48rem, 100vw',
 });
-
-/** The pictures a gallery may draw: a safe path with alt text, nothing else. */
-export function galleryImages(block) {
-  if (!Array.isArray(block?.images)) return [];
-  return block.images.filter(
-    (image) =>
-      typeof image?.url === 'string' &&
-      image.url.trim() &&
-      isSafeHref(image.url) &&
-      typeof image.alt === 'string' &&
-      image.alt.trim(),
-  );
-}
-
-/** The stored layout when it is one the page has, else grid. */
-export function galleryLayout(block) {
-  return GALLERY_LAYOUTS.includes(block?.layout) ? block.layout : 'grid';
-}
 
 function GalleryPicture({ image, layout }) {
   const sources = useSizedImageSources(image.url);
