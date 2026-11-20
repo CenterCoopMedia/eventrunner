@@ -132,6 +132,8 @@ function PreviewFrame({ width, label, scopeId, sideNav, children }) {
  *   longReadOpening?: boolean,
  *   sideNav?: boolean,
  *   map?: boolean,
+ *   previewLabel?: string,
+ *   hideHeading?: boolean,
  *   blocksError?: boolean,
  * }} props
  *   `readingMeasure` is true where the public page holds a Reading width
@@ -143,7 +145,7 @@ function PreviewFrame({ width, label, scopeId, sideNav, children }) {
  *   `longReadOpening` is true for the section that opens a Long read page,
  *   so the preview draws the style's drop cap or standfirst there too.
  */
-export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false, longReadOpening = false, sideNav = false, blocksError = false, map = false }) {
+export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false, longReadOpening = false, sideNav = false, blocksError = false, map = false, previewLabel, hideHeading = false }) {
   const name = useId();
   // A closed section keeps its fields mounted; its preview documents are
   // made only once the preview is first shown.
@@ -166,8 +168,12 @@ export default function SectionLayoutChoice({ value, onChange, label, blocks, bl
   const section = (frame) => {
     const drawn = (
       <>
-        <SectionHead level={2} id={`${previewId}-${frame}-head`} title={label || 'Untitled section'} />
-        <div className={readingMeasure && current === DEFAULT_SECTION_LAYOUT ? 'measure mt-md' : 'mt-md'}>
+        {/* An introduction or a heading that repeats the page title is
+            visually hidden on the page (ContentPage), so it is not drawn. */}
+        {hideHeading ? null : (
+          <SectionHead level={2} id={`${previewId}-${frame}-head`} title={previewLabel || label || 'Untitled section'} />
+        )}
+        <div className={[readingMeasure && current === DEFAULT_SECTION_LAYOUT ? 'measure' : '', hideHeading ? '' : 'mt-md'].filter(Boolean).join(' ') || undefined}>
           <LongReadOpening active={longReadOpening}>
             <SectionBlocks blocks={blocks} layout={current} />
           </LongReadOpening>

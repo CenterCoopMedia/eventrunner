@@ -39,11 +39,12 @@ import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
 import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
+import { contentLanguages, resolveContentVariant } from 'shared/contentLanguages';
 import { buildNavItems } from '../../lib/siteNavigation.js';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useVenueMapImage } from '../../components/VenueMap.jsx';
 import { openStreetMapCoordinates } from '../../components/AreaMap.jsx';
-import { builtInSectionBlockTypes } from 'shared/page';
+import { builtInSectionBlockTypes, pageHeading } from 'shared/page';
 import { isStarterContent, publicContentDoc } from 'shared/seed';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
 import { moveItem, nextStoredOrder } from '../reorder.js';
@@ -218,6 +219,12 @@ function PageEditor({ mode }) {
   // (lib/linkTargets.js), so the columns split the blocks the reader gets.
   // Targets are the published pages: publishing this page does not publish
   // the page a link leads to.
+  // The language a reader meets first: a site that opens in Spanish draws
+  // its approved Spanish copy (PublicLanguageRuntime), so the preview does.
+  const opensInSpanish = contentLanguages(eventConfig).default === 'es';
+  const inPublicLanguage = (record, kind) => (opensInSpanish && record
+    ? resolveContentVariant(record, kind, 'es', eventConfig).value
+    : record);
   // The pages a link can lead to once this page is published: the
   // published pages, with this page as it is being edited in place of its
   // published record (a new path or visibility counts).
@@ -233,7 +240,7 @@ function PageEditor({ mode }) {
     contentRows
       // The public shape first (shared/seed publicContentDoc), as the site's
       // content provider does, so starter text is judged the same way.
-      .map((row) => (row.live ? publicContentDoc(row.live) : null))
+      .map((row) => (row.live ? inPublicLanguage(publicContentDoc(row.live), 'block') : null))
       .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     features,
@@ -595,7 +602,7 @@ function PageEditor({ mode }) {
         save({ publish: false });
       }}
     >
-      {venueMapImage && longReadSectionId !== null ? (
+      {venueMapImage && !page.systemPage && (page.sections ?? []).some((section) => section.id === VENUE_MAP_SECTION_ID) ? (
         <img src={venueMapImage.src} onError={venueMapImage.onError} alt="" hidden />
       ) : null}
       <AdminPageHeader help="Save a draft to keep your changes. Publish to show them on the site."
@@ -981,6 +988,10 @@ function PageEditor({ mode }) {
                         readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
                         longReadOpening={section.id === longReadSectionId}
                         map={sectionHasMap(page, section)}
+                        previewLabel={inPublicLanguage(section, 'section')?.label}
+                        hideHeading={!page.systemPage && (section.label === page.label
+                          || section.label === pageHeading(page)
+                          || /_intro$/.test(section.id) || /_header$/.test(section.id))}
                         sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side' && publicNavShown}
                         blocksError={Boolean(contentError) && !contentReady}
                       />
