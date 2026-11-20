@@ -1,0 +1,118 @@
+/* The held-up figure (components/HeldFigure.jsx). theme.css gives each motif
+   set its --motif-wait-* values: which layer shows, the drawings as inlined
+   data URIs, and the moving part's pivot and swing. A set without a drawing
+   leaves the ampersand, which rocks on its heel. At ten seconds the gesture
+   reverses: the swing turns the other way, and the ampersand rocks onto its
+   toe. */
+.held-figure {
+  --held-turn: 1;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  inline-size: 2rem;
+  block-size: 2rem;
+  pointer-events: none;
+}
+
+.held-figure[data-held-stage='slow'],
+.held-figure[data-held-stage='prolonged'] {
+  --held-turn: -1;
+}
+
+.held-figure__glyph {
+  --held-angle: calc(-10deg * var(--held-turn));
+  display: var(--motif-wait-glyph, inline-block);
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: var(--weight-regular);
+  line-height: 1;
+  transform-origin: 20% 85%;
+}
+
+.held-figure[data-held-stage='slow'] .held-figure__glyph,
+.held-figure[data-held-stage='prolonged'] .held-figure__glyph {
+  transform-origin: 80% 85%;
+}
+
+.held-figure__body,
+.held-figure__part {
+  display: var(--motif-wait-drawn, none);
+  position: absolute;
+  inset: 0;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.held-figure__body {
+  -webkit-mask-image: var(--motif-wait-body);
+  mask-image: var(--motif-wait-body);
+}
+
+.held-figure__part {
+  --held-angle: calc(var(--motif-wait-swing, 0deg) * var(--held-turn));
+  -webkit-mask-image: var(--motif-wait-part);
+  mask-image: var(--motif-wait-part);
+  transform-origin: var(--motif-wait-pivot, 50% 50%);
+}
+
+/* The held-up figure in a busy control (lib/busyControlFigures.js, #1090):
+   always the ampersand, whatever the motif set. Its 20px slot is held from the press, so the ampersand arriving at one
+   second does not change the control's width. It is the control's own text
+   colour, so a filled button draws it in the button's ink, and it has no
+   foot stroke. The empty alternative text keeps it out of the accessible
+   name; a browser without that syntax keeps the empty content and shows no
+   figure. */
+.public-action[aria-busy='true']::after,
+.public-text-control[aria-busy='true']::after {
+  content: '';
+  display: inline-block;
+  flex: none;
+  inline-size: 1.25rem;
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: var(--weight-regular);
+  line-height: 1;
+  transform-origin: 20% 85%;
+  --held-angle: -10deg;
+}
+
+.public-action[aria-busy='true'][data-held-stage]::after,
+.public-text-control[aria-busy='true'][data-held-stage]::after {
+  content: '&' / '';
+}
+
+.public-action[aria-busy='true'][data-held-stage='slow']::after,
+.public-action[aria-busy='true'][data-held-stage='prolonged']::after,
+.public-text-control[aria-busy='true'][data-held-stage='slow']::after,
+.public-text-control[aria-busy='true'][data-held-stage='prolonged']::after {
+  --held-angle: 10deg;
+  transform-origin: 80% 85%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .held-figure__glyph,
+  .held-figure__part,
+  .public-action[aria-busy='true'][data-held-stage]::after,
+  .public-text-control[aria-busy='true'][data-held-stage]::after {
+    animation: held-figure-gesture 1.2s ease-in-out infinite;
+  }
+
+  @keyframes held-figure-gesture {
+    50% { transform: rotate(var(--held-angle)); }
+  }
+}
+
+/* Forced colours replace a background with Canvas, which would paint the
+   masked drawing invisible. Keep the paint on the text colour. */
+@media (forced-colors: active) {
+  .held-figure__body,
+  .held-figure__part {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
+}

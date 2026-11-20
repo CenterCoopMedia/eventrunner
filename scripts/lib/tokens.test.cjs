@@ -679,6 +679,27 @@ test('the state shares resolve in both modes, and dark carries the higher share'
   }
 });
 
+test('the held-up figure inlines its drawings and falls back to the ampersand', () => {
+  const css = buildTokenCss(THEME);
+  const { motifs } = loadTokens();
+  for (const [setId, set] of Object.entries(motifs.sets)) {
+    const block = css.match(new RegExp(`\\[data-motif-set='${setId}'\\] \\{([^}]*)\\}`))[1];
+    if (!set.wait) {
+      assert.match(block, /--motif-wait-glyph: inline-block;/, `${setId} shows the ampersand`);
+      assert.match(block, /--motif-wait-drawn: none;/);
+      assert.doesNotMatch(block, /--motif-wait-body/);
+      continue;
+    }
+    assert.match(block, /--motif-wait-glyph: none;/, `${setId} shows its drawing`);
+    // A stalled load must not have to fetch the drawing that explains it.
+    for (const layer of ['body', 'part']) {
+      assert.match(block, new RegExp(`--motif-wait-${layer}: url\\("data:image/svg\\+xml,%3Csvg `), `${setId} inlines its ${layer}`);
+    }
+    assert.match(block, new RegExp(`--motif-wait-pivot: ${set.wait.pivot};`));
+    assert.match(block, new RegExp(`--motif-wait-swing: ${set.wait.swing};`));
+  }
+});
+
 test('every motif set gets a slot-resolution block, and its assets exist', () => {
   const css = buildTokenCss(THEME);
   const { motifs } = loadTokens();

@@ -16,6 +16,15 @@
   color: var(--loading-activity-color, rgb(var(--color-accent-rgb)));
 }
 
+/* The held-up figure's slot is reserved from the first render, so the
+   figure arriving at one second moves nothing. */
+.loading-status__activity-slot--held {
+  flex-basis: 2rem;
+  inline-size: 2rem;
+  block-size: 2rem;
+  margin-block-start: 0;
+}
+
 .loading-status__activity {
   inline-size: 100%;
   block-size: 100%;
@@ -56,7 +65,7 @@
 }
 
 .loading-state__actions {
-  padding-inline-start: calc(1.25rem + var(--space-xs));
+  padding-inline-start: calc(2rem + var(--space-xs));
 }
 
 .loading-state__placeholder {

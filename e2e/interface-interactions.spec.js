@@ -184,7 +184,12 @@ for (const width of [1440, 390, 320]) {
       await page.keyboard.press('Enter');
       await expect(dialog).toBeVisible();
       await expect.poll(() => payloads.length).toBe(1);
-      await expect(dialog.locator('.loading-status__activity')).toBeVisible();
+      // Past one second the busy control draws the page's one figure, an
+      // ampersand outside its accessible name; the status beside it draws none.
+      await expect(sending).toHaveAttribute('data-held-stage', 'active');
+      expect(await sending.evaluate((element) => getComputedStyle(element, '::after').content)).toMatch(/&/);
+      await expect(dialog.getByRole('button', { name: 'Sending feedback…', exact: true })).toBeVisible();
+      await expect(dialog.locator('.held-figure')).toHaveCount(0);
       await capture(page, `feedback-pending-${width}`);
 
       first.resolve();
@@ -237,12 +242,14 @@ for (const width of [1440, 390, 320]) {
     const preview = page.locator('[data-loading-preview]');
     const stage = preview.getByLabel('Loading preview stage');
     const layout = preview.getByLabel('Loading preview layout');
-    const indicator = preview.locator('.loading-status__activity');
+    // The figure's visible moving layer: the drawing's part, or the ampersand.
+    const indicator = preview.locator('.held-figure__part:visible, .held-figure__glyph:visible');
     await expect(stage).toHaveValue('initial');
     await expect(preview.getByRole('status')).toHaveText('Loading the schedule…');
     await expect(indicator).toHaveCount(0);
     await stage.selectOption('active');
-    await expect(indicator).toHaveCSS('animation-name', 'loading-status-turn');
+    await expect(indicator).toBeVisible();
+    await expect(indicator).toHaveCSS('animation-name', 'held-figure-gesture');
     await stage.selectOption('slow');
     await expect(preview.getByRole('status')).toContainText('longer than usual');
     await expect(preview.getByRole('progressbar')).toHaveCount(0);
@@ -272,7 +279,7 @@ for (const width of [1440, 390, 320]) {
     await expect(indicator).toHaveCSS('animation-name', 'none');
     await capture(page, `loading-continued-wait-${width}`);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(indicator).toHaveCSS('animation-name', 'loading-status-turn');
+    await expect(indicator).toHaveCSS('animation-name', 'held-figure-gesture');
   });
 }
 
@@ -285,7 +292,7 @@ test('a pending Schedule request keeps its motion across the one-minute boundary
     await route.continue();
   });
   const loading = page.getByRole('status', { name: 'Loading schedule…', exact: true });
-  const indicator = page.locator('.loading-status__activity');
+  const indicator = page.locator('.held-figure__part:visible, .held-figure__glyph:visible');
 
   try {
     await page.goto('/');
@@ -296,11 +303,12 @@ test('a pending Schedule request keeps its motion across the one-minute boundary
     await expect(loading).toBeVisible();
     await page.clock.fastForward(59_999);
     await expect(loading).toContainText('This is taking longer than usual.');
-    await expect(indicator).toHaveCSS('animation-name', 'loading-status-turn');
+    await expect(indicator).toBeVisible();
+    await expect(indicator).toHaveCSS('animation-name', 'held-figure-gesture');
 
     await page.clock.fastForward(1);
     await expect(loading).toContainText('You can keep waiting.');
-    await expect(indicator).toHaveCSS('animation-name', 'loading-status-turn');
+    await expect(indicator).toHaveCSS('animation-name', 'held-figure-gesture');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(indicator).toHaveCSS('animation-name', 'none');
   } finally {

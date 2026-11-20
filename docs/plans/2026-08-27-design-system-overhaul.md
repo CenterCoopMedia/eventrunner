@@ -277,7 +277,18 @@ These rules bind every motif:
 - A motif is decorative to a screen reader. Give it `aria-hidden="true"` and
   `pointer-events: none`.
 - A motif that carries meaning is an icon, not a motif. Give an icon a label.
-- Keep motif density low. Use at most three motifs on a page.
+- Keep motif density low. Use at most three motifs on a page. The held-up figure is exempt: It
+  shows only while a wait is pending, and a page shows one figure at a time: A wait inside an
+  open dialog goes first, a loading status outranks a busy control, the earliest wait past one
+  second goes next, and the next wait takes the figure when the holder ends
+  (`apps/web/src/lib/heldFigures.js`).
+- **Held-up figure (owner ruling, 2026-11-04; #1090).** A public wait past one second shows a small
+  figure in the active set's drawing: A body and one moving part that makes one gesture. A set
+  with no wait drawing uses the ampersand, which rocks on its heel. At ten seconds the gesture
+  reverses. The figure moves until the wait ends, holds still under reduced motion, and is
+  hidden from assistive technology, because the words carry the meaning. A busy control always
+  uses the ampersand, at 20px in `currentColor`, because a drawing does not survive that size.
+  The admin keeps its ring.
 
 ### 2.4 Anti-pattern guidance
 
@@ -657,6 +668,12 @@ Bind the mechanics:
 - A client may switch a set or turn motifs off from the theme editor. Treat `--motif-set` as a
   normal overridable token.
 - Adding a motif set is a data change plus new SVG assets. It is never a component change.
+- **Wait drawings.** A set may declare a `wait` entry: A body and a moving part as two SVG files,
+  with the part's pivot and swing. Draw them as solid silhouettes on a 32px square viewBox; a
+  silhouette has no stroke width to measure, so `motifAssets.test.js` renders each at 32px and
+  rejects any part thinner than about a pixel. The generator inlines both files as data URIs,
+  because fetching a drawing during a stalled load defeats it. The figure paints in
+  `currentColor`, so it takes the colour of the status or control it sits in.
 
 Draw each set in the style §2.3 assigns to the preset that uses it. One set may ship two style
 variants when two presets share it.

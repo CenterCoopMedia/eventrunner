@@ -27,10 +27,25 @@ node scripts/ci/bundle-budget.cjs --dist docs/demo
 
 The committed limits are:
 
-- 430,000 raw bytes and 135,000 gzip bytes for the initial graph.
-- 190,000 raw bytes and 28,000 gzip bytes for the stylesheets `index.html` names, which block first paint.
+- 431,000 raw bytes and 136,000 gzip bytes for the initial graph.
+- 195,000 raw bytes and 29,000 gzip bytes for the stylesheets `index.html` names, which block first paint.
 - 180,000 raw bytes and 50,000 gzip bytes for each deferred chunk.
 - 560,000 raw bytes and 165,000 gzip bytes for the named `firebase-sdk` chunk. This exception covers the static dependencies of the deferred Firebase runtime. Storage, Firestore Lite and dynamic App Check remain outside that group and retain the ordinary deferred ceiling.
+
+### 2026-11-19: held-up figure, initial and CSS limits raised (#1090)
+
+A wait past one second shows the held-up figure. #1090 requires its drawings inlined as data URIs, because fetching a drawing during a stalled load defeats it, and the figure must render inside the route fallback, which is in the entry. The fleet coordinator approved both increases; a lazy figure would fail in the stalled load it exists for. The busy-control observer loads after first paint and stays out of the entry.
+
+Measured with `node scripts/ci/bundle-budget.cjs` on local builds of `main` at `5b635a77` and of the change, with the same environment:
+
+| Build | Initial raw | Initial gzip | Initial CSS raw | Initial CSS gzip |
+| --- | ---: | ---: | ---: | ---: |
+| Normal, `main` | 424,035 | 133,939 | 188,326 | 27,419 |
+| Normal, with #1090 | 425,584 | 134,440 | 193,263 | 28,583 |
+| Demo, `main` | 428,552 | 134,992 | 189,193 | 27,472 |
+| Demo, with #1090 | 430,101 | 135,524 | 194,130 | 28,629 |
+
+The JavaScript adds 1,549 raw / 532 gzip bytes: the figure component, the one-figure queue and the loading status's figure choice. The stylesheet adds 4,937 raw / 1,157 gzip bytes: about 2,040 raw bytes of inlined drawings, each inlined once in its `[data-motif-set]` block, about 420 of figure variables, and about 2,000 of figure and busy-control rules. On `main` the demo initial graph had 8 gzip bytes left. The new limits are the measured demo values plus about 500 bytes; the deferred and SDK ceilings are unchanged.
 
 ### 2026-11-12: Firebase starts after snapshot paint (#625)
 

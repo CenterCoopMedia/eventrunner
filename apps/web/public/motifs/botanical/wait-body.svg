@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor">
+  <!-- The held-up figure's body: a seedling in a mound of soil, with its
+       first leaf. The second leaf is wait-part.svg; it waves from the top of
+       the stem. A solid silhouette drawn for the 32px wait slot, on a pixel
+       grid: no part of it is narrower than 2 units. -->
+  <path d="M3 30 C7 25 25 25 29 30 Z"/>
+  <path d="M15 27 C15.2 22.5 15.4 18.5 15.2 14.5 L17.4 14.5 C17.6 18.5 17.3 22.5 17.2 27 Z"/>
+  <path d="M16 16 C12.5 17.2 6.5 15.5 4.5 9.5 C10.5 8.3 15.2 11 16 16 Z"/>
+</svg>

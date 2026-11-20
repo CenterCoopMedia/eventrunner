@@ -399,6 +399,50 @@ function motifSlotValues(motifs, setId) {
   return lines;
 }
 
+const MOTIFS_DIR = path.resolve(__dirname, '..', '..', 'apps', 'web', 'public', 'motifs');
+
+/** One wait drawing as a data URI, so a stalled load never has to fetch it. */
+function inlineSvg(assetDir, file) {
+  let svg = fs.readFileSync(path.join(MOTIFS_DIR, assetDir, file), 'utf8');
+  // Removing one comment can join the text around it into another.
+  for (let previous; previous !== svg;) {
+    previous = svg;
+    svg = svg.replace(/<!--[\s\S]*?-->/g, '');
+  }
+  svg = svg
+    .replace(/\s+/g, ' ')
+    .replace(/> </g, '><')
+    .trim()
+    .replace(/"/g, "'")
+    .replace(/[%#<>{}]/g, encodeURIComponent);
+  return `url("data:image/svg+xml,${svg}")`;
+}
+
+/**
+ * The held-up figure's values (motifs.json $wait-note). A set without a wait
+ * drawing shows the ampersand, so the drawn layers leave the layout. Only the
+ * [data-motif-set] blocks carry them, so no drawing is inlined twice: the
+ * figure first shows a second into a wait, after the runtime has written the
+ * attribute, and without one the CSS fallbacks show the ampersand.
+ */
+function waitFigureValues(set) {
+  const wait = set?.wait;
+  if (!wait) {
+    return [
+      ['--motif-wait-glyph', 'inline-block'],
+      ['--motif-wait-drawn', 'none'],
+    ];
+  }
+  return [
+    ['--motif-wait-glyph', 'none'],
+    ['--motif-wait-drawn', 'block'],
+    ['--motif-wait-body', inlineSvg(set.assetDir, wait.body)],
+    ['--motif-wait-part', inlineSvg(set.assetDir, wait.part)],
+    ['--motif-wait-pivot', wait.pivot],
+    ['--motif-wait-swing', wait.swing],
+  ];
+}
+
 /**
  * The `:root` block: every token that does not change with the mode.
  *
@@ -918,7 +962,10 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     lines.push('   background-color: rgb(var(--color-ink-motif-rgb)), or inline the SVG as a');
     lines.push('   symbol reading currentColor. Never an <img>, never a url() fill. */');
     for (const setId of setIds) {
-      const slots = motifSlotValues(tokens.motifs, setId);
+      const slots = [
+        ...motifSlotValues(tokens.motifs, setId),
+        ...waitFigureValues(tokens.motifs.sets[setId]),
+      ];
       lines.push('');
       lines.push(`${scopedSelector(`[data-motif-set='${setId}']`)} {`);
       for (const [name, value] of slots) lines.push(`  ${name}: ${value};`);

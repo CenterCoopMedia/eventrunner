@@ -426,10 +426,10 @@ it.each([800, 10_000])('carries a %i ms code wait through account and bookmark l
     if (codeWait === 800) {
       tick(199);
       expect(stage()).toHaveAttribute('data-loading-stage', 'initial');
-      expect(view.container.querySelector('.loading-status__activity')).toBeNull();
+      expect(view.container.querySelector('.held-figure')).toBeNull();
       tick(1);
       expect(stage()).toHaveAttribute('data-loading-stage', 'active');
-      expect(view.container.querySelector('.loading-status__activity')).toBeInTheDocument();
+      expect(view.container.querySelector('.held-figure')).toBeInTheDocument();
       tick(600);
       view.rerender(myScheduleElement({ route, auth: { user: { uid: 'u1' }, loading: false }, profile: { profileReady: false } }));
       expect(stage()).toHaveAttribute('data-loading-stage', 'active');
@@ -446,7 +446,7 @@ it.each([800, 10_000])('carries a %i ms code wait through account and bookmark l
     view.rerender(myScheduleElement({ route }));
     expect(screen.getByRole('heading', { name: 'No bookmarked sessions yet' })).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: 'Loading your schedule…' })).toBeNull();
-    expect(view.container.querySelector('.loading-status__activity')).toBeNull();
+    expect(view.container.querySelector('.held-figure')).toBeNull();
 
     useMyBookmarksMock.mockReturnValue({ bookmarkedIds: new Set(), loading: true });
     view.rerender(myScheduleElement({ route }));

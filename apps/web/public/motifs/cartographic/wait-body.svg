@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" fill-rule="evenodd">
+  <!-- The held-up figure's body: a compass card, with its ring, the four
+       cardinal ticks and the pivot. The needle is wait-part.svg; it hunts
+       about the centre. A solid silhouette drawn for the 32px wait slot; the
+       ring and the ticks are 2 units wide. -->
+  <path d="M16 2 A14 14 0 1 1 16 30 A14 14 0 1 1 16 2 Z M16 4 A12 12 0 1 0 16 28 A12 12 0 1 0 16 4 Z"/>
+  <path d="M15 5 L17 5 L17 8.5 L15 8.5 Z M15 23.5 L17 23.5 L17 27 L15 27 Z M5 15 L8.5 15 L8.5 17 L5 17 Z M23.5 15 L27 15 L27 17 L23.5 17 Z"/>
+  <path d="M16 14 A2 2 0 1 1 16 18 A2 2 0 1 1 16 14 Z"/>
+</svg>

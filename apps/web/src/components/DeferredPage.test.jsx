@@ -42,7 +42,7 @@ describe('DeferredPage', () => {
       view.rerender(<DeferredPage component={Fast} label="new page" routeKey="/new" />);
       act(() => vi.advanceTimersByTime(300));
       expect(screen.getByRole('status')).toHaveAccessibleName('Loading new page…');
-      expect(view.container.querySelector('.loading-status__activity')).toBeNull();
+      expect(view.container.querySelector('.held-figure')).toBeNull();
       await act(async () => finish());
       expect(screen.getByRole('heading', { name: 'New page' })).toBeInTheDocument();
       expect(screen.queryByRole('status')).toBeNull();
