@@ -26,7 +26,7 @@ import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
+import { usePageSectionBlocks } from '../lib/usePageSectionBlocks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
@@ -137,7 +137,7 @@ function filterSections(sections, query, timeline) {
 
 export default function ContentPage() {
   const { pathname } = useLocation();
-  const { pages, getPublicPage, getSectionBlocks, timeline } = usePublicContent();
+  const { getPublicPage, timeline } = usePublicContent();
   const { text } = usePublicLanguage();
   const { eventConfig, features } = useEventConfig();
   // Declared before the early return below so hook order stays fixed across
@@ -196,6 +196,7 @@ export default function ContentPage() {
   // save today — treat it as unreachable rather than rendering it.
   const pageReserved =
     page && page.systemPage !== true && isReservedPathSegment(firstPathSegment(page.path));
+  const getSectionBlocks = usePageSectionBlocks(page && !page.systemPage && !pageReserved ? page.sections ?? [] : [], features);
 
   // Called ahead of the early return below, unconditionally, as the rules
   // of hooks require. A page that does not resolve names nothing, which
@@ -223,10 +224,7 @@ export default function ContentPage() {
   const baseSections = (page.sections ?? [])
     .map((section) => ({
       section,
-      // A cta or link_group that leads to a section that is off, or to a
-      // page that is not public, is not drawn (lib/linkTargets.js). Filtered before the emptiness test
-      // below, so a section left with nothing draws no heading.
-      blocks: withoutSwitchedOffLinks(getSectionBlocks(section.id), features, pages),
+      blocks: getSectionBlocks(section.id),
       map: section.id === VENUE_MAP_SECTION_ID ? map : null,
       areaMap: section.id === AREA_MAP_SECTION_ID ? areaMap : null,
     }))

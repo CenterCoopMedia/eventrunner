@@ -145,6 +145,15 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'label', type: 'string', required: false },
     ],
   },
+  latest_updates: {
+    id: 'latest_updates',
+    label: 'Latest updates',
+    description: 'Links to the newest published updates.',
+    fields: [
+      { id: 'label', type: 'string', required: false },
+      { id: 'count', type: 'number', required: true },
+    ],
+  },
   sponsor_package: {
     id: 'sponsor_package',
     label: 'Sponsor package',

@@ -10,41 +10,11 @@ import BlockRenderer from './registry.jsx';
 import StatBlock from './StatBlock.jsx';
 import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
-import { sponsorPackageDraws } from './sponsorPackageData.js';
-import Folio from '../editorial/Folio.jsx';
 
 const blockKey = (block, index) =>
   block.id ?? `${block.section}__${block.field ?? index}`;
 
-function LinkGroups({ blocks }) {
-  const groups = new Map();
-  for (const block of blocks) {
-    const name = block.group ?? '';
-    if (!groups.has(name)) groups.set(name, []);
-    groups.get(name).push(block);
-  }
-  return (
-    <div className="grid gap-lg sm:grid-cols-2">
-      {[...groups.entries()].map(([name, links]) => (
-        <div key={name || 'ungrouped'}>
-          {/* The group name is a folio on a hairline: it heads its own list,
-              which is what a folio is for. It is not an eyebrow — nothing
-              sits above a heading here (design brief §2.4). */}
-          {name ? (
-            <Folio as="h3" className="border-t-hairline border-t-rule-hairline pt-2xs">
-              {name}
-            </Folio>
-          ) : null}
-          <ul className="mt-xs space-y-3xs">
-            {links.map((block, i) => (
-              <BlockRenderer key={blockKey(block, i)} block={block} />
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
-}
+const groupedRun = (run) => <BlockRenderer block={run[0]} run={run} />;
 
 // How each batched run renders. Ids outside this map render individually.
 const RUN_RENDERERS = {
@@ -79,19 +49,8 @@ const RUN_RENDERERS = {
       ))}
     </div>
   ),
-  link_group: (run) => <LinkGroups blocks={run} />,
-  // A run of sponsor packages (#193) is one list of entries, each ruled on
-  // top: no box, no card. A package with no name is left out rather than
-  // drawn as an empty entry.
-  sponsor_package: (run) => (
-    <ul className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
-      {run.filter(sponsorPackageDraws).map((block, i) => (
-        <li key={blockKey(block, i)} className="border-t-hairline border-t-rule-hairline pt-sm">
-          <BlockRenderer block={block} />
-        </li>
-      ))}
-    </ul>
-  ),
+  link_group: groupedRun,
+  sponsor_package: groupedRun,
 };
 
 export default function SectionBlocks({ blocks }) {

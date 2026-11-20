@@ -112,6 +112,8 @@ function typeSearchText(block, timeline) {
         verbatim(block.label),
         ...(Array.isArray(block.images) ? block.images.map((image) => verbatim(image?.alt)) : []),
       );
+    case 'latest_updates':
+      return joined(block.label, ...(Array.isArray(block.updates) ? block.updates.map((update) => update?.title) : []));
     case 'sponsor_package':
       // The name and the price are plain input; the benefits are rich text.
       return joined(verbatim(block.name), verbatim(block.price), stripHtml(block.benefits));

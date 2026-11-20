@@ -14,7 +14,6 @@
 import { subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
-import { demoUpdates } from './demoCommunity.js';
 
 // Static demo build: report local updates and keep other snapshots in charge.
 //
@@ -80,8 +79,14 @@ export function subscribeSpeakersPublic(onNext) {
  */
 export function subscribeContentCollection(name, readSource, onNext, onConfirmed) {
   if (IS_DEMO) {
-    if (name === 'cmsUpdates') onNext(demoUpdates);
-    return NO_OVERLAY;
+    if (name !== 'cmsUpdates') return NO_OVERLAY;
+    let active = true;
+    import('../../../../scripts/lib/demo-updates.json').then(({ default: updates }) => {
+      if (active) onNext(updates);
+    }, (error) => {
+      if (active) console.warn('Demo updates could not load.', error);
+    });
+    return () => { active = false; };
   }
   return subscribeToFirebase(({ db, collection, onSnapshot, query, where }) => {
     const target =

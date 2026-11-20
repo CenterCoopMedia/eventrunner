@@ -30,6 +30,7 @@
 const { VENUE_MAP_SECTION_ID, venueAddress } = require('shared/venue');
 const { SEED_WHEN_PLACEHOLDER } = require('shared/seed');
 const { builtInSectionBlockTypes } = require('shared/page');
+const { DEFAULT_LATEST_UPDATES_COUNT } = require('shared/update');
 const { buildLegalContent } = require('./legal.cjs');
 const { getDefaultTemplate } = require('../../functions/src/email/templates.cjs');
 
@@ -659,6 +660,8 @@ function placeholderBlock(blockType, description) {
       return { group: 'Links', label: text, url: 'https://example.org' };
     case 'gallery':
       return { layout: 'grid', images: [{ url: 'branding/og-default.svg', alt: text }] };
+    case 'latest_updates':
+      return { count: DEFAULT_LATEST_UPDATES_COUNT };
     case 'sponsor_package':
       return { name: text, benefits: '<p>[Replace] What this package includes.</p>' };
     case 'timeline':

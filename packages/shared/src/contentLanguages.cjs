@@ -10,7 +10,7 @@ const BLOCK_FIELDS = Object.freeze({
   text: ['value'], richtext: ['value'], image: ['alt', 'caption'], map: ['label'], cta: ['label'],
   stat: ['label', 'takeaway', 'description', 'alt'], fact: ['label', 'note'],
   quote: ['text'], list_item: ['text'], faq_item: ['question', 'answer'],
-  link_group: ['label'], sponsor_package: ['benefits'],
+  link_group: ['label'], latest_updates: ['label'], sponsor_package: ['benefits'],
 });
 const RICH_FIELDS = Object.freeze({ richtext: ['value'], faq_item: ['answer'], sponsor_package: ['benefits'] });
 

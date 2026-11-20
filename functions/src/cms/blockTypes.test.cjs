@@ -15,7 +15,7 @@ const {
 
 const TYPE_IDS = [
   'text', 'richtext', 'image', 'cta', 'stat', 'fact', 'quote', 'list_item', 'faq_item', 'link_group',
-  'gallery', 'sponsor_package', 'map', 'timeline',
+  'gallery', 'sponsor_package', 'map', 'timeline', 'latest_updates',
 ];
 
 test('registry ships exactly the supported block types', () => {

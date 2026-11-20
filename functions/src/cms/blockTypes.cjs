@@ -178,6 +178,12 @@ const BLOCK_TYPES = Object.freeze({
       field('label', 'string', false),
     ],
   }),
+  latest_updates: blockType({
+    id: 'latest_updates',
+    label: 'Latest updates',
+    description: 'Links to the newest published updates.',
+    fields: [field('label', 'string', false), field('count', 'number', true)],
+  }),
   sponsor_package: blockType({
     id: 'sponsor_package',
     label: 'Sponsor package',

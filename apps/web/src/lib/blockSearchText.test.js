@@ -110,6 +110,12 @@ describe('blockSearchText', () => {
     expect(blockMatchesQuery({ blockType: 'fact', label: 'Where', value: 'The hall' }, 'hall')).toBe(true);
   });
 
+  it('indexes the Latest updates heading and displayed post titles', () => {
+    const block = { blockType: 'latest_updates', label: 'Event news', updates: [{ title: 'New venue' }] };
+    expect(blockSearchText(block)).toBe('Event news New venue');
+    expect(blockMatchesQuery(block, 'venue')).toBe(true);
+  });
+
   it('joins the name, the price and the stripped benefits on a sponsor package (issue 193)', () => {
     const block = {
       blockType: 'sponsor_package',

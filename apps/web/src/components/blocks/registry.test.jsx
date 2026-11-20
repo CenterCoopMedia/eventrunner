@@ -4,6 +4,7 @@
 // UnknownBlock fallback (labeled box in dev, nothing in production).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import * as blockTypesCjs from '../../../../../functions/src/cms/blockTypes.cjs';
 import BlockRenderer, { BLOCK_RENDERERS, rendererFor, UnknownBlock } from './registry.jsx';
 import ContentContext from '../../contexts/ContentContext.jsx';
@@ -42,6 +43,7 @@ const SAMPLE_BLOCKS = {
   faq_item: { blockType: 'faq_item', question: 'Sample question?', answer: '<p>Sample answer.</p>' },
   link_group: { blockType: 'link_group', group: 'About', label: 'Contact the organizers', url: 'mailto:hi@example.org' },
   gallery: { blockType: 'gallery', layout: 'grid', images: [{ url: 'cms-images/a1/crowd.webp', alt: 'The main hall' }] },
+  latest_updates: { blockType: 'latest_updates', updates: [{ id: 'program', title: 'The program is out' }] },
   sponsor_package: { blockType: 'sponsor_package', name: 'Coffee break', price: 'Illustrative', limit: 2, benefits: '<p>Signs</p>' },
   timeline: { blockType: 'timeline' },
 };
@@ -64,6 +66,7 @@ describe('block renderer registry', () => {
     const content = { timeline: [{ id: 'edition', year: 2024, title: 'First edition' }] };
     const { container } = render(
       <ContentContext.Provider value={content}><BlockRenderer block={sample} /></ContentContext.Provider>,
+      { wrapper: MemoryRouter },
     );
     await waitFor(() => {
       expect(container.firstElementChild).toBeInTheDocument();

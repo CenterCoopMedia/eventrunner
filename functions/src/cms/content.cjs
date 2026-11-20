@@ -24,6 +24,7 @@
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { BLOCK_TYPES, draftCollectionFor, requiredBlockErrors } = require('./blockTypes.cjs');
+const { MAX_LATEST_UPDATES_COUNT, validLatestUpdatesCount } = require('shared/update');
 const { builtInSectionBlockTypes, sectionBlockTypes } = require('shared/page');
 const { captionPlacementErrors } = require('shared/imageCaption');
 const {
@@ -270,6 +271,18 @@ function sponsorPackageErrors(fields) {
   return ['limit: must be a whole number of 1 or more. Leave it empty for no limit.'];
 }
 
+function latestUpdatesErrors({ blockType, label, count }) {
+  if (blockType !== 'latest_updates') return [];
+  const errors = [];
+  if (label != null && label !== DELETE_FIELD_SENTINEL && typeof label !== 'string') {
+    errors.push('label: must be text.');
+  }
+  if (count != null && count !== DELETE_FIELD_SENTINEL && !validLatestUpdatesCount(count)) {
+    errors.push(`count: must be a whole number from 1 to ${MAX_LATEST_UPDATES_COUNT}.`);
+  }
+  return errors;
+}
+
 /**
  * Block-shape contracts at the content-write seam (design brief §2.1.1).
  *
@@ -290,8 +303,10 @@ function sponsorPackageErrors(fields) {
  */
 function checkBlockContract({ collection, fields }) {
   const errors = collectionVariantErrors(fields, collection);
-  if (collection === 'cmsContent') errors.push(...requiredBlockErrors(fields), ...sponsorPackageErrors(fields));
-  if (collection === 'cmsContent' && fields.blockType === 'image') errors.push(...captionPlacementErrors(fields));
+  if (collection === 'cmsContent') {
+    errors.push(...requiredBlockErrors(fields), ...sponsorPackageErrors(fields), ...latestUpdatesErrors(fields));
+    if (fields.blockType === 'image') errors.push(...captionPlacementErrors(fields));
+  }
   if (errors.length > 0) return { ok: false, message: errors.join('; ') };
   return { ok: true };
 }

@@ -1,5 +1,6 @@
 import { FACT_HINTS, STAT_CONTRACT_HINTS } from './blockTypes.js';
 import { SPONSOR_PACKAGE_HINTS } from './sponsorPackageHints.js';
+import { DEFAULT_LATEST_UPDATES_COUNT, MAX_LATEST_UPDATES_COUNT } from 'shared/update';
 
 const FIELD_HINTS = Object.freeze({
   text: { value: 'Write the text attendees should see in this part of the page.' },
@@ -36,6 +37,10 @@ const FIELD_HINTS = Object.freeze({
   quote: { text: 'Use the speaker’s exact words, without quotation marks.', attribution: 'Who said it, and in what role.' },
   sponsor_package: { ...SPONSOR_PACKAGE_HINTS, benefits: 'Describe what sponsors receive with this package. Use the toolbar for a list of benefits.' },
   list_item: { text: 'Write one entry in this page’s list.' },
+  latest_updates: {
+    label: 'Add a heading above the links.',
+    count: `Choose 1 to ${MAX_LATEST_UPDATES_COUNT} posts. The default is ${DEFAULT_LATEST_UPDATES_COUNT}.`,
+  },
   faq_item: {
     question: 'Write the question attendees are likely to ask.',
     answer: 'Answer the question in plain language. Use the toolbar for links or lists.',

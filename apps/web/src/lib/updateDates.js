@@ -62,12 +62,24 @@ export function publishDateLabel(publishAt, timeZone, language) {
 export function compareUpdates(a, b) {
   const pinDiff = (b?.pinned === true ? 1 : 0) - (a?.pinned === true ? 1 : 0);
   if (pinDiff !== 0) return pinDiff;
+  return compareUpdateDates(a, b);
+}
+
+function compareUpdateDates(a, b) {
   const aDate = toPublishDate(a?.publishAt);
   const bDate = toPublishDate(b?.publishAt);
   if (aDate && bDate) return bDate.getTime() - aDate.getTime();
   if (aDate) return -1;
   if (bDate) return 1;
   return 0;
+}
+
+export function latestPublishedUpdates(updates) {
+  return (updates ?? [])
+    .filter((update) => update?.visible === true &&
+      typeof update.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/u.test(update.id) &&
+      typeof update.title === 'string' && update.title.trim())
+    .sort(compareUpdateDates);
 }
 
 /**

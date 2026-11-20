@@ -16,6 +16,8 @@ import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
 import UnknownBlock from './UnknownBlock.jsx';
 
+export const loadLatestUpdatesBlock = () => import('./LatestUpdatesBlock.jsx');
+
 export const BLOCK_RENDERERS = Object.freeze({
   // Keep the Home hero, information cards and opening copy ready for first
   // paint. Add new block types with a dynamic import.
@@ -30,6 +32,7 @@ export const BLOCK_RENDERERS = Object.freeze({
   quote: lazy(() => import('./QuoteBlock.jsx')),
   faq_item: lazy(() => import('./FaqItemBlock.jsx')),
   link_group: lazy(() => import('./LinkGroupBlock.jsx')),
+  latest_updates: lazy(loadLatestUpdatesBlock),
   sponsor_package: lazy(() => import('./SponsorPackageBlock.jsx')),
   gallery: lazy(() => import('./GalleryBlock.jsx')),
   timeline: lazy(() => import('./TimelineBlock.jsx')),
@@ -83,9 +86,6 @@ function BlockPlaceholder({ block }) {
       ? <VenueMapPlaceholder address={fields.address} />
       : <MapPlaceholder address={fields.address} />;
   }
-  if (block.blockType === 'link_group') {
-    return <li aria-hidden="true" className="min-h-11" />;
-  }
   if (block.blockType === 'faq_item') {
     return (
       <div aria-hidden="true" className="invisible border-hairline">
@@ -112,12 +112,12 @@ export function rendererFor(blockType) {
     : UnknownBlock;
 }
 
-/** Render one cmsContent block through the registry. */
-export default function BlockRenderer({ block }) {
+/** Render a block or a run of blocks of its type through the registry. */
+export default function BlockRenderer({ block, run }) {
   const Renderer = rendererFor(block?.blockType);
   return (
     <Suspense fallback={block ? <BlockPlaceholder block={block} /> : null}>
-      <Renderer block={block} />
+      <Renderer block={block} run={run} />
     </Suspense>
   );
 }

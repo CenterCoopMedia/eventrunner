@@ -10,6 +10,7 @@ import { blockTypeFor, blockTypeLabel } from './blockTypes.js';
 import { blockSearchText } from '../lib/blockSearchText.js';
 import { hasRichTextContent } from 'shared/richText';
 import { googleMapsEmbedUrl } from 'shared/urlSafety';
+import { DEFAULT_LATEST_UPDATES_COUNT, MAX_LATEST_UPDATES_COUNT, validLatestUpdatesCount } from 'shared/update';
 
 /**
  * Mirrors functions/src/cms/content.cjs's DELETE_FIELD_SENTINEL exactly (a
@@ -62,6 +63,7 @@ export function blankContentValues(blockTypeId) {
   for (const field of valueFieldsOf(blockTypeId)) {
     values[field.id] = blankValue(field);
   }
+  if (blockTypeId === 'latest_updates') values.count = DEFAULT_LATEST_UPDATES_COUNT;
   return values;
 }
 
@@ -77,11 +79,11 @@ export function blankContentValues(blockTypeId) {
  */
 export function toEditableContent(doc, blockTypeId) {
   const resolvedType = blockTypeId ?? doc?.blockType ?? '';
-  const values = {};
+  const values = blankContentValues(resolvedType);
   for (const field of valueFieldsOf(resolvedType)) {
     const raw = doc?.[field.id];
     if (field.type === 'boolean') values[field.id] = raw === true;
-    else if (field.type === 'number') values[field.id] = typeof raw === 'number' ? raw : '';
+    else if (field.type === 'number') values[field.id] = typeof raw === 'number' ? raw : values[field.id];
     else if (field.type === 'images') values[field.id] = Array.isArray(raw) ? raw.map(galleryImage) : [];
     else values[field.id] = typeof raw === 'string' ? raw : '';
   }
@@ -220,6 +222,7 @@ const EDITORIAL_FIELD_LABELS = Object.freeze({
   list_item: { text: 'Text' },
   faq_item: { question: 'Question', answer: 'Answer' },
   link_group: { group: 'Group', label: 'Link text', url: 'Destination' },
+  latest_updates: { label: 'Heading', count: 'Number of updates' },
   sponsor_package: { name: 'Name', price: 'Price', limit: 'Limit', benefits: 'Benefits' },
 });
 
@@ -326,6 +329,12 @@ export function validateRequiredContent(content) {
     const limit = Number(text);
     if (text !== '' && !(Number.isSafeInteger(limit) && limit >= 1)) {
       errors.push({ field: 'limit', message: 'limit: must be a whole number of 1 or more. Leave it empty for no limit.' });
+    }
+  }
+  if (content.blockType === 'latest_updates') {
+    const raw = content.values?.count;
+    if (raw != null && String(raw).trim() !== '' && !validLatestUpdatesCount(Number(raw))) {
+      errors.push({ field: 'count', message: `count: must be a whole number from 1 to ${MAX_LATEST_UPDATES_COUNT}.` });
     }
   }
   return errors;
