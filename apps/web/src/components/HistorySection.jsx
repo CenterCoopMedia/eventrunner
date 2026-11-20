@@ -14,7 +14,7 @@
 import { useContent } from '../contexts/ContentContext.jsx';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
-import TimelineBlock from './blocks/TimelineBlock.jsx';
+import PublishedTimeline from './editorial/PublishedTimeline.jsx';
 
 /**
  * @param {{
@@ -36,7 +36,7 @@ export default function HistorySection({ id, title, blocks, arrangement, action 
           blocks keep the width the page's arrangement gives them. */}
       <div className={arrangement === 'grid' ? 'mt-md' : 'measure mt-md'}>
         {blocks.length > 0 ? <SectionBlocks blocks={blocks} /> : null}
-        {showTimeline ? <TimelineBlock className={blocks.length > 0 ? 'mt-lg' : ''} /> : null}
+        {showTimeline ? <PublishedTimeline className={blocks.length > 0 ? 'mt-lg' : ''} /> : null}
       </div>
     </section>
   );

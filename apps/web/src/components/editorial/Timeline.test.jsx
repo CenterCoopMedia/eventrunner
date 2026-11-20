@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Timeline from './Timeline.jsx';
+import TimelineDetails from './TimelineDetails.jsx';
 import { renderInEveryStyle } from '../../test/everyStyle.jsx';
 
 const EDITIONS = [
@@ -49,9 +50,9 @@ describe('Timeline', () => {
   });
 
   it('isolates external links and renders invalid destinations as headings', () => {
-    inRouter(<Timeline entries={[
-      { id: 'external', title: 'External recap', href: 'https://example.org/recap' },
-      { id: 'unsafe', title: 'Unsafe link', href: '//example.org/recap', image: 'https://example.org/photo.png', alt: 'An untrusted image' },
+    inRouter(<TimelineDetails timeline={[
+      { id: 'external', title: 'External recap', url: 'https://example.org/recap' },
+      { id: 'unsafe', title: 'Unsafe link', url: '//example.org/recap', image: 'https://example.org/photo.png', alt: 'An untrusted image' },
       { id: 'undescribed', title: 'Undescribed image', image: 'cms-images/archive/photo.png' },
     ]} />);
     const external = screen.getByRole('link', { name: 'External recap (opens in a new tab)', exact: true });

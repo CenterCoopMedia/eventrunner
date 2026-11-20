@@ -12,28 +12,27 @@
 // BESIDE the entry's title on the same line — never above it, because
 // nothing sits directly above a heading.
 import { PublicLink as Link } from '../PublicLink.jsx';
-import ExternalLink from '../ExternalLink.jsx';
-import { timelineHref, timelineImagePath } from '../../lib/timelineEntry.js';
-import AssetImage from '../media/AssetImage.jsx';
 
 /**
  * @param {{
- *   entries: Array<{
+ *   entries?: Array<{
  *     id: string,
  *     title: string,
  *     date?: string,        // machine-readable, for <time dateTime>
  *     dateLabel?: string,   // what a reader sees: "2025", "14 October"
  *     body?: string,
- *     href?: string,        // an HTTPS address or internal path
- *     image?: string,       // a media-library object path
- *     alt?: string,
+ *     href?: string,
  *   }>,
+ *   timeline?: Array<{ id: string, title: string, year: number, description?: string }>,
+ *   renderTitle?: (entry: object) => import('react').ReactNode,
+ *   renderMedia?: (entry: object) => import('react').ReactNode,
  *   level?: 2 | 3 | 4,
  *   className?: string,
  * }} props
  */
-export default function Timeline({ entries, level = 3, className = '' }) {
-  const rows = (Array.isArray(entries) ? entries : []).filter(
+export default function Timeline({ entries, timeline, renderTitle, renderMedia, level = 3, className = '' }) {
+  const source = entries ?? timeline;
+  const rows = (Array.isArray(source) ? source : []).filter(
     (entry) => entry && typeof entry.title === 'string' && entry.title.trim(),
   );
   if (rows.length === 0) return null;
@@ -41,34 +40,26 @@ export default function Timeline({ entries, level = 3, className = '' }) {
   return (
     <ol role="list" className={['timeline', className].filter(Boolean).join(' ')}>
       {rows.map((entry) => {
-        const href = timelineHref(entry.href);
-        const image = timelineImagePath(entry.image);
-        const alt = typeof entry.alt === 'string' ? entry.alt.trim() : '';
+        const date = timeline ? entry.year : entry.date;
+        const dateLabel = timeline ? entry.year : entry.dateLabel;
+        const body = timeline ? entry.description : entry.body;
         let title = entry.title;
-        if (href?.startsWith('https://')) {
-          title = <ExternalLink href={href} rel="noopener noreferrer" className="underline">{title}</ExternalLink>;
-        } else if (href) {
-          title = <Link to={href} className="underline">{title}</Link>;
-        }
+        if (renderTitle) title = renderTitle(entry);
+        else if (entries && entry.href) title = <Link to={entry.href}>{title}</Link>;
         return (
           <li key={entry.id ?? entry.title} className="timeline__entry">
             <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
               <Heading className="min-w-0 break-words font-heading text-h3 font-semibold text-text-primary">{title}</Heading>
-              {entry.dateLabel ? (
+              {dateLabel ? (
                 <p className="timeline__date text-caption text-text-secondary">
-                  {entry.date ? <time dateTime={entry.date}>{entry.dateLabel}</time> : entry.dateLabel}
+                  {date ? <time dateTime={date}>{dateLabel}</time> : dateLabel}
                 </p>
               ) : null}
             </div>
-            {entry.body ? (
-              <p className="mt-xs max-w-prose break-words text-body text-text-secondary text-pretty">{entry.body}</p>
+            {body ? (
+              <p className="mt-xs max-w-prose break-words text-body text-text-secondary text-pretty">{body}</p>
             ) : null}
-            {image && alt ? (
-              <div className="mt-sm max-w-prose">
-                <AssetImage path={image} alt={alt} sizes="(max-width: 40rem) 100vw, 40rem"
-                  className="h-auto max-w-full rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08]" />
-              </div>
-            ) : null}
+            {renderMedia?.(entry)}
           </li>
         );
       })}
