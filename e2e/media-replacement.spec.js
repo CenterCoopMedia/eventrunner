@@ -38,13 +38,16 @@ test('an editor replaces a library image on an event page and keeps its draft se
     assets.push(original);
     const replacement = await upload(token, 'nora-chen.webp', 'Replacement arrival photo', 'Replacement arrival view');
     assets.push(replacement);
-    await db.doc(`media_assets/${replacement.id}`).update({ caption: 'Updated arrival caption', credit: 'Fixture photo credit' });
-    const image = { section: id, field: 'photo', blockType: 'image', url: original.path, alt: 'Original arrival view', visible: true };
+    const metadata = await callFunction('mediaUpdateMetadata', {
+      assetId: replacement.id, caption: 'Updated arrival caption', credit: 'Fixture photo credit',
+    }, token);
+    expect(metadata.status).toBe(200);
+    const image = { section: id, field: 'photo', blockType: 'image', url: original.path, alt: 'Original arrival view', caption: 'Old arrival caption', visible: true };
     await Promise.all([
       pageRef.set({ label: 'Arrival guide', title: 'Arrival guide', path: `/${id}`, order: 999, visible: true, systemPage: false,
         sections: [{ id, label: 'Arrivals', description: '', allowedBlocks: ['image'], maxBlocks: 4, reorderable: true, defaultBlocks: [] }] }),
-      photo.set({ ...image, revision: 1, focalX: 28 }),
-      draft.set({ ...image, status: 'dirty', basedOnRevision: 1, focalX: 73 }),
+      photo.set({ ...image, revision: 1, focalX: 28, size: 'small', alignment: 'center' }),
+      draft.set({ ...image, status: 'dirty', basedOnRevision: 1, focalX: 73, size: 'large', alignment: 'right' }),
     ]);
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/media');
@@ -66,14 +69,17 @@ test('an editor replaces a library image on an event page and keeps its draft se
     await expect(details.getByText('2 places changed.')).toBeVisible();
     await expect(details.getByRole('button', { name: 'Delete this file', exact: true })).toBeVisible();
     expect((await db.doc(`media_assets/${original.id}`).get()).exists).toBe(true);
-    expect((await photo.get()).data()).toMatchObject({ url: replacement.path, focalX: 28, caption: 'Updated arrival caption', credit: 'Fixture photo credit' });
-    expect((await draft.get()).data()).toMatchObject({ url: replacement.path, focalX: 73, status: 'dirty' });
+    const live = (await photo.get()).data();
+    expect(live).toMatchObject({ url: replacement.path, focalX: 28, alt: 'Replacement arrival view', size: 'small', alignment: 'center' });
+    expect(live).not.toHaveProperty('caption');
+    expect((await draft.get()).data()).toMatchObject({ url: replacement.path, focalX: 73, status: 'dirty', size: 'large', alignment: 'right' });
 
     await page.goto(`/${id}`);
     const imageAfter = page.getByRole('img', { name: 'Replacement arrival view' });
     await expect(imageAfter).toBeVisible();
     await expect(imageAfter).toHaveAttribute('src', new RegExp(encodeURIComponent(replacement.path)));
-    await expect(page.getByText('Updated arrival caption · Fixture photo credit')).toBeVisible();
+    await expect(page.getByText('Updated arrival caption', { exact: true })).toBeVisible();
+    await expect(page.getByText('Credit: Fixture photo credit', { exact: true })).toBeVisible();
   } finally {
     await Promise.all([pageRef.delete(), photo.delete(), draft.delete()]);
     for (const asset of assets) {

@@ -1,6 +1,7 @@
 'use strict';
 
 const { THEME_LOGO_SLOTS } = require('shared/theme');
+const { imageCaptionAssetId } = require('shared/imageCaption');
 
 const DESCRIPTION_FIELDS = ['alt', 'caption', 'credit'];
 
@@ -8,19 +9,19 @@ const DESCRIPTION_FIELDS = ['alt', 'caption', 'credit'];
 // path. Replacement changes only the fields the site renders as images.
 function imagePlacements(collection, id, doc) {
   const placements = [];
-  const add = (keys, description = [], requiredAlt = false) => {
+  const add = (keys, described = false) => {
     const value = keys.reduce((record, key) => record?.[key], doc);
-    if (typeof value === 'string' && value) placements.push({ keys, value, description, requiredAlt });
+    if (typeof value === 'string' && value) placements.push({ keys, value, described });
   };
   switch (collection.replace(/_drafts$/, '')) {
     case 'cmsContent':
-      if (doc?.blockType === 'image') add(['url'], DESCRIPTION_FIELDS, true);
+      if (doc?.blockType === 'image') add(['url'], true);
       break;
     case 'cmsUpdates':
-      add(['featuredImage', 'url'], DESCRIPTION_FIELDS, true);
+      add(['featuredImage', 'url'], true);
       if (Array.isArray(doc?.content)) {
         doc.content.forEach((block, index) => {
-          if (block?.type === 'image') add(['content', index, 'image', 'url'], DESCRIPTION_FIELDS, true);
+          if (block?.type === 'image') add(['content', index, 'image', 'url'], true);
         });
       }
       break;
@@ -32,7 +33,7 @@ function imagePlacements(collection, id, doc) {
         for (const slot of THEME_LOGO_SLOTS) add(['logos', slot]);
       } else if (id === 'event') {
         add(['seo', 'defaultOgImagePath']);
-        add(['venue', 'map', 'image'], ['alt'], true);
+        add(['venue', 'map', 'image'], true);
       }
       break;
   }
@@ -75,13 +76,26 @@ function withReplacement(object, keys, offset, placement, source, target, keepDe
     return next;
   }
   next[key] = target.path;
-  for (const field of placement.description) {
-    if (!keepDescription) next[field] = target[field];
-    else if (field === 'alt' && typeof object.alt !== 'string') next.alt = source.alt;
+  if (!placement.described) return next;
+  if (keepDescription) {
+    // Preserve the text inherited from the old asset, including an empty
+    // caption or credit. The placement's own caption and translations stay.
+    const inheritsFromSource = imageCaptionAssetId(placement.value) === source.id;
+    const inherited = object.descriptionOverride?.assetId === source.id ? object.descriptionOverride : source;
+    if (typeof object.alt !== 'string') next.alt = source.alt;
+    next.descriptionOverride = {
+      assetId: target.id,
+      caption: inheritsFromSource ? inherited.caption : '',
+      credit: inheritsFromSource ? inherited.credit : '',
+    };
+    return next;
   }
-  if (!keepDescription && next.translations && placement.description.length > 0) {
+  next.alt = target.alt;
+  delete next.caption;
+  delete next.descriptionOverride;
+  if (next.translations) {
     next.translations = Object.fromEntries(Object.entries(next.translations).flatMap(([language, fields]) => {
-      const kept = Object.fromEntries(Object.entries(fields ?? {}).filter(([field]) => !placement.description.includes(field)));
+      const kept = Object.fromEntries(Object.entries(fields ?? {}).filter(([field]) => !DESCRIPTION_FIELDS.includes(field)));
       return Object.keys(kept).length ? [[language, kept]] : [];
     }));
   }
@@ -102,7 +116,7 @@ function replaceImageFields({ collection, id, doc, expected, source, target, buc
       const currentAlt = parent.reduce((object, key) => object[key], doc).alt;
       const alt = keepDescription && typeof currentAlt === 'string' ? currentAlt.trim()
         : (keepDescription ? source.alt : target.alt);
-      if (placement.requiredAlt && !alt) {
+      if (placement.described && !alt) {
         failed.push({ field, reason: 'Add an image description to the replacement or keep the current one.' });
         continue;
       }

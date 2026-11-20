@@ -22,7 +22,10 @@ function fixture() {
     'media_assets/new': { path: target, alt: 'Replacement alt', caption: 'Replacement caption', credit: 'Replacement photographer' },
     'cmsContent/hero__image': { ...image, section: 'hero', field: 'image', revision: 2, visible: true },
     'cmsContent_drafts/hero__image': { ...image, status: 'dirty', basedOnRevision: 2, focalX: 28 },
-    'cmsContent/travel-arrival__photo': { ...image, credit: 'Placement photographer', section: 'travel-arrival', field: 'photo', revision: 4, visible: true },
+    'cmsContent/travel-arrival__photo': {
+      ...image, section: 'travel-arrival', field: 'photo', revision: 4, visible: true,
+      descriptionOverride: { assetId: 'old', caption: '', credit: '' },
+    },
     'cmsContent/travel-arrival__link': { blockType: 'cta', url: source, label: 'Keep this destination' },
     'cmsUpdates/arrival': { title: 'Arrival', featuredImage: { url: hostedOld, alt: 'Feature alt' },
       content: [{ type: 'image', image: { url: source, alt: 'Body alt' } }], revision: 1, visible: true },
@@ -91,8 +94,8 @@ test('replacement resumes committed groups through the publish receipt without p
   assert.equal(db.read('cmsContent_drafts', 'hero__image').focalX, 28);
   assert.equal(db.read('cmsContent_drafts', 'hero__image').status, 'dirty');
   const photo = db.read('cmsContent', 'travel-arrival__photo');
-  assert.deepEqual([photo.url, photo.alt, photo.caption, photo.credit],
-    [target, 'Replacement alt', 'Replacement caption', 'Replacement photographer']);
+  assert.deepEqual([photo.url, photo.alt, photo.caption, photo.descriptionOverride],
+    [target, 'Replacement alt', undefined, undefined]);
   assert.equal(db.read('cmsContent', 'travel-arrival__link').url, source);
   assert.equal(db.read('cmsUpdates', 'arrival').content[0].image.url, target);
   assert.equal(db.read('cmsUpdates', 'arrival').featuredImage.url, target);
@@ -104,14 +107,18 @@ test('replacement resumes committed groups through the publish receipt without p
   assert.ok(db.read('media_assets', 'old'));
 });
 
-test('keeping descriptions preserves placement text without adding a library credit', async () => {
+test('keeping descriptions retains authored text and pins the old inherited text, including blanks', async () => {
   const { db, call } = fixture();
   const references = (await scanReplacementUsage({ db, paths: [source], bucket: bucketName }))[source];
   const outcome = await call({ requestId, mediaReplacement: { assetId: 'old', replacementId: 'new', references, keepDescription: true } });
   assert.equal(outcome.body.status, 'done');
-  const { url, alt, caption, credit } = db.read('cmsContent', 'hero__image');
-  assert.deepEqual([url, alt, caption, credit], [target, 'Old description', 'Old caption', undefined]);
-  assert.equal(db.read('cmsContent', 'travel-arrival__photo').credit, 'Placement photographer');
+  const inherited = { assetId: 'new', caption: '', credit: 'Original photographer' };
+  const { url, alt, caption, descriptionOverride } = db.read('cmsContent', 'hero__image');
+  assert.deepEqual([url, alt, caption, descriptionOverride], [target, 'Old description', 'Old caption', inherited]);
+  assert.deepEqual(db.read('cmsContent', 'travel-arrival__photo').descriptionOverride, { ...inherited, credit: '' });
+  assert.deepEqual(db.read('cmsUpdates', 'arrival').featuredImage.descriptionOverride, { ...inherited, credit: '' });
+  assert.deepEqual(db.read('cmsUpdates', 'arrival').content[0].image.descriptionOverride, inherited);
+  assert.deepEqual(db.read('config', 'event').venue.map.descriptionOverride, inherited);
 });
 
 test('a placement that moved after confirmation is reported and cannot strand the run', async (t) => {

@@ -1,16 +1,17 @@
 'use strict';
 const { isSafeUrl } = require('./urlSafety.cjs');
 const { isMediaLibraryPath, storageObjectPath } = require('./venue.cjs');
+const { validDescriptionOverride } = require('./imageCaption.cjs');
 const text = (value) => typeof value === 'string' && value.trim().length > 0 && value.length <= 20000;
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const keys = (value, allowed) => Object.keys(value).every((key) => allowed.includes(key));
 const localRoute = (value) => typeof value === 'string' && /^\/[a-z0-9][a-z0-9/?=&_-]*$/i.test(value);
 function validUpdateImage(value) {
-  const optionalText = (field) => field === undefined || typeof field === 'string' && field.length <= 20000;
-  return object(value) && keys(value, ['url', 'alt', 'caption', 'credit']) && text(value.alt)
+  return object(value) && keys(value, ['url', 'alt', 'caption', 'descriptionOverride']) && text(value.alt)
     && (isSafeUrl(value.url) || isMediaLibraryPath(storageObjectPath(value.url))
       || typeof value.url === 'string' && /^demo\/[a-z0-9-]+\.webp$/.test(value.url))
-    && optionalText(value.caption) && optionalText(value.credit);
+    && (value.caption === undefined || typeof value.caption === 'string' && value.caption.length <= 20000)
+    && (value.descriptionOverride === undefined || validDescriptionOverride(value.descriptionOverride));
 }
 function validUpdateBlock(block) {
   if (!object(block)) return false;

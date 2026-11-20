@@ -150,7 +150,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
             <ImagePlacementFields values={values} onChange={change} errorFor={(field) => fieldErrors.get(field)} />
           </div>
         ) : null}
-        <ImagePlacementPreview image={values} hero="home" eventName={eventConfig.name} />
+        <ImagePlacementPreview image={{ ...values, descriptionOverride: image?.current?.descriptionOverride }} hero="home" eventName={eventConfig.name} />
         <div className="flex flex-wrap gap-xs">
           <button type="button" className={secondaryButtonClass} onClick={() => save(false)}>
             <BusyLabel busy={busy} pending="Saving the draft…">Save draft</BusyLabel>

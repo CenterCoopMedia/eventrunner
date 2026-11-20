@@ -114,6 +114,13 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
         <>
           <p>{places.length} {places.length === 1 ? 'place will change' : 'places will change'}. The previous image stays in the library.</p>
           <Places places={places} usageLocation={usageLocation} />
+          {replacement && !keepDescription ? (
+            <p className="text-admin-sm text-admin-ink-secondary">
+              {replacement.caption || replacement.credit
+                ? [replacement.caption, replacement.credit].filter(Boolean).join(' · ')
+                : 'The replacement image has no caption or credit.'}
+            </p>
+          ) : null}
           <CheckboxField label="Keep the current description" checked={keepDescription} onChange={setKeepDescription}
             help="Keep the alt text, caption, and credit at each place. Clear the checkbox to use the replacement image’s description." disabled={busy || confirmed} />
         </>

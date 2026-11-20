@@ -108,6 +108,7 @@ export function normalizeVenueReferences(venue) {
       alt: map?.alt ?? '',
       ...(map?.captionMode ? { captionMode: map.captionMode } : {}),
       ...(map?.captionAlign ? { captionAlign: map.captionAlign } : {}),
+      ...(map?.descriptionOverride ? { descriptionOverride: map.descriptionOverride } : {}),
       markers: Array.isArray(map?.markers)
         ? map.markers.map((marker) => ({
             placeId: marker?.placeId ?? '',
@@ -190,6 +191,7 @@ function venueMapPayload(map) {
     alt: String(map?.alt ?? '').trim(),
     ...(map.captionMode !== undefined ? { captionMode: map.captionMode === '' ? null : map.captionMode } : {}),
     ...(map.captionAlign !== undefined ? { captionAlign: map.captionAlign === '' ? null : map.captionAlign } : {}),
+    ...(map.descriptionOverride ? { descriptionOverride: map.descriptionOverride } : {}),
     markers: (map?.markers ?? []).map((marker) => ({
       placeId: marker.placeId,
       x: coordinate(marker.x),

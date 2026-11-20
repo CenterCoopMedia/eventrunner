@@ -1,6 +1,7 @@
 'use strict';
 
 const { isMediaLibraryPath, storageObjectPath } = require('shared/venue');
+const { MAX_CAPTION_LENGTH, MAX_CREDIT_LENGTH } = require('shared/imageCaption');
 const { badRequest, internal, notFound, sendError } = require('../core/errors.cjs');
 const { contentFieldsOf, isAlreadyExistsError, isValidDocId, logAdminAction, writeConfigVersion, internals } = require('../cms/store.cjs');
 const { scanReplacementUsage } = require('./usage.cjs');
@@ -11,7 +12,10 @@ function assetDescription(row) {
   const path = storageObjectPath(row?.path);
   if (!isMediaLibraryPath(path)) return null;
   const text = (value) => typeof value === 'string' ? value.trim() : '';
-  return { path, alt: text(row.alt), caption: text(row.caption), credit: text(row.credit) };
+  return {
+    path, alt: text(row.alt), caption: text(row.caption).slice(0, MAX_CAPTION_LENGTH),
+    credit: text(row.credit).slice(0, MAX_CREDIT_LENGTH),
+  };
 }
 
 function referenceKeys(references) {
@@ -54,7 +58,8 @@ async function replaceGroup({ db, queueRef, group, key, plan, bucket, targetExis
     }
 
     const replace = (doc, expected) => replaceImageFields({
-      collection, id, doc, expected, source: plan.source, target: plan.target, bucket,
+      collection, id, doc, expected, source: { ...plan.source, id: plan.assetId },
+      target: { ...plan.target, id: plan.replacementId }, bucket,
       keepDescription: plan.keepDescription,
     });
     const nextLive = replace(liveData, live);
@@ -129,7 +134,8 @@ async function prepare({ db, bucket, body, actor, res }) {
     return null;
   }
   return {
-    assetId, replacementId, keepDescription, source: { path: source.path, alt: source.alt }, target, places, operatorOnly, completed: {},
+    assetId, replacementId, keepDescription, source, target: { path: target.path, alt: target.alt },
+    places, operatorOnly, completed: {},
   };
 }
 

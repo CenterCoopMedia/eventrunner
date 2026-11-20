@@ -682,7 +682,7 @@ export default function AdminContentBlockEditor({ mode }) {
       ) : null}
       {content.blockType === 'image' ? (
         <ImagePlacementPreview
-          image={toContentFields(content)}
+          image={{ ...toContentFields(content), descriptionOverride: existingRow?.current?.descriptionOverride }}
           hero={sectionId === 'hero' && ['home', 'schedule'].includes(pageId) ? pageId : undefined}
           eventName={eventConfig.name}
         />
