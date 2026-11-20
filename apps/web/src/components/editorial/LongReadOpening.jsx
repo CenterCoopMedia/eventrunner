@@ -14,6 +14,8 @@
 // A page whose values happen to match the template has not chosen it
 // (lib/pageTemplates.js), so no cap appears by coincidence.
 
+import './LongReadOpening.css';
+
 /**
  * @param {{
  *   active?: boolean,

@@ -68,7 +68,7 @@ describe('SponsorPackageBlock', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('sets a run of packages as one list of entries ruled on top, leaving out one with no name', () => {
+  it('sets a run of packages as one list of entries ruled on top, leaving out one with no name', async () => {
     const { container } = render(
       <SectionBlocks
         blocks={[
@@ -78,6 +78,7 @@ describe('SponsorPackageBlock', () => {
         ]}
       />,
     );
+    await screen.findByRole('heading', { level: 3, name: 'First' });
     // The outer list; each package's benefits carry a list of their own.
     const list = container.querySelector('ul');
     const entries = within(list).getAllByRole('listitem').filter((item) => item.parentElement === list);

@@ -34,6 +34,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..', '..', '..', '..');
 const require = createRequire(import.meta.url);
 const { buildCommand, DEFAULT_BASE, DEMO_FIREBASE_ENV } = require(path.join(REPO_ROOT, 'scripts', 'build-demo.cjs'));
+const { measureBundle } = require(path.join(REPO_ROOT, 'scripts', 'ci', 'bundle-budget.cjs'));
 
 /**
  * The same demo-mode vite build scripts/build-demo.cjs runs, written to a
@@ -204,6 +205,18 @@ describe('the built stylesheet', () => {
     expect(bundled.length).toBeGreaterThan(1000);
     for (const selector of DEVICE_CLASSES) {
       expect(bundled, `${selector} survived the build`).toContain(selector);
+    }
+  });
+
+  it('keeps block and admin styles out of the first-paint CSS', () => {
+    const { initialCss } = measureBundle(scratch);
+    expect(initialCss.files.length).toBeGreaterThan(0);
+    const startup = initialCss.files.map(({ file }) =>
+      fs.readFileSync(path.join(scratch, file), 'utf8'),
+    ).join('\n');
+    for (const selector of ['.pull-quote__mark', '.long-read-opening', '.venue-map__frame', '.admin-rich-text', '.admin-proof-row']) {
+      expect(bundled).toContain(selector);
+      expect(startup).not.toContain(selector);
     }
   });
 

@@ -164,6 +164,22 @@ test('the first-paint source graph reaches the section edit link and nothing und
   assert.deepEqual(adminFiles, [], 'a file under src/admin is in the first-paint graph');
 });
 
+test('only the home first-paint blocks can be statically imported', () => {
+  const blocks = path.join(WEB_SRC, 'components', 'blocks');
+  const eagerBlocks = new Set([
+    'CtaBlock.jsx', 'FactBlock.jsx', 'ImageBlock.jsx', 'ListItemBlock.jsx',
+    'RichTextBlock.jsx', 'StatBlock.jsx', 'TextBlock.jsx', 'UnknownBlock.jsx',
+  ]);
+  for (const entry of [path.join(WEB_SRC, 'main.jsx'), path.join(blocks, 'registry.jsx')]) {
+    const { files } = eagerSourceGraph(entry);
+    const unexpected = [...files]
+      .filter((file) => file.startsWith(blocks + path.sep) && file.endsWith('Block.jsx'))
+      .map((file) => path.basename(file))
+      .filter((filename) => !eagerBlocks.has(filename));
+    assert.deepEqual(unexpected, [], `Use a dynamic import for block renderers reached from ${path.basename(entry)}`);
+  }
+});
+
 test('the demo settings panel and style descriptions load only after the disclosure opens', () => {
   const { files } = eagerSourceGraph(path.join(WEB_SRC, 'main.jsx'));
   assert.equal(files.has(path.join(WEB_SRC, 'components', 'DemoBanner.jsx')), true);

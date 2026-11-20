@@ -3,7 +3,7 @@
 // the two halves of the contract cannot drift — and unknown ids hit the
 // UnknownBlock fallback (labeled box in dev, nothing in production).
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import * as blockTypesCjs from '../../../../../functions/src/cms/blockTypes.cjs';
 import BlockRenderer, { BLOCK_RENDERERS, rendererFor, UnknownBlock } from './registry.jsx';
 
@@ -54,15 +54,15 @@ describe('block renderer registry', () => {
     );
   });
 
-  it('renders visible output for every registered block type', () => {
-    for (const id of Object.keys(BLOCK_TYPES)) {
-      const sample = SAMPLE_BLOCKS[id];
-      // A new backend block type must gain a sample here alongside its renderer.
-      expect(sample, `missing sample block for '${id}'`).toBeTruthy();
-      const { container, unmount } = render(<BlockRenderer block={sample} />);
-      expect(container.innerHTML, `renderer for '${id}' produced nothing`).not.toBe('');
-      unmount();
-    }
+  it.each(Object.keys(BLOCK_TYPES))('renders visible output for %s', async (id) => {
+    const sample = SAMPLE_BLOCKS[id];
+    // A new backend block type must gain a sample here alongside its renderer.
+    expect(sample, `missing sample block for '${id}'`).toBeTruthy();
+    const { container } = render(<BlockRenderer block={sample} />);
+    await waitFor(() => {
+      expect(container.firstElementChild).toBeVisible();
+      expect(container.firstElementChild).not.toHaveAttribute('aria-hidden', 'true');
+    });
   });
 
   it('routes unknown and prototype-name ids to UnknownBlock', () => {
@@ -72,10 +72,10 @@ describe('block renderer registry', () => {
     expect(rendererFor('text')).not.toBe(UnknownBlock);
   });
 
-  it('renders the titled sandboxed map and an address search link', () => {
+  it('renders the titled sandboxed map and an address search link', async () => {
     const { map } = SAMPLE_BLOCKS;
     render(<BlockRenderer block={map} />);
-    const frame = screen.getByTitle(map.label);
+    const frame = await screen.findByTitle(map.label);
     expect(frame).toHaveAttribute('src', map.embedUrl);
     expect(frame).toHaveAttribute('loading', 'lazy');
     expect(frame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
@@ -86,11 +86,11 @@ describe('block renderer registry', () => {
     );
   });
 
-  it('renders nothing for an invalid, unlabeled or starter map', () => {
+  it('renders nothing for an invalid, unlabeled or starter map', async () => {
     const { map } = SAMPLE_BLOCKS;
-    const { container, rerender } = render(
-      <BlockRenderer block={{ ...map, embedUrl: 'https://www.google.com/maps/search?q=fixture' }} />,
-    );
+    const { container, rerender } = render(<BlockRenderer block={map} />);
+    await screen.findByTitle(map.label);
+    rerender(<BlockRenderer block={{ ...map, embedUrl: 'https://www.google.com/maps/search?q=fixture' }} />);
     expect(container).toBeEmptyDOMElement();
     rerender(<BlockRenderer block={{ ...map, label: '' }} />);
     expect(container).toBeEmptyDOMElement();
@@ -98,10 +98,10 @@ describe('block renderer registry', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('embeds the venue name and address and links directly to the saved short URL', () => {
+  it('embeds the venue name and address and links directly to the saved short URL', async () => {
     const label = 'Test event map';
     render(<BlockRenderer block={{ blockType: 'map', useEventVenue: true, label }} />);
-    const frame = screen.getByTitle(label);
+    const frame = await screen.findByTitle(label);
     const src = new URL(frame.getAttribute('src'));
     expect(src.origin).toBe('https://www.google.com');
     expect(src.pathname).toBe('/maps');

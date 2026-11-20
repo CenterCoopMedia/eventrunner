@@ -28,6 +28,7 @@
 // that a picture with no alt text does not render at all.
 import { useCallback, useEffect, useState } from 'react';
 import { assetUrl } from '../lib/mediaSource.js';
+import './VenueMap.css';
 
 /**
  * The map's image, or `null` when there is nothing to draw.
