@@ -64,7 +64,6 @@ const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'), 
 // Lazy, as the other large pages: with its sync and account actions the page
 // put the admin entry chunk over the lazy-chunk budget.
 const AdminTicketing = lazy(() => import('./pages/AdminTicketing.jsx'), 'AdminTicketing');
-const AdminContentPages = lazy(() => import('./pages/AdminContentPages.jsx'), 'AdminContentPages');
 const AdminContentSection = lazy(() => import('./pages/AdminContentSection.jsx'), 'AdminContentSection');
 const AdminMedia = lazy(() => import('./pages/AdminMedia.jsx'), 'AdminMedia');
 // The block editor carries a form for every block type, and each new type
