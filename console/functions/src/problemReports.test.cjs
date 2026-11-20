@@ -6,6 +6,7 @@ const { makeFakeDb, makeReq, makeRes } = require('./fakes.cjs');
 const { cleanPageUrl, readReport, redact, reportOriginAllowed, reportProblemHandler } = require('./problemReports.cjs');
 const { getProblemReportReceipts, readProblemReportScreenshot } = require('./problemReportReceipts.cjs');
 const { notifyProblemReport } = require('./applicationStatus.cjs');
+const { notifySubmissionOnce } = require('shared/operatorAlert');
 
 const jwt = (aud) => `h.${Buffer.from(JSON.stringify({ aud })).toString('base64url')}.s`;
 const user = (overrides = {}) => ({ uid: 'u1', email: 'Pat@Example.org', email_verified: true, ...overrides });
@@ -104,10 +105,8 @@ test('a short description names its field and creates no report', async () => {
   assert.equal(s.sent.length, 0);
 });
 
-test('a plain report saves and alerts once even if the triage relay is down', async () => {
+test('a plain report saves one receipt even if the triage relay is down', async () => {
   const { deps, sent } = setup({ fetchStatus: 403 });
-  const notices = [];
-  deps.notifyReport = async (notice) => { notices.push(notice); throw new Error('mail unavailable'); };
   const body = { ...BODY, submissionKey: 'a'.repeat(32) };
   const first = makeRes();
   const repeat = makeRes();
@@ -117,8 +116,17 @@ test('a plain report saves and alerts once even if the triage relay is down', as
   assert.deepEqual(repeat.body, first.body);
   assert.equal(sent.length, 1);
   const id = sent[0].body.request_id;
-  assert.deepEqual(notices, [{ id, screenshotCount: 0, project: 'er-console' }]);
   assert.equal(deps.db.read(`problem_report_receipts/${id}`).description, BODY.description);
+});
+
+test('another trigger invocation cannot repeat an attempted delivery', async () => {
+  const db = makeFakeDb({ 'problem_report_receipts/receipt-1234': { screenshotCount: 0 } });
+  const ref = db.doc('problem_report_receipts/receipt-1234');
+  let attempts = 0;
+  const notify = async () => { attempts += 1; throw new Error('mail stalled'); };
+  await assert.rejects(() => notifySubmissionOnce({ db, ref, notify }), /mail stalled/);
+  await notifySubmissionOnce({ db, ref, notify });
+  assert.equal(attempts, 1);
 });
 
 test('a Console alert reaches the current operator list with a private receipt link', async () => {
@@ -152,10 +160,8 @@ test('screenshots stay in the Console receipt, out of the relay, and require ope
   const operator = { email: 'ops@example.test' };
   const { deps, sent } = setup({ fetchStatus: 502, seed: { 'console_config/operators': { emails: [operator.email] } } });
   const image = await require('sharp')({ create: { width: 12, height: 12, channels: 3, background: 'white' } }).png().toBuffer();
-  const notices = [];
   const replays = [];
   deps.log.info = (...entry) => replays.push(entry);
-  deps.notifyReport = async (notice) => notices.push(notice);
   const body = { ...BODY, submissionKey: 'f'.repeat(32), screenshots: [image.toString('base64')] };
   const res = makeRes();
   await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body }), res);
@@ -166,7 +172,6 @@ test('screenshots stay in the Console receipt, out of the relay, and require ope
   assert.deepEqual(retry.body, { id });
   assert.deepEqual(replays, [['reportProblem: replay matched an existing Console receipt', id]]);
   assert.equal(sent.length, 1);
-  assert.deepEqual(notices, [{ id, screenshotCount: 1, project: 'er-console' }]);
   assert.equal(sent[0].body.request_id, id);
   assert.ok(!('screenshots' in sent[0].body));
   assert.ok(!JSON.stringify(sent[0].body).includes('problem-reports'));

@@ -1,1 +1,1 @@
-export { buildSubmissionAlert, escapeHtml, renderOperatorMail } from './operatorAlert.cjs';
+export { buildSubmissionAlert, escapeHtml, notifySubmissionOnce, renderOperatorMail } from './operatorAlert.cjs';

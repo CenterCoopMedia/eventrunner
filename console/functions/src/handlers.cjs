@@ -60,6 +60,7 @@ const { connectionsAvailable, createConnectors } = require('./connectors.cjs');
 const { reportOriginAllowed, reportProblemHandler } = require('./problemReports.cjs');
 const { getProblemReportReceipts, readProblemReportScreenshot } = require('./problemReportReceipts.cjs');
 const { freshScreenshotAuth } = require('shared/screenshots');
+const { notifySubmissionOnce } = require('shared/operatorAlert');
 const { STRIPE_WEBHOOK_FUNCTION, STRIPE_WEBHOOK_SECRET, stripeConnectWebhook } = require('./stripeWebhooks.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
@@ -146,6 +147,7 @@ function adminServices() {
 /** `startBuild({ orgId, appId })` defaults to the GitHub dispatch; a test can give its own. */
 function buildHandlers({ startBuild } = {}) {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { onDocumentCreated } = require('firebase-functions/v2/firestore');
   const { onSchedule } = require('firebase-functions/v2/scheduler');
   const { defineSecret } = require('firebase-functions/params');
   const { createPostmarkMailer } = require('./mailer.cjs');
@@ -257,7 +259,7 @@ function buildHandlers({ startBuild } = {}) {
     return clientAuths.get(projectId);
   };
   handlers[REPORT_FUNCTION] = onRequest({
-    region, secrets: [...reportSecrets, postmarkToken], memory: '512MiB', cpu: 1, concurrency: 2,
+    region, secrets: reportSecrets, memory: '512MiB', cpu: 1, concurrency: 2,
   }, async (req, res) => {
     const origin = req.headers?.origin;
     const extraOrigins = parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS);
@@ -285,9 +287,22 @@ function buildHandlers({ startBuild } = {}) {
       consoleProject: process.env.GCLOUD_PROJECT,
       extraProjects: parseAllowedOrigins(process.env.CONSOLE_REPORT_PROJECTS),
       extraOrigins,
-      notifyReport: (notice) => notifyProblemReport({ db, mailer: lazyMailer(), log: console, publicUrl: publicUrl() }, notice),
       intake: { url: process.env.CONSOLE_REPORT_INTAKE_URL || '', secret, accessId, accessSecret },
     })(req, res);
+  });
+  handlers.onProblemReportOperatorAlert = onDocumentCreated({
+    document: 'problem_report_receipts/{id}', region, secrets: [postmarkToken], timeoutSeconds: 30,
+  }, async (event) => {
+    const ref = event.data?.ref;
+    if (!ref) return;
+    const { db } = adminServices();
+    await notifySubmissionOnce({
+      db, ref,
+      notify: ({ screenshotCount, project }) => notifyProblemReport(
+        { db, mailer: lazyMailer(), log: console, publicUrl: publicUrl() },
+        { id: ref.id, screenshotCount, project },
+      ),
+    });
   });
   for (const [name, spec] of Object.entries(SCHEDULED)) {
     const secrets = [...(spec.mail ? [postmarkToken] : []), ...(spec.connect ? connectSecrets : [])];

@@ -41,6 +41,17 @@ function buildSubmissionAlert({ kind, site, id, link, page, screenshotCount = 0,
   };
 }
 
+/** Claim the first delivery attempt on the saved record, including across trigger instances. */
+async function notifySubmissionOnce({ db, ref, notify, now = Date.now }) {
+  const data = await db.runTransaction(async (tx) => {
+    const record = (await tx.get(ref)).data();
+    if (!record || record.operatorAlertAttemptedAt) return null;
+    tx.update(ref, { operatorAlertAttemptedAt: new Date(now()) });
+    return record;
+  });
+  if (data) await notify(data);
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -74,4 +85,4 @@ function renderOperatorMail(payload) {
   return { subject, text: lines.filter((line) => line.length > 0).join('\n'), html };
 }
 
-module.exports = { buildSubmissionAlert, renderOperatorMail, escapeHtml };
+module.exports = { buildSubmissionAlert, notifySubmissionOnce, renderOperatorMail, escapeHtml };

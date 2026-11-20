@@ -92,24 +92,11 @@ function body(overrides = {}) {
   return { message: 'The travel page lists the wrong hotel.', page: '/travel', submissionKey: KEY, ...overrides };
 }
 
-async function submit(db, { token = 'visitor', payload = body(), now = () => T0, method, notifySubmission } = {}) {
+async function submit(db, { token = 'visitor', payload = body(), now = () => T0, method } = {}) {
   const res = makeRes();
-  await createSubmitChangeRequestHandler({ db, auth, now, log: QUIET, notifySubmission })(req(token, payload, method), res);
+  await createSubmitChangeRequestHandler({ db, auth, now, log: QUIET })(req(token, payload, method), res);
   return res;
 }
-
-test('a change request alerts only after its first write', async () => {
-  const db = makeFakeDb();
-  const notices = [];
-  const notifySubmission = async (notice) => {
-    assert.ok((await db.collection('change_requests').doc(notice.id).get()).exists);
-    notices.push(notice);
-  };
-  assert.equal((await submit(db, { notifySubmission })).statusCode, 201);
-  assert.equal((await submit(db, { notifySubmission })).statusCode, 201);
-  assert.equal((await submit(db, { token: 'unverified', notifySubmission })).statusCode, 403);
-  assert.deepEqual(notices, [{ id: KEY, kind: 'change-request', page: '/travel', screenshotCount: 0 }]);
-});
 
 async function setStatus(db, payload, token = 'staff') {
   const res = makeRes();

@@ -270,11 +270,6 @@ function reportProblemHandler(deps) {
       }).catch((err) => {
         log.error('reportProblem: forwarding failed for saved Console receipt', requestId, err.message);
       });
-      try {
-        await deps.notifyReport?.({ id: requestId, screenshotCount: screenshots.length, project: reporter.project });
-      } catch {
-        log.error('reportProblem: operator alert failed for Console receipt', requestId);
-      }
       res.status(200).json({ id: receiptId });
     } catch (err) {
       if (err instanceof ScreenshotError) {

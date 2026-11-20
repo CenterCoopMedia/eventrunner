@@ -128,8 +128,8 @@ function createOperatorNotifier({
 
 function createSubmissionNotifier({ getConfig, sendEmail, env = process.env, log = console, ...deps }) {
   const notifier = createOperatorNotifier({ getConfig, sendEmail, env, log, ...deps });
+  if (notifier.name === 'none') return null;
   return async ({ kind, id, page, screenshotCount }) => {
-    if (notifier.name === 'none') return;
     try {
       const config = await getConfig();
       const target = kind === 'feedback' ? '/admin/feedback' : '/admin/change-requests';

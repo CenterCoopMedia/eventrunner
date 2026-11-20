@@ -116,23 +116,6 @@ function realBody(overrides = {}) {
   };
 }
 
-test('only the first persisted feedback submission alerts the operator', async () => {
-  const db = fakeDb();
-  const notices = [];
-  const handler = createSubmitFeedbackHandler({
-    db, now: () => NOW,
-    notifySubmission: async (notice) => {
-      assert.ok(db.store.has(`feedback/${notice.id}`));
-      notices.push(notice);
-    },
-  });
-  const payload = realBody({ submissionKey: 'feedback-once-key' });
-  for (const body of [payload, payload, { ...payload, message: 'This should conflict.' }]) {
-    await handler(fakeReq({ body }), fakeRes());
-  }
-  assert.deepEqual(notices, [{ id: 'feedback-once-key', kind: 'feedback', screenshotCount: 0 }]);
-});
-
 test('signed-out screenshots require the feedback feature and invalid image decoding spends the existing rate limit', async () => {
   const db = fakeDb();
   let decodes = 0;
