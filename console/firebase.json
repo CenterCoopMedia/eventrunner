@@ -54,6 +54,8 @@
       { "source": "/api/listEventbriteEvents", "function": { "functionId": "listEventbriteEvents", "region": "us-central1" } },
       { "source": "/api/chooseEventbriteEvent", "function": { "functionId": "chooseEventbriteEvent", "region": "us-central1" } },
       { "source": "/api/reportProblem", "function": { "functionId": "reportProblem", "region": "us-central1" } },
+      { "source": "/api/getProblemReportReceipts", "function": { "functionId": "getProblemReportReceipts", "region": "us-central1" } },
+      { "source": "/api/readProblemReportScreenshot", "function": { "functionId": "readProblemReportScreenshot", "region": "us-central1" } },
       { "source": "!/assets/**", "destination": "/index.html" }
     ],
     "headers": [

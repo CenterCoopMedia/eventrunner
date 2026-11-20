@@ -36,7 +36,7 @@ const { acceptInvite, inviteMember } = require('./invites.cjs');
 const { changeMemberRole, removeMember } = require('./members.cjs');
 const { getApplication, listApplications } = require('./applications.cjs');
 const { saveApplicationStep } = require('./applicationSave.cjs');
-const { withdrawApplication } = require('./applicationStatus.cjs');
+const { withdrawApplication, notifyProblemReportAttachments } = require('./applicationStatus.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { consentEventMount, manageEventMount } = require('./clientHostEnrollment.cjs');
 const { createRouteMapStore } = require('./clientHostMapStore.cjs');
@@ -58,6 +58,8 @@ const {
 } = require('./connections.cjs');
 const { connectionsAvailable, createConnectors } = require('./connectors.cjs');
 const { reportOriginAllowed, reportProblemHandler } = require('./problemReports.cjs');
+const { getProblemReportReceipts, readProblemReportScreenshot } = require('./problemReportReceipts.cjs');
+const { freshScreenshotAuth } = require('shared/screenshots');
 const { STRIPE_WEBHOOK_FUNCTION, STRIPE_WEBHOOK_SECRET, stripeConnectWebhook } = require('./stripeWebhooks.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
@@ -93,6 +95,8 @@ const ENDPOINTS = Object.freeze({
   acceptAgreement: { action: acceptAgreement, mail: true, build: true },
   // Operator review (ADR 0007 §5). An Owner can also retry a failed build.
   listApplicationsForReview: { action: listApplicationsForReview },
+  getProblemReportReceipts: { action: getProblemReportReceipts, privateRead: true },
+  readProblemReportScreenshot: { action: readProblemReportScreenshot, privateRead: true },
   getApplicationForReview: { action: getApplicationForReview },
   declineApplication: { action: declineApplication, mail: true },
   closeApplication: { action: closeApplication, mail: true, connect: true },
@@ -125,7 +129,7 @@ const SCHEDULED = Object.freeze({
 // panel, so it has its own CORS and sign-in check (problemReports.cjs).
 const REPORT_FUNCTION = 'reportProblem';
 
-const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice', 'sendAgreementCopy']);
+const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice', 'sendAgreementCopy', 'sendReportAttachmentNotice']);
 
 let services = null;
 function adminServices() {
@@ -218,7 +222,7 @@ function buildHandlers({ startBuild } = {}) {
       const { db, auth } = adminServices();
       const deps = {
         db,
-        auth,
+        auth: spec.privateRead ? freshScreenshotAuth(auth) : auth,
         now: Date.now,
         log: console,
         publicUrl: publicUrl(),
@@ -235,6 +239,7 @@ function buildHandlers({ startBuild } = {}) {
           getStorage: () => require('firebase-admin/storage').getStorage(),
         });
       }
+      if (spec.privateRead) res.set('Cache-Control', 'private, no-store');
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });
   }
@@ -251,7 +256,9 @@ function buildHandlers({ startBuild } = {}) {
     }
     return clientAuths.get(projectId);
   };
-  handlers[REPORT_FUNCTION] = onRequest({ region, secrets: reportSecrets }, async (req, res) => {
+  handlers[REPORT_FUNCTION] = onRequest({
+    region, secrets: [...reportSecrets, postmarkToken], memory: '512MiB', concurrency: 2,
+  }, async (req, res) => {
     const origin = req.headers?.origin;
     const extraOrigins = parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS);
     if (reportOriginAllowed(origin, extraOrigins)) {
@@ -278,6 +285,7 @@ function buildHandlers({ startBuild } = {}) {
       consoleProject: process.env.GCLOUD_PROJECT,
       extraProjects: parseAllowedOrigins(process.env.CONSOLE_REPORT_PROJECTS),
       extraOrigins,
+      notifyAttachments: (notice) => notifyProblemReportAttachments({ db, mailer: lazyMailer(), log: console, publicUrl: publicUrl() }, notice),
       intake: { url: process.env.CONSOLE_REPORT_INTAKE_URL || '', secret, accessId, accessSecret },
     })(req, res);
   });

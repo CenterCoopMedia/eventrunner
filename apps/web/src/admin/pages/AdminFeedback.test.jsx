@@ -1,4 +1,7 @@
 vi.mock('../components/PlannerFeatureControls.jsx', () => ({ default: () => null }));
+vi.mock('../../contexts/EventConfigContext.jsx', () => ({
+  useEventConfig: () => ({ features: { feedbackInbox: true } }),
+}));
 // AdminFeedback — the review tab (issue #28). Mocks adminApi and
 // adminSource directly, same convention as AdminLiveUpdates.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';

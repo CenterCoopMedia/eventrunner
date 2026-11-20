@@ -90,6 +90,7 @@
     "removeEmailSuppression",
     "submitFeedback",
     "updateFeedbackStatus",
+    "readRequestScreenshot",
     "submitSessionPitch",
     "updatePitchCall",
     "updatePitchFormOptions",

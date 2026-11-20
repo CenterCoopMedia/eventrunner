@@ -133,6 +133,12 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'star
   return compose(words[0], words[1], link, kind === 'started' ? 'Open the request' : 'Open Deployments', { title: words[0].slice(0, words[0].length - who.length - 2), context: who, contextInText: false });
 }
 
+function reportAttachmentNoticeMessage({ id, count, project, link }) {
+  const subject = `Problem report with screenshots: ${project}`;
+  const noun = count === 1 ? 'screenshot' : 'screenshots';
+  return compose(subject, [`Report ${id} includes ${count} ${noun}.`], link, 'Open the report in Console');
+}
+
 /**
  * The signer's note: what they accepted, when, and which version. The full
  * text and its SHA-256 are in the attached PDF (agreementPdf.cjs).
@@ -232,6 +238,7 @@ function createPostmarkMailer({ token, from, fetch, sleep = delay }) {
     sendInvite: (invite) => send(invite.to, inviteMessage(invite), 'console-invite', 'invite'),
     sendStatusChange: (change) => send(change.to, statusChangeMessage(change), 'console-status', 'status'),
     sendOperatorNotice: (notice) => send(notice.to, operatorNoticeMessage(notice), 'console-operator', 'operator notice'),
+    sendReportAttachmentNotice: (notice) => send(notice.to, reportAttachmentNoticeMessage(notice), 'console-operator', 'problem report notice'),
     sendAgreementCopy: async (copy) => send(copy.to, agreementCopyMessage(copy), 'console-agreement', 'agreement copy', [await agreementAttachment(copy)], 3),
   };
 }

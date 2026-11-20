@@ -58,6 +58,10 @@ const { sendError, badRequest, notFound, methodNotAllowed, internal } = require(
 const { logAdminAction } = require('../cms/store.cjs');
 const { internals: clientErrorInternals } = require('../telemetry/clientErrors.cjs');
 const { extractClientIp, hashIp } = clientErrorInternals;
+const {
+  PUBLIC_SCREENSHOT_MIB, ScreenshotError, readScreenshots, renderScreenshots,
+  screenshotBodyBytes, screenshotWireBytes, sameScreenshotDigests, writeScreenshots,
+} = require('shared/screenshots');
 
 const FEEDBACK_COLLECTION = 'feedback';
 const RATE_LIMIT_COLLECTION = 'feedback_rate_limits';
@@ -125,9 +129,11 @@ async function takeFeedbackRateLimitSlot({ db, ipHash, now = Date.now }) {
 }
 
 /** Store one feedback row and its rate-limit slot atomically. */
-async function storeFeedback({ db, id, message, email, category, ipHash, userAgent, nowMs }) {
+async function storeFeedback({ db, id, message, email, category, ipHash, userAgent, nowMs, screenshots, render }) {
   const ref = db.collection(FEEDBACK_COLLECTION).doc(id);
   const limitRef = db.collection(RATE_LIMIT_COLLECTION).doc(ipHash);
+  const digests = screenshots.map(({ digest }) => digest);
+  let rendering;
   return db.runTransaction(async (tx) => {
     const limitSnap = await tx.get(limitRef);
     const window = feedbackRateLimitWindow(limitSnap.exists ? limitSnap.data()?.requests : null, nowMs);
@@ -135,16 +141,28 @@ async function storeFeedback({ db, id, message, email, category, ipHash, userAge
 
     const snap = await tx.get(ref);
     const at = new Date(nowMs);
-    tx.set(limitRef, { requests: [...window.requests, nowMs], updatedAt: at });
+    const spendSlot = () => tx.set(limitRef, { requests: [...window.requests, nowMs], updatedAt: at });
     if (snap.exists) {
+      spendSlot();
       const stored = snap.data() || {};
       if (stored.message !== message
           || (stored.email ?? null) !== email
-          || stored.category !== category) {
+          || stored.category !== category
+          || !sameScreenshotDigests(stored.screenshotDigests, digests)) {
         return { outcome: 'changed' };
       }
+      return { outcome: 'replayed' };
     }
-    if (snap.exists) return { outcome: 'replayed' };
+    spendSlot();
+    if (screenshots.length) {
+      try {
+        rendering ??= render(screenshots);
+        writeScreenshots(db, tx, FEEDBACK_COLLECTION, id, await rendering);
+      } catch (error) {
+        if (error instanceof ScreenshotError) return { outcome: 'invalid', message: error.message };
+        throw error;
+      }
+    }
 
     tx.create(ref, {
       message,
@@ -154,6 +172,7 @@ async function storeFeedback({ db, id, message, email, category, ipHash, userAge
       ipHash,
       userAgent,
       createdAt: at,
+      ...(digests.length ? { screenshotDigests: digests } : {}),
     });
     return { outcome: 'stored' };
   });
@@ -185,7 +204,10 @@ function looksLikeBot({ honeypot, startedAt, now }) {
  *           getConfig?: () => Promise<object>,
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
-function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now, log = console }) {
+function createSubmitFeedbackHandler({
+  db, sendEmail, getConfig, now = Date.now, log = console,
+  render = (screenshots) => renderScreenshots(screenshots, require('sharp'), 4_000_000),
+}) {
   return async function submitFeedback(req, res) {
     if (req.method !== 'POST') {
       res.set('Allow', 'POST');
@@ -193,13 +215,8 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
       return;
     }
 
-    let bodyBytes = 0;
-    try {
-      bodyBytes = Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8');
-    } catch {
-      bodyBytes = MAX_BODY_BYTES + 1;
-    }
-    if (bodyBytes > MAX_BODY_BYTES) {
+    const maxBytes = MAX_BODY_BYTES + screenshotWireBytes(PUBLIC_SCREENSHOT_MIB);
+    if (req.rawBody?.length > maxBytes || screenshotBodyBytes(req.body) > MAX_BODY_BYTES) {
       res.status(413).json({ error: { code: 'payload-too-large', message: 'Feedback is too large.' } });
       return;
     }
@@ -243,6 +260,17 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
     const policy = await checkDemoWrites({ db });
     if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
 
+    let screenshots;
+    try {
+      screenshots = readScreenshots(req.body?.screenshots, PUBLIC_SCREENSHOT_MIB);
+    } catch (error) {
+      if (error instanceof ScreenshotError) return badRequest(res, error.message);
+      throw error;
+    }
+    if (screenshots.length) {
+      const features = await db.collection('config').doc('features').get();
+      if (features.data()?.feedbackInbox !== true) return notFound(res, 'This event is not collecting screenshots.');
+    }
     const clientIpHash = hashIp(extractClientIp(req));
     const docId = rawSubmissionKey !== undefined ? String(rawSubmissionKey) : crypto.randomUUID();
     const ref = db.collection(FEEDBACK_COLLECTION).doc(docId);
@@ -257,6 +285,8 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
         ipHash: clientIpHash,
         userAgent,
         nowMs,
+        screenshots,
+        render,
       });
     } catch (err) {
       log.error('feedback write failed', err);
@@ -274,6 +304,7 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
     if (result.outcome === 'changed') {
       return sendError(res, 409, 'conflict', 'submissionKey: already used. Open the form again.');
     }
+    if (result.outcome === 'invalid') return badRequest(res, result.message);
 
     // Confirmation email is best-effort and onceKey-gated on the doc id: a
     // client retry after a dropped response must not send a second mail for
@@ -378,7 +409,7 @@ function buildHandlers() {
   };
 
   return {
-    submitFeedback: onRequest({ region, secrets }, withCors(async (req, res) => {
+    submitFeedback: onRequest({ region, secrets, memory: '512MiB', concurrency: 2 }, withCors(async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');
       const { getEventConfig } = require('../core/config.cjs');
       const { getEmailProvider } = require('../email/providers/index.cjs');

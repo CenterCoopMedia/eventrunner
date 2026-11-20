@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   // The dev server serves the CommonJS shared package without interop unless
   // it is prebundled. src/optimizeDeps.test.js keeps this list complete.
-  optimizeDeps: { include: ['shared/consoleRequest'] },
+  optimizeDeps: { include: ['shared/consoleRequest', 'shared/screenshots', 'shared/ScreenshotField', 'shared/ScreenshotViewer'] },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

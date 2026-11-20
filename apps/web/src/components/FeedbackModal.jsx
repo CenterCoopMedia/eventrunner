@@ -49,6 +49,9 @@ import useLoadingStage from '../lib/useLoadingStage.js';
 import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 import LoadingStatus from './LoadingStatus.jsx';
+import { useScreenshotFiles } from 'shared/ScreenshotField';
+import { encodeScreenshots, PUBLIC_SCREENSHOT_MIB, ScreenshotReadError } from 'shared/screenshots';
+import PublicScreenshotField from './forms/PublicScreenshotField.jsx';
 
 /**
  * The dialog's frame: the strong rule on the page ground, at the reading
@@ -85,6 +88,7 @@ export default function FeedbackModal({ onClose }) {
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState('feedback');
+  const screenshots = useScreenshotFiles(PUBLIC_SCREENSHOT_MIB);
   const [website, setWebsite] = useState(''); // honeypot
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -169,14 +173,20 @@ export default function FeedbackModal({ onClose }) {
     try {
       result = await submitFeedback({
         ...payload,
+        ...(screenshots.files.length ? await encodeScreenshots(screenshots.files) : {}),
         honeypot: website,
         startedAt: startedAtRef.current,
-        submissionKey: submissionKey.keyFor(payload),
+        submissionKey: submissionKey.keyFor({ ...payload, files: screenshots.files.map(({ id }) => id) }),
       }, { signal: controller?.signal });
-    } catch {
+    } catch (error) {
       // The API normally returns a fail-soft result. Preserve a retry even
       // if an unexpected client failure breaks that contract.
-      result = { ok: false, error: 'We could not confirm your feedback was received. Please try again.' };
+      result = {
+        ok: false,
+        error: error instanceof ScreenshotReadError
+          ? error.message
+          : 'We could not confirm your feedback was received. Please try again.',
+      };
     }
     if (requestAbortRef.current === controller) requestAbortRef.current = null;
     submissionStateRef.current = result.ok ? 'sent' : 'idle';
@@ -247,7 +257,7 @@ export default function FeedbackModal({ onClose }) {
             </div>
           </div>
         ) : (
-          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
+          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit} onPaste={submitting ? undefined : screenshots.onPaste}>
             <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
               Share feedback
             </h2>
@@ -298,6 +308,7 @@ export default function FeedbackModal({ onClose }) {
               hint="Leave your email if you’d like a reply."
               readOnly={submitting}
             />
+            <PublicScreenshotField selection={screenshots} disabled={submitting} />
 
             {/* Honeypot: visually hidden, out of tab order, and never
                 announced — a real person cannot perceive or fill this in. */}

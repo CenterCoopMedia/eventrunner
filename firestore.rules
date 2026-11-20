@@ -714,6 +714,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Only the authenticated screenshot endpoint can read image bytes.
+    match /request_screenshots/{docId} {
+      allow read, write: if false;
+    }
+
     // The private attendee feed (issue #506, functions/src/social/feed.cjs).
     //
     // An attendee reads posts only while config/features has BOTH

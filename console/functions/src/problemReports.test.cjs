@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { makeFakeDb, makeReq, makeRes } = require('./fakes.cjs');
 const { cleanPageUrl, readReport, redact, reportOriginAllowed, reportProblemHandler } = require('./problemReports.cjs');
+const { getProblemReportReceipts, readProblemReportScreenshot } = require('./problemReportReceipts.cjs');
 
 const jwt = (aud) => `h.${Buffer.from(JSON.stringify({ aud })).toString('base64url')}.s`;
 const user = (overrides = {}) => ({ uid: 'u1', email: 'Pat@Example.org', email_verified: true, ...overrides });
@@ -116,6 +117,38 @@ test('one person gets ten reports an hour', async () => {
   const res = makeRes();
   await reportProblemHandler(s.deps)(makeReq({ token: jwt('er-console'), body: BODY }), res);
   assert.equal(res.statusCode, 429);
+});
+
+test('screenshots stay in the Console receipt, out of the relay, and require operator access', async () => {
+  const operator = { email: 'ops@example.test' };
+  const { deps, sent } = setup({ fetchStatus: 502, seed: { 'console_config/operators': { emails: [operator.email] } } });
+  const image = await require('sharp')({ create: { width: 12, height: 12, channels: 3, background: 'white' } }).png().toBuffer();
+  const notices = [];
+  deps.notifyAttachments = async (notice) => notices.push(notice);
+  const body = { ...BODY, submissionKey: 'f'.repeat(32), screenshots: [image.toString('base64')] };
+  const res = makeRes();
+  await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body }), res);
+  assert.equal(res.statusCode, 200, 'the Console receipt survives a relay refusal');
+  const id = res.body.id;
+  const retry = makeRes();
+  await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body }), retry);
+  assert.deepEqual(retry.body, { id });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(notices, [{ id, count: 1, project: 'er-console' }]);
+  assert.equal(sent[0].body.request_id, id);
+  assert.ok(!('screenshots' in sent[0].body));
+  assert.ok(!JSON.stringify(sent[0].body).includes('problem-reports'));
+  const receipt = await getProblemReportReceipts(deps, { user: operator, body: { id } });
+  assert.equal(receipt.body.receipt.screenshotCount, 1);
+  assert.ok(!('image' in receipt.body.receipt));
+  await assert.rejects(() => readProblemReportScreenshot(deps, {
+    user: { email: 'client@example.test' }, body: { id, index: 0 },
+  }), { status: 403 });
+  const view = await readProblemReportScreenshot(deps, { user: operator, body: { id, index: 0 } });
+  assert.equal((await require('sharp')(Buffer.from(view.body.image, 'base64')).metadata()).format, 'webp');
+  await assert.rejects(() => readProblemReportScreenshot({ ...deps, now: () => 30 * 24 * 60 * 60 * 1000 }, {
+    user: operator, body: { id, index: 0 },
+  }), { status: 404 });
 });
 
 test('origins, page addresses and fields are bounded', () => {

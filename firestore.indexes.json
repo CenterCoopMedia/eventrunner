@@ -218,6 +218,7 @@
     }
   ],
   "fieldOverrides": [
+    { "collectionGroup": "request_screenshots", "fieldPath": "image", "indexes": [] },
     {
       "collectionGroup": "web_vitals_daily",
       "fieldPath": "counts",

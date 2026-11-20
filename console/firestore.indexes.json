@@ -18,6 +18,9 @@
     }
   ],
   "fieldOverrides": [
+    { "collectionGroup": "request_screenshots", "fieldPath": "image", "indexes": [] },
+    { "collectionGroup": "request_screenshots", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "problem_report_receipts", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
     {
       "collectionGroup": "members",
       "fieldPath": "uid",

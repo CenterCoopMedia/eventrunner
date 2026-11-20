@@ -29,6 +29,9 @@ import { DIALOG_FRAME_CLASS } from './FeedbackModal.jsx';
 import { focusFirstError, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 import BusyLabel from './BusyLabel.jsx';
+import { useScreenshotFiles } from 'shared/ScreenshotField';
+import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from 'shared/screenshots';
+import PublicScreenshotField from './forms/PublicScreenshotField.jsx';
 
 /** The server's limits (functions/src/admin/changeRequests.cjs). */
 export const MAX_MESSAGE_LENGTH = 2000;
@@ -44,6 +47,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
 
   const [message, setMessage] = useState('');
   const [page, setPage] = useState(() => String(initialPage ?? '').slice(0, MAX_PAGE_LENGTH));
+  const screenshots = useScreenshotFiles(SIGNED_IN_SCREENSHOT_MIB);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [messageError, setMessageError] = useState(null);
@@ -79,10 +83,16 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
     setError(null);
     setMessageError(null);
     const request = { message: message.trim(), page: page.trim() || null };
-    const result = await submitChangeRequest(
-      { ...request, submissionKey: submissionKey.keyFor(request) },
-      { user },
-    );
+    let result;
+    try {
+      result = await submitChangeRequest({
+        ...request,
+        ...(screenshots.files.length ? await encodeScreenshots(screenshots.files) : {}),
+        submissionKey: submissionKey.keyFor({ ...request, files: screenshots.files.map(({ id }) => id) }),
+      }, { user });
+    } catch (error) {
+      result = { ok: false, error: error.message };
+    }
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
@@ -127,7 +137,8 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
             </div>
           </div>
         ) : (
-          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit} noValidate>
+          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}
+            onPaste={submitting ? undefined : screenshots.onPaste} noValidate>
             <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
               Request a change
             </h2>
@@ -159,6 +170,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
               maxLength={MAX_PAGE_LENGTH}
               hint="The page the change is about."
             />
+            <PublicScreenshotField selection={screenshots} disabled={submitting} />
 
             <div className="flex flex-wrap justify-end gap-xs">
               <button type="button" className={secondaryActionClass} onClick={onClose}>

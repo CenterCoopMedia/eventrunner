@@ -148,6 +148,8 @@ const PER_ACCOUNT_STORES = Object.freeze([
   // requests than one transaction can delete. The store reads users/{uid} in
   // its transaction, so none lands after the account document goes.
   { phase: 'sweep', kind: 'owned', collection: 'change_requests', field: 'uid', key: 'changeRequests' },
+  // Each screenshot record may carry 768 KiB of image data.
+  { phase: 'sweep', kind: 'owned', collection: 'request_screenshots', field: 'uid', key: 'requestScreenshots', pageSize: 8 },
   { phase: 'sweep', kind: 'doc', collection: 'change_request_rate_limits', key: 'changeRequestLimits' },
   // A representative's edit waiting for review names its sender (issue
   // #334). The edit transaction reads the grant, which the directory phase
@@ -554,7 +556,7 @@ function ownedBy(db, uid, store) {
 async function sweepOwned({ db, uid, store }) {
   let removed = 0;
   for (;;) {
-    const page = (await ownedBy(db, uid, store).limit(OWNED_CHUNK).get()).docs;
+    const page = (await ownedBy(db, uid, store).limit(store.pageSize ?? OWNED_CHUNK).get()).docs;
     if (page.length === 0) return removed;
     const batch = db.batch();
     for (const doc of page) batch.delete(doc.ref);
