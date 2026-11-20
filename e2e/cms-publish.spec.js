@@ -301,7 +301,7 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
     await page.getByRole('combobox', { name: 'Block type' }).selectOption('map');
 
     const embedField = page.getByRole('textbox', { name: 'Google Maps embed' });
-    await embedField.fill(`<iframe width="600" src="${src.replace('&', '&amp;')}" height="450"></iframe>`);
+    await embedField.fill(`<iframe width="600" src="${src.replaceAll('&', '&amp;')}" height="450"></iframe>`);
     await expect(embedField).toHaveValue(src);
     await page.getByRole('textbox', { name: 'Map label' }).fill(label);
     await page.getByRole('textbox', { name: 'Address (optional)' }).fill(address);

@@ -6,8 +6,9 @@ const src = 'https://www.google.com/maps/embed?pb=!1m2&hl=en';
 describe('Google Maps embed input', () => {
   it('accepts a copied URL or the src from a copied iframe', () => {
     expect(mapEmbedInput(src)).toBe(src);
-    expect(mapEmbedInput(`<iframe width="600" src="${src.replace('&', '&amp;')}"
+    expect(mapEmbedInput(`<iframe width="600" src="${src.replaceAll('&', '&amp;')}"
       height="450" style="border:0" loading="lazy"></iframe>`)).toBe(src);
+    expect(mapEmbedInput(`<iframe title='src="ignored"' src='${src}' allowfullscreen></iframe>`)).toBe(src);
   });
 
   it('rejects unsupported sources and other HTML', () => {
@@ -17,6 +18,7 @@ describe('Google Maps embed input', () => {
       `<p><iframe src="${src}"></iframe></p>`,
       `<iframe src="${src}"></iframe><p>Other content</p>`,
       `<iframe srcdoc="<p>${src}</p>"></iframe>`,
+      `<iframe src="https://example.org" src="${src}"></iframe>`,
     ]) {
       expect(mapEmbedInput(input), input).toBe('');
     }
