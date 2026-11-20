@@ -62,7 +62,7 @@
 
 /* The stone: the work surface beside the rail. Its gutters are custom
    properties so the title band below can run to the stone's edges. */
-.admin-stone {
+:where(.admin-stone) {
   --admin-stone-pad-inline: var(--space-md);
   --admin-stone-pad-block: var(--space-md);
   padding: var(--admin-stone-pad-block) var(--admin-stone-pad-inline) var(--space-xl);

@@ -172,7 +172,7 @@ describe('Sponsors', () => {
 
   // Issue 193: the seeded Sponsorship packages section draws its packages
   // after the wall, and nothing at all while it is empty.
-  it('draws the Sponsorship packages section after the wall once it holds a package', () => {
+  it('draws the Sponsorship packages section after the wall once it holds a package', async () => {
     organizationsData = [{ id: 'beacon-fund', name: 'Beacon Fund', tier: 'presenting', visible: true }];
     pageDoc = {
       id: 'sponsors',
@@ -190,10 +190,11 @@ describe('Sponsors', () => {
       ],
     };
     const { container } = renderSponsors();
+    const region = screen.getByRole('region', { name: 'Sponsorship packages' });
+    const headings = await within(region).findAllByRole('heading', { level: 3 });
     pageDoc = null;
     sectionBlocks = {};
-    const region = screen.getByRole('region', { name: 'Sponsorship packages' });
-    expect(within(region).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Presenting', 'Partner']);
+    expect(headings.map((h) => h.textContent)).toEqual(['Presenting', 'Partner']);
     // After the wall, in the page's main slot.
     const wall = container.querySelector('.logo-wall');
     expect(wall.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
