@@ -27,9 +27,9 @@ const { googleMapsEmbedUrl } = require('shared/urlSafety');
 
 const FIELD_TYPES = Object.freeze(['string', 'richtext', 'url', 'number', 'boolean']);
 
-/** @param {string} id @param {'string'|'richtext'|'url'|'number'|'boolean'} type @param {boolean} required */
-function field(id, type, required) {
-  return Object.freeze({ id, type, required });
+/** @param {string} id @param {'string'|'richtext'|'url'|'number'|'boolean'} type @param {boolean} required @param {string[]} [choices] */
+function field(id, type, required, choices) {
+  return Object.freeze(choices ? { id, type, required, choices: Object.freeze(choices) } : { id, type, required });
 }
 
 function blockType(def) {
@@ -66,6 +66,8 @@ const BLOCK_TYPES = Object.freeze({
       field('caption', 'string', false),
       field('focalX', 'number', false),
       field('focalY', 'number', false),
+      field('size', 'string', false, ['full', 'small', 'medium', 'large']),
+      field('alignment', 'string', false, ['left', 'center', 'right']),
     ],
   }),
   map: blockType({
@@ -224,7 +226,7 @@ function statContractErrors(fields) {
 }
 
 /**
- * Required fields for any content block, derived from the same registry the
+ * Required fields and allowed choices, derived from the same registry the
  * page and editor use. This runs at the server write boundary so an editor,
  * a restore, and a direct endpoint call all meet the same rule.
  *
@@ -260,7 +262,11 @@ function requiredBlockErrors(fields) {
     }
     return errors;
   }
-  return BLOCK_TYPES[blockType].fields
+  const blockFields = BLOCK_TYPES[blockType].fields;
+  const choiceErrors = blockFields
+    .filter(({ id, choices }) => choices && fields[id] != null && !choices.includes(fields[id]))
+    .map(({ id, choices }) => `${id}: choose ${choices.join(', ')}.`);
+  const missingErrors = blockFields
     .filter((entry) => entry.required && entry.type !== 'boolean')
     .filter((entry) => {
       if (entry.type === 'richtext') return !hasRichTextContent(fields[entry.id]);
@@ -269,6 +275,7 @@ function requiredBlockErrors(fields) {
         || String(fields[entry.id]).trim().length === 0;
     })
     .map((entry) => `${entry.id}: is required for block type "${blockType}".`);
+  return [...missingErrors, ...choiceErrors];
 }
 
 /**

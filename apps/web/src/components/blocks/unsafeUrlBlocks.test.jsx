@@ -141,10 +141,40 @@ describe('ImageBlock', () => {
       const { container } = render(<ImageBlock block={{ url: 'cms-images/a1b2c3/hall.jpg', alt: 'x' }} />);
       const img = container.querySelector('img');
       await waitFor(() => expect(img).toHaveAttribute('srcset'));
+      expect(img).toHaveAttribute('sizes', '100vw');
       expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
       expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it.each([
+    ['small', 320], ['medium', 640], ['large', 1280], ['full', 1920],
+  ])('uses the %s figure cap and responsive slot width', async (size, width) => {
+    const url = 'cms-images/a1b2c3/hall.jpg';
+    resetImageSizeCacheForTest();
+    stubManifests({ [url]: readyManifest(url, 2400) });
+    try {
+      const { findByRole, getByText } = render(<ImageBlock block={{ url, size, alignment: 'right', alt: 'Hall', caption: 'Main hall' }} />);
+      const img = await findByRole('img', { name: 'Hall' });
+      const figure = img.closest('figure');
+      expect(figure.style.maxWidth).toBe(`min(100%, ${width}px)`);
+      expect(figure).toHaveClass('ml-auto');
+      expect(getByText('Main hall').closest('figure')).toBe(figure);
+      expect(img).toHaveAttribute('sizes', `(max-width: ${width}px) 100vw, ${width}px`);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('aligns the image within its figure when the original has no responsive copies', () => {
+    const { getByRole } = render(<ImageBlock block={{
+      url: 'https://example.org/small.png', size: 'large', alignment: 'right', alt: 'Hall', caption: 'A wide caption',
+    }} />);
+    const img = getByRole('img', { name: 'Hall' });
+    expect(img).not.toHaveAttribute('srcset');
+    expect(img).toHaveClass('ml-auto');
+    expect(img.closest('figure')).toHaveClass('ml-auto', 'wrap-anywhere');
   });
 });

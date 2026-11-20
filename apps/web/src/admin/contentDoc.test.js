@@ -48,6 +48,8 @@ describe('valueFieldsOf', () => {
       'caption',
       'focalX',
       'focalY',
+      'size',
+      'alignment',
     ]);
   });
 
@@ -322,6 +324,8 @@ describe('a cleared number field', () => {
   it('is dropped on a create, where there is nothing to delete', () => {
     const fields = toContentFields(blankContent('image'));
     expect(fields.focalX).toBe(DELETE_FIELD_SENTINEL);
+    expect(fields.size).toBe(DELETE_FIELD_SENTINEL);
+    expect(fields.alignment).toBe(DELETE_FIELD_SENTINEL);
     const { internals } = contentCjs.default ?? contentCjs;
     expect('focalX' in internals.omitDeletedFields(fields)).toBe(false);
   });
