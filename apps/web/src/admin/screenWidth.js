@@ -35,6 +35,9 @@ export function adminScreenWidth(pathname) {
   if (segments[0] !== 'admin') return 'form';
   const [, section = '', ...rest] = segments;
   if (FORM_SECTIONS.has(section)) return 'form';
-  if (rest.length === 0 || WIDE_EDITOR_SECTIONS.has(section)) return 'wide';
+  if (rest.length === 0) return 'wide';
+  // A navigation link (pages/links/…) is a plain form, not the page editor.
+  if (section === 'pages' && rest[0] === 'links') return 'form';
+  if (WIDE_EDITOR_SECTIONS.has(section)) return 'wide';
   return 'form';
 }
