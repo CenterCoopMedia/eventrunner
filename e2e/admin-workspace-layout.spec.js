@@ -100,8 +100,11 @@ test('admin workspaces bound their reading width and group readable cards withou
         };
       });
       expect(geometry.canvasToken, 'the organizer canvas uses the approved width token').toBe('64rem');
-      const expectedWidth = task.name === 'branding' ? geometry.mainWidth : Math.min(geometry.mainWidth, geometry.canvasLimit);
-      expect(Math.abs(geometry.canvasWidth - expectedWidth), `${task.name} uses its bounded workspace or wide preview`).toBeLessThanOrEqual(1);
+      // Editors that draw the site use the whole workspace; forms keep the
+      // bound (apps/web/src/admin/screenWidth.js, issue #1153).
+      const wide = ['branding', 'page-editor', 'content-editor'].includes(task.name);
+      const expectedWidth = wide ? geometry.mainWidth : Math.min(geometry.mainWidth, geometry.canvasLimit);
+      expect(Math.abs(geometry.canvasWidth - expectedWidth), `${task.name} uses its bounded workspace or the whole workspace`).toBeLessThanOrEqual(1);
       expect(Math.abs(geometry.canvasLeft - geometry.mainLeft), `${task.name} keeps its leading grid edge`).toBeLessThanOrEqual(1);
       expect(geometry.pageWidth, `${task.name} page overflow at ${viewport.width}`).toBeLessThanOrEqual(geometry.viewportWidth + 1);
       expect(geometry.cardsFit, `${task.name} cards contain their content at ${viewport.width}`).toBe(true);
