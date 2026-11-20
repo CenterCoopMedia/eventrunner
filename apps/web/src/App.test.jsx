@@ -220,7 +220,21 @@ describe('app shell', () => {
     );
     // EventConfigProvider owns the runtime theme style element (spec §7.2).
     expect(document.getElementById('event-theme-runtime')).not.toBeNull();
-    expect(document.title).toBe(eventConfig.name);
+    expect(document.title).toBe(`${siteContent.hero__title.value} · ${eventConfig.name}`);
+  });
+
+  it('keeps the Spanish homepage title after the app loads', async () => {
+    const title = 'Cumbre de noticias locales';
+    const event = { ...eventConfig, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+    renderAt('/?lang=es');
+    act(() => {
+      configSubscriptions.get('event')(event);
+      contentSubscriptions.get('cmsContent').onNext([
+        { ...siteContent.hero__title, id: 'hero__title', translations: { es: { value: title } } },
+        { ...siteContent.hero__subtitle, id: 'hero__subtitle', translations: { es: { value: 'Conoce a las redacciones.' } } },
+      ]);
+    });
+    await waitFor(() => expect(document.title).toBe(`${title} · ${event.name}`));
   });
 
   it('renders the schedule from the snapshot with sessions grouped by day', async () => {

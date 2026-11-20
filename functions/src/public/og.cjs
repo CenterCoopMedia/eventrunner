@@ -864,7 +864,8 @@ function resolveRouteMeta({ config, subject, path, address, requestedLanguage, s
   };
 
   if (home) {
-    return { ...described, ...home.text[language] };
+    const { title, description } = home.text[language];
+    return { ...described, title, description };
   }
   if (subject.kind === 'session') {
     const { value: session } = resolveContentVariant(subject.doc, 'session', language, event);

@@ -1,1 +1,1 @@
-export { metaExcerpt, eventMetaDescription } from './pageMetadata.cjs';
+export { metaExcerpt, eventMetaDescription, homepageMetadata } from './pageMetadata.cjs';

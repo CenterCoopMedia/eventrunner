@@ -132,9 +132,8 @@ export function routeTitlePartFor({ pathname, pages, features, pitchTitle = 'Pit
   const all = Array.isArray(pages) ? pages : [];
   const visible = (page) => page && page.visible !== false;
 
-  // The home page names nothing, exactly as the server titles '/' with the
-  // event name alone: "Home" names the document for an editor, not the
-  // site for a reader.
+  // RouteTitle uses the published hero for the homepage. The page label is
+  // the name used by editors.
   if (path === '/') return null;
   if (path === '/pitch' || path.startsWith('/pitch/')) return pitchTitle;
 

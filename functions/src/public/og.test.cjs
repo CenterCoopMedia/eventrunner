@@ -798,7 +798,7 @@ test('routeMeta: homepage requests select approved hero text and reciprocal URLs
     assert.equal(res.headers['Content-Language'], language);
     assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
     assert.ok(res.sent.includes(`<html lang="${language}">`));
-    assert.ok(res.sent.includes(`<title>${title}</title>`));
+    assert.ok(res.sent.includes(`<title>${title} · ${event.name}</title>`));
     assert.ok(res.sent.includes(`<meta name="description" content="${description}">`));
     assert.ok(res.sent.includes(`<link rel="canonical" href="https://example.org/?lang=${language}">`));
     for (const alternate of ['en', 'es']) {
@@ -812,7 +812,7 @@ test('routeMeta: homepage requests select approved hero text and reciprocal URLs
   for (const fallbackHandler of [routeHandler({ event }, partialDocs), routeHandler({ event: SITE_EVENT }, docs)]) {
     const res = await get(fallbackHandler, 'es');
     assert.equal(res.headers['Content-Language'], 'en');
-    assert.match(res.sent, /<title>Local news summit<\/title>/);
+    assert.ok(res.sent.includes(`<title>Local news summit · ${event.name}</title>`));
     assert.match(res.sent, /<link rel="canonical" href="https:\/\/example.org\/">/);
     assert.doesNotMatch(res.sent, /hreflang=|\[Replace\]/);
   }

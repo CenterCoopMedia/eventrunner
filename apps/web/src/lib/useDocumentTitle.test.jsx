@@ -138,9 +138,7 @@ describe('routeTitlePartFor', () => {
     expect(partFor('/Travel')).toBeNull(); // not a path this system stores
   });
 
-  it('names the home page nothing, so the event name stands alone there', () => {
-    // The server titles '/' with the event name alone for the same reason:
-    // "Home" names the document for an editor, not the site.
+  it('leaves the home page title to the published hero', () => {
     expect(partFor('/')).toBeNull();
     expect(partFor('')).toBeNull();
   });
