@@ -103,6 +103,32 @@ test('mediaUpdateMetadata answers 404 for an unknown asset', async () => {
   assert.equal(res.statusCode, 404);
 });
 
+test('caption and credit updates publish only public text and preserve omitted fields', async () => {
+  const db = seeded();
+  const save = createMediaUpdateMetadataHandler(deps(db));
+  const res = fakeRes();
+  await save(post({ assetId: ASSET_ID, caption: ' In the courtyard ', credit: ' Dana Lee ' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('media_assets', ASSET_ID).caption, 'In the courtyard');
+  assert.equal(db.read('media_assets', ASSET_ID).credit, 'Dana Lee');
+  assert.deepEqual(db.read('media_captions', ASSET_ID), { caption: 'In the courtyard', credit: 'Dana Lee' });
+
+  await save(post({ assetId: ASSET_ID, caption: '' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('media_assets', ASSET_ID).caption, '');
+  assert.deepEqual(db.read('media_captions', ASSET_ID), { caption: '', credit: 'Dana Lee' });
+});
+
+test('a failed metadata batch changes neither the library row nor public text', async () => {
+  const db = seeded();
+  db.failAtCommit = 1;
+  const res = fakeRes();
+  await createMediaUpdateMetadataHandler(deps(db))(post({ assetId: ASSET_ID, credit: 'Dana Lee' }), res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(db.read('media_assets', ASSET_ID).credit, undefined);
+  assert.equal(db.read('media_captions', ASSET_ID), undefined);
+});
+
 test('mediaUpdateMetadata writes an admin_logs row', async () => {
   const db = seeded();
   await createMediaUpdateMetadataHandler(deps(db))(post({ assetId: ASSET_ID, alt: 'x' }), fakeRes());

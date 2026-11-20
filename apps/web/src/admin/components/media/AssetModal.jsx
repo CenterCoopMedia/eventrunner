@@ -18,6 +18,7 @@ import HelpTooltip from '../HelpTooltip.jsx';
 // says so once instead of offering controls that fail. `operator` is the
 // caller's tier; it defaults closed.
 import { useEffect, useRef, useState } from 'react';
+import { MAX_CAPTION_LENGTH, MAX_CREDIT_LENGTH } from 'shared/imageCaption';
 import { formatBytes, typeLabel } from '../../../lib/mediaSource.js';
 import {
   DestructiveConfirm,
@@ -105,6 +106,9 @@ export default function AssetModal({
 }) {
   const [alt, setAlt] = useState(asset.alt ?? '');
   const [title, setTitle] = useState(asset.title ?? '');
+  const [caption, setCaption] = useState(asset.caption ?? '');
+  const [credit, setCredit] = useState(asset.credit ?? '');
+  const savedText = useRef({ caption, credit });
   const [references, setReferences] = useState(null);
   const [usageError, setUsageError] = useState(false);
   const [scanAttempt, setScanAttempt] = useState(0);
@@ -144,7 +148,15 @@ export default function AssetModal({
     setDeleteError(null);
     setStatus('');
     try {
-      await updateMetadata({ assetId: asset.id, alt: alt.trim(), title: title.trim() });
+      const text = { caption: caption.trim(), credit: credit.trim() };
+      await updateMetadata({
+        assetId: asset.id,
+        alt: alt.trim(),
+        title: title.trim(),
+        ...(text.caption !== savedText.current.caption ? { caption: text.caption } : {}),
+        ...(text.credit !== savedText.current.credit ? { credit: text.credit } : {}),
+      });
+      savedText.current = text;
       setStatus('Description saved.');
     } catch (err) {
       setSaveError(mediaErrorMessage(err, 'The description could not be saved. Try again.'));
@@ -200,6 +212,8 @@ export default function AssetModal({
         <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
           <TextAreaField help="Describe what the image shows for people who cannot see it." label="Image description"  value={alt} onChange={(value) => { setAlt(value); setStatus(''); }} rows={2} disabled={busy} />
           <TextField help="Give this file a name staff can recognize in the media library." label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} disabled={busy} />
+          <TextAreaField help="Write a caption for places on the event site that use this image." label="Caption (optional)" value={caption} onChange={(value) => { setCaption(value); setStatus(''); }} rows={2} maxLength={MAX_CAPTION_LENGTH} disabled={busy} />
+          <TextField help="Name the photographer or source. The event site shows this as a credit under the image." label="Credit (optional)" value={credit} onChange={(value) => { setCredit(value); setStatus(''); }} maxLength={MAX_CREDIT_LENGTH} disabled={busy} />
           {status ? <SaveStatus message={status} /> : null}
           {saveError ? <Notice tone="error" message={saveError} /> : null}
           <div className="flex flex-wrap gap-xs">

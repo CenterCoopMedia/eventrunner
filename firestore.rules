@@ -841,6 +841,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // A placed image already discloses its asset ID in its Storage path.
+    // Only public caption and credit text is stored here.
+    match /media_captions/{assetId} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
     // Emoji reaction aggregate + per-user dedup (spec §4.1, §9). The
     // aggregate is a counts-by-emoji object, harmless to read publicly
     // (same reasoning as sessionBookmarks above); only reactToSession

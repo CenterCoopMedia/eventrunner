@@ -11,6 +11,7 @@
 
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 const { languageConfigErrors } = require('../contentLanguages.cjs');
+const { captionPlacementErrors } = require('../imageCaption.cjs');
 const { safeUrlHref } = require('../urlSafety.cjs');
 const { MAX_TICKET_BUTTON_LABEL_LENGTH, TICKET_BUTTON_STYLES } = require('../registration.cjs');
 const { MAX_SOCIAL_LABEL_LENGTH, httpsUrlHref, isHttpsUrl, isValidCalendarDate } = require('./values.cjs');
@@ -434,6 +435,7 @@ function validateEventConfig(event) {
           for (const key of Object.keys(map)) {
             if (!VENUE_MAP_KEYS.includes(key)) errors.push(`venue.map.${key}: unknown map field`);
           }
+          errors.push(...captionPlacementErrors(map, 'venue.map.'));
           // The stored value is a Storage object path, not a download URL —
           // the same identity the media library and theme.logos speak. A URL
           // pasted in here would render as a broken image on the public

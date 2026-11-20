@@ -81,7 +81,7 @@ export function useMediaLibrary({ folder = null } = {}) {
   );
 
   const updateMetadata = useCallback(
-    ({ assetId, alt, title }) => call('mediaUpdateMetadata', { assetId, alt, title }),
+    (metadata) => call('mediaUpdateMetadata', metadata),
     [call],
   );
 

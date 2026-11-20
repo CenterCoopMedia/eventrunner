@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { MEDIA_LIBRARY_PREFIXES, isMediaLibraryPath, storageObjectPath } from 'shared/venue';
+import { MEDIA_LIBRARY_PREFIXES, isMediaLibraryPath, resolveVenueMap, storageObjectPath } from 'shared/venue';
+import VenueMap, { useVenueMapImage } from '../../components/VenueMap.jsx';
 import {
   Panel,
   SelectField,
@@ -8,6 +9,7 @@ import {
   secondaryButtonClass,
 } from './formControls.jsx';
 import ImagePicker from './media/ImagePicker.jsx';
+import { ImagePlacementFields, ImagePlacementPreview } from './media/ImagePlacementEditor.jsx';
 
 const PLACE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMPTY_REFERENCES = Object.freeze([]);
@@ -104,6 +106,8 @@ export function normalizeVenueReferences(venue) {
     map: {
       image: map?.image ?? '',
       alt: map?.alt ?? '',
+      ...(map?.captionMode ? { captionMode: map.captionMode } : {}),
+      ...(map?.captionAlign ? { captionAlign: map.captionAlign } : {}),
       markers: Array.isArray(map?.markers)
         ? map.markers.map((marker) => ({
             placeId: marker?.placeId ?? '',
@@ -184,6 +188,8 @@ function venueMapPayload(map) {
   return {
     image,
     alt: String(map?.alt ?? '').trim(),
+    ...(map.captionMode !== undefined ? { captionMode: map.captionMode === '' ? null : map.captionMode } : {}),
+    ...(map.captionAlign !== undefined ? { captionAlign: map.captionAlign === '' ? null : map.captionAlign } : {}),
     markers: (map?.markers ?? []).map((marker) => ({
       placeId: marker.placeId,
       x: coordinate(marker.x),
@@ -324,6 +330,8 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
   const places = venue.places ?? EMPTY_REFERENCES;
   const movements = venue.movements ?? EMPTY_REFERENCES;
   const map = venue.map ?? EMPTY_MAP;
+  const previewMap = resolveVenueMap({ venue: { map: venueMapPayload(map), places } });
+  const previewImage = useVenueMapImage(previewMap);
   const markers = map.markers ?? EMPTY_REFERENCES;
   const options = useMemo(
     () => [
@@ -663,7 +671,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
             // fields stop rendering either way; this is what makes them
             // stop existing.
             onChange={(value) =>
-              changeMap(value ? { image: value } : { image: '', alt: '', markers: [] })
+              changeMap(value ? { image: value } : { image: '', alt: '', markers: [], captionMode: '', captionAlign: '' })
             }
             
             error={errorFor('venue.map.image')}
@@ -676,6 +684,20 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
               error={errorFor('venue.map.alt')}
               
             />
+          ) : null}
+          {map.image ? (
+            <div className="grid gap-sm sm:grid-cols-2">
+              <ImagePlacementFields
+                values={map}
+                onChange={(field, value) => changeMap({ [field]: value })}
+                errorFor={(field) => errorFor(`venue.map.${field}`)}
+              />
+            </div>
+          ) : null}
+          {previewImage ? (
+            <ImagePlacementPreview image={{ url: map.image, alt: map.alt }}>
+              <VenueMap map={previewMap} image={previewImage} />
+            </ImagePlacementPreview>
           ) : null}
         </div>
 

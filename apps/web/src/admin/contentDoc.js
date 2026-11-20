@@ -148,6 +148,8 @@ export function toContentFields(content) {
       }
       const n = Number(raw);
       fields[field.id] = Number.isFinite(n) ? n : raw;
+    } else if (field.id === 'captionMode' || field.id === 'captionAlign') {
+      fields[field.id] = raw || DELETE_FIELD_SENTINEL;
     } else {
       fields[field.id] = raw ?? '';
     }
@@ -195,6 +197,8 @@ const EDITORIAL_FIELD_LABELS = Object.freeze({
     url: 'Image',
     alt: 'Alt text',
     caption: 'Caption',
+    captionMode: 'Caption display',
+    captionAlign: 'Caption alignment',
     focalX: 'Horizontal focus',
     focalY: 'Vertical focus',
     size: 'Image size',

@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { readyManifest, stubManifests, TEST_GENERATION } from '../test/imageSizeManifests.js';
 import { resetImageSizeCacheForTest } from '../lib/mediaSource.js';
-import LeadImage, { focalPosition } from './LeadImage.jsx';
+import LeadImage from './LeadImage.jsx';
+import { focalPosition } from '../lib/useImageSizeSrcSet.js';
 
 const BLOCK = {
   blockType: 'image',

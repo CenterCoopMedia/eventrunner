@@ -557,6 +557,14 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
         // the validator accepts a partial shape, so validating (or writing)
         // the payload alone would let a partial save erase venue/legal/etc.
         written = deepMerge(stored, merged);
+        const { captionMode, captionAlign } = merged.venue?.map ?? {};
+        if (captionMode === null || captionAlign === null) {
+          // The settings editor sends null to reset one choice to its default.
+          const map = { ...written.venue.map };
+          if (captionMode === null) delete map.captionMode;
+          if (captionAlign === null) delete map.captionAlign;
+          written.venue = { ...written.venue, map };
+        }
         // The merge already preserves a stored verification record (the
         // payload was proven not to carry any of its fields). Keep that
         // record only while the sender email is the same address. A

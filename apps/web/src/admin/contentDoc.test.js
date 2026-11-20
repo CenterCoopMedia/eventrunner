@@ -49,6 +49,8 @@ describe('valueFieldsOf', () => {
       'url',
       'alt',
       'caption',
+      'captionMode',
+      'captionAlign',
       'focalX',
       'focalY',
       'size',

@@ -28,6 +28,7 @@
 // that a picture with no alt text does not render at all.
 import { useCallback, useEffect, useState } from 'react';
 import { assetUrl } from '../lib/mediaSource.js';
+import ImageFigure from './media/ImageFigure.jsx';
 import './VenueMap.css';
 
 /**
@@ -77,7 +78,12 @@ export default function VenueMap({ map, image, className = '' }) {
 
   return (
     <div className={['venue-map grid gap-lg md:grid-cols-3', className].filter(Boolean).join(' ')}>
-      <div className="venue-map__frame md:col-span-2">
+      <ImageFigure
+        placement={map}
+        assetPath={map.image}
+        className="md:col-span-2"
+        mediaClassName="venue-map__frame"
+      >
         {/* The frame is the picture and nothing more (index.css): it shrinks
             to whatever box the image's own proportions make. It cannot hold
             a shape of its own, because the markers below are positioned
@@ -108,7 +114,7 @@ export default function VenueMap({ map, image, className = '' }) {
             {room.number}
           </span>
         ))}
-      </div>
+      </ImageFigure>
 
       {map.rooms.length > 0 ? (
         <div>

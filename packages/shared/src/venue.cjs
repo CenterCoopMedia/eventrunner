@@ -104,7 +104,7 @@ const VENUE_MOVEMENT_KEYS = Object.freeze([
  * a page an unlabelled picture — the same rule the lead image device
  * follows.
  */
-const VENUE_MAP_KEYS = Object.freeze(['image', 'alt', 'markers']);
+const VENUE_MAP_KEYS = Object.freeze(['image', 'alt', 'markers', 'captionMode', 'captionAlign']);
 
 /** Keys a `config/event.venue.map.markers[]` entry may carry. */
 const VENUE_MARKER_KEYS = Object.freeze(['placeId', 'x', 'y']);
@@ -384,7 +384,13 @@ function resolveVenueMap(eventConfig) {
     };
   });
 
-  return { image, alt: map.alt.trim(), rooms };
+  return {
+    image,
+    alt: map.alt.trim(),
+    rooms,
+    ...(map.captionMode ? { captionMode: map.captionMode } : {}),
+    ...(map.captionAlign ? { captionAlign: map.captionAlign } : {}),
+  };
 }
 
 module.exports = {

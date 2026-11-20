@@ -168,6 +168,14 @@ describe('venue map helpers', () => {
     expect(payload.map.markers[0]).toEqual({ placeId: 'studio', x: null, y: null });
   });
 
+  it('sends an explicit reset when a map caption choice returns to default', () => {
+    const form = normalizeVenueReferences({
+      map: { image: 'cms-images/a/plan.png', alt: 'A floor plan.', markers: [], captionMode: 'overlay', captionAlign: 'right' },
+    });
+    form.map.captionMode = '';
+    expect(venueReferencesPayload(form).map).toMatchObject({ captionMode: null, captionAlign: 'right' });
+  });
+
   it('keeps the map out of the errors that disable the save button', () => {
     // Issue #219: the disabled-while-invalid set does not grow. A map with
     // nothing but problems still leaves validateVenueReferences empty.

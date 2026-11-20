@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import WayfindingIcon from './editorial/WayfindingIcon.jsx';
-import { focalPosition, useSizedImageSources } from './LeadImage.jsx';
+import { focalPosition, useSizedImageSources } from '../lib/useImageSizeSrcSet.js';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
+import ImageFigure from './media/ImageFigure.jsx';
 
 // One live content contract; each preset composes its own artwork and marks.
 // Home owns the h1. Schedule's compact treatment supplies artwork only;
@@ -30,9 +31,13 @@ export default function EventHero({
   // The artwork can fill the whole hero on a phone, and a style can give it
   // the full width at any size, so the slot is stated as the viewport.
   const art = useSizedImageSources(src);
-  const caption = typeof image?.caption === 'string' ? image.caption.trim() : '';
-  const figure = src ? <figure lang={image.publicLanguage} className="event-hero__figure">
-    <div className="event-hero__media">
+  const figure = src ? <ImageFigure
+    placement={image}
+    assetPath={art.path}
+    className="event-hero__figure"
+    mediaClassName="event-hero__media"
+    legacyCaptionClass="event-hero__caption"
+  >
       <img className="event-hero__art" src={art.src} srcSet={art.srcSet} sizes={art.srcSet ? '100vw' : undefined} onError={art.onError} alt={alt} style={{ objectPosition: focalPosition(image), ...(art.pending ? { visibility: 'hidden' } : null) }} fetchpriority="high" />
       {image.demoTransitSign ? (
         <div className="event-hero__sign" aria-hidden="true">
@@ -46,9 +51,7 @@ export default function EventHero({
       <svg className="event-hero__press" viewBox="0 0 100 100" fill="none" aria-hidden="true">
         <circle cx="50" cy="50" r="35" /><path d="M50 4V22M50 78V96M4 50H22M78 50H96M35 50H65M50 35V65" />
       </svg>
-    </div>
-    {caption ? <figcaption className="event-hero__caption">{caption}</figcaption> : null}
-  </figure> : null;
+  </ImageFigure> : null;
   if (compact) return figure ? (
     <div className="event-hero event-hero--illustrated event-hero--compact">{figure}</div>
   ) : null;

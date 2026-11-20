@@ -612,6 +612,25 @@ test('a nested partial merges within the section instead of replacing it', async
   assert.equal(written.legal.operatorName, 'Center for Cooperative Media', 'sibling legal fields survive');
 });
 
+test('venue map caption placement resets without clearing the image or its other settings', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), ...STORED_EXTRAS } });
+  const save = createUpdateEventConfigHandler(deps);
+  const map = { image: 'cms-images/a/plan.png', alt: 'A floor plan.', markers: [] };
+  const res = makeRes();
+
+  await save(makeReq({ event: { venue: { map: { ...map, captionMode: 'overlay', captionAlign: 'right' } } } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').venue.map, { ...map, captionMode: 'overlay', captionAlign: 'right' });
+
+  await save(makeReq({ event: { venue: { map: { captionMode: null } } } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').venue.map, { ...map, captionAlign: 'right' });
+
+  await save(makeReq({ event: { venue: { map: { captionAlign: null } } } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').venue.map, map);
+});
+
 test('the shared validator runs on the MERGED result, not the partial payload', async () => {
   // A partial payload that would corrupt the doc must be rejected even
   // though it is "valid as far as it goes" — validation sees the result.

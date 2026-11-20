@@ -220,6 +220,25 @@ describe('the delete-with-usage-warning flow', () => {
       }),
     );
   });
+
+  it('saves a caption and credit, then clears a caption without overwriting the credit', async () => {
+    render(<MediaLibrary folder="cms-images" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
+    const caption = await screen.findByLabelText('Caption (optional)');
+    fireEvent.change(caption, { target: { value: 'At the venue' } });
+    fireEvent.change(screen.getByLabelText('Credit (optional)'), { target: { value: 'Dana Lee' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Description saved.')).toBeVisible();
+    expect(call).toHaveBeenLastCalledWith('mediaUpdateMetadata', expect.objectContaining({
+      assetId: HERO.id, caption: 'At the venue', credit: 'Dana Lee',
+    }));
+    fireEvent.change(caption, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Description saved.')).toBeVisible();
+    const [, request] = call.mock.lastCall;
+    expect(request.caption).toBe('');
+    expect(request).not.toHaveProperty('credit');
+  });
 });
 
 describe('nested dialogs', () => {

@@ -4,6 +4,7 @@ const FIELD_LABELS = {
   description: 'Description', body: 'Message', summary: 'Summary', value: 'Content',
   visible: 'Shown on the site', year: 'Year', url: 'Link', href: 'Link', website: 'Website',
   alt: 'Image description', caption: 'Caption', order: 'Order', heading: 'Heading',
+  captionMode: 'Caption display', captionAlign: 'Caption alignment',
   day: 'Day', startTime: 'Start time', endTime: 'End time', location: 'Location',
   featured: 'Featured', sections: 'Sections', items: 'Items', links: 'Links',
   image: 'Image', imagePath: 'Image', imageAlt: 'Image description', logo: 'Logo',

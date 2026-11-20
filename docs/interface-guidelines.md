@@ -350,7 +350,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: A reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.
 
 - **Eyebrow furniture.** Nothing sits directly above a heading. See Editorial devices above for the full rule and its three non-exceptions.
-- **Decorative gradients.** No gradient blobs, no purple-heavy gradients, no gradient as a background event.
+- **Decorative gradients.** No gradient blobs, no purple-heavy gradients, no gradient as a background event. An image caption overlay uses white text on a black gradient bar with at least 85% opacity at both stops. This keeps the caption readable over any image.
 - **Glassmorphism.** No frosted panels, no blurred translucent overlays used as style.
 - **Zero-padded decorative numbers.** No `01` / `02` / `03` motifs.
 - **Headline tricks.** No italicized or underlined single word in a headline.

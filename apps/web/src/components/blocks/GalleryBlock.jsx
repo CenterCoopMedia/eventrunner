@@ -17,7 +17,7 @@
 // are drawn, and an unknown layout draws as a grid.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
-import { useSizedImageSources } from '../LeadImage.jsx';
+import { useSizedImageSources } from '../../lib/useImageSizeSrcSet.js';
 import { secondaryActionClass } from '../controlClasses.js';
 import { galleryImages, galleryLayout } from './galleryBlockFields.js';
 import './gallery.css';

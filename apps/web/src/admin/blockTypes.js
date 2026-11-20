@@ -32,6 +32,8 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'url', type: 'url', required: true },
       { id: 'alt', type: 'string', required: true },
       { id: 'caption', type: 'string', required: false },
+      { id: 'captionMode', type: 'string', required: false },
+      { id: 'captionAlign', type: 'string', required: false },
       { id: 'focalX', type: 'number', required: false },
       { id: 'focalY', type: 'number', required: false },
       { id: 'size', type: 'string', required: false, choices: ['full', 'small', 'medium', 'large'] },

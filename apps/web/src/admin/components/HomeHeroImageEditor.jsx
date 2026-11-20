@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { isDrawable } from '../../contexts/ContentContext.jsx';
 import { useAdminApi } from '../adminApi.js';
-import { toEditableContent, validateRequiredContent } from '../contentDoc.js';
+import { DELETE_FIELD_SENTINEL, toEditableContent, validateRequiredContent } from '../contentDoc.js';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { uniqueEditorialId } from '../editorialId.js';
 import { byStoredOrder, nextStoredOrder } from '../reorder.js';
 import { summarizePublish } from '../publishResult.js';
 import { EditorActionFeedback } from './ActionFeedback.jsx';
 import { Notice, Panel, ServerErrorSummary, TextField, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
 import ImagePicker from './media/ImagePicker.jsx';
+import { ImagePlacementFields, ImagePlacementPreview } from './media/ImagePlacementEditor.jsx';
 import BusyLabel from '../../components/BusyLabel.jsx';
 
 // Both entry points edit cmsContent/hero__<field>. Theme configuration never
 // holds a second copy. Read merged live/draft rows, as the content editor does.
+const EDITED_FIELDS = ['url', 'alt', 'captionMode', 'captionAlign'];
+
 export default function HomeHeroImageEditor({ page, rows, ready, disabled = false, branding = false, onEditStateChange }) {
   const call = useAdminApi();
+  const { eventConfig } = useEventConfig();
   const section = page?.current?.sections?.find((item) => item.id === 'hero');
   const blocks = byStoredOrder(rows.filter((row) => row.current?.section === 'hero'));
   const image = blocks.find((row) => row.current?.blockType === 'image' && isDrawable(row.current));
@@ -28,7 +33,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   const observedImage = useRef(null);
   const errorRef = useRef(null);
   const values = edit ?? toEditableContent(image?.current, 'image').values;
-  const dirty = edit !== null && (edit.url !== baseline?.url || edit.alt !== baseline?.alt);
+  const dirty = edit !== null && EDITED_FIELDS.some((field) => edit[field] !== baseline?.[field]);
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
   const full = !image && !savedField && blocks.length >= maxBlocks;
   const unavailable = !ready || !section || (!image && !section.allowedBlocks?.includes('image')) || full;
@@ -68,7 +73,12 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
     if (pending.current || unavailable || disabled) return;
     setError(null);
     setStatus('');
-    const fields = { url: values.url.trim(), alt: values.alt.trim() };
+    const cleanValues = { ...values, url: values.url.trim(), alt: values.alt.trim() };
+    const fields = { url: cleanValues.url, alt: cleanValues.alt };
+    for (const key of ['captionMode', 'captionAlign']) {
+      if (values[key]) fields[key] = values[key];
+      else if (baseline?.[key] || image?.current?.[key]) fields[key] = DELETE_FIELD_SENTINEL;
+    }
     const fieldErrors = validateRequiredContent({ blockType: 'image', values: fields });
     if (fieldErrors.length) {
       setError({ message: 'Choose a picture and describe it first.', fieldErrors, clientValidation: true });
@@ -83,13 +93,13 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
       const response = await call(existingField ? 'cmsUpdateContent' : 'cmsCreateContent', {
         section: 'hero',
         field,
-        // A partial update preserves the caption, crop, order and visibility.
+        // A partial update preserves any caption text, crop, order and visibility.
         fields: existingField ? fields : { blockType: 'image', ...fields, order: nextStoredOrder(blocks) },
         ...(!existingField ? { pageId: page.id, visible: true } : {}),
       });
       setSavedField(field);
-      setBaseline(fields);
-      setEdit((current) => current === values ? fields : current);
+      setBaseline(cleanValues);
+      setEdit((current) => current === values ? cleanValues : current);
       draftSaved = true;
       if (!publish) {
         setStatus('Draft saved. Publish to show it on your site.');
@@ -135,6 +145,12 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
           
           error={fieldErrors.get('alt')}
         />
+        {values.url ? (
+          <div className="grid gap-sm sm:grid-cols-2">
+            <ImagePlacementFields values={values} onChange={change} errorFor={(field) => fieldErrors.get(field)} />
+          </div>
+        ) : null}
+        <ImagePlacementPreview image={values} hero="home" eventName={eventConfig.name} />
         <div className="flex flex-wrap gap-xs">
           <button type="button" className={secondaryButtonClass} onClick={() => save(false)}>
             <BusyLabel busy={busy} pending="Saving the draft…">Save draft</BusyLabel>
