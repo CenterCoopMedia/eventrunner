@@ -8,6 +8,7 @@ const { scanReplacementUsage } = require('./usage.cjs');
 
 const source = 'cms-images/old/old.png';
 const target = 'cms-images/new/new.png';
+const other = 'cms-images/other/photo.png';
 const bucketName = 'fixture.appspot.com';
 const hostedOld = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(source)}?alt=media`;
 const requestId = '12d4b840-52b0-4af5-8f88-d40836151a48';
@@ -31,10 +32,17 @@ function fixture() {
       updatedBy: staff.email, updatedAt: '2026-11-19T19:00:00.000Z',
     },
     'cmsContent/travel-arrival__link': { blockType: 'cta', url: source, label: 'Keep this destination' },
+    'cmsContent/travel-arrival__gallery': {
+      blockType: 'gallery', layout: 'carousel', revision: 2, visible: true,
+      images: [{ url: other, alt: 'Other photo' }, { url: source, alt: 'Gallery photo' }],
+    },
     'cmsUpdates/arrival': { title: 'Arrival', featuredImage: { url: hostedOld, alt: 'Feature alt' },
       content: [{ type: 'image', image: { url: source, alt: 'Body alt' } }], revision: 1, visible: true },
     'cmsOrganizations/patron': { name: 'Patron', logoPath: source, tier: 'gold', revision: 1, visible: true },
-    'config/theme': { logos: { primary: source, footer: 'branding/another.png' }, preset: 'zine' },
+    'config/theme': {
+      logos: { primary: source, footer: 'branding/another.png' }, preset: 'zine',
+      footerLogo: true, logoAlt: 'Old footer logo', headerLogo: 'both', heroLogo: 'above',
+    },
     'config/event': { venue: { map: { image: source, alt: 'The map', markers: [{ x: 44, y: 20 }] } } },
   });
   const handler = createCmsPublishHandler({
@@ -54,7 +62,8 @@ test('replacement usage finds actual image slots across revisions and leaves ima
   const { db, call } = fixture();
   const refs = (await scanReplacementUsage({ db, paths: [source], bucket: bucketName }))[source];
   assert.deepEqual(refs.map(({ docPath, field }) => `${docPath}:${field}`).sort(), [
-    'cmsContent/hero__image:url', 'cmsContent/travel-arrival__photo:url', 'cmsContent_drafts/hero__image:url',
+    'cmsContent/hero__image:url', 'cmsContent/travel-arrival__gallery:images.1.url',
+    'cmsContent/travel-arrival__photo:url', 'cmsContent_drafts/hero__image:url',
     'cmsOrganizations/patron:logoPath', 'cmsUpdates/arrival:content.0.image.url', 'cmsUpdates/arrival:featuredImage.url',
     'config/event:venue.map.image', 'config/theme:logos.primary',
   ]);
@@ -109,11 +118,17 @@ test('replacement resumes committed groups through the publish receipt without p
   assert.equal(untouchedDraft.updatedBy, staff.email);
   assert.equal(untouchedDraft.updatedAt, '2026-11-19T19:00:00.000Z');
   assert.equal(db.read('cmsContent', 'travel-arrival__link').url, source);
+  const gallery = db.read('cmsContent', 'travel-arrival__gallery');
+  assert.equal(gallery.layout, 'carousel');
+  assert.deepEqual(gallery.images, [{ url: other, alt: 'Other photo' }, { url: target, alt: 'Replacement alt' }]);
   assert.equal(db.read('cmsUpdates', 'arrival').content[0].image.url, target);
   assert.equal(db.read('cmsUpdates', 'arrival').featuredImage.url, target);
   assert.equal(db.read('cmsOrganizations', 'patron').logoPath, target);
   assert.equal(db.read('config', 'theme').logos.primary, target);
   assert.equal(db.read('config', 'theme').logos.footer, 'branding/another.png');
+  const theme = db.read('config', 'theme');
+  assert.deepEqual([theme.logoAlt, theme.headerLogo, theme.heroLogo, theme.footerLogo],
+    ['Replacement alt', 'both', 'above', true]);
   assert.ok(db.ids('cmsVersionHistory').some((id) => db.read('cmsVersionHistory', id).docPath === 'config/theme'));
   assert.deepEqual(db.read('config', 'event').venue.map.markers, [{ x: 44, y: 20 }]);
   assert.ok(db.read('media_assets', 'old'));
@@ -131,6 +146,21 @@ test('keeping descriptions retains authored text and pins the old inherited text
   assert.deepEqual(db.read('cmsUpdates', 'arrival').featuredImage.descriptionOverride, { ...inherited, credit: '' });
   assert.deepEqual(db.read('cmsUpdates', 'arrival').content[0].image.descriptionOverride, inherited);
   assert.deepEqual(db.read('config', 'event').venue.map.descriptionOverride, inherited);
+  assert.equal(db.read('config', 'theme').logoAlt, 'Old footer logo');
+  assert.deepEqual(db.read('cmsContent', 'travel-arrival__gallery').images[1], { url: target, alt: 'Gallery photo' });
+});
+
+test('a gallery that already contains the replacement keeps its images and reports the conflict', async () => {
+  const { db, call } = fixture();
+  const id = 'travel-arrival__gallery';
+  const images = [{ url: target, alt: 'Already in the gallery' }, { url: source, alt: 'Gallery photo' }];
+  await db.collection('cmsContent').doc(id).update({ images });
+  const references = (await scanReplacementUsage({ db, paths: [source], bucket: bucketName }))[source];
+  const outcome = await call({ requestId, mediaReplacement: { assetId: 'old', replacementId: 'new', references } });
+  assert.equal(outcome.body.status, 'done');
+  assert.equal(outcome.body.failed[0].field, 'images.1.url');
+  assert.match(outcome.body.failed[0].reason, /already in the gallery/);
+  assert.deepEqual(db.read('cmsContent', id).images, images);
 });
 
 test('a placement that moved after confirmation is reported and cannot strand the run', async (t) => {

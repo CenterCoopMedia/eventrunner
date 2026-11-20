@@ -1,7 +1,9 @@
 'use strict';
 
-const { THEME_LOGO_SLOTS } = require('shared/theme');
+const { THEME_LOGO_SLOTS, THEME_LOGO_ALT_MAX } = require('shared/theme');
+const { storageObjectPath } = require('shared/venue');
 const { imageCaptionAssetId } = require('shared/imageCaption');
+const { galleryErrors } = require('../cms/blockTypes.cjs');
 
 const DESCRIPTION_FIELDS = ['alt', 'caption', 'credit'];
 
@@ -9,19 +11,22 @@ const DESCRIPTION_FIELDS = ['alt', 'caption', 'credit'];
 // path. Replacement changes only the fields the site renders as images.
 function imagePlacements(collection, id, doc) {
   const placements = [];
-  const add = (keys, described = false) => {
+  const add = (keys, description = null) => {
     const value = keys.reduce((record, key) => record?.[key], doc);
-    if (typeof value === 'string' && value) placements.push({ keys, value, described });
+    if (typeof value === 'string' && value) placements.push({ keys, value, description });
   };
   switch (collection.replace(/_drafts$/, '')) {
     case 'cmsContent':
-      if (doc?.blockType === 'image') add(['url'], true);
+      if (doc?.blockType === 'image') add(['url'], 'library');
+      if (doc?.blockType === 'gallery' && Array.isArray(doc.images)) {
+        doc.images.forEach((_, index) => add(['images', index, 'url'], 'alt'));
+      }
       break;
     case 'cmsUpdates':
-      add(['featuredImage', 'url'], true);
+      add(['featuredImage', 'url'], 'library');
       if (Array.isArray(doc?.content)) {
         doc.content.forEach((block, index) => {
-          if (block?.type === 'image') add(['content', index, 'image', 'url'], true);
+          if (block?.type === 'image') add(['content', index, 'image', 'url'], 'library');
         });
       }
       break;
@@ -33,7 +38,7 @@ function imagePlacements(collection, id, doc) {
         for (const slot of THEME_LOGO_SLOTS) add(['logos', slot]);
       } else if (id === 'event') {
         add(['seo', 'defaultOgImagePath']);
-        add(['venue', 'map', 'image'], true);
+        add(['venue', 'map', 'image'], 'library');
       }
       break;
   }
@@ -76,13 +81,16 @@ function withReplacement(object, keys, offset, placement, source, target, keepDe
     return next;
   }
   next[key] = target.path;
-  if (!placement.described) return next;
+  if (!placement.description) return next;
+  if (!keepDescription || typeof object.alt !== 'string') {
+    next.alt = keepDescription ? source.alt : target.alt;
+  }
+  if (placement.description === 'alt') return next;
   if (keepDescription) {
     // Preserve the text inherited from the old asset, including an empty
     // caption or credit. The placement's own caption and translations stay.
     const inheritsFromSource = imageCaptionAssetId(placement.value) === source.id;
     const inherited = object.descriptionOverride?.assetId === source.id ? object.descriptionOverride : source;
-    if (typeof object.alt !== 'string') next.alt = source.alt;
     next.descriptionOverride = {
       assetId: target.id,
       caption: inheritsFromSource ? inherited.caption : '',
@@ -90,7 +98,6 @@ function withReplacement(object, keys, offset, placement, source, target, keepDe
     };
     return next;
   }
-  next.alt = target.alt;
   delete next.caption;
   delete next.descriptionOverride;
   if (next.translations) {
@@ -116,7 +123,7 @@ function replaceImageFields({ collection, id, doc, expected, source, target, buc
       const currentAlt = parent.reduce((object, key) => object[key], doc).alt;
       const alt = keepDescription && typeof currentAlt === 'string' ? currentAlt.trim()
         : (keepDescription ? source.alt : target.alt);
-      if (placement.described && !alt) {
+      if (placement.description && !alt) {
         failed.push({ field, reason: 'Add an image description to the replacement or keep the current one.' });
         continue;
       }
@@ -124,7 +131,23 @@ function replaceImageFields({ collection, id, doc, expected, source, target, buc
       changed.push(field);
     }
   }
+  if (changed.length > 0 && collection === 'config' && id === 'theme' && !keepDescription) {
+    const footer = storageObjectPath(doc.logos?.footer);
+    const footerSlot = footer?.split('/').length > 2 ? 'footer' : 'primary';
+    const field = `logos.${footerSlot}`;
+    if (changed.includes(field)) {
+      if (target.alt.length > THEME_LOGO_ALT_MAX) {
+        failed.push({ field, reason: `Use a replacement with at most ${THEME_LOGO_ALT_MAX} characters of alt text, or keep the current description.` });
+      } else {
+        next.logoAlt = target.alt;
+      }
+    }
+  }
   if (changed.length > 0 && collection === 'cmsContent') {
+    if (next.blockType === 'gallery') {
+      const [galleryError] = galleryErrors(next);
+      if (galleryError) failed.push({ field: changed[0], reason: galleryError });
+    }
     delete next.seeded;
     delete next.seededAt;
   }
