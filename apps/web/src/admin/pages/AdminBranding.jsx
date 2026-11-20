@@ -328,13 +328,15 @@ function ColourOverride({ field, value, palette, onChange, backgroundFailure, er
   const background = accent ? palette.surface : colour;
   const picker = toPickerHex(value) || (colour && rgbTripleToHex(colour.join(' '))) || '';
   const accentRatio = accent && text && background ? contrastRatio(text, background) : null;
-  const warning = accent
-    ? accentRatio !== null && accentRatio < 4.5
-      ? `This accent is hard to see on the page background (${accentRatio.toFixed(2)}:1). Aim for at least 4.5:1 if you use it for text.`
-      : ''
-    : backgroundFailure
-      ? `Text is hard to read on this colour (${backgroundFailure.ratio.toFixed(2)}:1). Choose a colour with at least 4.5:1 contrast.`
-      : '';
+  let warning = '';
+  if (accentRatio !== null && accentRatio < 4.5) {
+    warning = `This accent is hard to see on the page background (${accentRatio.toFixed(2)}:1). Aim for at least 4.5:1 if you use it for text.`;
+  } else if (backgroundFailure) {
+    const problem = backgroundFailure.foreground === 'control'
+      ? 'Control borders are hard to see on this colour'
+      : 'Text is hard to read on this colour';
+    warning = `${problem} (${backgroundFailure.ratio.toFixed(2)}:1). Choose a colour with at least ${backgroundFailure.min}:1 contrast.`;
+  }
   return <div className="flex flex-col gap-xs">
     <div className="admin-branding-color-row flex flex-wrap items-end gap-sm">
       <input type="color" aria-label={`${field.label} picker`} value={picker}
@@ -757,8 +759,7 @@ export default function AdminBranding() {
                 <div className="admin-branding-grid grid gap-sm">
                   {MAIN_COLOUR_FIELDS.map((field) => {
                     const palette = colourPalettes[overrideMode];
-                    const backgroundFailure = contrastFailures.find((pair) => pair.mode === overrideMode &&
-                      pair.background === field.key && ['ink', 'inkMuted'].includes(pair.foreground));
+                    const backgroundFailure = contrastFailures.find((pair) => pair.mode === overrideMode && pair.background === field.key);
                     return <ColourOverride key={field.key} field={field} palette={palette}
                       value={form.tokens[overrideMode][field.key]} onChange={(value) => setColourOverride(field.key, value)}
                       error={fieldErrors.get(`theme.tokens.${overrideMode}.${field.key}`)}

@@ -739,7 +739,8 @@ describe('advanced colour settings', () => {
 });
 
 it('previews readable background and accent controls and publishes the existing theme roles', async () => {
-  await renderBranding({ ...PRESET_THEME, tokens: { light: { surface: hex('f7f4ee'), ink: hex('112233') } } });
+  const light = { surface: hex('f7f4ee'), ink: hex('112233'), inkMuted: hex('223344') };
+  await renderBranding({ ...PRESET_THEME, tokens: { light } });
   const background = screen.getByLabelText('Background colour');
   const picker = screen.getByLabelText('Background colour picker');
   const accent = screen.getByLabelText('Accent / secondary colour');
@@ -749,6 +750,8 @@ it('previews readable background and accent controls and publishes the existing 
   expect(screen.queryByText(/This accent is hard to see/)).toBeNull();
   fireEvent.change(accent, { target: { value: '' } });
   expect(background).toBeVisible();
+  fireEvent.change(background, { target: { value: hex('c0c0c0') } });
+  expect(screen.getByText(/Control borders are hard to see on this colour.*3:1 contrast/)).toBeVisible();
   fireEvent.change(background, { target: { value: hex('112233') } });
   expect(picker).toHaveValue(hex('112233'));
   expect(screen.getByText(/Text is hard to read on this colour \(1.00:1\)/)).toBeVisible();
@@ -766,7 +769,7 @@ it('previews readable background and accent controls and publishes the existing 
 
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
-  expect(theme.tokens).toEqual({ light: { surface: hex('f7f4ee'), ink: hex('112233'), surfaceAlt: hex('fffff0') }, dark: { accent: RUST } });
+  expect(theme.tokens).toEqual({ light: { ...light, surfaceAlt: hex('fffff0') }, dark: { accent: RUST } });
   expect(theme.navPlacement).toBe('side');
 });
 
