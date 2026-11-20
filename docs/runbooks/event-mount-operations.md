@@ -1,0 +1,113 @@
+# Operate an event under a shared client host
+
+This is the ordered operator procedure for putting an event at a path on a shared client host, for example `https://events.example.org/conference/`. It covers host authority, Owner consent, enrollment, provider settings, publication, cutover, retirement and rollback. Issue [#1063](https://github.com/CenterCoopMedia/eventrunner/issues/1063) asked for it. The steps come from the two-event rehearsal on November 19 and 20, 2026 ([plan](../../console/functions/CLIENT_HOST_REHEARSAL.md)). Prefix hosting stays closed to customer onboarding until [#560](https://github.com/CenterCoopMedia/eventrunner/issues/560) passes.
+
+Each step is marked:
+
+- **Proven**: done in the rehearsal on the synthetic sites, with the receipt named.
+- **Proven with a fix**: done, but only after a defect fix or a changed method. The step text includes the fix.
+- **Unproven**: not run. The step names what is missing.
+
+Rehearsal receipts below use these names. Site A is `rehearsal-nov4` (`/conference`). Site B is `fresh-nov11-ae21` (`/events/workshop`). The test host was `er1063-rehearsal.eventrunner.org`. "Run 1" is November 19, 2026, 15:03Z to 18:42Z, at `ac8baabc` to `39c60097`. "Run 2" is November 20, 2026, 02:23Z to 03:55Z: Console at `5b635a77`, mounted deploys at `57cadf73`, rollback deploys at `5d286454`.
+
+## Rules for every step
+
+- Record each change before you make it: the old value, the new value, the UTC time, the identity and the reversal. Read the result back.
+- Never reassign an old event slug or path, and never delete an event's Firebase project to undo an address change. Route reservations and enrollment records stay by design.
+- Roll back the route and the matching build and URL settings together. Keep the event's fixed Hosting origin (`https://<project>.web.app`) as the router's upstream and as the recovery address.
+- Keep secrets in process memory or the credential store. Never print a token, a signed link or a sign-in code.
+- One event's change must leave every sibling event on the host unchanged. Check the sibling after each step.
+- `scripts/dev/client-host-rehearsal.cjs` (`edge`, `cors`, `browser`, `unsubscribe`) is rehearsal-only: it hard-codes the test host and the two fixture projects. For any other host, run the same checks by hand against that host and the event's own project: the public receipt at `https://<host>/.well-known/eventrunner-route-map`, `curl -X OPTIONS` preflights to `https://<region>-<project>.cloudfunctions.net/sendOtpCode` with each origin, using the event's region recorded in step 1, and the mounted pages in a browser.
+
+## 1. Verify host authority and each Owner's consent
+
+1. Name the owners: host authority (CCM release coordinator), DNS/router/TLS (Cloudflare zone administrator), Hosting origins and deploys (Firebase and release operators), provider settings (each project's Auth, App Check, mail and ticket operators), route projection (Console and provisioning operators). Record the authority receipt reference, for example `er1063/host-authority`. **Proven** (runs 1 and 2).
+2. Confirm each event's Console application, organization, completed build, project, site and GitHub environment. The build record needs `resources` with `projectId`, `site`, `environment`, `domain` and `region`. An older build can lack it (site A's build, last written November 5, 2026, did): backfill with a field-mask update and an update-time precondition, then read back all five fields. **Proven** (run 1, change 1).
+3. Each event organization Owner approves the exact public base in their own Console session: `POST /api/consentEventMount` with `{"appId":"<application id>","orgId":"<organization id>","publicBase":"https://<host>/<mount>/","confirm":true}`. The Owner must still be an Owner when the operator enrolls; enrollment checks that again. **Proven** (runs 1 and 2). In both runs the agent account was added as a second Owner of the test organization by a recorded deviation (an invite record with the product's exact fields, then a normal acceptance), because the real Owner was not available. A customer run needs the real Owner's session.
+
+## 2. Prepare the host: router, TLS, ingress rules and the route projection
+
+1. Route projection bucket. If `CONSOLE_CLIENT_ROUTE_MAP_BUCKET` is already set, reuse that bucket: the Console and the provisioning and decommission workflows write every host's map to it, and enrolled hosts' Workers read it. Never replace it while any host is enrolled. Only for the first host, create a dedicated, empty bucket in the Console project, grant public object read and object read/write to the Console runtime and the provisioning/decommission identity, set the repository variable, then run **Deploy console** on `main`. Read back the variable in the deployed `manageEventMount` environment. **Proven** for the first host (runs 1 and 2).
+2. Use a host that serves nothing yet. The router answers 404 for every path without a published route, so attaching it to a host that already serves a site takes that site offline at once. Taking over an occupied host is **unproven** and needs its own coordinated procedure. Deploy the router Worker from the reviewed source (`console/functions/client-host-worker.mjs`) with the pinned Wrangler, a plain `CLIENT_ROUTE_MAP_BUCKET` variable and the exact host as a Custom Domain. Disable `workers.dev` and previews. Install the repository's dependencies first (`npm run prepare:functions`, `npm ci`); without them the bundle cannot resolve `shared/config/publicPath`. Check `curl ... https://<host>/` returns 404 with `ssl_verify_result` 0 before any event is enrolled. **Proven** (runs 1 and 2).
+3. Add a cache bypass for the host and a raw-path refusal rule before any event becomes public. The rehearsal plan's rule (its step 2) blocks every path containing `%` and fits only the ASCII-only test host: on a customer host it would also block valid encoded paths such as a session ID with `%20`. A customer host needs a rule that refuses ambiguous paths (`//`, dot segments, a raw backslash, encoded `/`, `\`, `.` or `%`, and any encoded unreserved character: letters, digits, `-`, `_`, `~`) and passes other encoded characters such as `%20`, matching the router's raw-path contract in [CLIENT_HOST_ROUTING.md](../../console/functions/CLIENT_HOST_ROUTING.md). Check that `//`, `/../`, `%2F`, `%5c`, `%252f`, a raw backslash and an encoded letter (`/%63onference/`) return 403. Cloudflare normalizes URLs before the Worker, so without that rule `/%63onference/` would reach the router as `/conference/`. The test-host rule is **proven** (runs 1 and 2); a customer-host rule is **unproven**. The WAF rule needs a token with Zone WAF Write; the general Cloudflare token lacked it, so each run created a narrow token and deleted it at the end.
+4. Old custom addresses that will redirect to the mount. This applies only when the old address is a different host name from the shared host. If an event's own host name becomes the shared host, these host-wide redirects would also match the mounted paths and sibling events (for example `/conference/` to `/conference/conference/`); that same-host migration needs its own rules that exclude every mounted path, and it is **unproven**. For a distinct old host: keep each CNAME target, switch it to proxied only after the edge certificate is active and the origin presents a valid certificate, and set Full (strict) TLS for those exact hosts with a configuration rule (do not change the zone-wide mode). Stage one disabled 302 redirect rule per old host for GET and HEAD, excluding `/unsubscribe`, `/__/` and `/.well-known/`, with the query kept. **Proven** (run 1, changes 12 and 15).
+
+## 3. Set provider settings for the shared host
+
+1. Add the host name (host only, never a path) to each event project's Firebase Auth authorized domains. Keep each project's own `authDomain` (`<project>.firebaseapp.com`) and its OAuth handler. Do not route a shared `/__/auth/handler`; the router answers 404 there. **Proven** (runs 1 and 2).
+2. Add the full origin `https://<host>` to each event environment's `EVENT_ALLOWED_ORIGINS`, next to the standalone and fixed origins. The running functions read this value only after a Deploy, so run a standalone Deploy (`gh workflow run deploy.yml --ref main -f client=<environment>`) with the URL variables still standalone, then check CORS with `node scripts/dev/client-host-rehearsal.cjs cors <event>`: allowed origins get an exact `Access-Control-Allow-Origin`, an unrelated origin gets none. **Proven** (run 1 with the standalone Deploy first; run 2 checked after the cutover Deploys).
+3. App Check: keep enforcement where it is already on. **Unproven.** New projects cannot onboard the reCAPTCHA v3 provider the app uses; [#1082](https://github.com/CenterCoopMedia/eventrunner/issues/1082) moves the app to reCAPTCHA Enterprise. Attestation and enforcement under a mount need that fix and a test project with App Check configured.
+4. Google sign-in: **Unproven.** It needs an approved synthetic Google account (none is stored), and a Google provider in each project that uses it.
+5. CMS publisher, if the event uses it: follow [deploy runbook §9.1](../DEPLOY_RUNBOOK.md#91-one-time-setup-per-client). **Proven with a fix** (run 1): the first enable needed the fixes for #1084, #1087 and #1088.
+
+## 4. Enroll and publish the route
+
+1. As Console operator: `POST /api/manageEventMount` with `{"action":"enroll","appId":"<application id>","publicBase":"https://<host>/<mount>/","confirmAuthority":true,"authorityReference":"<authority receipt>"}` for the first event on a host, and without the two authority fields for later events. Read back with `{"action":"get","appId":"<application id>"}`: project, mount and fixed origin. Check the public edge with the map version the action returned: `edge empty <version>` when no event on the host is published yet, or the phase that matches the published siblings (`only-a`, `only-b`) when a sibling is already live. An enrollment changes no public route. **Proven** (runs 1 and 2).
+2. A malformed base (query, empty leading or inner segment) must fail with 400 `invalid-mount` and no change. **Proven** (run 1, change 29).
+3. Publish: `{"action":"publish","appId":"<application id>","publicBase":"https://<host>/<mount>/","publicTitle":"<public title>","confirm":true}`. Run `edge staged-<event> <version>`: the mount routes, the old address still works, and the staged event is not listed or in a sitemap. **Proven** (runs 1 and 2).
+
+## 5. Inventory public and emailed URLs
+
+List every public, admin, speaker, unsubscribe, welcome, reminder, ticket and payment-return URL for the event, and the old emailed links still in inboxes. Old emailed links keep working at the old address: the old host's redirect excludes `/unsubscribe`, and the old Hosting rewrite sends signed unsubscribe POSTs to the same project. **Proven** (run 1: old-host `/unsubscribe?test=1` 200 with the redirect on).
+
+## 6. Cut over one event
+
+1. Have the rollback commands ready before you start. Pause other deploys and publisher jobs for this event only.
+2. Run `gh workflow run provision-client.yml --ref main -f application_id=<app> -f sync_event_mount=true`. It writes the mounted URL variables and runs **Deploy** for this event. **Proven** (runs 1 and 2).
+   - Window 1, publication to mounted Hosting release: 11 min 18 s (A, run 1), 23 min 28 s (B, run 1, of which about 19 min was queue), 12 min 10 s (A, run 2) and 20 min 6 s (B, run 2, including one Deploy retry).
+   - Window 2, release to applied receipt: 3 min 21 s and 3 min 27 s (run 1), 3 min 51 s and 3 min 16 s (run 2).
+   - A transient Google-side error (`HTTP 500, Could not update Cloud Run service`) failed one B function update in run 2; the provisioner's own retry deployed the same commit. Before testing, check that every function and the Hosting release are at one commit.
+3. At the Hosting release, enable that event's old-host redirect and check: `HEAD` on an old deep link returns 302 to the matching mounted path with the query kept; a request to the fixed `.web.app` origin gets no redirect. **Proven** (run 1, changes 23 and 30).
+4. Read `manageEventMount get` for `appliedPublicBase`. Read the host revision independently from the Console Firestore document `console_client_hosts/<host>` (field `revision`); the applied-address update can advance it after publication. Pass that value to `edge only-<event> <revision>` or `edge both <revision>`, which also checks that the public receipt at `/.well-known/eventrunner-route-map` matches. **Proven** (runs 1 and 2).
+
+## 7. Verify the required outputs
+
+1. Browser matrix on both events, system Chrome and Playwright WebKit, desktop and phone: `node scripts/dev/client-host-rehearsal.cjs browser <event> mounted <engine> <form> <update> <title>`. **Proven** (run 1). Real Safari and iPhone: **Unproven** (needs Joe's devices).
+2. CMS publication through the site publisher keeps the mounted base in canonical and OG URLs and the sitemap. **Proven with a fix** (run 1, change 33).
+3. Sign-in and roles under the shared host. **Proven** (run 2) in system Chrome 158 and Playwright WebKit 26, desktop and phone (Pixel 7 and iPhone 13 emulation). Real Safari, Google popup and App Check stay **unproven** (see step 3):
+   - Email-code sign-in: a wrong code gets 401 and a visible error; the right code signs in and stays on the mount. Both calls answer with `Access-Control-Allow-Origin` set to the shared host's origin.
+   - The product limits code requests to 5 per 15 minutes per address, with a `+tag` stripped (429 with `retryAfterSeconds`). Plan test sign-ins inside that limit.
+   - Each project keeps its own Firebase Auth entry on the shared origin, and its storage keys are namespaced by project.
+   - An ID token from one project gets 401 from the other project's functions. An attendee gets 403 from an admin function. A self-profile write through Firestore rules succeeds in its own project and gets 403 in the other.
+   - Signing out of one event leaves the other signed in.
+   - No service worker and no Cache Storage entries. A failed lazy chunk sets only that project's reload flag.
+4. Email links: welcome, registration prompt, speaker invite, speaker reminder and announcement mail point at the mounted base, and each linked page calls only its own project's functions. The emailed speaker invite opens the right synthetic record and can be accepted under the mount. **Proven** (run 2). Ticket confirmation mail: **Unproven** (the test sites have no ticket catalog).
+5. Payment returns: success and cancel URLs are built from the mounted base, open the order status page under the mount, and the checkout endpoint refuses any external return key (`returnUrl`, `success_url`, `next`) with 400. **Proven** without a payment (run 2).
+6. Unsubscribe under the mount, per event, with the app's signed link: GET shows the confirmation and records nothing; the **Unsubscribe** button POST records one suppression; a repeat keeps the first time; RFC 8058 one-click POST records one suppression and a repeat keeps it; a changed signature gets 400; the other project records nothing; responses are `no-store` and `noindex`. **Proven** (run 2). Both test sites use Postmark-managed unsubscribe handling (the documented default), so their mailed announcements carry Postmark's own link, not the app's signed link. Do not open a Postmark unsubscribe link from a test mail unless the test means to suppress that address at Postmark.
+7. Hostile paths on the host: wrong case, lookalike and prefix paths, unknown and retired mounts, `/__/auth/handler`, `.well-known` and unrelated host paths return 404; traversal and encoded separators return 403; non-GET methods on an event root return 405 while the event's `/unsubscribe` POST still reaches its project; a bare mount redirects with 308 to a relative same-host path. **Proven** (runs 1 and 2).
+8. Upstream failure and redirect loop give 503 through the router, and the sibling keeps working. **Proven** (runs 1 and 2, with a test-only Worker revision).
+9. Restore the reviewed Worker after a fault or a bad Worker change by deploying the reviewed source again with the same pinned Wrangler and config, then check the affected paths and `edge both <revision>` with the current host revision (section 6, step 4). **Proven** (run 2: restored in about 32 s). `wrangler rollback <reviewed version>` worked in run 1 but **failed** in run 2 with Cloudflare code 100146 on a 13-second-old version ([#1125](https://github.com/CenterCoopMedia/eventrunner/issues/1125)); use it only as the second route.
+
+## 8. Roll back one address
+
+1. Disable that event's old-host redirect first.
+2. `{"action":"remove","appId":"<application id>","confirm":true}`, then read the host revision as in section 6, step 4, and check the route-map receipt and the sibling with `edge only-<sibling> <revision>`.
+3. Run the same `sync_event_mount` command. When the event's applied address was the mount, it restores the standalone URL variables and runs a full Deploy (functions, metadata, publisher configuration, Hosting). It runs a Deploy only when it writes a URL variable or the applied address changes: after an abort before the first address sync it deploys nothing.
+4. Check: the standalone address loads and its functions work, the mount returns 404, and the sibling's route, Hosting version and data are unchanged.
+
+**Proven** (run 1, changes 22, 38 and 41; run 2: A removed with B still mounted, `edge only-b` passed, B pages loaded and called only B's project, then B removed and `edge empty` passed).
+
+The rollback sync writes only the URL variables and keeps `EVENT_ALLOWED_ORIGINS` as stored, so the host origin stays allowed. If the host is going away, revert the settings and run a standalone Deploy as in section 10, steps 3 and 4. A failure after the Hosting release (post-release smoke failed, no applied receipt, sibling unaffected) is **proven** (run 1, change 39). The provisioner retries a failed Deploy 3 times, so that path takes about 40 minutes before rollback can start.
+
+## 9. Retire and restore an event
+
+Archive with `gh workflow run decommission-client.yml --ref main -f application_id=<app> -f mode=archive`: the mount returns 404 and leaves the index and robots, the sibling keeps serving. Restore with `mode=restore` inside the recovery window: the saved route and Hosting version return. **Proven** (run 1, change 37).
+
+Automatic deploys after a restore: **unproven**. In run 1 the restore added the event to `AUTO_DEPLOY_ENVIRONMENTS` although it was not enrolled before the archive ([#1093](https://github.com/CenterCoopMedia/eventrunner/issues/1093)). The fix ([#1096](https://github.com/CenterCoopMedia/eventrunner/pull/1096)) merged after run 1: the archive records whether the event was enrolled, and the restore re-enrolls it only then. No rehearsal has run a restore with the fix. After a restore, read `AUTO_DEPLOY_ENVIRONMENTS` and check that the event is listed only if it was listed before the archive. Do not delete or overwrite the variable by hand: it holds every enrolled event.
+
+## 10. Clean up a rehearsal
+
+Reverse in dependency order and read back each step:
+
+1. Disable the old-host redirects, and `remove` each route. **Proven** (run 1, changes 38, 40 and 41; run 2, change 19).
+2. Run `sync_event_mount` for each event and wait for it to finish. Read back that the route is `removed` with `appliedPublicBase` at the standalone address. **Proven** (run 1, change 44; run 2, change 20). The sync can run no Deploy (section 8, step 3), so it does not deliver the next step's settings.
+3. Set each event's deploy variables back to their baseline: `EVENT_ALLOWED_ORIGINS`, and `EVENT_SITE_PUBLISHER_ENABLED` and `EVENT_PUBLISHER_SERVICE_ACCOUNT` if the rehearsal changed them. **Proven** (run 1, change 46).
+4. Run a standalone Deploy for each event after step 3: `gh workflow run deploy.yml --ref main -f client=<environment>`. `deploy-client.yml` writes these settings into the running functions only during a Deploy. Read back: the Deploy succeeded; its **Update the site-publisher Cloud Run job** job was skipped when the publisher is off; a CORS preflight from the removed host gets no `Access-Control-Allow-Origin` and the standalone origin gets its own. **Proven** (run 1, changes 46 and 50). Reading the publisher setting directly from the running functions' environment is **unproven**.
+5. Only after step 4's readback, remove what the running functions no longer use: the publisher job, its image repository and grants, and the publisher service account. **Proven** (run 1, change 51).
+6. Fixture content and accounts, Auth authorized domains, redirect and configuration rules, old hosts back to DNS-only.
+7. Route projection: if the rehearsal created the bucket and no other host is enrolled, delete the Console variable, run **Deploy console**, then remove the bucket's grants, its object and the bucket. **Proven** (runs 1 and 2). If the bucket was reused (step 2.1), keep the variable and the bucket, and delete only this rehearsal host's map object after its routes are removed. **Unproven**: both runs created their own bucket.
+8. Custom Domain, then Worker, then cache and WAF rules, then temporary tokens and the temporary Owner membership.
+
+Steps 6 to 8: **proven** (runs 1 and 2). Run 2 had no publisher and set the origins back before its syncs, whose Deploys applied them (changes 19 and 20); steps 3 and 4 above follow run 1, which works whether or not the sync deploys.
+
+Delete synthetic sign-in accounts one at a time, or run the account cleanup yourself after a batch delete: a batch delete through the Auth admin API does not fire `onUserDeleted`, so the `users` document and the per-account records stay (run 2).
