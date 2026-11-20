@@ -20,7 +20,9 @@ function createReadRequestScreenshotHandler({ auth, db, now = Date.now }) {
     const image = await db.runTransaction(async (tx) => {
       const parent = (await tx.get(db.collection(source).doc(id))).data();
       if (!validScreenshotIndex(index, parent?.screenshotDigests?.length ?? 0)) return null;
-      return (await tx.get(screenshotRef(db, source, id, index))).data()?.image;
+      const stored = (await tx.get(screenshotRef(db, source, id, index))).data();
+      if (source === 'feedback' && !(stored?.expiresAt?.toMillis?.() > now())) return null;
+      return stored?.image;
     }, { readOnly: true });
     if (!image) return notFound(res, 'This screenshot is no longer available.');
     return res.status(200).json({ image: image.toString('base64') });

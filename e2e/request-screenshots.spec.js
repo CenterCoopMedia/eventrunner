@@ -39,10 +39,17 @@ test('a signed-out visitor attaches screenshots and only staff can open the sani
     const request = { source: 'feedback', id: receipt, index: 2 };
     const endpoint = new URL('readRequestScreenshot', response.url()).href;
     expect((await page.request.post(endpoint, { data: request })).status()).toBe(401);
-    const opened = await page.request.post(endpoint, { data: request, headers: { Authorization: `Bearer ${await adminIdToken()}` } });
+    const headers = { Authorization: `Bearer ${await adminIdToken()}` };
+    const opened = await page.request.post(endpoint, { data: request, headers });
     expect(opened.status()).toBe(200);
     const image = await sharp(Buffer.from((await opened.json()).image, 'base64')).metadata();
     expect(image).toMatchObject({ format: 'webp', width: 40, height: 30 });
+    const imageRef = db.doc(`request_screenshots/feedback-${receipt}-2`);
+    const createdAt = (await db.doc(`feedback/${receipt}`).get()).get('createdAt');
+    const expiresAt = (await imageRef.get()).get('expiresAt');
+    expect(expiresAt.toMillis() - createdAt.toMillis()).toBe(30 * 24 * 60 * 60 * 1000);
+    await imageRef.update({ expiresAt: new Date(0) });
+    expect((await page.request.post(endpoint, { data: request, headers })).status()).toBe(404);
   } finally {
     await flagsRef.set(flags);
     if (receipt) {

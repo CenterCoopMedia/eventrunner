@@ -10,7 +10,7 @@
  * files agreeing with each other from a distance.
  *
  *   submitFeedback       POST { message, email?, category?, honeypot,
- *                         startedAt, submissionKey? } — unauthenticated.
+ *                         startedAt, submissionKey?, screenshots? } — unauthenticated.
  *                         Writes `feedback` (renamed from `bug_reports`,
  *                         spec §4.1) and, with an email, sends an
  *                         onceKey-gated confirmation.
@@ -75,6 +75,7 @@ const MAX_BODY_BYTES = 16 * 1024;
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const SCREENSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 // A person reading a feedback form and typing a real message takes longer
 // than this; a submission that arrives faster is treated as scripted.
@@ -157,7 +158,8 @@ async function storeFeedback({ db, id, message, email, category, ipHash, userAge
     if (screenshots.length) {
       try {
         rendering ??= render(screenshots);
-        writeScreenshots(db, tx, FEEDBACK_COLLECTION, id, await rendering);
+        const expiresAt = new Date(nowMs + SCREENSHOT_TTL_MS);
+        writeScreenshots(db, tx, FEEDBACK_COLLECTION, id, await rendering, { expiresAt });
       } catch (error) {
         if (error instanceof ScreenshotError) return { outcome: 'invalid', message: error.message };
         throw error;

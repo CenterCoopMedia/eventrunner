@@ -219,6 +219,7 @@
   ],
   "fieldOverrides": [
     { "collectionGroup": "request_screenshots", "fieldPath": "image", "indexes": [] },
+    { "collectionGroup": "request_screenshots", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
     {
       "collectionGroup": "web_vitals_daily",
       "fieldPath": "counts",
