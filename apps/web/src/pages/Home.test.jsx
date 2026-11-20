@@ -76,7 +76,7 @@ describe('Latest updates on Home', () => {
     requestLatestUpdates.mockClear();
   });
 
-  it('waits for published posts and lists the three newest even when an older post is pinned', () => {
+  it('waits for published posts and lists the three newest even when an older post is pinned', async () => {
     const view = render(<Home />);
     expect(requestLatestUpdates).toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'News' })).toBeNull();
@@ -89,7 +89,7 @@ describe('Latest updates on Home', () => {
       { id: 'e', title: 'Hidden post', visible: false, publishAt: '2026-05-01' },
     ];
     view.rerender(<MemoryRouter><Home /></MemoryRouter>);
-    expect(screen.getByRole('heading', { name: 'From the organizers' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'From the organizers' })).toBeVisible();
     const links = within(screen.getByRole('region', { name: 'News' })).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual(['Newest', 'Second', 'Third']);
     expect(links[0]).toHaveAttribute('href', '/updates/d');

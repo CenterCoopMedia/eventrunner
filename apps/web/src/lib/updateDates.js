@@ -65,13 +65,21 @@ export function compareUpdates(a, b) {
   return compareUpdateDates(a, b);
 }
 
-export function compareUpdateDates(a, b) {
+function compareUpdateDates(a, b) {
   const aDate = toPublishDate(a?.publishAt);
   const bDate = toPublishDate(b?.publishAt);
   if (aDate && bDate) return bDate.getTime() - aDate.getTime();
   if (aDate) return -1;
   if (bDate) return 1;
   return 0;
+}
+
+export function latestPublishedUpdates(updates) {
+  return (updates ?? [])
+    .filter((update) => update?.visible === true &&
+      typeof update.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/u.test(update.id) &&
+      typeof update.title === 'string' && update.title.trim())
+    .sort(compareUpdateDates);
 }
 
 /**
