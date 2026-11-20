@@ -29,6 +29,8 @@ let pageDoc;
 let features;
 let organizationsData;
 let sectionBlocks;
+let publishedUpdates;
+const requestLatestUpdates = vi.fn();
 // The History section (issue #194) reads the past editions as
 // ContentContext serves them: prepared, oldest first.
 let timeline;
@@ -44,6 +46,8 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
     organizationsData,
     timeline,
+    publishedUpdates,
+    requestLatestUpdates,
     getPage: () => pageDoc,
     pageHasTimelineBlock: () => false,
     getSectionBlocks: (section) => {
@@ -61,6 +65,45 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 
 import Home from './Home.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
+
+describe('Latest updates on Home', () => {
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    pageDoc = { id: 'home', sections: [{ id: 'news', label: 'News' }] };
+    sectionBlocks = { news: [{ blockType: 'latest_updates', label: 'From the organizers' }] };
+    features = { updates: true };
+    publishedUpdates = [];
+    requestLatestUpdates.mockClear();
+  });
+
+  it('waits for published posts and lists the three newest even when an older post is pinned', () => {
+    const view = render(<Home />);
+    expect(requestLatestUpdates).toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'News' })).toBeNull();
+
+    publishedUpdates = [
+      { id: 'a', title: 'Old pinned', visible: true, pinned: true, publishAt: '2026-01-01' },
+      { id: 'b', title: 'Third', visible: true, publishAt: '2026-02-01' },
+      { id: 'c', title: 'Second', visible: true, publishAt: '2026-03-01' },
+      { id: 'd', title: 'Newest', visible: true, publishAt: '2026-04-01' },
+      { id: 'e', title: 'Hidden post', visible: false, publishAt: '2026-05-01' },
+    ];
+    view.rerender(<MemoryRouter><Home /></MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'From the organizers' })).toBeVisible();
+    const links = within(screen.getByRole('region', { name: 'News' })).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(['Newest', 'Second', 'Third']);
+    expect(links[0]).toHaveAttribute('href', '/updates/d');
+
+    sectionBlocks.news = [{ blockType: 'latest_updates', count: 1 }];
+    view.rerender(<MemoryRouter><Home /></MemoryRouter>);
+    expect(within(screen.getByRole('region', { name: 'News' })).getAllByRole('link')).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: 'From the organizers' })).toBeNull();
+
+    features.updates = false;
+    view.rerender(<MemoryRouter><Home /></MemoryRouter>);
+    expect(screen.queryByRole('heading', { name: 'News' })).toBeNull();
+  });
+});
 import { SEED_WHEN_PLACEHOLDER, publicContentDoc } from 'shared/seed';
 import { makeFakeDb } from '../../../../functions/src/cms/firestoreFake.cjs';
 import { createCmsUpdateContentHandler } from '../../../../functions/src/cms/content.cjs';

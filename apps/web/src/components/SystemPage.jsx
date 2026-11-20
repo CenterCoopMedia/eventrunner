@@ -27,7 +27,7 @@
 import { Fragment } from 'react';
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
+import { usePageSectionBlocks } from '../lib/usePageSectionBlocks.js';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
 import { PullQuoteBudget } from './blocks/pullQuoteBudget.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
@@ -134,12 +134,8 @@ export default function SystemPage({
   children,
   ...articleProps
 }) {
-  const { pages, getPage, getSectionBlocks: storedSectionBlocks } = usePublicContent();
+  const { getPage } = usePublicContent();
   const { features } = useEventConfig();
-  // A cta or link_group that leads to a section that is off, or to a page
-  // that is not public, is not drawn (lib/linkTargets.js). Filtered here, before any section decides whether
-  // it is empty, so a section left with nothing draws no heading.
-  const getSectionBlocks = (sectionId) => withoutSwitchedOffLinks(storedSectionBlocks(sectionId), features, pages);
   // Every system route now seeds a cmsPages document (scripts/lib/seed.cjs,
   // held by a test that reads every <SystemPage pageId="…"> in this app).
   // A route can still find nothing — an operator deleted the page, or the
@@ -148,9 +144,9 @@ export default function SystemPage({
   const page = [pageId].flat().map((key) => getPage(key)).find(Boolean) ?? null;
   const layout = resolvePageLayout(page);
   const stated = statedPageLayout(page);
-  const slots = sectionsBySlot(
-    (page?.sections ?? []).filter((section) => !exclude.includes(section.id)),
-  );
+  const sections = (page?.sections ?? []).filter((section) => !exclude.includes(section.id));
+  const getSectionBlocks = usePageSectionBlocks(sections, features);
+  const slots = sectionsBySlot(sections);
   // The core may need the layout it renders under — `arrangement` on a
   // directory, most of all — so it may arrive as a function of it.
   const core = typeof children === 'function' ? children(layout) : children;

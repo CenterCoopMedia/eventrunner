@@ -31,6 +31,7 @@ export const BLOCK_TYPE_SUMMARIES = Object.freeze({
   faq_item: 'A question with its answer.',
   link_group: 'One link in a named group, such as footer links.',
   gallery: 'Several pictures as a grid, a carousel or a slideshow.',
+  latest_updates: 'Links to the newest published posts.',
   sponsor_package: 'A sponsorship level with its price and benefits.',
   timeline: 'Past editions in order, with optional links and images.',
 });
@@ -63,6 +64,12 @@ const SAMPLE_BLOCKS = Object.freeze({
       { url: 'demo/summit-gathering.webp', alt: 'Attendees at the summit' },
       { url: 'demo/speakers/amara-okafor.webp', alt: 'A speaker' },
       { url: 'demo/speakers/devon-achebe.webp', alt: 'A speaker' },
+    ],
+  },
+  latest_updates: {
+    updates: [
+      { id: 'program', title: 'The program is out' },
+      { id: 'venue', title: 'Getting to the venue' },
     ],
   },
   sponsor_package: { name: 'Gold', price: '$2,500', limit: 3, benefits: '<p>Logo on every page</p>' },

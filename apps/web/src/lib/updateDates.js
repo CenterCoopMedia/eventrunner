@@ -62,6 +62,10 @@ export function publishDateLabel(publishAt, timeZone, language) {
 export function compareUpdates(a, b) {
   const pinDiff = (b?.pinned === true ? 1 : 0) - (a?.pinned === true ? 1 : 0);
   if (pinDiff !== 0) return pinDiff;
+  return compareUpdateDates(a, b);
+}
+
+export function compareUpdateDates(a, b) {
   const aDate = toPublishDate(a?.publishAt);
   const bDate = toPublishDate(b?.publishAt);
   if (aDate && bDate) return bDate.getTime() - aDate.getTime();

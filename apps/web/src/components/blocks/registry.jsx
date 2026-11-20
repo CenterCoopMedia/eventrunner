@@ -30,6 +30,7 @@ export const BLOCK_RENDERERS = Object.freeze({
   quote: lazy(() => import('./QuoteBlock.jsx')),
   faq_item: lazy(() => import('./FaqItemBlock.jsx')),
   link_group: lazy(() => import('./LinkGroupBlock.jsx')),
+  latest_updates: lazy(() => import('./LatestUpdatesBlock.jsx')),
   sponsor_package: lazy(() => import('./SponsorPackageBlock.jsx')),
   gallery: lazy(() => import('./GalleryBlock.jsx')),
   timeline: lazy(() => import('./TimelineBlock.jsx')),
