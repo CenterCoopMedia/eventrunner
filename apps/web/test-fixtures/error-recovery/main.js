@@ -1,22 +1,24 @@
 // Hosted fixture: the production boundary and reporter, without Firebase
 // providers. Every HTTP report is intercepted by the browser test.
-import { createElement as h, Fragment, useState } from 'react';
+import { createElement as h, Fragment, Suspense, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Link, Outlet, Route, Routes, useLocation } from 'react-router';
 import ErrorBoundary from '../../src/components/ErrorBoundary.jsx';
 import { initErrorReporting } from '../../src/lib/errorReporting.js';
+import { installChunkReload } from '../../src/lib/chunkReload.js';
+import { lazyPage } from '../../src/lib/routePage.jsx';
 import '../../src/generated/theme.css';
 import '../../src/index.css';
 
 initErrorReporting();
+installChunkReload();
 globalThis.document.documentElement.dataset.navigationType =
   globalThis.performance.getEntriesByType('navigation')[0].type;
 
+const RecoveryPage = lazyPage(() => import('./RecoveryPage.jsx'), 'RecoveryPage');
+
 function Crash() {
-  const { pathname } = useLocation();
-  throw new Error(pathname === '/chunk-error'
-    ? 'Failed to fetch dynamically imported module: /assets/missing-page.js'
-    : 'Synthetic production render failure');
+  throw new Error('Synthetic production render failure');
 }
 
 function Shell() {
@@ -53,6 +55,7 @@ createRoot(globalThis.document.getElementById('root')).render(
       h(Routes, null,
         h(Route, { element: h(Shell) },
           h(Route, { path: '/working', element: h('h1', null, 'Working page content') }),
+          h(Route, { path: '/chunk-error', element: h(Suspense, { fallback: null }, h(RecoveryPage)) }),
           h(Route, { path: '/steps/:step', element: h(Stepper) }),
           h(Route, { path: '/feedback-error', element: h(FailedForm, { title: 'The feedback form could not open' }) }),
           h(Route, { path: '/change-request-error', element: h(FailedForm, { title: 'The change request form could not open' }) }),

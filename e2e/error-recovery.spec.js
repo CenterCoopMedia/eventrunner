@@ -165,16 +165,42 @@ test('a production caught error reaches the emulator and the real System errors 
   await expect(cards.getByRole('heading', { name: 'A browser error occurred', exact: true }).first()).toBeVisible();
 });
 
-test('production missing chunk reloads once and stays out of telemetry', async ({ page }) => {
-  const reports = await intercept(page);
-  let documents = 0;
-  page.on('request', (request) => {
-    if (request.isNavigationRequest() && request.url() === `${origin}/chunk-error`) documents += 1;
+for (const persists of [false, true]) {
+  test(`production chunk ${persists ? 'alerts after the reload fails' : 'recovers without a report'}`, async ({ page }) => {
+    const reports = await intercept(page, async (report) => {
+      const response = await callFunction('logClientError', report);
+      expect(response.status).toBe(201);
+      return { status: response.status, json: response.body };
+    });
+    let documents = 0;
+    page.on('request', (request) => {
+      if (request.isNavigationRequest() && request.url() === `${origin}/chunk-error`) documents += 1;
+    });
+    // Fail the real lazy import in the first document and, for the persistent
+    // case, also after the automatic reload. A modulepreload can fetch it too.
+    let failedChunk;
+    await page.route('**/assets/RecoveryPage-*.js', (route) => {
+      if (!persists && documents >= 2) return route.fallback();
+      failedChunk = new URL(route.request().url()).pathname.split('/').at(-1);
+      return route.fulfill({ status: 404 });
+    });
+    const saved = persists ? page.waitForResponse(`${origin}/telemetry/logClientError`) : null;
+    await page.goto(`${origin}/chunk-error`, { waitUntil: 'commit' });
+    await expect(page.locator('html')).toHaveAttribute('data-navigation-type', 'reload');
+    expect(documents).toBe(2);
+    expect(failedChunk).toMatch(/^RecoveryPage-.+\.js$/);
+    if (persists) {
+      await expect(page.getByRole('alert')).toContainText('A page file did not load.');
+      expect((await saved).status()).toBe(201);
+      expect(reports).toHaveLength(1);
+      const entry = await page.locator('link[data-app-entry]').getAttribute('href');
+      const build = entry.split('/').at(-1);
+      expect(reports[0].message).toBe(
+        `A page file still failed to load after automatic reload. File ${failedChunk}. Previous build ${build}. Current build ${build}.`,
+      );
+    } else {
+      await expect(page.getByRole('heading', { name: 'Recovered page content' })).toBeVisible();
+      expect(reports).toHaveLength(0);
+    }
   });
-  await page.goto(`${origin}/chunk-error`, { waitUntil: 'commit' });
-  await expect(page.locator('html')).toHaveAttribute('data-navigation-type', 'reload');
-  await expect.poll(() => documents).toBe(2);
-  await expect(page.getByRole('heading', { name: 'This page could not be shown' })).toBeVisible();
-  expect(await page.evaluate(() => globalThis.sessionStorage.getItem('eventrunner:chunk-reload'))).toBe('1');
-  expect(reports).toHaveLength(0);
-});
+}

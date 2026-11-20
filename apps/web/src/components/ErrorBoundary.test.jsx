@@ -5,6 +5,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes } from 'react-router';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import { lazyPage } from '../lib/routePage.jsx';
+import { resetErrorReportingStateForTest } from '../lib/errorReporting.js';
 import {
   RELOAD_FLAG,
   clearReloadFlag,
@@ -35,6 +37,15 @@ function renderBoundary(children, props = {}) {
   return render(<MemoryRouter><ErrorBoundary {...props}>{children}</ErrorBoundary></MemoryRouter>);
 }
 
+function captureReports() {
+  resetErrorReportingStateForTest();
+  vi.stubEnv('VITE_ENABLE_CLIENT_ERROR_REPORTING', 'true');
+  vi.stubEnv('VITE_FUNCTIONS_ORIGIN', 'https://telemetry.example.test');
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  return fetch;
+}
+
 let consoleError;
 
 beforeEach(() => {
@@ -47,6 +58,8 @@ beforeEach(() => {
 afterEach(() => {
   consoleError.mockRestore();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('isChunkLoadError', () => {
@@ -101,10 +114,12 @@ describe('installChunkReload', () => {
     const remove = installChunkReload(target, { reload });
 
     const first = new Event('vite:preloadError', { cancelable: true });
+    first.payload = new TypeError('Importing a module script failed.');
     target.dispatchEvent(first);
     expect(first.defaultPrevented).toBe(true);
 
     const second = new Event('vite:preloadError', { cancelable: true });
+    second.payload = first.payload;
     target.dispatchEvent(second);
     expect(second.defaultPrevented).toBe(false);
 
@@ -114,6 +129,78 @@ describe('installChunkReload', () => {
 });
 
 describe('ErrorBoundary', () => {
+  it('does not report when Vite has started a recovery reload', async () => {
+    const fetch = captureReports();
+    const reload = vi.fn();
+    const remove = installChunkReload(window, { reload });
+    // Safari's stack contains frames without the error name, so the benign
+    // filter cannot identify the synthetic missing-module error by its stack.
+    const stack = vi.spyOn(Error, 'prepareStackTrace').mockImplementation(
+      (_error, frames) => frames.map(String).join('\n'),
+    );
+    const Page = lazyPage(async () => {
+      const error = new TypeError('Importing a module script failed.');
+      const event = new Event('vite:preloadError', { cancelable: true });
+      event.payload = error;
+      if (window.dispatchEvent(event)) throw error;
+    }, 'AdminOverview');
+    try {
+      renderBoundary(<Suspense fallback={null}><Page /></Suspense>, { reload });
+      expect(await screen.findByRole('alert')).toHaveTextContent('A page file did not load.');
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      remove();
+      stack.mockRestore();
+    }
+  });
+
+  it('reports the page chunk and both builds when Safari omits the asset URL after reload', async () => {
+    const fetch = captureReports();
+    const entry = document.createElement('link');
+    entry.setAttribute('data-app-entry', '');
+    entry.href = '/assets/index-new1.js';
+    document.head.append(entry);
+    sessionStorage.setItem(RELOAD_FLAG, 'index-old2.js');
+    const reload = vi.fn();
+    const Page = lazyPage(() => Promise.reject(new TypeError('Importing a module script failed.')), 'AdminOverview');
+    try {
+      renderBoundary(<Suspense fallback={null}><Page /></Suspense>, { reload });
+      expect(await screen.findByRole('alert')).toHaveTextContent('A page file did not load.');
+      expect(reload).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(fetch.mock.calls[0][1].body).message).toBe(
+        'A page file still failed to load after automatic reload. File AdminOverview. Previous build index-old2.js. Current build index-new1.js.',
+      );
+    } finally {
+      entry.remove();
+    }
+  });
+
+  it('reports the original application error when a lazy module throws during evaluation', async () => {
+    const fetch = captureReports();
+    const reload = vi.fn();
+    const remove = installChunkReload(window, { reload });
+    const Page = lazyPage(async () => {
+      const error = new ReferenceError('A required feature is undefined');
+      const event = new Event('vite:preloadError', { cancelable: true });
+      event.payload = error;
+      if (window.dispatchEvent(event)) throw error;
+    }, 'AdminOverview');
+    try {
+      renderBoundary(<Suspense fallback={null}><Page /></Suspense>, { reload });
+      expect(await screen.findByRole('alert')).toHaveTextContent('Reload the page to try again.');
+      expect(reload).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
+        message: 'A required feature is undefined',
+        stack: expect.stringContaining('ReferenceError: A required feature is undefined'),
+      });
+    } finally {
+      remove();
+    }
+  });
+
   it('renders its children when nothing fails', () => {
     renderBoundary(<p>admin</p>);
     expect(screen.getByText('admin')).toBeTruthy();

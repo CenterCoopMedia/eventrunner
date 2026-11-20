@@ -2,7 +2,7 @@
 // retries a failed subtree without remounting healthy pages and steppers.
 import { Component } from 'react';
 import { useLocation } from 'react-router';
-import { isChunkLoadError, reloadOnce } from '../lib/chunkReload.js';
+import { chunkRecoveryFailureMessage, isChunkLoadError, isChunkReloadPending, reloadOnce } from '../lib/chunkReload.js';
 import { isClientErrorReportingEnabled, reportClientError } from '../lib/errorReporting.js';
 import { primaryActionClass } from './controlClasses.js';
 import { IS_DEMO } from '../lib/demoMode.js';
@@ -23,19 +23,23 @@ class RenderErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     this.props.onFailure?.();
+    const chunk = isChunkLoadError(error, info?.componentStack);
+    if (chunk) {
+      // Chrome and Firefox lazy-module errors are known only with the stack.
+      if (!this.state.chunk) this.setState({ chunk: true });
+      if (isChunkReloadPending() || reloadOnce({ reload: this.reload })) return;
+    }
     if (!IS_DEMO && isClientErrorReportingEnabled()) {
+      const recoveryFailure = chunk ? chunkRecoveryFailureMessage(error) : null;
       void reportClientError({
-        message: error?.message || String(error),
-        stack: typeof error?.stack === 'string' ? error.stack : null,
+        message: recoveryFailure || error?.message || String(error),
+        // The original chunk error text can match the benign telemetry filter.
+        stack: !recoveryFailure && typeof error?.stack === 'string' ? error.stack : null,
         url: globalThis.location?.href ?? null,
         userAgent: globalThis.navigator?.userAgent ?? null,
         context: { source: 'react-boundary', componentStack: info.componentStack },
       });
     }
-    if (!isChunkLoadError(error, info?.componentStack)) return;
-    // Chrome and Firefox lazy-module errors are known only with the stack.
-    if (!this.state.chunk) this.setState({ chunk: true });
-    reloadOnce({ reload: this.reload });
   }
 
   reload = () => {
