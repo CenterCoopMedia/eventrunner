@@ -11,11 +11,10 @@ const html = readFileSync(path.join(WEB, 'index.html'), 'utf8');
 
 function mountBoot() {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const root = doc.getElementById('root');
-  const script = root.querySelector('script');
+  const script = doc.head.querySelector('script:not([src])');
   document.body.innerHTML = '';
-  document.body.append(document.importNode(root, true));
-  // Inserted scripts do not run; run its text once, as the parser would.
+  document.body.append(document.importNode(doc.getElementById('root'), true));
+  // Inserted scripts do not run; run the head script once, as the parser would.
   new Function(script.textContent)();
   return document.getElementById('console-boot');
 }
@@ -44,13 +43,19 @@ describe('the first-load message', () => {
     expect(reload.hidden).toBe(false);
   });
 
-  it('stops its clock when the app replaces it', async () => {
+  it('changes nothing once the app has replaced it', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
-    const boot = mountBoot();
-    expect(vi.getTimerCount()).toBe(2);
-    document.getElementById('root').replaceChildren();
-    await Promise.resolve();
-    expect(boot.isConnected).toBe(false);
-    expect(vi.getTimerCount()).toBe(0);
+    mountBoot();
+    document.getElementById('root').replaceChildren(Object.assign(document.createElement('h1'), { textContent: 'Your organizations' }));
+    vi.advanceTimersByTime(10000);
+    expect(document.getElementById('root').textContent).toBe('Your organizations');
+  });
+
+  it('runs in the head, ahead of any stylesheet, so a slow stylesheet cannot hold it', () => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const script = doc.head.querySelector('script:not([src])');
+    expect(script).not.toBeNull();
+    expect(doc.querySelector('link[rel="stylesheet"]')).toBeNull();
+    expect(doc.body.querySelector('script:not([src])')).toBeNull();
   });
 });
