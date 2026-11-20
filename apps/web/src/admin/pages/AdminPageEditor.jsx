@@ -39,6 +39,7 @@ import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
 import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
+import { buildNavItems } from '../../lib/siteNavigation.js';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useVenueMapImage } from '../../components/VenueMap.jsx';
 import { openStreetMapCoordinates } from '../../components/AreaMap.jsx';
@@ -263,6 +264,12 @@ function PageEditor({ mode }) {
     getSectionBlocks: (id) => sectionPreviewBlocks({ id }),
   };
   const longReadSectionId = longReadSection(page);
+  // Layout draws the side navigation rail only when the site has public
+  // pages to list, so the preview reserves it only then too.
+  const publicNavShown = buildNavItems(
+    ready ? rows.map((row) => (row.live ? publicContentDoc(row.live) : null)).filter(Boolean) : [],
+    features,
+  ).length > 0;
   const [savedSnapshot, setSavedSnapshot] = useState(() => (
     mode === 'create' ? pageSnapshot(blankPage()) : null
   ));
@@ -958,7 +965,7 @@ function PageEditor({ mode }) {
                         budget={quoteBudget}
                         readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
                         longReadOpening={section.id === longReadSectionId}
-                        sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side'}
+                        sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side' && publicNavShown}
                         blocksError={Boolean(contentError) && !contentReady}
                       />
                     </div>

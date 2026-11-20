@@ -42,3 +42,14 @@
   .admin-section-layout__picture { width: 4rem; flex: none; }
   .admin-section-layout__frames { grid-template-columns: minmax(0, 1fr); }
 }
+/* A map's own page cannot run inside the preview's sandbox, so the
+   preview draws the map's place and size with a note instead. */
+.admin-section-layout__page :has(> iframe) { position: relative; }
+.admin-section-layout__page iframe { visibility: hidden; }
+.admin-section-layout__page :has(> iframe)::before {
+  content: 'Map: shows on the published page';
+  position: absolute; inset-inline: 0; top: 0; aspect-ratio: 4 / 3; min-height: 200px;
+  display: grid; place-items: center;
+  font-family: var(--admin-font-ui); font-size: var(--admin-text-sm); color: rgb(var(--admin-ink-secondary-rgb));
+  background: rgb(var(--admin-ground-soft-rgb)); border: 1px dashed rgb(var(--admin-rule-control-rgb));
+}
