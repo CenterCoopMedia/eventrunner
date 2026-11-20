@@ -212,6 +212,33 @@ test('a cancelled run still evaluates the required gate', () => {
   assert.match(gate, /if: \$\{\{ always\(\) \}\}/);
 });
 
+test('merge groups select hosted tiers from the queue candidate range', () => {
+  const base = 'a'.repeat(40);
+  const head = 'b'.repeat(40);
+  const result = classifyEvent({
+    eventName: 'merge_group',
+    base,
+    head,
+    runGit(command, args) {
+      assert.equal(command, 'git');
+      assert.equal(args.at(-1), `${base}...${head}`);
+      return Buffer.from('apps/web/src/App.jsx\0firestore.rules\0');
+    },
+  });
+  assert.deepEqual(result, classifyPaths(['apps/web/src/App.jsx', 'firestore.rules']));
+  assert.throws(() => classifyEvent({ eventName: 'merge_group', base }), /base and head must be commit ids/);
+});
+
+test('the required check receives the queue event and scans its commit range', () => {
+  const workflow = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+  assert.match(workflow, /^  merge_group:\n    types: \[checks_requested\]/m);
+  assert.match(workflow, /GITHUB_BASE_SHA: .*github\.event\.merge_group\.base_sha/);
+  assert.match(workflow, /GITHUB_HEAD_SHA: .*github\.event\.merge_group\.head_sha/);
+  assert.match(workflow, /if: github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group'\s+run: \|\s+\.\/gitleaks .*--log-opts="\$GITHUB_BASE_SHA\.\.\$GITHUB_HEAD_SHA"/);
+  const gate = workflow.slice(workflow.indexOf('\n  gate:'));
+  assert.match(gate, /^    name: CI gate$/m);
+});
+
 test('workflow, configuration, and dependency changes select the full matrix', () => {
   for (const path of [
     '.github/workflows/ci.yml',

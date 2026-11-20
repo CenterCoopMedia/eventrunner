@@ -295,7 +295,7 @@ function changedPaths(base, head, runGit = execFileSync) {
 }
 
 function classifyEvent({ eventName, base, head, runGit = execFileSync } = {}) {
-  if (eventName !== 'pull_request') {
+  if (eventName !== 'pull_request' && eventName !== 'merge_group') {
     return { paths: [], mode: 'full', jobs: allJobs(), e2eConsoleOnly: false };
   }
   return classifyPaths(changedPaths(base, head, runGit));

@@ -76,7 +76,9 @@ boundary small while leaving fork-review cleanup failures visible.
   the regenerated `docs/docs/` output. "Documentation checks" and "Shared
   package tests" fail on a stale build.
 - Merge a pull request only after "CI gate" passes and every review thread is
-  resolved. Update the branch first when it is behind `main`.
+  resolved. When the merge queue is enabled, it checks the combined commit
+  against `main`. Update the branch first for a conflict, or when it is
+  behind `main` and the merge queue is disabled.
 - Deploy the console with `deploy-console.yml` on `main`. Deploy a client site
   with the Deploy workflow and that client's environment.
 - Never start a browser (agent-browser, Playwright or any other) inside a Codex
