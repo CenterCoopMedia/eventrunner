@@ -4,6 +4,8 @@ name: CI
 # Every job must be runnable from a fork PR.
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:
@@ -14,11 +16,15 @@ permissions:
   contents: read
   statuses: read
 
+env:
+  GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+  GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+
 jobs:
   changes:
     name: Classify changed paths
     runs-on: ubuntu-latest
-    # Manual runs use the full matrix. PRs select tiers by changed paths.
+    # PRs and merge groups select tiers by changed paths. Manual runs use all tiers.
     outputs:
       local: ${{ steps.local.outputs.verified }}
       docs: ${{ steps.classify.outputs.docs }}
@@ -66,16 +72,11 @@ jobs:
             }
       - name: Classify the changed paths
         id: classify
-        env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        # The classifier decides which security tiers run. A pull request
-        # loads the copy from its base commit, so it cannot replace those
-        # rules. A manual run has no base commit and uses the checked-out file.
+        # Load the security tier rules from the base for both PRs and merge groups.
+        # Manual runs have no base commit and use the checked-out file.
         run: |
           script=scripts/ci/classify-changes.cjs
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
             script="$RUNNER_TEMP/classify-changes.cjs"
             git show "$GITHUB_BASE_SHA:scripts/ci/classify-changes.cjs" > "$script"
           fi
@@ -87,7 +88,8 @@ jobs:
     # Credential-free (spec §8.1, §1.5): reads only the checked-out git
     # range from the PR event payload — no token, no third-party action, so
     # a fork PR runs it exactly like a same-repo PR. Manual runs have no PR
-    # commit range and skip this job.
+    # commit range. The queue admits PRs with this check already passed and
+    # tests combined commits that GitHub creates.
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -96,9 +98,6 @@ jobs:
       # The sign-off verdict is a required check, so the pull request runs
       # the copy from its base commit and cannot replace the rule (#354).
       - name: Verify every commit is signed off
-        env:
-          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           script="$RUNNER_TEMP/check-dco.cjs"
           git show "$GITHUB_BASE_SHA:scripts/check-dco.cjs" > "$script"
@@ -131,11 +130,10 @@ jobs:
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
           tar -xzf gitleaks.tar.gz gitleaks
-      - name: gitleaks (PR range)
-        if: github.event_name == 'pull_request'
+      - name: gitleaks (PR or merge group range)
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         run: |
-          ./gitleaks detect --source . --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
-            --redact -v
+          ./gitleaks detect --source . --log-opts="$GITHUB_BASE_SHA..$GITHUB_HEAD_SHA" --redact -v
       - name: gitleaks (full history)
         if: github.event_name == 'workflow_dispatch'
         run: ./gitleaks detect --source . --log-opts="--all" --redact -v
@@ -558,8 +556,7 @@ jobs:
     needs: [changes, dco, secrets, docs, demo, lint, audit, unit, unit-web, build, hygiene, rules, e2e]
     runs-on: ubuntu-latest
     # Keep this job's name stable and require it in branch protection.
-    # Selected tiers must pass locally or on GitHub. DCO and secret scanning
-    # remain hosted; manual runs skip DCO because they have no PR range.
+    # Merge groups require hosted results. DCO runs on each PR's source commits.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -567,7 +564,6 @@ jobs:
       - name: Verify the selected CI tiers passed
         env:
           EVENT_NAME: ${{ github.event_name }}
-          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           LOCAL_VALIDATED: ${{ needs.changes.outputs.local }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           DCO_RESULT: ${{ needs.dco.result }}
@@ -592,12 +588,11 @@ jobs:
           RULES_RESULT: ${{ needs.rules.result }}
           E2E_SELECTED: ${{ needs.changes.outputs.e2e }}
           E2E_RESULT: ${{ needs.e2e.result }}
-        # The gate is the aggregate required check. A pull request loads the
-        # verifier from its base commit, so it cannot replace the verdict
-        # (#354). A manual run has no base commit and uses the checked-out file.
+        # PRs and merge groups load the aggregate verifier from their base
+        # commit (#354). Manual runs use the checked-out verifier.
         run: |
           script=scripts/ci/verify-gate.cjs
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [ "$EVENT_NAME" != "workflow_dispatch" ]; then
             script="$RUNNER_TEMP/verify-gate.cjs"
             git show "$GITHUB_BASE_SHA:scripts/ci/verify-gate.cjs" > "$script"
           fi

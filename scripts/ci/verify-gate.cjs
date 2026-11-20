@@ -24,10 +24,10 @@ function verifyGate(env = process.env) {
   requireResult(env, 'SECRETS_RESULT', 'success');
   if (env.EVENT_NAME === 'pull_request') {
     requireResult(env, 'DCO_RESULT', 'success');
-  } else if (env.EVENT_NAME === 'workflow_dispatch') {
+  } else if (env.EVENT_NAME === 'workflow_dispatch' || env.EVENT_NAME === 'merge_group') {
     requireResult(env, 'DCO_RESULT', 'skipped');
   } else {
-    throw new Error('EVENT_NAME must be pull_request or workflow_dispatch');
+    throw new Error('EVENT_NAME must be pull_request, merge_group or workflow_dispatch');
   }
 
   if (!['true', 'false'].includes(env.LOCAL_VALIDATED)) {

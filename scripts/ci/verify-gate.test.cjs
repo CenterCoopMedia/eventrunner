@@ -48,12 +48,26 @@ test('requires success for selected jobs and skipped for unselected jobs', () =>
   assert.throws(() => verifyGate(unselectedRun), /docs was not selected but finished with success/);
 });
 
-test('rejects an event type outside the pull request and manual contract', () => {
+test('rejects an unsupported event type', () => {
   const env = passingEnvironment();
   env.EVENT_NAME = 'push';
   env.DCO_RESULT = 'skipped';
 
-  assert.throws(() => verifyGate(env), /EVENT_NAME must be pull_request or workflow_dispatch/);
+  assert.throws(() => verifyGate(env), /EVENT_NAME must be pull_request, merge_group or workflow_dispatch/);
+});
+
+test('merge groups require hosted tiers and secret scan, with DCO checked at PR admission', () => {
+  const env = passingEnvironment();
+  env.EVENT_NAME = 'merge_group';
+  env.DOCS_SELECTED = 'true';
+  env.DOCS_RESULT = 'success';
+
+  assert.throws(() => verifyGate(env), /DCO_RESULT must be skipped/);
+  env.DCO_RESULT = 'skipped';
+  assert.doesNotThrow(() => verifyGate(env));
+  assert.throws(() => verifyGate({ ...env, LOCAL_VALIDATED: 'true' }), /Only pull requests/);
+  assert.throws(() => verifyGate({ ...env, SECRETS_RESULT: 'skipped' }), /SECRETS_RESULT must be success/);
+  assert.throws(() => verifyGate({ ...env, DOCS_RESULT: 'skipped' }), /docs was selected/);
 });
 
 test('local evidence replaces selected tiers but retains the trust checks', () => {
