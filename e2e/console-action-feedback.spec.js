@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
+import { REFLOW_PROFILES, expectControlFits, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 
 const ROOT = process.cwd();
 const FIXTURE = path.join(ROOT, 'e2e/fixtures/console-feedback');
@@ -104,6 +105,90 @@ async function capture(page, name, width) {
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', width);
   await page.screenshot({ path: path.join(EVIDENCE, `console-feedback-${name}-${width}.png`) });
 }
+
+test('the guided setup reflows and all eight steps remain reachable by keyboard', async ({ page }) => {
+  const current = application();
+  const longName = 'Regional Community News and Public Information Collaborative';
+  const longAddress = 'https://regionalcommunitynewsandpublicinformationcollaborative.example.test';
+  const validation = 'Enter the organization name that appears on your contracts and official documents.';
+  current.answers.organization = { ...current.answers.organization, name: '', website: longAddress };
+  current.answers.tickets.choice = 'spreadsheet';
+  current.errors = { 'organization.name': validation };
+  const saved = deferred();
+  const errors = await intercept(page, async (action, body) => {
+    if (action === 'getApplication') return { application: current };
+    if (action === 'getTeam') return team();
+    if (action === 'getAgreement') return { agreement: AGREEMENT, accepted: null };
+    if (action === 'checkWebAddress') return { name: body.name, available: true, address: `${body.name}.eventrunner.org` };
+    if (action === 'saveApplicationStep' && body.step === 'organization') {
+      await saved.promise;
+      return { step: body.step, saved: true, errors: {} };
+    }
+  });
+  const layouts = [
+    { path: 'organization', title: 'Your organization', text: page.locator('#f-organization-name-error') },
+    { path: 'event', title: 'Your event', text: page.getByText('Name of the day (optional)', { exact: true }) },
+    { path: 'web-address', title: 'Your web address', text: page.locator('.availability') },
+    { path: 'team', title: 'Your team', ready: page.getByRole('heading', { name: 'Members', exact: true }) },
+    { path: 'tickets', title: 'Tickets', ready: page.getByText('Import a spreadsheet later', { exact: true }) },
+    { path: 'email', title: 'Email', ready: page.getByLabel('Sender name', { exact: true }) },
+    { path: 'review', title: 'Review', text: page.getByText(longAddress, { exact: true }) },
+    { path: 'agreement', title: 'Agreement', text: page.getByRole('article', { name: AGREEMENT.title }).getByText(/^1\. The organization/) },
+  ];
+
+  await page.goto(`${origin}${APP_PATH}/organization`);
+  const body = page.locator('.step-body');
+  const next = body.getByRole('button', { name: /^Next: / });
+  const organization = page.getByLabel('Organization name', { exact: true });
+  await next.press('Enter');
+  await expect(organization).toHaveAttribute('aria-invalid', 'true');
+  await expect(organization).toBeFocused();
+
+  for (const [index, layout] of layouts.entries()) {
+    await test.step(`Setup step ${index + 1}: ${layout.title}`, async () => {
+      await expect(page).toHaveURL(new RegExp(`/${layout.path}(?:\\?|$)`));
+      const heading = body.getByRole('heading', { name: layout.title, level: 1, exact: true });
+      await expect(heading).toBeVisible();
+      if (layout.ready) await expect(layout.ready).toBeVisible();
+      const control = index < layouts.length - 1 ? next : body.getByRole('button', { name: 'Accept agreement' });
+      if (layout.text) {
+        for (const profile of REFLOW_PROFILES) {
+          await test.step(profile.name, async () => {
+            await setReflowProfile(page, profile);
+            await expectPageFits(page);
+            await expectTextFits(heading);
+            if (layout.path === 'web-address') await expect(layout.text).toHaveText('community-gathering.eventrunner.org is available.');
+            await expectTextFits(layout.text);
+            await expectControlFits(control);
+            await expectTextFits(control);
+          });
+        }
+      }
+      if (index === 0) {
+        await body.getByRole('link', { name: 'Close setup' }).focus();
+        await page.keyboard.press('Tab');
+        await expect(body.getByRole('link', { name: 'Your organization', exact: true })).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(organization).toBeFocused();
+        await organization.fill(longName);
+        await next.press('Enter');
+        try {
+          const pending = body.getByRole('group', { name: 'Save status' }).getByRole('status');
+          await expect(pending).toHaveText('Saving.');
+          await expectTextFits(pending);
+          await expect(next).toBeDisabled();
+          await expectControlFits(next);
+          await expectPageFits(page);
+        } finally {
+          saved.resolve();
+        }
+      } else if (index < layouts.length - 1) {
+        await next.press('Enter');
+      }
+    });
+  }
+  expect(errors).toEqual([]);
+});
 
 for (const width of [1440, 390, 320]) {
   test(`agreement feedback stays beside Accept on a long page at ${width}px`, async ({ page }) => {

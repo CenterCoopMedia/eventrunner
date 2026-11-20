@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ADMIN_EMAIL, signIn } from './helpers.mjs';
+import { REFLOW_PROFILES, expectControlFits, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 
 const pageWidth = (page) =>
   page.evaluate(() => ({
@@ -130,6 +131,30 @@ test('the phone menu uses a compact named icon and keeps the current destination
   await page.keyboard.press('Escape');
   await expect(summary).toHaveAccessibleName('Open menu');
   await expect(summary).toBeFocused();
+
+  for (const profile of REFLOW_PROFILES) {
+    await test.step(profile.name, async () => {
+      await setReflowProfile(page, profile);
+      await expectPageFits(page);
+      await expectTextFits(page.getByRole('heading', { name: 'Pages', level: 1 }));
+      await expectControlFits(summary);
+      await expectTextFits(summary);
+      await summary.press('Enter');
+      await expect(summary).toHaveAccessibleName('Close menu');
+      await expect(page.locator('#admin-content')).toHaveAttribute('inert');
+      const nav = page.getByRole('navigation', { name: 'Admin sections' });
+      const operations = nav.getByRole('button', { name: 'Operations', exact: true });
+      await expectControlFits(operations);
+      if (await operations.getAttribute('aria-expanded') === 'false') await operations.press('Enter');
+      const feedback = nav.getByRole('link', { name: 'Feedback', exact: true });
+      await expectControlFits(feedback);
+      await expectTextFits(feedback);
+      await expectPageFits(page);
+      await feedback.press('Escape');
+      await expect(summary).toHaveAccessibleName('Open menu');
+      await expect(summary).toBeFocused();
+    });
+  }
 });
 
 test('the Branding bar resizes the panes by keyboard, keeps the frame width, and stacks on a phone', async ({ page }) => {

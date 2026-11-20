@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
+import { REFLOW_PROFILES, expectControlFits, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 
 const EVIDENCE = process.env.EVENT_SETTINGS_EVIDENCE_DIR;
 const LONG = 'A very long label that keeps going well past the width of a narrow phone screen';
@@ -137,6 +138,26 @@ test('event days, tracks, and the time zone use labelled compact controls that f
       await page.locator('.admin-settings-grid--essentials').first().screenshot({ path: path.join(EVIDENCE, `event-essentials-${name}.png`), animations: 'disabled' });
     }
     await page.keyboard.press('Escape');
+  }
+
+  for (const profile of REFLOW_PROFILES) {
+    await test.step(profile.name, async () => {
+      await setReflowProfile(page, profile);
+      await zone.press('ArrowDown');
+      const option = list.getByRole('option', { name: /Tokyo/ }).first();
+      await expect(zone).toBeFocused();
+      await expect(list).toBeVisible();
+      await expectPageFits(page);
+      await expectTextFits(option);
+      await expectControlFits(zone);
+      await expectTextFits(page.getByText(`${LONG} ${lastDay} will be removed when you save.`));
+      const addTrack = page.getByRole('button', { name: 'Add track', exact: true });
+      await expectControlFits(addTrack);
+      await expectTextFits(addTrack);
+      await zone.press('Escape');
+      await expect(list).toBeHidden();
+      await expect(zone).toBeFocused();
+    });
   }
 
   // Nothing was saved.

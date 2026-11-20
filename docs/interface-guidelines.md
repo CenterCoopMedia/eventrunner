@@ -306,6 +306,8 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 
 ## Accessibility
 
+- **Text resize and reflow.** On public pages, in the admin and in the console, keep text readable and controls reachable by keyboard and touch at 320 CSS pixels and at 200% browser zoom on a 1440px screen. Text and controls must stay visible without overlap or page-level horizontal scrolling. Give wide tables their own labelled, keyboard-reachable scroll region. Use `.wrap-anywhere` in the web app for long words and URLs that would force a column wider. Preserve native browser and pinch zoom.
+- Check 320 and 720 CSS pixel viewports and an enlarged root font in hosted fixtures. Record actual 200% browser zoom separately, with the starting and resulting viewport widths. Record Safari page zoom and iOS and Android text settings separately, with the browser and OS versions and what text sizing actually changed.
 - Semantically correct native elements: `button` for buttons, `a` for links.
 - Style `:focus-visible`; never remove outlines without replacing them.
 - Only `tabindex="0"` and `tabindex="-1"` — positive values break tab order.

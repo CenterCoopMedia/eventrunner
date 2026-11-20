@@ -36,6 +36,8 @@
   --state-pressed-share: 10%;
   font-family: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   line-height: 1.6;
 }
 
