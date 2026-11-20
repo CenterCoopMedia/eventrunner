@@ -37,11 +37,14 @@ export async function expectTextFits(locator) {
     for (let text = walker.nextNode(); text; text = walker.nextNode()) {
       if (!text.data.trim() || text.parentElement.closest('[aria-hidden="true"], .sr-only, .visually-hidden')) continue;
       range.selectNodeContents(text);
-      const lineHeight = Number.parseFloat(getComputedStyle(text.parentElement).lineHeight);
+      const textStyle = getComputedStyle(text.parentElement);
+      const lineHeight = Number.parseFloat(textStyle.lineHeight);
+      const fontSize = Number.parseFloat(textStyle.fontSize);
       for (const line of range.getClientRects()) {
         if (line.width === 0) continue;
         // A text range includes font ascent and descent beyond the line box.
-        const fontBleed = Number.isNaN(lineHeight) ? 0 : Math.max(0, line.height - lineHeight) / 2;
+        // Tight line heights can clip actual glyphs, so keep the full range there.
+        const fontBleed = lineHeight > fontSize ? Math.max(0, line.height - lineHeight) / 2 : 0;
         for (let ancestor = text.parentElement; ancestor; ancestor = ancestor.parentElement) {
           const style = getComputedStyle(ancestor);
           const bounds = ancestor.getBoundingClientRect();
