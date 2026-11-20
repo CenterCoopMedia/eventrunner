@@ -49,8 +49,8 @@ import useLoadingStage from '../lib/useLoadingStage.js';
 import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 import LoadingStatus from './LoadingStatus.jsx';
-import { useScreenshotFiles } from 'shared/ScreenshotField';
-import { encodeScreenshots, PUBLIC_SCREENSHOT_MIB, ScreenshotReadError } from 'shared/screenshots';
+import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, PUBLIC_SCREENSHOT_MIB, ScreenshotReadError } from '@screenshot-ui/browser.mjs';
 import PublicScreenshotField from './forms/PublicScreenshotField.jsx';
 
 /**

@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import { MAX_SCREENSHOTS, MIB } from './screenshots.mjs';
+import { MAX_SCREENSHOTS, MIB } from './browser.mjs';
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp';
 
@@ -34,7 +34,7 @@ export function useScreenshotFiles(mib) {
   };
 }
 
-export default function ScreenshotField({ selection, disabled, className, inputClass, buttonClass }) {
+export default function ScreenshotField({ selection, disabled, className, legendClass, inputClass, buttonClass }) {
   const id = useId();
   const input = useRef(null);
   const { files, error, mib, add, remove } = selection;
@@ -51,7 +51,7 @@ export default function ScreenshotField({ selection, disabled, className, inputC
         if (!disabled) add(event.dataTransfer.files);
       }}
     >
-      <legend><label htmlFor={id}>Screenshots (optional)</label></legend>
+      <legend className={legendClass}><label htmlFor={id}>Screenshots (optional)</label></legend>
       <p id={`${id}-help`}>Choose, paste, or drop up to 3 PNG, JPEG, or WebP images here. Up to {mib} MiB each.</p>
       <input
         ref={input}
@@ -73,7 +73,7 @@ export default function ScreenshotField({ selection, disabled, className, inputC
       {files.length ? (
         <ul aria-label="Selected screenshots">
           {files.map(({ file, id: fileId }, index) => (
-            <li key={fileId}>
+            <li key={fileId} style={{ overflowWrap: 'anywhere' }}>
               <span>{file.name || `Screenshot ${index + 1}`}</span>{' '}
               <button
                 type="button"

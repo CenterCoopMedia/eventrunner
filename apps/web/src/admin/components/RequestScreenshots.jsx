@@ -1,4 +1,4 @@
-import ScreenshotViewer from 'shared/ScreenshotViewer';
+import ScreenshotViewer from '@screenshot-ui/ScreenshotViewer.jsx';
 import { linkButtonClass } from './formControls.jsx';
 
 export default function RequestScreenshots({ row, source, call }) {

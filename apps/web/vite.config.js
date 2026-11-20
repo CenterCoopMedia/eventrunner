@@ -138,9 +138,6 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       'shared/speakerReadiness',
       'shared/invoice',
       'shared/imageSizes',
-      'shared/screenshots',
-      'shared/ScreenshotField',
-      'shared/ScreenshotViewer',
       'shared/ticketCommerce',
       'shared/ticketAccess',
       'shared/webVitals',
@@ -180,6 +177,7 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
   resolve: {
     alias: {
       '@generated': generatedDir,
+      '@screenshot-ui': path.resolve(here, '../../packages/shared/src/screenshot-ui'),
       '@': path.resolve(here, 'src'),
     },
   },

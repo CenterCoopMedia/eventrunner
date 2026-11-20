@@ -96,7 +96,7 @@ export default [
   // Frontend: JSX plus the rules-of-hooks guard. The client console's web
   // app (ADR 0007) is held to the same rules.
   {
-    files: ["apps/web/**/*.{js,jsx,mjs}", "console/web/**/*.{js,jsx,mjs}", "packages/shared/src/*.jsx"],
+    files: ["apps/web/**/*.{js,jsx,mjs}", "console/web/**/*.{js,jsx,mjs}", "packages/shared/src/screenshot-ui/*.{jsx,mjs}"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",

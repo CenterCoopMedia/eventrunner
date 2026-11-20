@@ -29,8 +29,8 @@ import { DIALOG_FRAME_CLASS } from './FeedbackModal.jsx';
 import { focusFirstError, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 import BusyLabel from './BusyLabel.jsx';
-import { useScreenshotFiles } from 'shared/ScreenshotField';
-import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from 'shared/screenshots';
+import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 import PublicScreenshotField from './forms/PublicScreenshotField.jsx';
 
 /** The server's limits (functions/src/admin/changeRequests.cjs). */

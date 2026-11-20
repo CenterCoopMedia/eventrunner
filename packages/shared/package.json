@@ -47,8 +47,6 @@
     "./seed": { "require": "./src/seed.cjs", "import": "./src/seed.mjs" },
     "./imageSizes": { "require": "./src/imageSizes.cjs", "import": "./src/imageSizes.mjs" },
     "./screenshots": { "require": "./src/screenshots.cjs", "import": "./src/screenshots.mjs" },
-    "./ScreenshotField": "./src/ScreenshotField.jsx",
-    "./ScreenshotViewer": "./src/ScreenshotViewer.jsx",
     "./consoleRequest": { "require": "./src/consoleRequest.cjs", "import": "./src/consoleRequest.mjs" },
     "./webVitals": { "require": "./src/webVitals.cjs", "import": "./src/webVitals.mjs" },
     "./contentLanguages": { "require": "./src/contentLanguages.cjs", "import": "./src/contentLanguages.mjs" },

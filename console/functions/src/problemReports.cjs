@@ -4,7 +4,9 @@
  * "Report a problem" relay. The console and each client site's admin panel
  * post here; the report goes on to the operator's triage service, which
  * sends it to the operator in Telegram with File, File + fix and Ignore.
- * Nothing is stored in the console: the triage service owns the record.
+ * Reports with screenshots also keep a private Console receipt for 30 days.
+ * It includes the reporter's verified address so operators can follow up
+ * when the triage relay is unavailable.
  *
  * The caller must be signed in, with a verified email, to the console or to
  * a client site this console built (or one named in CONSOLE_REPORT_PROJECTS

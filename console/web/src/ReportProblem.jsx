@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { callApi } from './api.js';
 import { recentMessages } from './recentMessages.js';
 import IconControl from './IconControl.jsx';
-import ScreenshotField, { useScreenshotFiles } from 'shared/ScreenshotField';
-import { encodeScreenshots, newReportSubmissionKey, SIGNED_IN_SCREENSHOT_MIB } from 'shared/screenshots';
+import ScreenshotField, { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, newReportSubmissionKey, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 
 const KINDS = [
   { value: 'bug', label: 'Something is broken' },

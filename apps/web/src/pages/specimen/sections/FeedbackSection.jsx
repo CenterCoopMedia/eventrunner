@@ -7,6 +7,9 @@ import { useState } from 'react';
 import EmptyState from '../../../components/EmptyState.jsx';
 import EventCountdown from '../../../components/EventCountdown.jsx';
 import FeedbackModal, { DIALOG_FRAME_CLASS } from '../../../components/FeedbackModal.jsx';
+import PublicScreenshotField from '../../../components/forms/PublicScreenshotField.jsx';
+import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { PUBLIC_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 import InfoCards, { groupIntoCards } from '../../../components/InfoCards.jsx';
 import { LoadingStateView } from '../../../components/LoadingState.jsx';
 import LoadingStatus from '../../../components/LoadingStatus.jsx';
@@ -221,6 +224,11 @@ function HeldUpSpecimen() {
   );
 }
 
+function ScreenshotSpecimen() {
+  const selection = useScreenshotFiles(PUBLIC_SCREENSHOT_MIB);
+  return <div onPaste={selection.onPaste}><PublicScreenshotField selection={selection} /></div>;
+}
+
 export default function FeedbackSection({ folio }) {
   return (
     <SpecimenSection
@@ -246,6 +254,15 @@ export default function FeedbackSection({ folio }) {
         note="A native dialog opened with showModal(): focus is trapped inside it, the page behind it is inert, Escape closes it, and focus returns to the control that opened it. The scrim is tinted ink at low alpha and carries no blur."
       >
         <DialogSpecimen />
+      </Figure>
+
+      <Figure
+        name="Screenshot picker"
+        file="components/forms/PublicScreenshotField.jsx"
+        contract={null}
+        note="Choose files with the keyboard, paste an image, or drop it onto the field. The field announces the selection and offers a Remove button for each image."
+      >
+        <ScreenshotSpecimen />
       </Figure>
 
       <Figure

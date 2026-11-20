@@ -60,8 +60,8 @@ import AdminPageHeader, {
   StatusBadge,
 } from '../components/adminChrome.jsx';
 import BusyLabel from '../../components/BusyLabel.jsx';
-import { useScreenshotFiles } from 'shared/ScreenshotField';
-import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from 'shared/screenshots';
+import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 import AdminScreenshotField from '../components/AdminScreenshotField.jsx';
 import RequestScreenshots from '../components/RequestScreenshots.jsx';
 

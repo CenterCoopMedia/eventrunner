@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import ScreenshotViewer from 'shared/ScreenshotViewer';
+import ScreenshotViewer from '@screenshot-ui/ScreenshotViewer.jsx';
 import { callApi } from '../../api.js';
 
 const PATH = '/review/problem-reports';

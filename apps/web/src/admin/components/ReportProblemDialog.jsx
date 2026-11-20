@@ -7,8 +7,8 @@ import { auth } from '../../firebase.js';
 import { recentMessages } from '../../lib/recentMessages.js';
 import ModalShell from './media/ModalShell.jsx';
 import { Notice, TextAreaField, fieldLabelClass, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
-import { useScreenshotFiles } from 'shared/ScreenshotField';
-import { encodeScreenshots, newReportSubmissionKey, SIGNED_IN_SCREENSHOT_MIB } from 'shared/screenshots';
+import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, newReportSubmissionKey, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 import AdminScreenshotField from './AdminScreenshotField.jsx';
 
 const CONSOLE_ORIGIN = (import.meta.env.VITE_CONSOLE_ORIGIN || 'https://console.eventrunner.org').replace(/\/+$/, '');
