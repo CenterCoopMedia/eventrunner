@@ -2,6 +2,17 @@
 
 The report measures the entry module and each static JavaScript import required before route interaction. Dynamic route chunks are separate.
 
+## 2026-11-19: held-up figure (#1090)
+
+Local builds of `main` at `5b635a77` and of the change, with the same environment and gzip level 9. Each initial graph has three chunks.
+
+| Build | Initial raw before | Initial raw after | Initial gzip before | Initial gzip after | CSS raw before | CSS raw after | CSS gzip before | CSS gzip after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Normal | 424,035 | 425,584 | 133,939 | 134,440 | 188,326 | 193,263 | 27,419 | 28,583 |
+| Demo | 428,552 | 430,101 | 134,992 | 135,524 | 189,193 | 194,130 | 27,472 | 28,629 |
+
+The initial ceiling is now 431,000 raw / 136,000 gzip bytes, and the stylesheet ceiling 195,000 / 29,000. The reasons are in the [budget](public-bundle-budget.md).
+
 ## 2026-11-12: Firebase loads after the public snapshot (#625)
 
 Hosted CI run [43343621985](https://github.com/CenterCoopMedia/eventrunner/actions/runs/43343621985) measured `367809f5` against the stack base `1110f947`. The normal Web build and demo build use the same budget script and gzip level 9. Each initial graph has three chunks.
