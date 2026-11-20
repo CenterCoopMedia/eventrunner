@@ -1,7 +1,8 @@
 # ADR 0005: Airtable refresh for session pitch intake
 
 **Date:** 2026-10-19  
-**Status:** Proposed for review with the implementation on this branch.  
+**Status:** Superseded on November 20, 2026. Event Runner uses reviewed CSV uploads for Airtable pitches.
+
 **Supersedes:** one row of [ADR 0001 §9](0001-event-platform-v1.md#9-porting-map), "Airtable sync: not ported", for session pitch intake only.
 
 ## Context

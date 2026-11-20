@@ -15,7 +15,7 @@ import '../plannerFields.css';
 // review revision, as a decision does.
 //
 // CONFLICTS. The page holds the revision it last read. When the live pitch
-// moves on (another reviewer, an Airtable refresh), the controls stop and a
+// moves on (another reviewer or a CSV import), the controls stop and a
 // notice offers the current version. Notes (PitchNotes) do not move the
 // revision, so they never cause a conflict.
 import AdminIconControl from '../components/AdminIconControl.jsx';

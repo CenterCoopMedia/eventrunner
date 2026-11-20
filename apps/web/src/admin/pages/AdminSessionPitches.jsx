@@ -5,7 +5,7 @@ import '../plannerFields.css';
 // its badges, a line of detail in the data face, and a Review link.
 //
 // The pitch itself is /admin/pitches/:pitchId; the call, the form choices
-// and the emails are /admin/pitches/settings; CSV and Airtable imports are
+// and the emails are /admin/pitches/settings; CSV imports are
 // /admin/pitches/import. Export writes the rows the filter shows.
 import PitchCallSettings from '../components/PitchCallSettings.jsx';
 import { subscribePitchCall } from '../../lib/pitchSource.js';

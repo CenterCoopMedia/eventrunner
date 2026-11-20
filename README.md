@@ -51,7 +51,7 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 
 **Speakers and the program**
 
-- Session pitches in steps, with co-presenters, a staff review queue, and intake from the site, a CSV file, or Airtable ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md))
+- Session pitches in steps, with co-presenters, a staff review queue, and reviewed CSV imports from Airtable or other forms. [Session pitch intake](docs/operator/session-pitches.md)
 - An accepted pitch invites each presenter as a speaker
 - Speaker invite, accept, and a profile in steps, with private travel, access, and audio and video needs
 - Session materials with embargo
@@ -67,7 +67,7 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 - An event data package for the handoff after the event
 - A "Report a problem" button in the admin and the console that sends the report to the hosting team
 
-What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, social feeds, and speaker chat stay out. Sponsor invoicing was cut in the triage and is back in scope ([ADR 0001 §4.2 amendment](docs/adr/0001-event-platform-v1.md#42-collections-not-carried-over), [#208](https://github.com/CenterCoopMedia/eventrunner/issues/208)). Airtable is in scope for session pitch intake only: a read-only refresh from one approved table into the private review queue ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md)). Other Airtable sync stays out. Announcement email goes only to the event's attendees and speakers; it is not a marketing list tool.
+What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, social feeds, and speaker chat stay out. Sponsor invoicing was cut in the triage and is back in scope ([ADR 0001 §4.2 amendment](docs/adr/0001-event-platform-v1.md#42-collections-not-carried-over), [#208](https://github.com/CenterCoopMedia/eventrunner/issues/208)). Announcement email goes only to the event's attendees and speakers; it is not a marketing list tool.
 
 ## Operating model
 

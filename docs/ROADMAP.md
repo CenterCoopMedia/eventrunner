@@ -108,7 +108,7 @@ Every public intake is a stepper with the same keyboard path, errors and save be
 
 - [x] Stepper component and the admin setup page on it
 - [x] Pitch stepper with co-presenters; staff lists for format, length and track
-- [x] Admin pitch pages; CSV, Airtable and export for the new fields
+- [x] Admin pitch pages with CSV import and export for the new fields
 - [x] Accept a pitch: a speaker per presenter, invited in one action
 - [x] Speaker profile stepper with private logistics
 - [x] Registration questions: the form editor, private answers, the attendee record and the export

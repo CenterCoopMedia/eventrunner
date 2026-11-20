@@ -358,7 +358,7 @@ function readLevel(value) {
 }
 
 /**
- * The stepper fields of an imported row (a CSV line or an Airtable record),
+ * The stepper fields of an imported CSV row,
  * ADR 0008 §2. Only the fields the row carries come back, so a file with the
  * legacy columns alone imports exactly as before.
  *

@@ -104,8 +104,6 @@
     "convertSessionPitch",
     "sendSessionPitchNotice",
     "savePitchNoticeSettings",
-    "updateAirtablePitchSource",
-    "refreshAirtablePitches",
     "submitChangeRequest",
     "updateChangeRequestStatus",
     "saveChangeRequestOutcome",

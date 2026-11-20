@@ -2,7 +2,7 @@
 // (for example, Airtable). A blank external address never saves, because the
 // server would read it as "no external form" and reopen native intake.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 
 let pitchCall;
@@ -25,7 +25,7 @@ vi.mock('../adminSource.js', () => ({
 // A live snapshot after mount, as Firestore delivers one.
 function push(name, docs) { act(() => listeners[name](docs)); }
 vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator: true, user: { uid: 'me' } }) }));
-vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: { days: [] } }) }));
+vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: { days: [], timezone: 'UTC' } }) }));
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
 
 import { PITCH_NOTICE_DEFAULTS } from 'shared/pitch';
@@ -291,6 +291,26 @@ const QUEUE = [
 ];
 
 describe('AdminSessionPitches queue', () => {
+  it('keeps earlier Airtable pitches and their source markers in the review queue', () => {
+    const base = { ...PITCH, source: 'airtable', status: 'accepted', uid: null, createdAt: new Date('2026-10-01T10:00:00Z') };
+    const changedAt = new Date('2026-10-12T10:00:00Z');
+    collections.session_pitches = [
+      { ...base, id: 'changed', title: 'Changed pitch', reviewedAt: new Date('2026-10-10T10:00:00Z'), sourceUpdatedAt: changedAt, sourceChangedFields: ['title', 'description'] },
+      { ...base, id: 'reviewed-after', title: 'Reviewed after change', reviewedAt: new Date('2026-10-13T10:00:00Z'), sourceUpdatedAt: changedAt },
+      { ...base, id: 'removed', title: 'Removed pitch', sourceRemovedAt: changedAt },
+      { ...base, id: 'consent', title: 'Unconsented pitch', sourceConsentMissingAt: changedAt },
+    ];
+    renderAt('/admin/pitches');
+    const item = (title) => screen.getByRole('link', { name: title }).closest('li');
+    expect(within(item('Changed pitch')).getByText('Updated from source')).toBeInTheDocument();
+    expect(within(item('Reviewed after change')).queryByText('Updated from source')).toBeNull();
+    expect(within(item('Removed pitch')).getByText('Removed from Airtable')).toBeInTheDocument();
+    expect(within(item('Unconsented pitch')).getByText('Consent unchecked in Airtable')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Changed pitch' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Changed pitch' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Source changes' })).toHaveTextContent('An import changed title, description on Oct 12, 2026, 10:00 AM UTC.');
+  });
+
   it('lists every pitch newest first with its decision, detail line and Review link, and counts them in the title band', () => {
     collections.session_pitches = QUEUE;
     renderAt('/admin/pitches');

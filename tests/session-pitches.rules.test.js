@@ -386,6 +386,16 @@ describe('pitch submission', () => {
     await assertFails(getDoc(doc(operatorClient(), `session_pitch_rate_limits/${RATE_LIMIT_ID}`)));
   });
 
+  it('keeps a previously imported Airtable pitch private and reviewable', async () => {
+    const address = 'session_pitches/imported-example';
+    await db.doc(address).set({ title: 'Imported talk', source: 'airtable', uid: null,
+      email: 'presenter@example.test', status: 'new', reviewRevision: 0 });
+    await assertSucceeds(getDoc(doc(staffClient(), address)));
+    await assertSucceeds(getDoc(doc(operatorClient(), address)));
+    await assertFails(getDoc(doc(submitterClient(), address)));
+    await assertFails(setDoc(doc(staffClient(), address), { status: 'accepted' }));
+  });
+
   it('replays the same account key, conflicts on changed payload, and isolates another account using the same key', async () => {
     expect((await submit()).statusCode).toBe(201);
     expect((await submit(pitch({

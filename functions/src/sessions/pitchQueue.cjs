@@ -95,7 +95,9 @@ async function importPitches({ db, actor, body, at }) {
       const changed = Object.keys(incoming).filter((field) =>
         !sameValue(compareSourceValue(field, incoming[field]), compareSourceValue(field, field === 'presenters' ? previousPresenters : baseline[field])),
       );
-      if (!changed.length) return;
+      // A matching, consented row is present in the source again.
+      const restored = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);
+      if (!changed.length && !restored) return;
       const patch = Object.fromEntries(changed.map((field) => [field, incoming[field]]));
       // An unmapped presenter list stays intact. The stored lead mirrors the
       // required contact fields so review and conversion agree on its address.
@@ -120,7 +122,9 @@ async function importPitches({ db, actor, body, at }) {
       }
       updated += 1;
       tx.update(refs[i], { ...patch, reviewRevision: revisionOf(stored) + 1,
-        sourceValues: { ...baseline, ...incoming }, sourceUpdatedAt: at, sourceChangedFields: changed });
+        ...(changed.length ? { sourceValues: { ...baseline, ...incoming }, sourceUpdatedAt: at, sourceChangedFields: changed } : {}),
+        ...(restored ? { sourceRemovedAt: null, sourceConsentMissingAt: null } : {}),
+      });
     });
     if (imported || updated) tx.set(db.collection('admin_logs').doc(), { action: 'importSessionPitches', docPath: 'session_pitches', uid: actor.uid, email: actor.email, at, details: { count: imported, updated, source: parsed.rows[0].source } });
     return { imported, updated, unchanged: snaps.length - imported - updated };

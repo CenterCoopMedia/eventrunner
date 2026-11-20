@@ -41,7 +41,7 @@ const {
   readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen, PITCH_STATUSES, pitchStatusOf,
 } = require('shared/pitch');
 const {
-  IMPORT_FIELDS, checkPitch, presenterList, readPitchFormOptions, readPresenters, sameValue, validatePitchFormOptions,
+  checkPitch, presenterList, readPitchFormOptions, readPresenters, sameValue, validatePitchFormOptions,
 } = require('shared/pitchForm');
 
 const MAX_TITLE_LENGTH = 160;
@@ -545,14 +545,6 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
         tx.update(ref, {
           ...next,
           ...(stored.submitted ? {} : { submitted: { ...before, at: stored.createdAt ?? null } }),
-          // A pitch from Airtable that predates sourceValues gets them now,
-          // from the values before this edit, so the next refresh does not
-          // read the correction as a change to undo.
-          ...(stored.source === 'airtable' && !stored.sourceValues
-            ? { sourceValues: Object.fromEntries(['email', 'title', 'description', 'organization', 'format', ...IMPORT_FIELDS, 'presenters']
-              .filter((key) => ['email', 'title', 'description', 'organization', 'format'].includes(key) || stored[key] !== undefined)
-              .map((key) => [key, stored[key] ?? null])) }
-            : {}),
           reviewRevision: nextRevision,
           editedAt: at,
           editedBy: gate.email,

@@ -127,7 +127,6 @@ module.exports = {
   ...scheduleReactions.handlers,
   ...sessionPitches.handlers,
   ...require('./src/sessions/pitchQueue.cjs').handlers,
-  ...require('./src/sessions/airtableSync.cjs').handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...usersApproval.handlers,

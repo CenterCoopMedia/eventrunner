@@ -16,99 +16,19 @@ The call is closed when the document is missing or malformed, when `enabled` is 
 A call uses one intake at a time:
 
 - **This site's pitch form** (`externalFormUrl: null`). Proposals go directly into the private queue.
-- **An external form** (for example, Airtable). `/pitch` shows the call status, the deadline and one **Open the pitch form** link while the call is open. The site's own form and sign-in are hidden. `submitSessionPitch` refuses new pitches, so one call never has two queues. A retry of a pitch stored before the switch is still acknowledged; it creates nothing new. The external service stores the answers under its own terms. Bring them into the queue with an [Airtable refresh](#refresh-pitches-from-airtable) or the [reviewed CSV import](#reviewed-csv-import-and-private-export).
+- **An external form** (for example, Airtable). `/pitch` shows the call status, the deadline and one **Open the pitch form** link while the call is open. The site's own form and sign-in are hidden. `submitSessionPitch` refuses new pitches, so one call never has two queues. A retry of a pitch stored before the switch is still acknowledged; it creates nothing new. The external service stores the answers under its own terms. Bring them into the queue with the [reviewed CSV import](#reviewed-csv-import-and-private-export).
 
 The deadline (or no deadline) and the enabled state apply in both modes. While the call is open, the home page lead shows a **Pitch a session** action to `/pitch`. Share `/pitch`, not the external address, so closing the call also removes the link.
 
 ### Set up an Airtable form
 
 1. In the Airtable base, make these fields: `email` (email), `title` (single line text), `description` (long text), `organization` (single line text), `format` (single line text or single select) and `consent` (checkbox). State the review and contact purpose in the checkbox's form label.
-2. For the CSV import only, add a formula field named `externalId` with the formula `RECORD_ID()`. Airtable fills it for each response. The Airtable refresh uses the record ID directly and does not need this field.
+2. Add a formula field named `externalId` with the formula `RECORD_ID()`. Airtable fills it for each response. Include this field in the grid view you export.
 3. Make a form view from these fields. Make `email`, `title`, `description` and `consent` required. Copy the form's public share link.
 4. In **Session pitches**, select **Call settings**. Choose **An external form, such as Airtable**, paste the share link, set the deadline or choose **Open until I close it**, select **Accept session pitches** and save.
-5. Bring the responses into the review queue. Use the [Airtable refresh](#refresh-pitches-from-airtable) when the deployment has an Airtable token. Otherwise download a CSV of a grid view (**Download CSV**) and use the [reviewed CSV import](#reviewed-csv-import-and-private-export). In a CSV, a ticked checkbox exports as `checked`, which the import reads as consent. Import 50 rows or fewer at a time. Use the source name `airtable` for every import from this form, so a later Airtable refresh adopts those rows and does not duplicate them.
+5. Choose **Download CSV** in the Airtable grid view, then upload it under [Import pitches](#reviewed-csv-import-and-private-export). Import up to 50 rows at a time. Reuse the source name and record IDs of the pitches already in the queue. **Download pitches** shows both values in the `source` and `externalId` columns.
 
 Firestore stays the record for the review queue. Airtable stays the record for the form answers.
-
-## Refresh pitches from Airtable
-
-The refresh reads one approved Airtable table and brings its records into the private review queue. It only reads. It never writes to Airtable, never deletes a pitch, never publishes and never sends email. Confirm the field names, the refresh timing and the editing rule below with the client before the call opens.
-
-### Set up the connection
-
-1. **Create a token.** In Airtable, open the builder hub and create a personal access token. Give it one scope, `data.records:read`, and add only the base that holds the pitch table. Use an Airtable account that the client controls, so the token stays valid after a staff change.
-2. **Store the token as a secret.** Save it in the client's Secret Manager as `AIRTABLE_API_TOKEN`. Grant the functions runtime service account `secretAccessor` on it ([DEPLOY_RUNBOOK.md](../DEPLOY_RUNBOOK.md)). Do not paste the token into the admin panel, a GitHub variable, a document or a chat.
-3. **Turn the feature on for the deployment.** Set the GitHub Environment variable `EVENT_AIRTABLE_ENABLED` to `true` and deploy. Without the flag, every refresh fails with "Airtable is not turned on for this deployment". With the flag and without the secret, the deploy fails.
-4. **Find the IDs.** Open the table in Airtable. The address has the form `airtable.com/<base ID>/<table ID>/<view ID>`. The base ID starts with `app`, the table ID with `tbl` and the view ID with `viw`. Each ID has 17 characters.
-5. **Save the settings.** In **Session pitches**, expand **Refresh pitches from Airtable**, then **Connection settings** (operators only). Enter the base ID and the table ID. A table name also works, but a renamed table then stops the refresh. Enter a view ID or name to bring in only the records that view shows, for example a view that hides test rows. Type the name of each Airtable field. Choose the automatic refresh timing. Turn on **Import from Airtable** and save.
-6. **Check earlier CSV imports.** If responses from this form were imported as CSV before, choose **Download pitches** and read the `source` column. A refresh adopts only rows imported under the exact source name `airtable` (lowercase) with the Airtable record ID as the external ID. Rows imported under another source name, such as `Airtable` or `pitch-form`, come in a second time on the first refresh. Tell staff before that refresh, so they review only one copy of each pitch and decline the other.
-7. **Test it.** Choose **Refresh from Airtable**. Check the counts. Open one new pitch and compare it with its Airtable record. Staff see the **Refresh pitches from Airtable** panel only after this first refresh.
-
-The settings are stored in `session_pitch_sources/airtable`. Only operators can read them. `updateAirtablePitchSource` writes them and an `admin_logs` row.
-
-### Field names
-
-| Pitch field | Airtable field type | Rule |
-| --- | --- | --- |
-| Email (required) | Email or single line text | One valid address. Stored lowercase. |
-| Title (required) | Single line text | 1–160 characters. |
-| Description (required) | Long text | 1–5,000 characters. |
-| Consent checkbox (required) | Checkbox | Only a ticked box is consent. A row without a ticked box is skipped. |
-| Organization (optional) | Single line text | Up to 200 characters. |
-| Format (optional) | Single line text, single select or multiple select | Up to 120 characters. A multiple select is joined with commas. |
-| External ID (optional) | Any text field | Leave it empty to use the Airtable record ID. Do not change it after the first refresh: a new ID makes a new pitch. |
-| Summary (optional) | Single line text | Up to 300 characters. |
-| Length in minutes (optional) | Number or single line text | A whole number from 5 to 480, such as `45`. It need not be one of the call's lengths. |
-| Track (optional) | Single line text or single select | Up to 120 characters. It need not be one of the call's tracks. |
-| Audience (optional) | Single select or single line text | `Everyone`, `New to the topic`, `Some experience` or `Experienced practitioners`, or the ids `everyone`, `beginner`, `intermediate`, `advanced`. |
-| Lead presenter name and role (optional) | Single line text | Up to 120 characters each. The record's email is the lead presenter's. A refresh changes only the lead's mapped fields; co-presenters from a CSV import or a staff edit stay. |
-| Access needs, notes (optional) | Long text | Up to 2,000 characters each. |
-
-A refresh writes only the fields you map. An unmapped field keeps what staff or a CSV import stored. Co-presenters are not mapped from Airtable, because each needs four fields; bring them in with the CSV import (`presenter_1_name` …).
-
-The names must match the Airtable field names exactly, including capitals and spaces. Each pitch field takes a different Airtable field. The refresh asks Airtable for the mapped fields only, so other columns stay in Airtable. A number becomes text. An attachment, a linked record or another object is refused with the reason "Required text missing or too long".
-
-### Refresh timing
-
-- **By hand.** Staff or an operator choose **Refresh from Airtable**. Staff see the panel after the first refresh; until then only operators see it. A refresh can start once a minute. A second refresh while one runs is refused.
-- **Automatic.** An operator picks **Every 15 minutes** or **Every hour** in the settings. The default is off. `scheduledAirtablePitchRefresh` runs every 15 minutes. It returns at once unless a timing is set and that much time has passed since the last run. It does the same work as the button. It is not a queue: nothing waits in Firestore for a later run.
-
-Each refresh reads up to 1,000 records (10 pages of 100). It sends at most four requests a second, below Airtable's limit of five per base. After a rate-limit answer (429) it waits 30 seconds and tries again, two times at most. The read stops after 4 minutes, so the run always records its result inside the function's 5-minute limit. A view with more than 1,000 records ends as **Completed in part**. Use a smaller view, for example one that hides declined records.
-
-Each complete refresh reads about two Firestore documents per Airtable record: one to compare the record with its pitch, and one to look for removed records. With 1,000 records, the 15-minute timing reads about 192,000 documents a day and the hourly timing about 48,000. Choose the hourly timing unless the client needs faster updates.
-
-### What a refresh changes
-
-Each record has the identity `airtable` plus its external ID. The CSV import uses the same identity for the source name `airtable`. A refresh therefore adopts rows from an earlier CSV import with that source name and does not duplicate them.
-
-- **New record with consent:** a new pitch with the decision **New**, no notes and no Firebase identity. Its consent record says `airtable-source`.
-- **Unchanged record:** nothing is written. A refresh compares each record with what Airtable sent last (`sourceValues`), not with the pitch, so a staff correction (**Edit pitch**) stays until the record itself changes in Airtable.
-- **Changed record:** the email, title, description, organization and format are updated, over any staff correction of those fields. The decision, private notes, reviewer, conversion and notices stay. The review revision goes up by one, so a review form opened on the old text reports a conflict and does not save over it. The queue shows **Updated from source** until the next saved review, and the pitch names the changed fields. Session and speaker drafts made before the change do not change. Edit them in their own editors.
-- **Record removed from the view or deleted in Airtable:** the pitch stays. A complete refresh marks it **Removed from Airtable**. A record that comes back loses the mark. A refresh that ends as **Completed in part** marks nothing.
-- **Consent box cleared on an existing record:** the pitch stays and shows **Consent unchecked in Airtable**. Do not use it until the submitter confirms consent.
-- **Rows that cannot be used:** skipped and counted, with the reason: consent box not ticked, email missing or not valid, required text missing or too long, external ID missing, or external ID used twice. When two records share an external ID, both are skipped, and an existing pitch with that ID stays as it is; Airtable's order never picks one. The status lists the first 25 Airtable record IDs. Find them with Airtable's record ID search, correct them in Airtable and refresh again.
-
-Editing rule: the submitter's text belongs to Airtable. Edit a proposal in Airtable, not in Event Runner. Review decisions and notes belong to Event Runner. Airtable never changes them.
-
-### Status and audit
-
-The **Refresh pitches from Airtable** panel shows the last run: when it ran, who ran it (or "on the schedule"), the result (**Completed**, **Completed in part** or **Failed**) and the counts. The counts are created, updated, unchanged, back in Airtable, skipped and flagged as removed. A failed run shows its error. The status is in `session_pitch_sync/airtable`. Staff and operators can read it. Only the refresh writes it. Every run, by hand or scheduled, also writes one `admin_logs` row with the action `refreshAirtablePitches`, its counts and any error code.
-
-### Troubleshooting
-
-| Error | Cause and fix |
-| --- | --- |
-| Airtable is not turned on for this deployment | Set `EVENT_AIRTABLE_ENABLED=true` and deploy. |
-| The AIRTABLE_API_TOKEN secret is not set | Create the secret, grant `secretAccessor` and deploy again. |
-| Airtable refused the access token | The token expired, was revoked or was typed wrong. Make a new token and add a new secret version. |
-| The access token cannot read this base | Add the base to the token's access list in Airtable. |
-| Airtable cannot find this base, table or view | Compare the IDs in the settings with the Airtable address. |
-| Airtable refused the request (`UNKNOWN_FIELD_NAME`) | A mapped field name does not match Airtable. Check capitals, spaces and renamed fields. |
-| Airtable asked Event Runner to slow down | Another tool uses the same base. Wait one minute and refresh again. |
-| Airtable answered too slowly or asked Event Runner to slow down too often | The read reached its 4-minute limit and no pitch changed. Wait a few minutes and refresh again. If it repeats, use a smaller view. |
-| A refresh is already running | Wait for it to finish. A run that stops without finishing releases its lock after 10 minutes. |
-
-The token never appears in the status, the audit log, an error message or the function logs. To rotate it, add a new secret version and deploy the refresh functions again. To stop the connection, turn off **Import from Airtable**. Pitches already in the queue stay.
 
 ## API
 
@@ -306,8 +226,6 @@ In a historical demo, the site sends no pitch email and records none.
 
 `session_pitch_settings/notices` holds the receipt mode and the edited email wording. Staff and operators can read it. Only `savePitchNoticeSettings` writes it.
 
-`session_pitch_sources` (the Airtable connection settings) is readable only by operators. `session_pitch_sync` (the Airtable refresh status) is readable by staff and operators. Clients cannot write either one.
-
 Reviewing a pitch does not create or publish a schedule session. It does not change a user role and does not send mail. Decision emails are a separate staff action (see [Pitch emails](#pitch-emails)). Staff explicitly create private drafts from an accepted proposal, then review the session and speaker editors before publication.
 
 Deleting an attendee account does not delete its submitted pitches. A pitch remains an organizer record with the uid and email captured at submission. Issue [#322](https://github.com/CenterCoopMedia/eventrunner/issues/322) owns this initial retention decision. Each deployment must document its retention period before it opens a pitch call. Track a change to this policy under the [first-customer readiness epic](https://github.com/CenterCoopMedia/eventrunner/issues/337).
@@ -320,7 +238,7 @@ The public `/pitch` route uses the event branding and theme. It is a stepper (AD
 
 The form requires a title, description, the lead presenter's name, and organizer-review consent. The other fields are optional. The Format step shows a choice list for each list the call sets, and a free-text format when it sets none. It displays the deadline in the visitor's timezone. A call with no deadline shows no date and no countdown. It says there is no set deadline. A missing, malformed, expired, or unreadable call keeps submission unavailable. Configure the deployment's consent and retention policy before opening intake; this acknowledgement does not grant permission to publish a proposal.
 
-Open **Session pitches** at `/admin/pitches`. The queue lists every pitch, newest first, with its decision and a line of detail. Filter by decision, search by title, email, organization or presenter, and select **Review** to open a pitch at `/admin/pitches/<id>`. **Call settings** (operators) opens `/admin/pitches/settings`; **Import pitches** opens `/admin/pitches/import` for a CSV file or an Airtable refresh; **Download pitches** saves the filtered rows.
+Open **Session pitches** at `/admin/pitches`. The queue lists every pitch, newest first, with its decision and a line of detail. Filter by decision, search by title, email, organization or presenter, and select **Review** to open a pitch at `/admin/pitches/<id>`. **Call settings** opens `/admin/pitches/settings` for operators. **Import pitches** opens `/admin/pitches/import` for CSV uploads. **Download pitches** saves the filtered rows.
 
 On a pitch, **Accept**, **Decline** and **Mark in review** each save the decision at once. Choose another to change it. Under **Private notes**, **Add note** saves a note with your email and the time. Anyone on staff can add notes; only the person who wrote a note can edit it (`saveSessionPitchNote`, staff). A note does not change the pitch's revision, so it never blocks a decision. A note saved by the older single notes box shows as **Earlier note**. **Edit pitch** corrects the proposal (`editSessionPitch`, staff): the edit is checked like a new pitch, the first edit keeps the submitted copy on the pitch (`submitted`), each edit writes an `admin_logs` row with the changed fields, and the lead presenter's email cannot change. A choice the pitch already holds stays allowed after staff take it off the call's list. When someone else changes the pitch while it is open, every control stops and **Load the current version** appears; unsaved notes stay on the page. Deciding or editing sends no email. Send the acceptance or decline email from the pitch after you save the decision (see [Pitch emails](#pitch-emails)).
 
@@ -352,6 +270,8 @@ A file may also contain the pitch form's other answers: `summary`, `lengthMinute
 Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form. `consent` must be `true` or `checked` (Airtable's export of a ticked checkbox). Choose **Review proposals** to see matched answers and any rows that need correction. Fix invalid rows in the file or adjust the column matches, then review again. Malformed CSV quotes prevent the file from opening. Check the consent acknowledgement and choose **Import reviewed proposals**. Changing the file, source name or a column match clears that review and acknowledgement. The server validates the complete batch before committing it.
 
 The summary counts pitches added, updated and unchanged. An update matches the same source name and ID. It applies fields changed in the latest export and keeps staff corrections to fields the source did not change. Decisions, review notes and existing drafts stay with the pitch. The queue shows **Updated from source** until the next saved review, and the pitch names the changed fields. Use the newest export when you upload an update.
+
+A pitch previously pulled from Airtable can still show **Removed from Airtable** or **Consent unchecked in Airtable**. Once the record is back in the grid and the checkbox is ticked, upload a fresh export with its original source name and record ID. The import clears those warnings and counts the pitch as updated, even if its answers are the same.
 
 Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail, and an imported pitch never gets a receipt. Staff can send an imported pitch's decision email. It goes to the address in the CSV, which nobody verified, so the preview says so (see [Pitch emails](#pitch-emails)).
 

@@ -68,7 +68,7 @@ admin panel (the admin setup page moves onto it).
   saved before this change reads as one lead presenter, the submitter.
 - Co-presenters get no email at submit. Their address is used only when staff accept the pitch.
   The form says so.
-- The CSV import and the Airtable mapping gain the new columns, with `presenter_1_name` …
+- The CSV import gains the new columns, with `presenter_1_name` …
   `presenter_5_email` for presenters. The queue export writes the same columns.
 - The external-form mode (an Airtable form instead of this form) is unchanged.
 
@@ -157,7 +157,7 @@ the order's seats and copied to `ticket_answers/{ticketId}` when that person cla
 - Access and dietary answers are sensitive personal data. They stay private, appear only to
   staff, and leave with the archive. The privacy policy template gains a clause for them, under
   legal review like the rest.
-- The pitch and ticket schemas grow, so the CSV and Airtable mappings and the exports change in
+- The pitch and ticket schemas grow, so the CSV mappings and the exports change in
   the same pull request as each schema.
 - Promo codes touch money. They get their own pull request, an ADR 0004 amendment, and tests for
   limits under concurrent checkouts.

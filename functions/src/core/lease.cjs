@@ -2,7 +2,7 @@
 
 /**
  * The run lease: one holder at a time for a scheduled or staff-started run
- * (reminder schedules, the Airtable refresh, announcement send chunks).
+ * (reminder schedules and announcement send chunks).
  * A lease is a token plus an end. It is live until its end, so a crashed run
  * frees it on its own. Only the run whose token is stored may release it, so
  * a run that outlives its lease never clears the lease of the run that took
