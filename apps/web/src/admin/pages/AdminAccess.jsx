@@ -326,22 +326,26 @@ export default function AdminAccess() {
   const focusListRef = useRef(false);
   const listRef = useRef(null);
 
-  // A read repeated while an older one hangs: only the newest one lands.
-  const loadRef = useRef(0);
+  // Reads land in the order they started: the first answer shows at once,
+  // and an older read that answers after a newer one has landed (a retry
+  // past a read that hung) changes nothing.
+  const loadRef = useRef({ started: 0, landed: 0 });
   const load = useCallback(async ({ focusList = false } = {}) => {
-    const attempt = ++loadRef.current;
+    const reads = loadRef.current;
+    const attempt = ++reads.started;
     setLoading(true);
     try {
       const response = await call('listAdminAccess', {});
-      if (attempt !== loadRef.current) return;
+      if (attempt < reads.landed) return;
+      reads.landed = attempt;
       focusListRef.current = focusList;
       setAccounts(Array.isArray(response?.accounts) ? response.accounts : []);
       setCallerEmail(typeof response?.callerEmail === 'string' ? response.callerEmail : null);
       setLoadError(null);
     } catch (err) {
-      if (attempt === loadRef.current) setLoadError(err);
+      if (attempt >= reads.landed) setLoadError(err);
     } finally {
-      if (attempt === loadRef.current) setLoading(false);
+      if (attempt === reads.started) setLoading(false);
     }
   }, [call]);
   const loadLate = useBusyLate(accounts === null && loading && Boolean(loadError));

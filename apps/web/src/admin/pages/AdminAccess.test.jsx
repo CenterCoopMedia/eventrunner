@@ -428,6 +428,35 @@ describe('AdminAccess', () => {
     }
   });
 
+  it('shows the first list to answer at once, even while a newer read is still out', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers = [];
+      callMock.mockImplementation((name) => {
+        if (name !== 'listAdminAccess') return Promise.resolve({});
+        if (answers.length === 0) {
+          answers.push(null);
+          return Promise.reject(serverError(500, 'internal', 'down'));
+        }
+        return new Promise((resolve) => answers.push(resolve));
+      });
+      render(<AdminAccess />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      act(() => vi.advanceTimersByTime(10000));
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      // The older retry answers first: its list shows without waiting.
+      await act(async () => answers[1](LIST));
+      expect(rowFor('desk@example.org')).toBeTruthy();
+      // The newer read still lands after it.
+      const later = { ...LIST, accounts: [...LIST.accounts, { email: 'new@example.org', tier: 'staff' }] };
+      await act(async () => answers[2](later));
+      expect(rowFor('new@example.org')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a list load that lands while a confirmation is open does not pull focus back onto the surface', async () => {
     callMock.mockImplementation((name) => (name === 'listAdminAccess'
       ? Promise.reject(serverError(500, 'internal', 'down'))
