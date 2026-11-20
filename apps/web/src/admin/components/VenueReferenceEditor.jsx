@@ -637,7 +637,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
           venue with no markers still publishes a readable room list. */}
       <Panel help="An uploaded map of the building. The public travel page prints the room list beside it, so a reader who cannot see the image still gets every room name."
         title="Venue map"
-        description="An uploaded map of the building. The public travel page prints the room list beside it, so a reader who cannot see the image still gets every room name."
+        description="Upload an image of the building so attendees can find their rooms. To show an interactive street map, add a Map block to the page."
         actions={
           map.image ? (
             <button

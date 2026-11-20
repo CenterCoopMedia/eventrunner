@@ -33,6 +33,7 @@ test('Hosting permits the Google Maps embed and the sign-in and App Check frames
     'https://www.google.com/recaptcha/',
     'https://recaptcha.google.com/recaptcha/',
     'https://www.google.com/maps/embed',
+    'https://www.google.com/maps',
   ]));
 });
 

@@ -428,6 +428,14 @@ function resolveVenueMap(eventConfig) {
   return { image, alt: map.alt.trim(), rooms };
 }
 
+/** Full street address from the event venue, with blank parts omitted. */
+function venueAddress(venue = {}) {
+  const line = [venue.addressLine1, venue.addressLine2].filter(Boolean).join(', ');
+  const town = [venue.city, venue.region].filter(Boolean).join(', ');
+  const tail = [town, venue.postalCode, venue.country].filter(Boolean).join(' ');
+  return [line, tail].filter(Boolean).join(', ');
+}
+
 module.exports = {
   VENUE_PLACE_KEYS,
   VENUE_MOVEMENT_KEYS,
@@ -446,4 +454,5 @@ module.exports = {
   storageObjectPath,
   isMediaLibraryPath,
   resolveVenueMap,
+  venueAddress,
 };

@@ -33,6 +33,14 @@ test('a map stores an embed URL and a text label, with an optional text address'
   assert.match(requiredBlockErrors({ ...map, address: ['100 Main Street'] })[0], /^address:/);
 });
 
+test('a venue map stores a source choice with no copied URL', () => {
+  const block = { blockType: 'map', useEventVenue: true, label: 'Map of Test Hall' };
+  assert.deepEqual(requiredBlockErrors(block), []);
+  assert.match(requiredBlockErrors({ ...block, embedUrl: 'https://www.google.com/maps/embed?pb=fixture' })[0], /^embedUrl:/);
+  assert.match(requiredBlockErrors({ ...block, useEventVenue: 'true' })[0], /^useEventVenue:/);
+  assert.match(requiredBlockErrors({ ...block, useEventVenue: false })[0], /^embedUrl:/);
+});
+
 // #234: a fact is a term and a description, never a stat block. The whole
 // point of the type is that an operator can write a venue name without
 // inventing a source line, so the registry must ask for none.

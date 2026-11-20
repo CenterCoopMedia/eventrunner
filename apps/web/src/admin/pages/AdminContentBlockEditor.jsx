@@ -139,7 +139,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
     <div className="admin-content-fields grid items-end gap-sm sm:grid-cols-2">
       {fields.map((field) => {
         const name = editorialFieldLabel(blockTypeId, field.id);
-        const label = field.required ? name : `${name} (optional)`;
+        const label = field.required || field.id === 'useEventVenue' ? name : `${name} (optional)`;
         const value = values[field.id];
         const error = errorFor(field.id);
         const hint = contentFieldHelp(blockTypeId, field.id);
@@ -189,6 +189,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
         }
         if (field.type === 'url') {
           if (blockTypeId === 'map') {
+            if (values.useEventVenue) return null;
             return (
               <div key={field.id} className="sm:col-span-2">
                 <TextAreaField
@@ -252,7 +253,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const { pageId, sectionId, field: fieldParam } = useParams();
   const call = useAdminApi();
   const reportDeleted = useDeletedRecord();
-  const { features } = useEventConfig();
+  const { eventConfig, features } = useEventConfig();
   const { rows: pageRows, findRow: findPage, loading: pagesLoading } = useAdminPages();
   const {
     rows: contentRows,
@@ -444,7 +445,14 @@ export default function AdminContentBlockEditor({ mode }) {
   }
 
   function changeValue(name, value) {
-    setContent((current) => ({ ...current, values: { ...current.values, [name]: value } }));
+    setContent((current) => {
+      const values = { ...current.values, [name]: value };
+      if (name === 'useEventVenue' && value && !values.label.trim()) {
+        const venueName = eventConfig?.venue?.name;
+        if (typeof venueName === 'string' && venueName.trim()) values.label = `Map of ${venueName.trim()}`;
+      }
+      return { ...current, values };
+    });
   }
 
   async function save({ publish }) {

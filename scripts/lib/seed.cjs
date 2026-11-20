@@ -27,7 +27,7 @@
  * the data instead of needing a special case in the renderer.
  */
 
-const { VENUE_MAP_SECTION_ID } = require('shared/venue');
+const { VENUE_MAP_SECTION_ID, venueAddress } = require('shared/venue');
 const { SEED_WHEN_PLACEHOLDER } = require('shared/seed');
 const { builtInSectionBlockTypes } = require('shared/page');
 const { buildLegalContent } = require('./legal.cjs');
@@ -543,14 +543,6 @@ function eventDateRange(event = {}) {
   const sameMonth = sameYear && first.getUTCMonth() === last.getUTCMonth();
   if (sameMonth) return `${MONTH_DAY.format(first)}–${last.getUTCDate()}, ${last.getUTCFullYear()}`;
   return `${(sameYear ? MONTH_DAY : FULL_DATE).format(first)} – ${FULL_DATE.format(last)}`;
-}
-
-/** Full street address from `config/event.venue`, blank parts dropped. */
-function venueAddress(venue = {}) {
-  const line = [venue.addressLine1, venue.addressLine2].filter(Boolean).join(', ');
-  const town = [venue.city, venue.region].filter(Boolean).join(', ');
-  const tail = [town, venue.postalCode, venue.country].filter(Boolean).join(' ');
-  return [line, tail].filter(Boolean).join(', ');
 }
 
 /**

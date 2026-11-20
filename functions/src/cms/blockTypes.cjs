@@ -73,6 +73,7 @@ const BLOCK_TYPES = Object.freeze({
     label: 'Map',
     description: 'An interactive Google map with an optional street address.',
     fields: [
+      field('useEventVenue', 'boolean', false),
       field('embedUrl', 'url', true),
       field('label', 'string', true),
       field('address', 'string', false),
@@ -241,8 +242,14 @@ function requiredBlockErrors(fields) {
   if (blockType === 'stat') return statContractErrors(fields);
   if (blockType === 'map') {
     const errors = [];
-    const { embedUrl, label, address } = fields;
-    if (!embedUrl || googleMapsEmbedUrl(embedUrl) !== embedUrl) {
+    const { useEventVenue, embedUrl, label, address } = fields;
+    if (useEventVenue !== undefined && typeof useEventVenue !== 'boolean') {
+      errors.push('useEventVenue: must be a boolean.');
+    }
+    if (useEventVenue === true && embedUrl !== undefined) {
+      errors.push('embedUrl: remove the copied link when using the event venue.');
+    }
+    if (useEventVenue !== true && (!embedUrl || googleMapsEmbedUrl(embedUrl) !== embedUrl)) {
       errors.push('embedUrl: paste an embed link from Google Maps.');
     }
     if (typeof label !== 'string' || !label.trim()) {

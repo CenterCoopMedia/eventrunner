@@ -16,4 +16,5 @@ export {
   storageObjectPath,
   isMediaLibraryPath,
   resolveVenueMap,
+  venueAddress,
 } from './venue.cjs';

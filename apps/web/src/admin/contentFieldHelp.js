@@ -12,9 +12,10 @@ const FIELD_HINTS = Object.freeze({
     focalY: 'Choose the part of the picture to keep down a crop: 0 is the top edge and 100 is the bottom.',
   },
   map: {
+    useEventVenue: 'Use the venue name, address and map link saved in Event settings.',
     embedUrl: 'In Google Maps, choose Share, then Embed a map. Paste the copied HTML or its embed link.',
     label: 'Describe what the map shows, such as “Map of the convention center”.',
-    address: 'Show a street address below the map so attendees can find the venue.',
+    address: 'Show a street address below the map. A map that uses the event venue shows its saved address when this is blank.',
   },
   cta: {
     label: 'Write the short action phrase shown on the button or link.',

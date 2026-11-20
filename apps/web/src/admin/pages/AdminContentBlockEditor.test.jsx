@@ -15,9 +15,11 @@ import { MemoryRouter } from 'react-router';
 // A live config/features document, when a test sets one. Null leaves the
 // build snapshot's flags in place.
 let liveFeatures = null;
+let liveEvent = null;
 vi.mock('../../lib/configSource.js', () => ({
   subscribeConfigDoc: (docId, onNext) => {
     if (docId === 'features' && liveFeatures) onNext(liveFeatures);
+    if (docId === 'event' && liveEvent) onNext(liveEvent);
     return () => {};
   },
 }));
@@ -68,6 +70,9 @@ vi.mock('firebase/firestore', () => ({
 
 import App from '../../App.jsx';
 import { BLOCK_TYPE_IDS } from '../blockTypes.js';
+// Load route modules in setup so the first test measures the editor, without a cold transform.
+import '../AdminApp.jsx';
+import './AdminContentBlockEditor.jsx';
 
 const HOME_PAGE = {
   id: 'home',
@@ -139,6 +144,7 @@ async function chooseBlockType(label) {
 
 beforeEach(() => {
   liveFeatures = null;
+  liveEvent = null;
   pagesLive = [HOME_PAGE];
   pagesDrafts = [];
   contentLive = [];
@@ -347,6 +353,41 @@ describe('AdminContentBlockEditor value fields', () => {
       name: 'Coffee break',
       limit: 2,
       benefits: '<p>Signs</p>',
+    });
+  });
+
+  it('previews and saves a Map block using the configured venue without embed code', async () => {
+    const mapUrl = 'https://maps.app.goo.gl/test-venue';
+    liveEvent = { venue: { name: 'Test Hall', addressLine1: '100 Main Street', mapUrl } };
+    pagesLive = [{
+      ...HOME_PAGE,
+      id: 'travel',
+      path: '/travel',
+      systemPage: false,
+      sections: [{ ...HOME_PAGE.sections[0], id: 'travel_map', allowedBlocks: [] }],
+    }];
+    await renderAt('/admin/content/travel/travel_map/_new');
+    expect(await screen.findByRole('radio', { name: 'Map' })).toHaveAccessibleDescription(
+      'An interactive street map for the event venue or another place.',
+    );
+    await chooseBlockType('Map');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use the event’s venue' }));
+    expect(screen.queryByRole('textbox', { name: 'Google Maps embed' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Map label' })).toHaveValue('Map of Test Hall');
+    expect(screen.getByTitle('Map of Test Hall')).toHaveAttribute(
+      'src',
+      'https://www.google.com/maps?q=Test+Hall%2C+100+Main+Street&output=embed',
+    );
+    expect(screen.getByRole('link', { name: 'Open in Google Maps' })).toHaveAttribute('href', mapUrl);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsCreateContent'))).toBe(true));
+    const [, request] = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
+    expect(JSON.parse(request.body).fields).toMatchObject({
+      blockType: 'map',
+      useEventVenue: true,
+      label: 'Map of Test Hall',
+      embedUrl: '__cms_delete_field__',
     });
   });
 
