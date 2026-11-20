@@ -25,6 +25,8 @@ describe('adminScreenWidth', () => {
   it('reads a path the way the router matches it', () => {
     expect(adminScreenWidth('/Admin/pages/home')).toBe('wide');
     expect(adminScreenWidth('/admin/%70ages/home')).toBe('wide');
+    // A page whose ID is links is still a page editor.
+    expect(adminScreenWidth('/admin/pages/links')).toBe('wide');
     expect(adminScreenWidth('/admin/Settings')).toBe('form');
     expect(adminScreenWidth('/admin/%E0%A4%A')).toBe('form');
   });

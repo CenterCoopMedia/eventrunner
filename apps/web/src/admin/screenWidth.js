@@ -37,7 +37,7 @@ export function adminScreenWidth(pathname) {
   if (FORM_SECTIONS.has(section)) return 'form';
   if (rest.length === 0) return 'wide';
   // A navigation link (pages/links/…) is a plain form, not the page editor.
-  if (section === 'pages' && rest[0] === 'links') return 'form';
+  if (section === 'pages' && rest[0] === 'links' && rest.length > 1) return 'form';
   if (WIDE_EDITOR_SECTIONS.has(section)) return 'wide';
   return 'form';
 }
