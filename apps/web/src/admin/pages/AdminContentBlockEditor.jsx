@@ -338,6 +338,9 @@ export default function AdminContentBlockEditor({ mode }) {
   // The Short text form as it was when the operator switched away from it,
   // so switching back restores the words and translations (issue #1184).
   const shortTextRef = useRef(null);
+  // The type the editor adopted or last saved, for the picker: a live
+  // update from another session does not move it (issue #1184).
+  const [baseType, setBaseType] = useState(null);
 
   useEffect(() => {
     if (mode !== 'edit') return;
@@ -360,6 +363,7 @@ export default function AdminContentBlockEditor({ mode }) {
     setContent(editable);
     setSavedEdit(contentEditSnapshot(nextField, editable));
     savedBlockTypeRef.current = doc?.blockType ?? null;
+    setBaseType(doc?.blockType ?? null);
     shortTextRef.current = null;
   }, [mode, sectionId, fieldParam, existingRow, contentReady]);
 
@@ -597,6 +601,7 @@ export default function AdminContentBlockEditor({ mode }) {
       setSavedDocId(docId);
       loadedKeyRef.current = `${sectionId}__${nextFieldId}`;
       savedBlockTypeRef.current = savedContent.blockType;
+      setBaseType(savedContent.blockType);
       // A saved type change is the new starting point: an undo goes no
       // further back than the last save.
       if (shortTextRef.current === shortTextAtSave) shortTextRef.current = null;
@@ -688,7 +693,7 @@ export default function AdminContentBlockEditor({ mode }) {
             <BlockTypePicker
               value={content.blockType}
               allowed={allowed}
-              savedType={(existingRow?.draft ?? existingRow?.live)?.blockType}
+              savedType={baseType ?? undefined}
               sectionName={section?.label}
               onChange={changeBlockType}
               error={errorFor('blockType')}
