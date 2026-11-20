@@ -228,7 +228,10 @@ function PageEditor({ mode }) {
   // (ContentPage): the first section with something in it, on a custom page
   // that states the Long read template. A map section counts only when its
   // map draws, as it does there.
-  const venueMapShown = Boolean(useVenueMapImage(resolveVenueMap(eventConfig)));
+  // The editor loads the venue map picture out of sight, so a picture that
+  // fails takes its section out of the count, as it does on the page.
+  const venueMapImage = useVenueMapImage(resolveVenueMap(eventConfig));
+  const venueMapShown = Boolean(venueMapImage);
   const areaMapShown = Boolean(openStreetMapCoordinates(eventConfig?.venue?.mapUrl));
   const sectionHasContent = (current, section) => sectionPreviewBlocks(section).length > 0
     || (section.id === VENUE_MAP_SECTION_ID && venueMapShown)
@@ -567,6 +570,9 @@ function PageEditor({ mode }) {
         save({ publish: false });
       }}
     >
+      {venueMapImage && longReadSectionId !== null ? (
+        <img src={venueMapImage.src} onError={venueMapImage.onError} alt="" hidden />
+      ) : null}
       <AdminPageHeader help="Save a draft to keep your changes. Publish to show them on the site."
         title={mode === 'create' ? 'New page' : page.label || 'Page'}
         recentTitle={row?.current?.label}
