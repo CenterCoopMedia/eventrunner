@@ -8,7 +8,16 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router';
 import Quill from 'quill/core.js';
 
-vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
+let footerPageGroup;
+vi.mock('../../lib/configSource.js', () => ({
+  subscribeConfigDoc: (id, next, status) => {
+    if (id === 'event' && footerPageGroup !== undefined) {
+      next({ footerPageGroup });
+      status('confirmed');
+    }
+    return () => {};
+  },
+}));
 vi.mock('../../lib/contentSource.js', () => ({
   subscribeContentCollection: () => () => {},
   subscribeSpeakersPublic: () => () => {},
@@ -180,6 +189,7 @@ async function chooseBlockType(label) {
 
 beforeEach(() => {
   sources = { cmsPages: [], cmsPages_drafts: [], cmsContent: [], cmsContent_drafts: [] };
+  footerPageGroup = undefined;
   listenerError = null;
   silentCollections = [];
   adminSubscriptions.clear();
@@ -195,6 +205,34 @@ const HOME_PAGE = {
 const HERO_TEXT = ['title', 'subtitle'].map((field, order) => ({
   id: `hero__${field}`, section: 'hero', field, blockType: 'text', value: field, order,
 }));
+
+it('opens footer editing from Content and saves a page selection beside existing custom links', async () => {
+  footerPageGroup = null;
+  sources.cmsPages = [
+    { ...HOME_PAGE, systemPage: true, visible: true, sections: [{ id: 'footer', label: 'Footer links' }] },
+    SCHOLARSHIPS_PAGE,
+    { ...SCHOLARSHIPS_PAGE, id: 'faq', path: '/faq', label: 'FAQ', order: 8 },
+    { ...SCHOLARSHIPS_PAGE, id: 'hidden', path: '/hidden', label: 'Hidden page', visible: false },
+  ];
+  sources.cmsContent = [{
+    id: 'footer__contact', section: 'footer', field: 'contact', blockType: 'link_group',
+    group: 'Resources', label: 'Contact us', url: 'https://example.org/contact',
+  }];
+  fetch.mockResolvedValue(okResponse());
+  await renderAt('/admin/content');
+  fireEvent.click(await screen.findByRole('link', { name: 'Edit footer links' }));
+  const editor = within((await screen.findByRole('heading', { name: 'Footer pages' })).closest('section'));
+  expect(screen.getByRole('link', { name: 'Contact us' })).toBeVisible();
+  fireEvent.change(editor.getByRole('textbox', { name: 'Group heading' }), { target: { value: 'Explore' } });
+  fireEvent.click(editor.getByRole('checkbox', { name: 'Choose which pages appear' }));
+  expect(editor.queryByText('Hidden page')).toBeNull();
+  fireEvent.click(editor.getByRole('button', { name: 'Remove Home' }));
+  fireEvent.click(editor.getByRole('button', { name: 'Move FAQ up' }));
+  fireEvent.click(editor.getByRole('button', { name: 'Save footer pages' }));
+  await editor.findByText('Footer pages saved.');
+  expect(urlOf(0)).toMatch(/\/updateEventConfig$/);
+  expect(bodyOf(0)).toEqual({ event: { footerPageGroup: { heading: 'Explore', pageIds: ['faq', 'scholarships'] } } });
+});
 
 function heroUnloadBlocked() {
   const event = new Event('beforeunload', { cancelable: true });

@@ -851,6 +851,21 @@ describe('Layout footer', () => {
     ]);
   });
 
+  it('shows the configured group heading and ordered public pages only in the footer', () => {
+    const { container } = renderShell({}, {
+      event: { ...FIXTURE_EVENT, footerPageGroup: { heading: 'Plan your visit', pageIds: ['faq', 'schedule', 'travel', 'missing'] } },
+      featureFlags: {},
+    });
+    const group = within(footer(container)).getByRole('navigation', { name: 'Plan your visit' });
+    expect(within(group).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(['/faq', '/travel']);
+    expect(within(container.querySelector('header')).getByRole('link', { name: 'Home' })).toBeInTheDocument();
+  });
+
+  it('accepts an empty footer page selection', () => {
+    const { container } = renderShell({}, { event: { ...FIXTURE_EVENT, footerPageGroup: { pageIds: [] } } });
+    expect(within(footer(container)).queryByRole('navigation', { name: 'Site pages' })).toBeNull();
+  });
+
   it('applies the navigation’s own gates rather than a second set', () => {
     const { container } = renderShell(
       {},

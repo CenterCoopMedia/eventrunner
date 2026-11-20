@@ -22,6 +22,7 @@ import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import HomeHeroImageEditor from '../components/HomeHeroImageEditor.jsx';
+import FooterPagesEditor from '../components/FooterPagesEditor.jsx';
 import {
   DestructiveConfirm,
   Notice,
@@ -52,14 +53,14 @@ export default function AdminContentSection() {
   const call = useAdminApi();
   const reportDeleted = useDeletedRecord();
   const { showToast } = useToast();
-  const { findRow: findPage, loading: pagesLoading, ready: pagesReady } = useAdminPages();
+  const { rows: pageRows, findRow: findPage, loading: pagesLoading, ready: pagesReady } = useAdminPages();
   const { rows: contentRows, loading: contentLoading, ready: contentReady, error: contentError } = useAdminContent();
   const [busy, setBusy] = useState(null);
   const requestPending = useRef(false);
   const [rowResults, setRowResults] = useState({});
   const blockedReasonId = useId();
   const [savingOrder, setSavingOrder] = useState(false);
-  const [heroEdit, setHeroEdit] = useState({ dirty: false, busy: false });
+  const [inlineEdit, setInlineEdit] = useState({ dirty: false, busy: false });
   const [keepHeroEditor, setKeepHeroEditor] = useState(false);
   const [notice, setNotice] = useState(null);
   const [spoken, setSpoken] = useState('');
@@ -72,6 +73,7 @@ export default function AdminContentSection() {
   const section = (page?.current?.sections ?? []).find((candidate) => candidate.id === sectionId);
   const serverBlocks = byStoredOrder(contentRows.filter((row) => row.current?.section === sectionId));
   const homeHeroSection = pageId === 'home' && sectionId === 'hero';
+  const homeFooterSection = pageId === 'home' && sectionId === 'footer';
   const hasHeroImage = serverBlocks.some((row) => row.current?.blockType === 'image');
   const draft = useDraftOrder(serverBlocks);
   const blocks = draft.rows;
@@ -82,8 +84,8 @@ export default function AdminContentSection() {
       displayed.splice(Math.min(result.position, displayed.length), 0, { row: { id }, result });
     }
   }
-  const writeBlocked = savingOrder || busy !== null || heroEdit.busy;
-  const leaveGuard = useUnsavedNavigation(draft.dirty || heroEdit.dirty || heroEdit.busy, { blocked: writeBlocked });
+  const writeBlocked = savingOrder || busy !== null || inlineEdit.busy;
+  const leaveGuard = useUnsavedNavigation(draft.dirty || inlineEdit.dirty || inlineEdit.busy, { blocked: writeBlocked });
   const allowed = sectionBlockTypes(page?.current, section, BLOCK_TYPE_IDS);
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
   // While either cmsContent revision is still loading, `blocks` can be an
@@ -146,7 +148,7 @@ export default function AdminContentSection() {
   }
 
   async function saveOrder() {
-    if (!contentReady || requestPending.current || heroEdit.busy) return;
+    if (!contentReady || requestPending.current || inlineEdit.busy) return;
     requestPending.current = true;
     const writes = ordersToWrite(blocks);
     setSavingOrder(true);
@@ -188,7 +190,7 @@ export default function AdminContentSection() {
   }
 
   async function publishOne(row) {
-    if (requestPending.current || heroEdit.busy) return;
+    if (requestPending.current || inlineEdit.busy) return;
     requestPending.current = true;
     actionFocus.remember(row.id);
     setBusy({ id: row.id, action: 'publish' });
@@ -207,7 +209,7 @@ export default function AdminContentSection() {
   }
 
   async function remove(row) {
-    if (requestPending.current || heroEdit.busy) return;
+    if (requestPending.current || inlineEdit.busy) return;
     requestPending.current = true;
     actionFocus.remember(row.id);
     setBusy({ id: row.id, action: 'delete' });
@@ -226,6 +228,7 @@ export default function AdminContentSection() {
     }
   }
 
+  const addBlockLabel = homeFooterSection ? 'Add a custom link' : 'Add a block';
   const addBlockButton =
     atMax ? (
       <button
@@ -239,14 +242,14 @@ export default function AdminContentSection() {
             : `This section already has its maximum of ${maxBlocks} blocks.`
         }
       >
-        Add a block
+        {addBlockLabel}
       </button>
     ) : (
       // '_new', not 'new' — see AdminApp.jsx's route comment: a field id
       // may legitimately be 'new', so the creation route uses a segment no
       // valid field id can ever match instead.
       <Link to="_new" className={primaryButtonClass}>
-        Add a block
+        {addBlockLabel}
       </Link>
     );
 
@@ -260,14 +263,15 @@ export default function AdminContentSection() {
             <span id={blockedReasonId} className="admin-prose mt-2xs block font-admin-ui text-admin-sm text-admin-ink-secondary">{blockedReason}</span>
           ) : null}
         </>}
-        description={allowed.length === BLOCK_TYPE_IDS.length ? 'Add and edit content in this section.' : `Available content: ${allowed.map(blockTypeLabel).join(', ')}.`}
+        description={homeFooterSection ? 'Choose the pages in the footer and manage custom links below.'
+          : allowed.length === BLOCK_TYPE_IDS.length ? 'Add and edit content in this section.' : `Available content: ${allowed.map(blockTypeLabel).join(', ')}.`}
         feedback={notice?.message ? <ActionFeedback message={notice.message} tone={notice.tone} className="admin-editor-action-feedback" /> : null}
         actions={
           <>
             <OrderDraftButtons
               dirty={draft.dirty}
               saving={savingOrder}
-              saveDisabled={!contentReady || busy !== null || heroEdit.busy}
+              saveDisabled={!contentReady || busy !== null || inlineEdit.busy}
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
@@ -294,14 +298,23 @@ export default function AdminContentSection() {
           rows={contentRows}
           ready={pagesReady && contentReady}
           disabled={savingOrder || busy !== null || draft.dirty}
-          onEditStateChange={setHeroEdit}
+          onEditStateChange={setInlineEdit}
+        />
+      ) : null}
+
+      {homeFooterSection ? (
+        <FooterPagesEditor
+          pageRows={pageRows}
+          ready={pagesReady}
+          disabled={savingOrder || busy !== null}
+          onEditStateChange={setInlineEdit}
         />
       ) : null}
 
       {displayed.length === 0 ? (
         <AdminEmptyState
-          title="No blocks yet"
-          description="Add the first content block for this section."
+          title={homeFooterSection ? 'No custom links yet' : 'No blocks yet'}
+          description={homeFooterSection ? 'Add a destination and choose its link group.' : 'Add the first content block for this section.'}
           action={addBlockButton}
         />
       ) : (
@@ -335,7 +348,10 @@ export default function AdminContentSection() {
                         {label}
                       </Link>
                       <RecordState state={row.state} />
-                      <StatusBadge tone="info">{blockTypeLabel(row.current.blockType)}</StatusBadge>
+                      <StatusBadge tone="info">
+                        {homeFooterSection && typeof row.current.group === 'string' && row.current.group.trim()
+                          ? row.current.group : blockTypeLabel(row.current.blockType)}
+                      </StatusBadge>
                       {row.current.visible === false ? (
                         <StatusBadge tone="neutral">Hidden</StatusBadge>
                       ) : isStarterContent(row.current) ? (
@@ -356,7 +372,7 @@ export default function AdminContentSection() {
                       <button
                         type="button"
                         className={secondaryButtonClass}
-                        disabled={savingOrder || heroEdit.busy || (busy !== null && !(busy.id === row.id && busy.action === 'publish'))}
+                        disabled={savingOrder || inlineEdit.busy || (busy !== null && !(busy.id === row.id && busy.action === 'publish'))}
                         aria-disabled={writeBlocked || undefined}
                         aria-busy={busy?.id === row.id && busy.action === 'publish' || undefined}
                         onClick={() => publishOne(row)}

@@ -430,7 +430,11 @@ export default function Layout() {
   // config or content snapshot, and the list only changes when the pages or
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
-  const pageNavItems = navItems.filter((item) => !item.custom);
+  const footerPageGroup = eventConfig?.footerPageGroup;
+  const footerPageIds = footerPageGroup?.pageIds;
+  const footerPages = useMemo(() => buildNavItems(pages, features, footerPageIds), [pages, features, footerPageIds]);
+  const footerPageHeading = (typeof footerPageGroup?.heading === 'string' && footerPageGroup.heading.trim())
+    || text('Site pages', 'Páginas del sitio');
   // The home page's footer section, drawn in the footer on every page
   // (FooterLinkGroups.jsx). Its label names the landmark.
   const homePage = getPage('home') ?? getPage('/');
@@ -692,18 +696,12 @@ export default function Layout() {
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}
             </p>
-            {/* THE SAME PAGE LIST THE NAVIGATION CARRIES (M7 issue 3), from
-                the same buildNavItems call above — one gate, read once, so
-                a page hidden in the editor or a system page whose feature
-                is off cannot leave the header and stay in the footer.
-                <Link>, not <a>: the demo runs under HashRouter, where a raw
-                href reloads a path the static host does not serve. */}
             <div className="grid gap-sm lg:grid-cols-2 lg:gap-lg">
-            {pageNavItems.length === 0 ? null : (
-              <nav aria-label={text('Site pages', 'Páginas del sitio')} className="mt-sm">
-                <p className="font-semibold text-text-primary">Site pages</p>
+            {footerPages.length === 0 ? null : (
+              <nav aria-label={footerPageHeading} className="mt-sm">
+                <p className="break-words font-semibold text-text-primary">{footerPageHeading}</p>
                 <ul className="footer-links">
-                  {pageNavItems.map((item) => (
+                  {footerPages.map((item) => (
                     <li key={item.to}>
                       <Link to={item.to} className={FOOTER_LINK_CLASS} lang={item.language}>
                         {item.label}

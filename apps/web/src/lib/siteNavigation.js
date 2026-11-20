@@ -74,7 +74,7 @@ function isNonEmptyString(v) {
  * @param {object|null|undefined} features config/features
  * @returns {{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }|null}
  */
-function navItemFor(page, features, pages) {
+export function navItemFor(page, features, pages) {
   if (!page || typeof page !== 'object') return null;
   if (isNavigationLink(page)) {
     const to = navigationLinkUrl(page.url);
@@ -127,10 +127,13 @@ function navItemFor(page, features, pages) {
  * @param {object|null|undefined} features config/features
  * @returns {Array<{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }>}
  */
-export function buildNavItems(pages, features) {
+export function buildNavItems(pages, features, orderedPageIds) {
+  const orderById = Array.isArray(orderedPageIds)
+    ? new Map(orderedPageIds.map((id, index) => [id, index])) : null;
   const seen = new Set();
   return (pages ?? [])
-    .map((page) => ({ order: page?.order, item: navItemFor(page, features, pages) }))
+    .filter((page) => !orderById || orderById.has(page?.id))
+    .map((page) => ({ order: orderById ? orderById.get(page.id) : page?.order, item: navItemFor(page, features, pages) }))
     .filter((entry) => entry.item !== null)
     .sort(
       (a, b) =>
