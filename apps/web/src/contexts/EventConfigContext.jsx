@@ -40,12 +40,12 @@ const EventConfigContext = createContext(null);
 const RUNTIME_STYLE_ID = 'event-theme-runtime';
 const CONFIG_DOC_IDS = ['event', 'features', 'theme'];
 
-// Every known config/features flag, defaulted false. A live config/features
-// doc is authoritative (backend contract: an omitted flag means disabled), so
-// this — not the snapshot — is the base a live doc is spread over.
-const FEATURE_DEFAULTS = Object.fromEntries(
-  Object.keys(snapshotFeatures).map((key) => [key, false]),
-);
+// A live config/features doc is authoritative. Omitted flags are off
+// except field performance monitoring, which requires an explicit opt-out.
+const FEATURE_DEFAULTS = {
+  ...Object.fromEntries(Object.keys(snapshotFeatures).map((key) => [key, false])),
+  coreWebVitals: true,
+};
 
 function ensureRuntimeStyleElement() {
   let styleEl = document.getElementById(RUNTIME_STYLE_ID);
@@ -150,12 +150,8 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
             historicalDemo: overlay.event.historicalDemo === true,
           }
         : snapshotEventConfig,
-      // config/features is the one doc where an omitted key is not "keep the
-      // snapshot value" — the backend contract is that an omitted flag means
-      // disabled. So once a live doc has arrived it is authoritative: every
-      // known flag defaults to false and only what the live doc actually sets
-      // wins. Only the absence of a live doc (no config/features write yet)
-      // falls back to the snapshot.
+      // An omitted key in a live features doc uses the feature defaults.
+      // Before that document arrives, render from the deployment snapshot.
       features: overlay.features
         ? { ...FEATURE_DEFAULTS, ...overlay.features }
         : snapshotFeatures,

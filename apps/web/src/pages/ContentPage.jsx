@@ -21,6 +21,7 @@ import { useLocation } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
 import { pageHeading } from 'shared/page';
+import { WEB_VITALS_NOTICE } from 'shared/webVitals';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
@@ -37,6 +38,7 @@ import LongReadOpening from '../components/editorial/LongReadOpening.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
 import SectionEditLink from '../components/SectionEditLink.jsx';
 import { blockMatchesQuery } from '../lib/blockSearchText.js';
+import { fieldVitalsEnabled } from '../lib/fieldVitals.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { inputClass, primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
@@ -236,6 +238,15 @@ export default function ContentPage() {
       blocks.length > 0 || sectionMap || sectionAreaMap,
     );
 
+  // The deployed privacy route supplies the approved text even when its
+  // published content predates the seed. Keep any existing CMS copy.
+  const missingPerformanceClauses = page.path === '/privacy' && fieldVitalsEnabled()
+    ? Object.entries(WEB_VITALS_NOTICE).filter(([, clause]) =>
+      !baseSections.some(({ blocks }) => blocks.some((block) =>
+        block.blockType === 'richtext' && (block.value === `<p>${clause}</p>`
+          || block.value === `<p>${clause} [Client legal review required]</p>`))))
+    : [];
+
   // AND A PAGE THAT NEVER ASKED STILL GETS IT, at the end. A deployment
   // seeded before that section existed has a travel page without it, and
   // re-running init leaves an edited page alone — so an operator there would
@@ -371,7 +382,7 @@ export default function ContentPage() {
           <SectionIndexNav sections={indexSections} />
         </div>
       ) : null}
-      {baseSections.length === 0 && !trailingMap ? (
+      {baseSections.length === 0 && !trailingMap && missingPerformanceClauses.length === 0 ? (
         <EmptyState
           title="Nothing here yet"
           description="This page is published but has no visible content. Check back soon."
@@ -474,6 +485,16 @@ export default function ContentPage() {
           ) : null}
         </>
       )}
+      {missingPerformanceClauses.length > 0 ? (
+        <section className="mt-2xl" lang="en" aria-labelledby="field-performance-privacy">
+          <SectionHead level={2} id="field-performance-privacy" title="Field performance monitoring" />
+          <div className="mt-md">
+            <SectionBlocks blocks={missingPerformanceClauses.map(([id, clause]) => ({
+              id, blockType: 'richtext', value: `<p>${clause}</p>`,
+            }))} />
+          </div>
+        </section>
+      ) : null}
     </article>
     </PullQuoteBudget>
   );

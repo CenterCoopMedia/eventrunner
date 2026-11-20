@@ -50,7 +50,7 @@ function recorderFixture({ enabled = true, exists = true, configError = false, c
       if (name === 'config') return { doc() { return { async get() {
         configReads += 1;
         if (configError) throw new Error('synthetic config outage');
-        return { exists, data: () => ({ coreWebVitals: enabled }) };
+        return { exists, data: () => enabled === undefined ? {} : { coreWebVitals: enabled } };
       } }; } };
       assert.equal(name, COLLECTION);
       return { doc(id) { return { id, path: `${name}/${id}` }; } };
@@ -160,6 +160,16 @@ test('feature missing, false, and a config read failure acknowledge valid sample
     assert.equal(res.statusCode, 204);
     assert.equal(fixture.commits.length, 0);
   }
+});
+
+test('a client with no stored monitoring choice records a valid sample', async () => {
+  const fixture = recorderFixture();
+  fixture.setEnabled(undefined);
+  const result = fixture.recorder.record(SAMPLE);
+  await until(() => fixture.waits.length === 1);
+  fixture.releaseWindow(0);
+  assert.deepEqual(await result, { stored: true });
+  assert.equal(fixture.commits.length, 1);
 });
 
 test('the receiver parses the JSON text body used by sendBeacon', async () => {

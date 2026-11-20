@@ -283,7 +283,7 @@ function pickTheme(theme) {
 }
 
 function pickFeatures(features) {
-  // Reader-data collection needs the receiving client's own privacy review.
+  // A monitoring choice belongs to its deployment.
   // A template carries presentation choices, never this client's opt-in.
   const portable = KNOWN_FEATURE_KEYS.filter((key) => key !== 'coreWebVitals');
   const value = {};

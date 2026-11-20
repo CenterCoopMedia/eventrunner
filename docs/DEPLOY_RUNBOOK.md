@@ -678,12 +678,17 @@ client already past step 3 never needs it again.
 
 ### Field performance monitoring
 
-Every site starts with `config/features.coreWebVitals` off. A deploy does not activate it. Before an
-operator turns on **Field performance monitoring**, the client's counsel reviews the conditional
-performance notice and retention text on the Privacy policy page. On an existing site, init
-does not replace a client-edited privacy block. Add or update those clauses in the Content editor,
-complete the legal review, and then enable the feature.
-Event templates omit this opt-in, so a new client does not inherit collection from its source site.
+Field performance monitoring is on by default for client sites. To turn it off for one site,
+open **Settings → Features**, switch off **Field performance monitoring**, and save.
+This sets `config/features.coreWebVitals` to `false`. An omitted setting uses the on default.
+Event templates omit the source site's setting so the new site uses its own default.
+
+On the next deploy, the upgrade removes the old `false` default stamped by `init-event-script`.
+It keeps a client's explicit setting. The deployed public `/privacy` page displays the approved
+collection and retention clauses when the site's published CMS content lacks them. Existing
+CMS copy stays in place. The browser waits for live confirmation of the setting and the public
+privacy page before sending its first beacon. If the page is unpublished or absent, reporting
+stays paused. Demo and development builds send no beacons.
 
 When enabled, the browser waits until after the first paint and samples 10% of documents. It keeps
 the first report for each metric and navigation in a sampled document. Chrome reports supported soft

@@ -29,7 +29,7 @@
  * Pure: decides, never writes.
  */
 
-const { isSeedOwned } = require('shared/seed');
+const { isSeedOwned, SEED_ACTOR } = require('shared/seed');
 
 /** @typedef {'create'|'overwrite'|'skip'} SeedAction */
 
@@ -111,7 +111,12 @@ function decideConfigWrite({ docId, existing, next, force = false }) {
   if (!force) {
     return { action: 'skip', reason: 'exists (re-run with --force to refresh)', value: existing };
   }
-  return { action: 'overwrite', reason: 'refreshed under --force', value: mergeConfigDoc(existing, next) };
+  const value = mergeConfigDoc(existing, next);
+  if (docId === 'features' && !Object.hasOwn(next, 'coreWebVitals')
+    && typeof existing.coreWebVitals === 'boolean' && existing.updatedBy !== SEED_ACTOR.email) {
+    value.coreWebVitals = existing.coreWebVitals;
+  }
+  return { action: 'overwrite', reason: 'refreshed under --force', value };
 }
 
 /**

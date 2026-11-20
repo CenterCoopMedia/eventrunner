@@ -1,5 +1,6 @@
-import { afterEach, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { onCLS, onINP, onLCP } from 'web-vitals/attribution';
 import { validSample } from 'shared/webVitals';
 
@@ -9,13 +10,17 @@ vi.mock('firebase/auth', () => ({ getAuth: () => ({}), connectAuthEmulator: vi.f
 vi.mock('firebase/firestore', () => ({
   getFirestore: () => ({}), connectFirestoreEmulator: vi.fn(), disableNetwork: vi.fn(),
   doc: (_db, ...path) => ({ path: path.join('/') }),
-  onSnapshot: (reference, _options, next) => {
-    snapshots.set(reference.path, next);
+  collection: (_db, path) => ({ path }),
+  query: (ref) => ref, where: vi.fn(),
+  onSnapshot: (reference, options, next) => {
+    snapshots.set(reference.path, typeof options === 'function' ? options : next);
     return () => snapshots.delete(reference.path);
   },
 }));
 vi.mock('web-vitals/attribution', () => ({ onCLS: vi.fn(), onINP: vi.fn(), onLCP: vi.fn() }));
 let suspend;
+
+beforeEach(() => vi.resetModules());
 
 afterEach(() => {
   suspend?.(false);
@@ -28,10 +33,10 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-it('retains counts and metrics through cached config, sends only on confirmed opt-in, and drops on opt-out', async () => {
-  vi.stubEnv('PROD', true);
-  vi.stubEnv('DEV', false);
-  vi.stubEnv('VITE_DEMO_MODE', '0');
+async function startCollector({ dev = false, demo = '0' } = {}) {
+  vi.stubEnv('PROD', !dev);
+  vi.stubEnv('DEV', dev);
+  vi.stubEnv('VITE_DEMO_MODE', demo);
   vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'demo-field-vitals');
   vi.stubEnv('VITE_FIREBASE_APP_CHECK_SITE_KEY', '');
   vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -48,19 +53,45 @@ it('retains counts and metrics through cached config, sends only on confirmed op
   const { initFieldVitals, reportHeldUp, setFieldVitalsEnabled } = await import('../lib/fieldVitals.js');
   suspend = setFieldVitalsEnabled;
   const { fieldVitalsRoute } = await import('../lib/fieldVitalsRoute.js');
-  const { EventConfigProvider } = await import('../contexts/EventConfigContext.jsx');
-  const { default: FieldVitals } = await import('./FieldVitals.jsx');
   initFieldVitals(fieldVitalsRoute);
-  render(<EventConfigProvider><FieldVitals /></EventConfigProvider>);
 
-  const answer = (fromCache, on = true) => act(() => snapshots.get('config/features')({
-    exists: () => true, data: () => ({ coreWebVitals: on }), metadata: { fromCache },
-  }));
   const paint = async () => {
     const pending = [...frames.values()];
     frames.clear();
     await act(async () => { await Promise.all(pending.map((callback) => callback())); });
   };
+  return { beacon, paint, reportHeldUp, setFieldVitalsEnabled };
+}
+
+const PRIVACY_PAGE = { id: 'privacy', path: '/privacy', label: 'Privacy', visible: true, systemPage: false, sections: [] };
+const publishPages = (pages, fromCache = false) => act(() => snapshots.get('cmsPages')({
+  docs: pages.map((page) => ({ id: page.id, data: () => page })),
+  metadata: { fromCache },
+}));
+const answerFeatures = (features, fromCache = false) => act(() => snapshots.get('config/features')({
+  exists: () => true, data: () => features, metadata: { fromCache },
+}));
+
+async function mountMonitor({ privacyRoute = false } = {}) {
+  const { EventConfigProvider } = await import('../contexts/EventConfigContext.jsx');
+  const { ContentProvider } = await import('../contexts/ContentContext.jsx');
+  const { default: FieldVitals } = await import('./FieldVitals.jsx');
+  const ContentPage = privacyRoute ? (await import('../pages/ContentPage.jsx')).default : null;
+  render(<MemoryRouter initialEntries={[privacyRoute ? '/privacy' : '/']}>
+    <EventConfigProvider>
+      <ContentProvider pathname={privacyRoute ? '/privacy' : '/schedule'}>
+        <FieldVitals />
+        {ContentPage && <ContentPage />}
+      </ContentProvider>
+    </EventConfigProvider>
+  </MemoryRouter>);
+}
+
+it('retains counts and metrics through cached config, sends only on confirmed opt-in, and drops on opt-out', async () => {
+  const { beacon, paint, reportHeldUp, setFieldVitalsEnabled } = await startCollector();
+  await mountMonitor();
+  publishPages([PRIVACY_PAGE]);
+  const answer = (fromCache, on = true) => answerFeatures({ coreWebVitals: on }, fromCache);
   const sent = () => beacon.mock.calls.map(([, body]) => JSON.parse(body));
 
   answer(true, false);
@@ -114,4 +145,38 @@ it('retains counts and metrics through cached config, sends only on confirmed op
   reportHeldUp();
   expect(sent()).toHaveLength(10);
   setFieldVitalsEnabled(false);
+});
+
+it('sends the first default-on beacon after the published legacy privacy page carries the clauses', async () => {
+  const { beacon, paint, reportHeldUp } = await startCollector();
+  await mountMonitor({ privacyRoute: true });
+  answerFeatures({});
+  publishPages([PRIVACY_PAGE], true);
+  await paint(); await paint();
+  expect(beacon).not.toHaveBeenCalled();
+
+  publishPages([]);
+  await paint(); await paint();
+  expect(screen.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+  expect(beacon).not.toHaveBeenCalled();
+
+  // The old site has no stored performance blocks. The deployed route adds them.
+  publishPages([PRIVACY_PAGE]);
+  expect(screen.getByText(/samples 10% of browser documents/)).toBeVisible();
+  expect(screen.getByText(/anonymous daily aggregate expires 30 days/)).toBeVisible();
+  expect(beacon).not.toHaveBeenCalled();
+  reportHeldUp();
+  await paint(); await paint();
+  expect(beacon).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  ['development', { dev: true }],
+  ['demo', { demo: '1' }],
+])('sends no beacons in %s even with the feature enabled', async (_mode, env) => {
+  const { beacon, paint, reportHeldUp, setFieldVitalsEnabled } = await startCollector(env);
+  setFieldVitalsEnabled(true);
+  reportHeldUp();
+  await paint(); await paint();
+  expect(beacon).not.toHaveBeenCalled();
 });

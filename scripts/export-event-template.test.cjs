@@ -247,7 +247,7 @@ test('a new event made from the template keeps its own project, records and chec
   assert.deepEqual(event.days.map((d) => d.date), ['2027-06-03']);
   assert.equal(event.sender.domainVerified, false, 'the sender domain is verified again');
   assert.equal(event.legal.reviewRequired, true, 'legal review starts again');
-  assert.equal(target.read('config', 'features').coreWebVitals, false, 'the source client monitoring opt-in is not inherited');
+  assert.equal(Object.hasOwn(target.read('config', 'features'), 'coreWebVitals'), false, 'the target keeps its own monitoring default');
   assert.equal(target.read('config', 'theme').radius, 'round', 'approved branding is reused');
   assert.equal(target.read('config', 'theme').navPlacement, 'side');
   assert.ok(target.read('config', 'theme').placeholderLogos.includes('primary'), 'the logo file is not carried');

@@ -62,6 +62,7 @@ function ContentGate({ children }) {
   return (
     <ContentProvider readSource={readSource} pathname={pathname} search={search} publicTools={IS_DEMO || features.webmcpPublic === true}
       languageNeedsSchedule={features.schedule && mayHaveSpanish(eventConfig)}>
+      <FieldVitals />
       {children}
     </ContentProvider>
   );
@@ -71,7 +72,6 @@ export default function App() {
   const { pathname, search } = useLocation();
   return (
     <EventConfigProvider pathname={pathname} search={search}>
-      <FieldVitals />
       <AuthProvider>
         <ProfileProvider>
           <ContentGate>

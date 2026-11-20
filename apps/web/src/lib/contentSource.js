@@ -76,8 +76,9 @@ export function subscribeSpeakersPublic(onNext) {
  * @param {string} name       Publishable collection name, e.g. 'cmsContent'.
  * @param {'published'|'draft'} readSource
  * @param {(docs: Array<object>) => void} onNext
+ * @param {(confirmed: boolean) => void} [onConfirmed]
  */
-export function subscribeContentCollection(name, readSource, onNext) {
+export function subscribeContentCollection(name, readSource, onNext, onConfirmed) {
   if (IS_DEMO) {
     if (name === 'cmsUpdates') onNext(demoUpdates);
     return NO_OVERLAY;
@@ -87,16 +88,16 @@ export function subscribeContentCollection(name, readSource, onNext) {
       readSource === 'draft'
         ? collection(db, `${name}_drafts`)
         : query(collection(db, name), where('visible', '==', true));
+    const next = (snapshot) => {
+      onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      onConfirmed?.(snapshot.metadata?.fromCache === false);
+    };
     return subscribeWithRetry(
-      (onError) =>
-        onSnapshot(
-          target,
-          (snapshot) => {
-            onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-          },
-          onError,
-        ),
+      (onError) => onConfirmed
+        ? onSnapshot(target, { includeMetadataChanges: true }, next, onError)
+        : onSnapshot(target, next, onError),
       (error) => {
+        onConfirmed?.(false);
         // Fail soft: the generated snapshot (or last-known live values) keeps
         // rendering. The SDK has already torn this listener down, so
         // subscribeWithRetry schedules a fresh one rather than staying
