@@ -29,6 +29,9 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import publicTailwind from '../../../tailwind.config.js';
+import adminTailwind from '../../../tailwind.admin.config.js';
+import specimenTailwind from '../../../tailwind.specimen.config.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..', '..', '..', '..');
@@ -242,10 +245,9 @@ describe('the built stylesheet', () => {
     // list it checks. Put the test files back in `content` and every name
     // here keeps its own rule alive, and both assertions pass for a class
     // no component renders. So the exclusion is asserted, not assumed.
-    const config = fs.readFileSync(path.join(REPO_ROOT, 'apps', 'web', 'tailwind.config.js'), 'utf8');
-    const globs = config.match(/content:\s*\[([^\]]*)\]/);
-    expect(globs, 'tailwind.config.js states its content globs').not.toBeNull();
-    expect(globs[1], 'the test files are excluded from what Tailwind scans')
-      .toContain("'!./src/**/*.test.{js,jsx}'");
+    for (const config of [publicTailwind, adminTailwind, specimenTailwind]) {
+      expect(config.content, 'the test files are excluded from what Tailwind scans')
+        .toContain('!./src/**/*.test.{js,jsx}');
+    }
   });
 });
