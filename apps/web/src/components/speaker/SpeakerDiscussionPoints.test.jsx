@@ -153,7 +153,7 @@ describe('speaker-wide private discussion draft', () => {
       const request = JSON.parse(fetch.mock.calls[1][1].body);
       const form = screen.getByRole('form', { name: 'Speaker discussion points' });
       const status = document.querySelector('.loading-status [role="status"]');
-      expect(screen.getByText('Saving discussion points…')).toBeVisible();
+      expect(screen.getByText('Saving discussion points…', { selector: '.loading-status__label' })).toBeVisible();
       expect(form).toHaveAttribute('aria-busy', 'true');
       expect(status.closest('[aria-busy="true"]')).toBeNull();
       expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
