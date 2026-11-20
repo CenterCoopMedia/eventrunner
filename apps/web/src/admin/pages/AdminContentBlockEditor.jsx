@@ -701,7 +701,9 @@ export default function AdminContentBlockEditor({ mode }) {
             <BlockTypePicker
               value={content.blockType}
               allowed={allowed}
-              savedType={baseType ?? undefined}
+              // Unsaved short text kept for a switch back keeps the option
+              // too, even after a save of another type lands.
+              savedType={shortTextRef.current ? 'text' : baseType ?? undefined}
               sectionName={section?.label}
               onChange={changeBlockType}
               error={errorFor('blockType')}
