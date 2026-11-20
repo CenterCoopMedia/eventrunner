@@ -76,6 +76,76 @@ describe('ScrollReset, with no fragment', () => {
 });
 
 describe('ScrollReset, at a fragment that is already there', () => {
+  it('drops the fragment landing when the reader leaves while fonts load', async () => {
+    let finishFonts;
+    const ready = new Promise((resolve) => { finishFonts = resolve; });
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready, status: 'loading' } });
+    try {
+      renderAt('/faq');
+      fireEvent.click(screen.getByText('Another page, at a heading'));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByText('Another page'));
+      await act(async () => { finishFonts(); });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      delete document.fonts;
+    }
+  });
+
+  it('respects a focus move while waiting for a fragment’s fonts', async () => {
+    let finishFonts;
+    const ready = new Promise((resolve) => { finishFonts = resolve; });
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready, status: 'loading' } });
+    try {
+      renderAt('/faq');
+      fireEvent.click(screen.getByText('Another page, at a heading'));
+      const focused = screen.getByText('This page, filtered');
+      focused.focus();
+      await act(async () => { finishFonts(); });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(focused).toHaveFocus();
+    } finally {
+      delete document.fonts;
+    }
+  });
+
+  it('lands at most once if fonts outlast the fragment window', async () => {
+    vi.useFakeTimers();
+    let finishFonts;
+    const ready = new Promise((resolve) => { finishFonts = resolve; });
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready, status: 'loading' } });
+    const scrollY = window.scrollY;
+    try {
+      renderAt('/faq');
+      fireEvent.click(screen.getByText('Another page, at a heading'));
+      // Layout can move the viewport while the browser is loading fonts.
+      window.scrollY = 100;
+      fireEvent.scroll(window);
+      act(() => { vi.advanceTimersByTime(FRAGMENT_WINDOW_MS); });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      await act(async () => { finishFonts(); });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      window.scrollY = scrollY;
+      delete document.fonts;
+    }
+  });
+
+  it('drops the pending landing when the reader wheels the page', async () => {
+    let finishFonts;
+    const ready = new Promise((resolve) => { finishFonts = resolve; });
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready, status: 'loading' } });
+    try {
+      renderAt('/faq');
+      fireEvent.click(screen.getByText('Another page, at a heading'));
+      fireEvent.wheel(document.body);
+      await act(async () => { finishFonts(); });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      delete document.fonts;
+    }
+  });
+
   it('takes the reader to the element the fragment names', () => {
     // React Router performs a client navigation, so nothing else in the
     // stack resolves the fragment — without this the reader would stay at

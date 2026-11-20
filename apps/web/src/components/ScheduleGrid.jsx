@@ -71,7 +71,7 @@ function GridEntry({ entry, eventConfig, countsById, now }) {
   return (
     <div className="schedule-grid__entry">
       <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
-        <h3 lang={entry.session.publicLanguage} className="font-heading text-h3 font-semibold text-text-primary">
+        <h3 id={entry.session.id} lang={entry.session.publicLanguage} className="font-heading text-h3 font-semibold text-text-primary">
           <Link
             to={{ pathname: `/schedule/${entry.session.id}`, search }}
             className="hover:underline"
@@ -94,6 +94,7 @@ function GridEntry({ entry, eventConfig, countsById, now }) {
         fields={[{ key: text('Place', 'Lugar'), value: entry.session.location }]}
       />
       <CallingPoints
+        scheduleAnchor
         className="mt-xs"
         parent={entry.session}
         points={entry.children}

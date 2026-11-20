@@ -3,15 +3,16 @@
 // the application uses, with synthetic providers in place of Firebase. The
 // spec build swaps the three data-source modules for ./sources (one boundary,
 // no live project).
+import { lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router';
+import { BrowserRouter, Link, Route, Routes } from 'react-router';
 import { eventConfig as snapshotEvent, features as snapshotFeatures, theme } from '@generated/eventConfig.js';
 import EventConfigContext from '../../src/contexts/EventConfigContext.jsx';
 import ContentContext from '../../src/contexts/ContentContext.jsx';
 import AuthContext from '../../src/contexts/AuthContext.jsx';
 import ProfileContext from '../../src/contexts/ProfileContext.jsx';
-import Schedule from '../../src/pages/Schedule.jsx';
 import Attendees from '../../src/pages/Attendees.jsx';
+import ScrollReset from '../../src/components/ScrollReset.jsx';
 import { eventDays, eventTracks, fixture } from './data.js';
 import '@generated/theme.css';
 import '../../src/index.css';
@@ -56,19 +57,31 @@ const profile = {
   status: 'ready', attendeeAccess: true, needsProfileSetup: false, profileConfirmed: true, profileReady: true,
   saveProfile: () => Promise.resolve(),
 };
+const Schedule = lazy(() => import('../../src/pages/Schedule.jsx'));
+const AdminTableFixture = lazy(() => import('./AdminTableFixture.jsx'));
+const basename = globalThis.location.pathname.startsWith('/fixture-event/') ? '/fixture-event' : undefined;
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
+  <BrowserRouter basename={basename}>
+    <ScrollReset />
     <EventConfigContext.Provider value={config}>
       <ContentContext.Provider value={content}>
         <AuthContext.Provider value={auth}>
           <ProfileContext.Provider value={profile}>
             {/* The top-navigation content frame from components/Layout.jsx. */}
             <main id="main-content" tabIndex={-1} className="stage flex-1 pb-2xl pt-xl">
-              <Routes>
-                <Route path="schedule" element={<Schedule />} />
-                <Route path="attendees" element={<Attendees />} />
-              </Routes>
+              <Suspense fallback={null}>
+                <Routes>
+                  <Route path="schedule" element={<Schedule />} />
+                  <Route path="attendees" element={<Attendees />} />
+                  <Route path="admin-table" element={<AdminTableFixture />} />
+                  <Route path="fragment-link" element={
+                    <div style={{ paddingBlockStart: '160vh' }}>
+                      <Link to="/schedule#day-2-session-37">Open a session fragment</Link>
+                    </div>
+                  } />
+                </Routes>
+              </Suspense>
             </main>
           </ProfileContext.Provider>
         </AuthContext.Provider>

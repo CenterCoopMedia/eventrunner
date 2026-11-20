@@ -93,7 +93,7 @@ export const FRAGMENT_WINDOW_MS = 3000;
  * @param {string} hash a location hash, with or without its leading '#'
  * @returns {string}
  */
-function fragmentId(hash) {
+export function fragmentId(hash) {
   const raw = typeof hash === 'string' ? hash.replace(/^#/, '') : '';
   if (!raw) return '';
   try {
@@ -162,16 +162,51 @@ export default function ScrollReset() {
       return undefined;
     }
 
-    /** @returns {boolean} whether the fragment was resolved */
+    const fragmentDeadline = Date.now() + FRAGMENT_WINDOW_MS;
+    let cancelLanding;
+    /** @returns {boolean} whether the fragment target was found */
     const settle = () => {
       const target = typeof document === 'undefined' ? null : document.getElementById(id);
       if (!target) return false;
-      scrollToElement(target);
-      focusFragmentTarget(target);
+      const doc = target.ownerDocument;
+      const land = () => {
+        const current = doc.getElementById(id);
+        if (!current) return;
+        scrollToElement(current);
+        focusFragmentTarget(current);
+      };
+      const fonts = doc.fonts;
+      if (!fonts) {
+        land();
+        return true;
+      }
+      // A lazy route's fonts may only be requested once its layout is read.
+      target.getBoundingClientRect();
+      if (fonts.status !== 'loading') {
+        land();
+        return true;
+      }
+      // Layout and scroll anchoring may move the viewport during a font
+      // swap. Only direct interaction cancels the requested landing.
+      const interactionEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown', 'focusin'];
+      const cancel = () => {
+        cancelLanding = undefined;
+        clearTimeout(deadline);
+        for (const type of interactionEvents) doc.removeEventListener(type, cancel, true);
+      };
+      const finish = () => {
+        if (!cancelLanding) return;
+        cancel();
+        land();
+      };
+      const deadline = setTimeout(finish, Math.max(0, fragmentDeadline - Date.now()));
+      cancelLanding = cancel;
+      for (const type of interactionEvents) doc.addEventListener(type, cancel, { capture: true, passive: true });
+      fonts.ready.then(finish);
       return true;
     };
 
-    if (settle()) return undefined;
+    if (settle()) return () => cancelLanding?.();
 
     const ObserverType = globalThis.MutationObserver;
     // No observer, no waiting — the same rule the rest of the shell applies
@@ -204,7 +239,10 @@ export default function ScrollReset() {
     // The next navigation cancels this one. A reader who has moved on is not
     // waiting for the previous page's fragment — and the key changes on
     // every navigation, so "the next one" includes a move within one page.
-    return close;
+    return () => {
+      cancelLanding?.();
+      close();
+    };
   }, [key, pathname, hash, state, navigationType]);
 
   return null;
