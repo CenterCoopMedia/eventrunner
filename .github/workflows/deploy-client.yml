@@ -243,6 +243,29 @@ jobs:
           --only firestore:rules,firestore:indexes,storage
           --project "$EVENT_FIREBASE_PROJECT_ID"
           --non-interactive
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Let the site's origins read Storage media
+        # Pages fetch each image's display-size manifest from the bucket
+        # (apps/web/src/lib/mediaSource.js). Without a CORS rule Storage
+        # sends no Access-Control-Allow-Origin, the browser blocks the
+        # read and the page loads the full original (#1128). The rule
+        # allows GET and HEAD from EVENT_ALLOWED_ORIGINS only; Storage
+        # rules still decide what each object serves. The file replaces
+        # the bucket's CORS on every deploy, so the Environment variable
+        # is the only source.
+        env:
+          EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
+          EVENT_ALLOWED_ORIGINS: ${{ vars.EVENT_ALLOWED_ORIGINS }}
+        run: |
+          set -euo pipefail
+          cors="$RUNNER_TEMP/storage-cors.json"
+          jq -n --arg origins "$EVENT_ALLOWED_ORIGINS" '[{
+            origin: ($origins | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))),
+            method: ["GET", "HEAD"],
+            maxAgeSeconds: 3600
+          }]' > "$cors"
+          jq -e '.[0].origin | length > 0' "$cors" > /dev/null
+          gcloud storage buckets update "gs://$EVENT_STORAGE_BUCKET" --cors-file="$cors"
 
   functions:
     name: Deploy functions

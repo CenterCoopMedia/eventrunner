@@ -371,7 +371,7 @@ Actions tab → Deploy → Run workflow
 
 `deploy-client.yml`'s `provision` job deploys `firestore:rules`, `firestore:indexes`, and `storage`
 on **every** run regardless of the `provision` input (spec §8.1) — that input exists for operator
-intent and log clarity, not as a gate. The Storage rules role in §2 is required before this dispatch. `bootstrap: true` is the actual gate: it is what skips
+intent and log clarity, not as a gate. The same job sets the Storage bucket's CORS rule to GET and HEAD from `EVENT_ALLOWED_ORIGINS`, replacing any earlier rule, so pages can read image display-size manifests (#1128). The Storage rules role in §2 is required before this dispatch. `bootstrap: true` is the actual gate: it is what skips
 `content` (and, transitively, `build`/`hosting`/`post`/`smoke`) on this run. A dispatch run always deploys
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).
