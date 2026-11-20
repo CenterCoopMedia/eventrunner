@@ -4,7 +4,11 @@ export function stripEventMount(pathname, mount) {
   return pathname.startsWith(`${mount}/`) ? pathname.slice(mount.length) : null;
 }
 
-/** Join a validated asset base and an app-relative pathname. */
-export function joinEventPath(assetBase, pathname) {
-  return `${assetBase}${pathname.slice(1)}`;
+/**
+ * Join a base that ends in `/` (a validated asset base or an absolute public
+ * base) and an app-relative path that starts with `/`. The path may include a
+ * query string.
+ */
+export function joinEventPath(base, appPath) {
+  return `${base}${appPath.slice(1)}`;
 }
