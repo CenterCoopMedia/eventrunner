@@ -66,6 +66,10 @@ describe('SectionBlocks layout', () => {
   it('keeps a single block in one column', () => {
     const { container } = render(<SectionBlocks layout="columns" blocks={[text('Only')]} />);
     expect(columnTexts(container)).toEqual(['Only']);
+    // The lone column spans both tracks (SectionBlocks.css).
+    const css = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'SectionBlocks.css'), 'utf8');
+    expect(css).toMatch(/\.section-blocks--columns > :only-child \{\s*grid-column: 1 \/ -1;/);
+    expect(container.querySelector('.section-blocks--columns > :only-child')).not.toBeNull();
   });
 
   it('draws the reading width with no layout class when no layout is given', () => {

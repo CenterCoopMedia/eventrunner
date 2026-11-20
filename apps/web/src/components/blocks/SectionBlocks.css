@@ -21,6 +21,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: var(--space-xl);
   }
+  /* One block, or one run of links, has nothing to sit beside: it takes
+     both tracks rather than leaving the right half empty. */
+  .section-blocks--columns > :only-child {
+    grid-column: 1 / -1;
+  }
 }
 /* A run of stats, links or sponsor packages (column > run wrapper > grid)
    keeps its own grid, sized by its column rather than by the screen: one track in a narrow column, two
