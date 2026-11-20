@@ -5,8 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./demoMode.js', () => ({ IS_DEMO: false, default: false }));
 
-import { listMyChangeRequests, submitChangeRequest } from './changeRequestApi.js';
-import { REQUEST_DEADLINE_MS } from './requestDeadline.js';
+import { CHANGE_REQUEST_TIMEOUT_MS, listMyChangeRequests, submitChangeRequest } from './changeRequestApi.js';
 
 const ENV = { VITE_FUNCTIONS_ORIGIN: 'https://functions.example.test/' };
 const PAYLOAD = { message: 'The travel page lists the wrong hotel.', page: '/travel', submissionKey: 'key0000000000001' };
@@ -67,7 +66,7 @@ describe('submitChangeRequest', () => {
     const fetchImpl = respond(201, { id: 'late' });
     const pending = submitChangeRequest(PAYLOAD, { user: slowUser, env: ENV, fetchImpl });
 
-    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    await vi.advanceTimersByTimeAsync(CHANGE_REQUEST_TIMEOUT_MS);
     expect(await pending).toEqual({ ok: false, error: 'Your change request could not be confirmed. Try again.' });
     resolveToken('late-token');
     await vi.advanceTimersByTimeAsync(0);
@@ -79,7 +78,7 @@ describe('submitChangeRequest', () => {
     const never = () => new Promise(() => {});
     const fetchImpl = stall === 'transport' ? vi.fn(never) : vi.fn(async () => ({ ok: true, json: never }));
     const pending = submitChangeRequest(PAYLOAD, { user, env: ENV, fetchImpl });
-    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS - 1);
+    await vi.advanceTimersByTimeAsync(CHANGE_REQUEST_TIMEOUT_MS - 1);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const { signal } = fetchImpl.mock.calls[0][1];
     expect(signal.aborted).toBe(false);

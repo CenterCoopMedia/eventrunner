@@ -10,7 +10,9 @@
 // lib/feedbackApi.js.
 import { resolveFunctionsOrigin } from './errorReporting.js';
 import { IS_DEMO } from './demoMode.js';
-import { requestWithDeadline } from './requestDeadline.js';
+
+/** Match Feedback's deadline and include the token lookup. */
+export const CHANGE_REQUEST_TIMEOUT_MS = 20_000;
 
 // Use named build-time replacements. The deployed chunk can compile a bare
 // import.meta.env to an empty object even when these settings are defined.
@@ -100,12 +102,26 @@ export async function submitChangeRequest(payload, deps = {}) {
     noServer: 'Your request could not be sent. Try again later.',
     unconfirmed: 'Your change request could not be confirmed. Try again.',
   };
-  const result = await requestWithDeadline(
-    (signal, stopped) => post('submitChangeRequest', payload, { ...deps, words, signal, stopped }),
-    { ok: false, error: words.unconfirmed },
-  );
-  if (!result.ok) return result;
-  return { ok: true, id: typeof result.body?.id === 'string' ? result.body.id : undefined };
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let expired = false;
+  let timer;
+  const deadline = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      expired = true;
+      resolve({ ok: false, error: words.unconfirmed });
+      controller?.abort();
+    }, CHANGE_REQUEST_TIMEOUT_MS);
+  });
+  try {
+    const result = await Promise.race([
+      post('submitChangeRequest', payload, { ...deps, words, signal: controller?.signal, stopped: () => expired }),
+      deadline,
+    ]);
+    if (!result.ok) return result;
+    return { ok: true, id: typeof result.body?.id === 'string' ? result.body.id : undefined };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { submitFeedback } from './feedbackApi.js';
-import { REQUEST_DEADLINE_MS } from './requestDeadline.js';
+import { FEEDBACK_REQUEST_TIMEOUT_MS, submitFeedback } from './feedbackApi.js';
 
 const env = { VITE_FUNCTIONS_ORIGIN: 'https://functions.example.org' };
 const payload = {
@@ -63,7 +62,7 @@ describe('submitFeedback', () => {
     const result = submitFeedback(payload, { env, fetchImpl });
     const signal = fetchImpl.mock.calls[0][1].signal;
 
-    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS - 1);
+    await vi.advanceTimersByTimeAsync(FEEDBACK_REQUEST_TIMEOUT_MS - 1);
     expect(signal.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(signal.aborted).toBe(true);
@@ -81,7 +80,7 @@ describe('submitFeedback', () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json });
     const result = submitFeedback(payload, { env, fetchImpl });
 
-    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    await vi.advanceTimersByTimeAsync(FEEDBACK_REQUEST_TIMEOUT_MS);
     const timedOut = await result;
     expect(json).toHaveBeenCalledTimes(1);
     expect(timedOut.ok).toBe(false);
@@ -97,7 +96,7 @@ describe('submitFeedback', () => {
       .mockImplementationOnce(() => new Promise(() => {}))
       .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'feedback-1' }) });
     const first = submitFeedback(payload, { env, fetchImpl });
-    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    await vi.advanceTimersByTimeAsync(FEEDBACK_REQUEST_TIMEOUT_MS);
     expect((await first).ok).toBe(false);
 
     await expect(submitFeedback(payload, { env, fetchImpl })).resolves.toEqual({ ok: true, id: 'feedback-1' });
@@ -124,7 +123,7 @@ describe('submitFeedback', () => {
     const fetchImpl = vi.fn(() => new Promise(() => {}));
     const result = submitFeedback(payload, { env, fetchImpl });
 
-    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    await vi.advanceTimersByTimeAsync(FEEDBACK_REQUEST_TIMEOUT_MS);
     await expect(result).resolves.toMatchObject({ ok: false });
     expect(fetchImpl.mock.calls[0][1]).not.toHaveProperty('signal');
     expect(vi.getTimerCount()).toBe(0);
