@@ -17,7 +17,10 @@ import { eventStorageKey } from './eventBrowserState.js';
 export const RELOAD_FLAG = eventStorageKey('eventrunner:chunk-reload');
 
 const CHUNK_ERROR_RE =
-  /(dynamically imported module|importing a module script failed|loading chunk|failed to fetch dynamically)/i;
+  /(dynamically imported module|importing a module script failed|loading chunk|failed to fetch dynamically|unable to preload css)/i;
+const RECOVERY_FAILURE = 'A page file still failed to load after automatic reload';
+const ASSET_NAME_RE = /(?:^|[/\s"'(])([\w-]+\.(?:m?js|css))(?=$|[?\s#"')])/i;
+let reloadStartedHere;
 const MISSING_LAZY_MODULE_RE =
   /^undefined is not an object \(evaluating ['"][\w$]+\._result\.default['"]\)$/i;
 // V8 and Firefox word a lazy module with no default like any read of
@@ -52,7 +55,7 @@ export function isChunkLoadError(error, componentStack) {
   if (!error) return false;
   if (error.name === 'ChunkLoadError') return true;
   const message = String(error.message || error);
-  if (CHUNK_ERROR_RE.test(message)) return true;
+  if (CHUNK_ERROR_RE.test(message) || message.startsWith(RECOVERY_FAILURE)) return true;
   if (error.name !== 'TypeError') return false;
   return MISSING_LAZY_MODULE_RE.test(message) ||
     (LAZY_DEFAULT_READ_RES.some((re) => re.test(message)) && thrownByLazyUnderSuspense(componentStack));
@@ -69,11 +72,14 @@ export function isChunkLoadError(error, componentStack) {
  * @returns {boolean}
  */
 export function hasReloaded(storage = safeStorage()) {
-  if (!storage) return true;
+  return readReloadAttempt(storage) !== null;
+}
+
+function readReloadAttempt(storage = safeStorage()) {
   try {
-    return storage.getItem(RELOAD_FLAG) === '1';
+    return storage?.getItem(RELOAD_FLAG);
   } catch {
-    return true;
+    return undefined;
   }
 }
 
@@ -85,6 +91,26 @@ function safeStorage() {
   }
 }
 
+function currentBuildId() {
+  // The build puts its content-hashed entry in this link. It also identifies
+  // content-only rebuilds by the publisher, which can reuse the same Git SHA.
+  const entry = globalThis.document?.querySelector('link[data-app-entry]')?.href;
+  return entry?.match(ASSET_NAME_RE)?.[1];
+}
+
+// An attempt written by this document is still in flight. A stored attempt
+// read by a new document means the reload happened, even on the same build.
+export function isChunkReloadPending() {
+  return reloadStartedHere !== undefined && readReloadAttempt() === reloadStartedHere;
+}
+
+export function chunkRecoveryFailureMessage(error) {
+  const previousBuild = readReloadAttempt();
+  if (!previousBuild) return null;
+  const chunk = String(error?.message || error).match(ASSET_NAME_RE)?.[1] || error?.chunkName || 'unknown';
+  return `${RECOVERY_FAILURE}. File ${chunk}. Previous build ${previousBuild === '1' ? 'unknown' : previousBuild}. Current build ${currentBuildId() || 'unknown'}.`;
+}
+
 /**
  * Reload once to pick up the current bundle.
  *
@@ -93,11 +119,13 @@ function safeStorage() {
  */
 export function reloadOnce({ storage = safeStorage(), reload } = {}) {
   if (hasReloaded(storage)) return false;
+  const attempt = currentBuildId() || '1';
   try {
-    storage.setItem(RELOAD_FLAG, '1');
+    storage.setItem(RELOAD_FLAG, attempt);
   } catch {
     return false;
   }
+  reloadStartedHere = attempt;
   (reload || (() => globalThis.location.reload()))();
   return true;
 }
@@ -112,6 +140,7 @@ export function clearReloadFlag(storage = safeStorage()) {
   if (!storage) return;
   try {
     storage.removeItem(RELOAD_FLAG);
+    reloadStartedHere = undefined;
   } catch {
     // Nothing to clear if storage is unavailable.
   }
@@ -133,6 +162,9 @@ export function installChunkReload(target = globalThis, { reload, isPrefetching 
     // Vite must reject rather than return an undefined module. A concurrent
     // real navigation still reaches ErrorBoundary and its reloadOnce.
     if (isPrefetching()) return;
+    // Vite also emits this event when a module throws during evaluation.
+    // Let the original application error reach its caller in that case.
+    if (!isChunkLoadError(event.payload)) return;
     if (reloadOnce({ reload })) event.preventDefault();
   };
   target.addEventListener('vite:preloadError', onPreloadError);
