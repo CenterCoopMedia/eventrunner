@@ -11,21 +11,23 @@ export function useTeam(orgId) {
   const [stale, setStale] = useState(false);
   const inFlight = useRef(false);
 
-  // A read repeated while an older one hangs: only the newest one lands. A
-  // superseded read returns null, and its caller leaves the state to the
-  // newer read.
-  const latest = useRef(0);
+  // Reads land in the order they started: the first answer shows at once,
+  // and an older read that answers after a newer one has landed returns
+  // null, so its caller leaves the state to the newer read.
+  const reads = useRef({ started: 0, landed: 0 });
+  const refreshes = useRef(0);
   const load = useCallback(async () => {
-    const attempt = ++latest.current;
+    const attempt = ++reads.current.started;
     try {
       const body = await callApi('getTeam', { orgId });
-      if (attempt !== latest.current) return null;
+      if (attempt < reads.current.landed) return null;
+      reads.current.landed = attempt;
       setData(body);
       setError('');
       setStale(false);
       return '';
     } catch (err) {
-      if (attempt !== latest.current) return null;
+      if (attempt < reads.current.landed) return null;
       setError(err.message);
       return err.message;
     }
@@ -34,11 +36,13 @@ export function useTeam(orgId) {
   useEffect(() => { load(); }, [load]);
 
   const refresh = useCallback(async () => {
+    refreshes.current += 1;
     setRefreshing(true);
     const problem = await load();
+    refreshes.current -= 1;
+    setRefreshing(refreshes.current > 0);
     if (problem === null) return;
     setOutcome((current) => current ? { ...current, refreshError: problem ? `We could not refresh the team. ${problem}` : '' } : current);
-    setRefreshing(false);
   }, [load]);
 
   const change = useCallback(async (name, body, message) => {
