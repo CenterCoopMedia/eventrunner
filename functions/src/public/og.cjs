@@ -289,6 +289,7 @@ const {
 } = require('shared/routing');
 const { pageHeading, isPublicPage } = require('shared/page');
 const { metaExcerpt: excerpt, eventMetaDescription } = require('shared/pageMetadata');
+const { homepageMetadata } = require('shared/homepageMetadata');
 const {
   contentLanguages, resolveContentVariant, selectContentLanguage, publicRouteUrls, publishedSpanishSections,
 } = require('shared/contentLanguages');
@@ -383,8 +384,8 @@ function createUpdatesMetaHandler({
  * fails, or an unset `EVENT_PUBLIC_URL` each degrade to the plain shell,
  * which still boots the app and reads its own configuration.
  *
- * Static files still win over rewrites in Hosting, which is what keeps the
- * self-fetch of `/index.html` from recursing back into this function.
+ * Hosting rewrites `/index.html` directly to the static app shell, ahead
+ * of this function. The homepage itself reaches the function.
  *
  * Authenticated and account routes are NOT rewritten here (see
  * `firebase.json`): they carry nothing to describe, a crawler has no
@@ -823,11 +824,11 @@ function speakerName(speaker) {
  * noindex — a Firestore outage must not deindex a site.
  *
  * @param {{ config: object, subject: object|null, path: string, address?: ReturnType<typeof parseEventPublicBase>,
- *           requestedLanguage?: unknown, spanishSections?: Set<string>, degraded?: boolean }} args
+ *           requestedLanguage?: unknown, spanishSections?: Set<string>, homeBlocks?: object[], degraded?: boolean }} args
  */
-function resolveRouteMeta({ config, subject, path, address, requestedLanguage, spanishSections, degraded = false }) {
+function resolveRouteMeta({ config, subject, path, address, requestedLanguage, spanishSections, homeBlocks, degraded = false }) {
   const event = (config && config.event) || null;
-  const language = selectContentLanguage(event, requestedLanguage);
+  const selectedLanguage = selectContentLanguage(event, requestedLanguage);
   const siteName = isNonEmptyString(event?.name) ? event.name.trim() : 'Event site';
   const eventDescription = eventMetaDescription(event);
   const { publicBase, origin, mount } = address ?? {};
@@ -839,7 +840,7 @@ function resolveRouteMeta({ config, subject, path, address, requestedLanguage, s
     siteName,
     image,
     ogType: 'website',
-    language,
+    language: selectedLanguage,
     noindex: !degraded,
     jsonLd: null,
   };
@@ -849,9 +850,12 @@ function resolveRouteMeta({ config, subject, path, address, requestedLanguage, s
   const canonicalPath = subject.kind === 'sponsor'
     ? `/sponsors/${encodeURIComponent(path.slice('/sponsors/'.length))}`
     : path;
-  const urls = publicRouteUrls(canonicalPath, subject.doc, subject.kind, event, spanishSections);
+  const home = path === '/' ? homepageMetadata(event, homeBlocks) : null;
+  const language = home && !home.text[selectedLanguage] ? 'en' : selectedLanguage;
+  const urls = home?.urls ?? publicRouteUrls(canonicalPath, subject.doc, subject.kind, event, spanishSections);
   const described = {
     ...shell,
+    language,
     url: joinEventPath(publicBase, urls[language] ?? urls.en),
     alternates: urls.es
       ? Object.entries(urls).map(([locale, href]) => ({ locale, href: joinEventPath(publicBase, href) }))
@@ -860,6 +864,10 @@ function resolveRouteMeta({ config, subject, path, address, requestedLanguage, s
     jsonLd: buildEventJsonLd({ event, url: mount ? publicBase : origin, imageUrl: image ? image.url : null }),
   };
 
+  if (home) {
+    const { title, description } = home.text[language];
+    return { ...described, title, description };
+  }
   if (subject.kind === 'session') {
     const { value: session } = resolveContentVariant(subject.doc, 'session', language, event);
     return {
@@ -888,9 +896,7 @@ function resolveRouteMeta({ config, subject, path, address, requestedLanguage, s
       ogType: 'profile',
     };
   }
-  // A page. The home page is titled with the event alone: its label names
-  // the document for an editor, not the site for a reader.
-  //
+  // A page.
   // Titled by the page's HEADING, not its navigation label: a page that
   // states both is headed by the full name, and a tab that read "FAQ" over
   // a page headed "Frequently asked questions" would be a third name for
@@ -898,7 +904,7 @@ function resolveRouteMeta({ config, subject, path, address, requestedLanguage, s
   // title makes (apps/web/src/lib/useDocumentTitle.js), which is what keeps
   // the served title from changing on the first in-app navigation.
   const { value: page } = resolveContentVariant(subject.doc, 'page', language, event);
-  return { ...described, title: path === '/' ? siteName : titled(pageHeading(page)) };
+  return { ...described, title: titled(pageHeading(page)) };
 }
 
 /**
@@ -1028,9 +1034,15 @@ function createRouteMetaHandler({
 
       const path = requestedRoutePath(req);
       let subject = null;
+      let homeBlocks;
       if (config && publicBase) {
         try {
           subject = await resolveRouteSubject({ db, config, path });
+          if (subject && path === '/') {
+            const blocks = db.collection('cmsContent');
+            const snapshots = await db.getAll(blocks.doc('hero__title'), blocks.doc('hero__subtitle'));
+            homeBlocks = snapshots.filter((snap) => snap.exists).map((snap) => snap.data());
+          }
         } catch (err) {
           degraded = true;
           log.error('routeMeta could not resolve the route', err);
@@ -1040,7 +1052,7 @@ function createRouteMetaHandler({
       const spanishSections = await readRouteSpanishSections({ db, event: config?.event, path, subject })
         .catch((err) => { log.error('routeMeta could not resolve translated page blocks', err); });
       const meta = resolveRouteMeta({
-        config, subject, path, address, requestedLanguage: requestedContentLanguage(req), spanishSections, degraded,
+        config, subject, path, address, requestedLanguage: requestedContentLanguage(req), spanishSections, homeBlocks, degraded,
       });
       res.status(200);
       res.set('Content-Type', 'text/html; charset=utf-8');

@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { prepareHostingShell } = require('./prepare-hosting-shell.cjs');
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'firebase.json'), 'utf8'));
 
@@ -39,20 +41,40 @@ test('Hosting permits the Google Maps embed and the sign-in and App Check frames
 
 test('admin rewrites retain noindex alongside the global framing policy', () => {
   for (const source of ['/admin', '/admin/**']) {
-    assert.ok(config.hosting.rewrites.some((rule) => rule.source === source && rule.destination === '/index.html'));
+    assert.ok(config.hosting.rewrites.some((rule) => rule.source === source && rule.destination === '/app-shell.html'));
     assert.ok(config.hosting.headers.some((rule) => rule.source === source &&
       rule.headers.some(({ key, value }) => key === 'X-Robots-Tag' && value === 'noindex')));
   }
 });
 
 test('no static app page outlives a deploy in a browser', () => {
-  const pages = ['/', '/index.html', ...config.hosting.rewrites.filter((rule) => rule.destination === '/index.html').map((rule) => rule.source)];
+  const pages = ['/', '/app-shell.html', ...config.hosting.rewrites.filter((rule) => rule.destination === '/app-shell.html').map((rule) => rule.source)];
   for (const source of pages) {
     const rule = config.hosting.headers.find((candidate) => candidate.source === source
       && candidate.headers.some(({ key }) => key === 'Cache-Control'));
     assert.ok(rule, `${source} needs a Cache-Control header`);
     assert.match(rule.headers.find(({ key }) => key === 'Cache-Control').value, /max-age=0.*must-revalidate/);
   }
+});
+
+test('Hosting ships the SPA shell without a root index shadowing the function', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'event-hosting-shell-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const index = path.join(dir, 'index.html');
+  const shell = path.join(dir, 'app-shell.html');
+  assert.deepEqual(config.hosting.predeploy, ['node "$PROJECT_DIR/scripts/prepare-hosting-shell.cjs" "$RESOURCE_DIR"']);
+  assert.throws(() => prepareHostingShell(dir), { code: 'ENOENT' });
+  const template = '<div id="root"></div><script src="/assets/entry.js"></script>';
+  fs.writeFileSync(index, template);
+  prepareHostingShell(dir);
+  prepareHostingShell(dir);
+  assert.equal(fs.existsSync(index), false);
+  assert.equal(fs.readFileSync(shell, 'utf8'), template);
+  const alias = config.hosting.rewrites.findIndex(({ source }) => source === '/index.html');
+  const routeMeta = config.hosting.rewrites.findIndex(({ source }) => source === '**');
+  assert.ok(alias >= 0 && alias < routeMeta);
+  assert.equal(config.hosting.rewrites[alias].destination, '/app-shell.html');
+  assert.equal(config.hosting.rewrites[routeMeta].function.functionId, 'routeMeta');
 });
 
 test('hashed files stay for a year, and nothing else is immutable', () => {

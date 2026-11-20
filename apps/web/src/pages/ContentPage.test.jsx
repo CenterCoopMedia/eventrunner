@@ -220,9 +220,9 @@ describe('ContentPage (catch-all route)', () => {
     expect(document.title).toBe(`${schedulePage.label} · ${eventConfig.name}`);
   });
 
-  it('names the event alone on the home page, as the server titles it', async () => {
+  it('keeps the homepage hero and event name in the client title', () => {
     renderAt('/');
-    expect(document.title).toBe(eventConfig.name);
+    expect(document.title).toBe(`${siteContent.hero__title.value} · ${eventConfig.name}`);
   });
 
   it('renders the venue map on the travel page, rooms and all', async () => {

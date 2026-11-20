@@ -225,6 +225,27 @@ test('the sitemap lists only public routes as absolute URLs', () => {
   assert.match(xml, /<loc>https:\/\/example\.org\/schedule<\/loc>/);
 });
 
+test('the homepage only advertises a Spanish document when its published metadata is available', () => {
+  const event = { name: 'Local news summit', contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const subtitle = {
+    section: 'hero', field: 'subtitle', blockType: 'text', visible: true,
+    value: 'Meet the newsrooms.', translations: { es: { value: 'Conoce a las redacciones.' } },
+  };
+  const args = { publicUrl: PUBLIC_URL, event, pages: PAGES, features: FEATURES, blocks: [subtitle] };
+  const xml = buildSitemapXml(args);
+  for (const language of ['en', 'es']) {
+    const href = `${PUBLIC_URL}/?lang=${language}`;
+    assert.ok(xml.includes(`<loc>${href}</loc>`));
+    assert.equal(xml.split(`<xhtml:link rel="alternate" hreflang="${language}" href="${href}"/>`).length - 1, 2);
+  }
+  const hidden = buildSitemapXml({ ...args, blocks: [{ ...subtitle, visible: false }] });
+  const demo = buildSiteArtifacts({ ...args, hashRouter: true }).sitemapXml;
+  for (const english of [hidden, demo]) {
+    assert.ok(english.includes(`<loc>${PUBLIC_URL}/</loc>`));
+    assert.doesNotMatch(english, /\/?lang=/);
+  }
+});
+
 test('a hidden page never appears in the sitemap', () => {
   const xml = buildSitemapXml({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
   assert.doesNotMatch(xml, /\/secret</);

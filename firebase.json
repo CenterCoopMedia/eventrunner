@@ -15,6 +15,7 @@
   "hosting": {
     "target": "site",
     "public": "apps/web/dist",
+    "predeploy": ["node \"$PROJECT_DIR/scripts/prepare-hosting-shell.cjs\" \"$RESOURCE_DIR\""],
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
@@ -24,21 +25,22 @@
           "region": "us-central1"
         }
       },
-      { "source": "/signin", "destination": "/index.html" },
-      { "source": "/profile", "destination": "/index.html" },
-      { "source": "/profile/**", "destination": "/index.html" },
-      { "source": "/attendees", "destination": "/index.html" },
-      { "source": "/attendees/**", "destination": "/index.html" },
-      { "source": "/schedule/mine", "destination": "/index.html" },
-      { "source": "/speaker/**", "destination": "/index.html" },
-      { "source": "/ticket/**", "destination": "/index.html" },
-      { "source": "/dashboard", "destination": "/index.html" },
-      { "source": "/registration", "destination": "/index.html" },
-      { "source": "/registration/**", "destination": "/index.html" },
-      { "source": "/tickets/mine", "destination": "/index.html" },
-      { "source": "/tickets/status", "destination": "/index.html" },
-      { "source": "/admin", "destination": "/index.html" },
-      { "source": "/admin/**", "destination": "/index.html" },
+      { "source": "/index.html", "destination": "/app-shell.html" },
+      { "source": "/signin", "destination": "/app-shell.html" },
+      { "source": "/profile", "destination": "/app-shell.html" },
+      { "source": "/profile/**", "destination": "/app-shell.html" },
+      { "source": "/attendees", "destination": "/app-shell.html" },
+      { "source": "/attendees/**", "destination": "/app-shell.html" },
+      { "source": "/schedule/mine", "destination": "/app-shell.html" },
+      { "source": "/speaker/**", "destination": "/app-shell.html" },
+      { "source": "/ticket/**", "destination": "/app-shell.html" },
+      { "source": "/dashboard", "destination": "/app-shell.html" },
+      { "source": "/registration", "destination": "/app-shell.html" },
+      { "source": "/registration/**", "destination": "/app-shell.html" },
+      { "source": "/tickets/mine", "destination": "/app-shell.html" },
+      { "source": "/tickets/status", "destination": "/app-shell.html" },
+      { "source": "/admin", "destination": "/app-shell.html" },
+      { "source": "/admin/**", "destination": "/app-shell.html" },
       {
         "source": "/unsubscribe",
         "function": {
@@ -128,7 +130,11 @@
       },
       {
         "source": "/index.html",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
+      },
+      {
+        "source": "/app-shell.html",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
       },
       {
         "source": "/assets/**",

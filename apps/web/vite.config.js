@@ -122,6 +122,8 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       'shared/routing',
       'shared/page',
       'shared/pageMetadata',
+      'shared/homepageMetadata',
+      'shared/homepageTitle',
       'shared/profile',
       'shared/badges',
       'shared/speaker',
@@ -178,6 +180,11 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
     alias: {
       '@generated': generatedDir,
       '@screenshot-ui': path.resolve(here, '../../packages/shared/src/screenshot-ui'),
+      // The demo has one static crawler document. Keep hosted locale metadata
+      // out of its import graph.
+      '@route-title': path.resolve(here, isDemoModeFlag(loadEnv(mode, here, 'VITE_DEMO_MODE').VITE_DEMO_MODE)
+        ? 'src/components/RouteTitle.jsx'
+        : 'src/components/HostedRouteTitle.jsx'),
       '@': path.resolve(here, 'src'),
     },
   },

@@ -351,7 +351,7 @@ test('every private route is rewritten to the static shell, above the routeMeta 
   for (const source of PRIVATE_SOURCES) {
     const index = rewrites.findIndex((r) => r.source === source);
     assert.notEqual(index, -1, `missing rewrite for ${source}`);
-    assert.equal(rewrites[index].destination, '/index.html', `${source} must not reach a function`);
+    assert.equal(rewrites[index].destination, '/app-shell.html', `${source} must not reach a function`);
     assert.ok(index < catchAll, `${source} must come before the catch-all`);
   }
 });

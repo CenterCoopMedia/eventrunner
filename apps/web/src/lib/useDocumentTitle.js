@@ -74,7 +74,7 @@ function setClaimedPart(value) {
 
 function setDerivedPart(value) {
   const before = getRouteTitlePart();
-  derivedPart = normalize(value);
+  derivedPart = value === undefined ? undefined : normalize(value);
   publish(before);
   return derivedPart;
 }
@@ -132,9 +132,8 @@ export function routeTitlePartFor({ pathname, pages, features, pitchTitle = 'Pit
   const all = Array.isArray(pages) ? pages : [];
   const visible = (page) => page && page.visible !== false;
 
-  // The home page names nothing, exactly as the server titles '/' with the
-  // event name alone: "Home" names the document for an editor, not the
-  // site for a reader.
+  // RouteTitle uses the published hero for the homepage. The page label is
+  // the name used by editors.
   if (path === '/') return null;
   if (path === '/pitch' || path.startsWith('/pitch/')) return pitchTitle;
 
@@ -156,7 +155,8 @@ export function routeTitlePartFor({ pathname, pages, features, pitchTitle = 'Pit
  * component that sits inside the content provider and watches the location
  * (apps/web/src/components/RouteTitle.jsx).
  *
- * @param {string|null} part
+ * Undefined keeps the served title while localized text loads.
+ * @param {string|null|undefined} part
  */
 export function useDerivedDocumentTitle(part) {
   useEffect(() => {

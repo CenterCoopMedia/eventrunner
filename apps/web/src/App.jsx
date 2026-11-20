@@ -11,7 +11,7 @@ import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
 import LaunchGate from './components/LaunchGate.jsx';
 import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
-import RouteTitle from './components/RouteTitle.jsx';
+import RouteTitle from '@route-title';
 import ScrollReset from './components/ScrollReset.jsx';
 import Home from './pages/Home.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';

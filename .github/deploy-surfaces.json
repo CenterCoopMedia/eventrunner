@@ -13,6 +13,7 @@
     "package-lock.json",
     "firebase.json",
     "scripts/generate-content.cjs",
+    "scripts/prepare-hosting-shell.cjs",
     "scripts/write-site-files.cjs",
     "scripts/publish-site.cjs",
     "publisher/**",
