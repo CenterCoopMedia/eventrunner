@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { reportHeldUp } from './fieldVitals.js';
 
-const STAGES = [[1000, 'active'], [10000, 'slow'], [60000, 'prolonged']];
+/** Elapsed milliseconds at which each waiting stage begins. */
+export const STAGES = [[1000, 'active'], [10000, 'slow'], [60000, 'prolonged']];
 const stageAt = (elapsed) => STAGES.findLast(([at]) => elapsed >= at)?.[1] ?? 'initial';
 
 export function createLoadingClock(inheritNavigation) {

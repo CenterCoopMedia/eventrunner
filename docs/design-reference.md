@@ -84,7 +84,7 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Type**: Besley over Vollkorn, with IBM Plex Mono for data.
 - **Shape**: Sharp corners, comfortable spacing, and the paper tone available as an advanced setting.
 - **Devices**: A plain ruled title head; the specimen label for a session.
-- **Illustrations**: The botanical set exists for this style and ships **off**. Drawings on every page of a real programme read as decoration rather than as observation. Turn them on for an event where they mean something.
+- **Illustrations**: The botanical set ships **on**. Turn it off for an event where drawings on every page would read as decoration rather than as observation.
 - **Deeper controls**: The heading face can move to Vollkorn at display size or to Spectral semibold. The header can become a framed title page or a plate-and-label lockup. Sessions can run as a field-notes column. A pencil line can be turned on in the margins. The empty-state plate stays framed whatever you pick, because a blank sheet really is one. A long read opens on a drop cap; a quote is a field note or a pressed page; the directory is specimen plates or a field list; a table closes its head with a hairline; a section boundary keeps its folio, drops it, or moves it to the margin.
 
 ### Atlas
@@ -148,11 +148,13 @@ There is no fifth role. Zine's handwritten callout runs on a component token, wh
 A set of small drawings that carry a style's vocabulary, in four slots: A section mark, a divider, a mark inside the header, and an empty state.
 
 - **None** — no drawings. What Institutional, Newsroom, Zine, and Broadsheet ship.
-- **Botanical** — leaves, seed heads, specimen sprigs. Built for Field Guide, off by default.
+- **Botanical** — leaves, seed heads, specimen sprigs. On for Field Guide.
 - **Fauna** — the same idea in animals.
 - **Cartographic** — compass points, contour fragments, route marks. On for Atlas. Empty states use a rule and text without a separate drawing.
 
 They take the site's own ink and never carry a colour of their own, so a set cannot fight a client's palette.
+
+**Held-up figure.** A wait past one second shows a small figure drawn in the set: The seedling waves, the bird pecks, the compass needle hunts. With no set, the ampersand rocks on its heel. At ten seconds the gesture turns the other way, and it moves until the wait ends. Busy buttons show the ampersand at 20px. The admin keeps its ring.
 
 **Engine.** `config/theme.motifSet` names the set; `data-motif-set` on the root element does the switching, because a custom property cannot rewrite the asset another custom property points at. A motif renders as a `mask-image` painted with the ink token, or as an inline SVG symbol reading `currentColor` — never as an `<img>`, never as a `url()` fill.
 

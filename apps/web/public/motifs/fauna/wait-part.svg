@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" fill-rule="evenodd">
+  <!-- The pecking head, with the eye cut out of it. It turns about the
+       neck, (22.5, 14). -->
+  <path d="M24.5 7 A4 4 0 1 1 24.5 15 A4 4 0 1 1 24.5 7 Z M25.8 9.2 A1.1 1.1 0 1 0 25.8 11.4 A1.1 1.1 0 1 0 25.8 9.2 Z"/>
+  <path d="M27.6 9.6 L31.6 11.5 L27.8 13 Z"/>
+</svg>

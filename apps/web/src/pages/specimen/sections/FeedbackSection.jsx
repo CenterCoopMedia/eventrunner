@@ -9,6 +9,8 @@ import EventCountdown from '../../../components/EventCountdown.jsx';
 import FeedbackModal, { DIALOG_FRAME_CLASS } from '../../../components/FeedbackModal.jsx';
 import InfoCards, { groupIntoCards } from '../../../components/InfoCards.jsx';
 import { LoadingStateView } from '../../../components/LoadingState.jsx';
+import LoadingStatus from '../../../components/LoadingStatus.jsx';
+import { THEME_MOTIF_SET_IDS } from 'shared/theme';
 import NoticeBar, { NOTICE_LEVELS } from '../../../components/NoticeBar.jsx';
 import Progress from '../../../components/Progress.jsx';
 import Count from '../../../components/editorial/Count.jsx';
@@ -165,7 +167,56 @@ function LoadingSpecimen() {
       <p className="mt-sm text-caption text-text-secondary">
         Choose an elapsed waiting stage to preview it immediately. These controls do not start a request.
       </p>
-      <LoadingStateView label={labels[shape]} rows={3} shape={shape} stage={stage} />
+      <LoadingStateView label={labels[shape]} rows={3} shape={shape} stage={stage} still />
+    </div>
+  );
+}
+
+const HELD_STAGES = [
+  ['initial', 'Immediate'],
+  ['active', 'After 1 second'],
+  ['slow', 'After 10 seconds'],
+  ['prolonged', 'After 60 seconds'],
+];
+
+const HELD_CONTROLS = [
+  ['Filled', primaryActionClass],
+  ['Outlined', secondaryActionClass],
+  ['Quiet', quietActionClass],
+];
+
+/**
+ * Every stage at once, for each motif set and for busy controls, so the
+ * book can be captured as stills. Nothing here waits: each row names its
+ * stage, and `data-held-still` keeps the controls' stage where it is set.
+ */
+function HeldUpSpecimen() {
+  return (
+    <div data-held-preview className="grid gap-md">
+      {THEME_MOTIF_SET_IDS.map((setId) => (
+        <div key={setId} data-motif-set={setId} className="grid gap-sm border-t-hairline border-t-rule-hairline pt-sm">
+          <p className="font-data text-caption font-semibold text-text-primary">Motif set: {setId}</p>
+          <div className="grid gap-sm sm:grid-cols-2">
+            {HELD_STAGES.map(([stage, when]) => (
+              <div key={stage} className="font-data text-caption text-text-secondary">
+                <p className="mb-2xs text-text-primary">{when}</p>
+                <LoadingStatus label="Loading the schedule…" stage={stage} still />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="grid gap-sm border-t-hairline border-t-rule-hairline pt-sm">
+        <p className="font-data text-caption font-semibold text-text-primary">Busy controls after 1 second</p>
+        <div className="flex flex-wrap gap-sm">
+          {HELD_CONTROLS.map(([kind, className]) => (
+            <button key={kind} type="button" className={className} aria-busy="true" aria-disabled="true"
+              data-held-stage="active" data-held-still="">
+              {kind}: Saving your answers…
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -293,9 +344,18 @@ export default function FeedbackSection({ folio }) {
         name="Loading"
         file="components/LoadingState.jsx"
         contract={null}
-        note="The task label appears immediately. A decorative activity ring appears after one second. It turns until the wait ends when motion is allowed and stays still under reduced motion. The explanation changes at ten seconds and again at one minute. Still text, time, and portrait shapes preview the layout of rows, a schedule, or a responsive directory. The messages describe elapsed time."
+        note="The task label appears immediately. The held-up figure appears after one second. It moves until the wait ends when motion is allowed and stays still under reduced motion. The explanation changes at ten seconds and again at one minute. Still text, time, and portrait shapes preview the layout of rows, a schedule, or a responsive directory. The messages describe elapsed time."
       >
         <LoadingSpecimen />
+      </Figure>
+
+      <Figure
+        name="Held-up figure"
+        file="components/HeldFigure.jsx"
+        contract={null}
+        note="A small figure in the site's own drawing, from one second of waiting. Each motif set has a body and one moving part: the seedling waves, the bird pecks, the compass needle hunts. A set with no drawing uses the ampersand, which rocks on its heel. At ten seconds the gesture reverses, and it keeps moving until the wait ends. Under reduced motion it holds still and only the words change. A busy control draws the ampersand at 20px in its own text colour. The figure is decoration: the words carry the wait, and assistive technology does not see it."
+      >
+        <HeldUpSpecimen />
       </Figure>
 
       <Figure

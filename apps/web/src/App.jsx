@@ -29,7 +29,7 @@ export function AppRoutes() {
       path: adminRoute.path,
       element: (
         <ErrorBoundary appearance="admin" title="Admin could not open">
-          <DeferredPage component={adminRoute.Component} label="admin" routeKey={pathname} />
+          <DeferredPage component={adminRoute.Component} label="admin" routeKey={pathname} figure="ring" />
         </ErrorBoundary>
       ),
     },

@@ -18,11 +18,11 @@ describe('LoadingState', () => {
     const { container } = render(<LoadingState label="Loading the schedule…" />);
     const status = screen.getByRole('status', { name: 'Loading the schedule…' });
     expect(status).toHaveTextContent('Loading the schedule…');
-    expect(container.querySelector('.loading-status__activity')).toBeNull();
+    expect(container.querySelector('.held-figure')).toBeNull();
     advance(999);
-    expect(container.querySelector('.loading-status__activity')).toBeNull();
+    expect(container.querySelector('.held-figure')).toBeNull();
     advance(1);
-    const activity = container.querySelector('.loading-status__activity');
+    const activity = container.querySelector('.held-figure');
     expect(activity).toHaveAttribute('aria-hidden', 'true');
     expect(status).not.toContainElement(activity);
     expect(screen.getByRole('status')).toBe(status);
@@ -59,10 +59,10 @@ describe('LoadingState', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try loading again' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
-    expect(container.querySelector('.loading-status__activity')).toBeNull();
+    expect(container.querySelector('.held-figure')).toBeNull();
     expect(screen.getByRole('status').textContent).toBe('Loading…');
     advance(1000);
-    expect(container.querySelector('.loading-status__activity')).toBeInTheDocument();
+    expect(container.querySelector('.held-figure')).toBeInTheDocument();
   });
 
   it('keeps waiting without suggesting an implicit reload when no retry is supplied', () => {
@@ -76,11 +76,11 @@ describe('LoadingState', () => {
     const { rerender, container } = render(<LoadingState />);
     expect(vi.getTimerCount()).toBe(3);
     advance(1000);
-    expect(container.querySelector('.loading-status__activity')).toBeInTheDocument();
+    expect(container.querySelector('.held-figure')).toBeInTheDocument();
     rerender(<h2>The schedule</h2>);
     expect(vi.getTimerCount()).toBe(0);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(container.querySelector('.loading-status__activity')).toBeNull();
+    expect(container.querySelector('.held-figure')).toBeNull();
   });
 
   it.each(['rows', 'schedule', 'directory'])('keeps %s placeholders decorative and reserves the requested rows', (shape) => {

@@ -96,11 +96,22 @@ function motionProblems(stylesheet, loopAllowed = () => false, paintAllowed = ()
 }
 const stylesheetFile = (node) => path.relative(SRC, node.source.input.file);
 const controlPaint = (decl) => CONTROL_STYLES.has(stylesheetFile(decl));
+// The held-up figure (#1090): its moving part, its ampersand, and the
+// ampersand a busy public control draws.
+const HELD_FIGURE_LOOP = [
+  '.held-figure__glyph',
+  '.held-figure__part',
+  ".public-action[aria-busy='true'][data-held-stage]::after",
+  ".public-text-control[aria-busy='true'][data-held-stage]::after",
+];
 const pendingLoop = (decl) => {
   const selector = decl.parent.selector ?? '';
   return (stylesheetFile(decl) === 'components/loadingState.css'
     && decl.value === 'loading-status-turn 1.2s linear infinite'
     && selector.split(',').every((part) => /^\.loading-status\[data-loading-stage='(?:active|slow|prolonged)'\] \.loading-status__activity$/.test(part.trim())))
+    || (stylesheetFile(decl) === 'components/heldFigure.css'
+      && decl.value === 'held-figure-gesture 1.2s ease-in-out infinite'
+      && selector.split(',').every((part) => HELD_FIGURE_LOOP.includes(part.trim())))
     || (stylesheetFile(decl) === 'admin/components/adminInteraction.css'
       && selector === '.admin-busy-mark'
       && decl.value === 'admin-request-spin 900ms linear infinite');

@@ -396,7 +396,43 @@ function motifSlotValues(motifs, setId) {
       asset && set.assetDir ? `url('/motifs/${set.assetDir}/${asset}')` : 'none',
     ]);
   }
-  return lines;
+  return [...lines, ...waitFigureValues(set)];
+}
+
+const MOTIFS_DIR = path.resolve(__dirname, '..', '..', 'apps', 'web', 'public', 'motifs');
+
+/** One wait drawing as a data URI, so a stalled load never has to fetch it. */
+function inlineSvg(assetDir, file) {
+  const svg = fs.readFileSync(path.join(MOTIFS_DIR, assetDir, file), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/> </g, '><')
+    .trim()
+    .replace(/"/g, "'")
+    .replace(/[%#<>{}]/g, encodeURIComponent);
+  return `url("data:image/svg+xml,${svg}")`;
+}
+
+/**
+ * The held-up figure's values (motifs.json $wait-note). A set without a wait
+ * drawing shows the ampersand, so the drawn layers leave the layout.
+ */
+function waitFigureValues(set) {
+  const wait = set?.wait;
+  if (!wait) {
+    return [
+      ['--motif-wait-glyph', 'inline-block'],
+      ['--motif-wait-drawn', 'none'],
+    ];
+  }
+  return [
+    ['--motif-wait-glyph', 'none'],
+    ['--motif-wait-drawn', 'block'],
+    ['--motif-wait-body', inlineSvg(set.assetDir, wait.body)],
+    ['--motif-wait-part', inlineSvg(set.assetDir, wait.part)],
+    ['--motif-wait-pivot', wait.pivot],
+    ['--motif-wait-swing', wait.swing],
+  ];
 }
 
 /**

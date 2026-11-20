@@ -14,6 +14,8 @@ export function LoadingStateView({
   shape = 'rows',
   stage = 'initial',
   onRetry,
+  figure,
+  still,
 }) {
   const layout = SHAPES.has(shape) ? shape : 'rows';
   const rowCount = Number.isFinite(rows) ? Math.max(0, Math.floor(rows)) : 3;
@@ -23,7 +25,7 @@ export function LoadingStateView({
       data-loading-stage={stage}
       data-loading-shape={layout}
     >
-      <LoadingStatus label={label} stage={stage} />
+      <LoadingStatus label={label} stage={stage} figure={figure} still={still} />
       {stage === 'prolonged' && typeof onRetry === 'function' ? (
         <div className="loading-state__actions mt-sm">
           <button type="button" className={secondaryActionClass} onClick={onRetry}>

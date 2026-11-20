@@ -132,7 +132,7 @@ export function AdminLoadingState({ label, routeAttempt }) {
   const { stage } = useLoadingStage({ routeAttempt });
   return (
     <div className="admin-loading-state py-md text-admin-sm text-admin-ink-secondary">
-      <LoadingStatus label={label} stage={stage} />
+      <LoadingStatus label={label} stage={stage} figure="ring" />
     </div>
   );
 }

@@ -319,6 +319,7 @@ export default function FeedbackModal({ onClose }) {
             <div className="font-data text-caption text-text-secondary">
               <LoadingStatus
                 stage={submissionStage}
+                figure="none"
                 label={submitting ? 'Sending your feedback. Keep this window open until we confirm it was received.' : ''}
               />
             </div>

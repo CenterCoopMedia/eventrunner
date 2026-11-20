@@ -1,6 +1,8 @@
+import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cwd } from 'node:process';
+import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
 const ASSET_DIR = resolve(cwd(), 'public/motifs/fauna');
@@ -21,8 +23,41 @@ const PAINT_PROPERTIES = new Set([
   'stroke',
 ]);
 
-function readAsset(file) {
-  return readFileSync(resolve(ASSET_DIR, file), 'utf8');
+// The held-up figure's drawings (#1090): a body and a moving part per set,
+// drawn as solid silhouettes for the 32px wait slot.
+const WAIT_DRAWINGS = ['botanical', 'fauna', 'cartographic'].flatMap((set) =>
+  ['wait-body.svg', 'wait-part.svg'].map((file) => ({ set, file })));
+const WAIT_SLOT = 32;
+
+function readAsset(file, dir = ASSET_DIR) {
+  return readFileSync(resolve(dir, file), 'utf8');
+}
+
+/**
+ * A silhouette has no stroke to measure, so measure its ink instead: render
+ * it at the slot size, and count the visible pixels with no solid pixel
+ * beside them. A part narrower than about a pixel is all such pixels; a
+ * solid form has a solid core under every edge.
+ */
+async function strayInk(svg, size) {
+  const { data, info } = await sharp(Buffer.from(svg), { density: (72 * size) / WAIT_SLOT })
+    .resize(size, size)
+    .ensureAlpha()
+    .extractChannel('alpha')
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const alpha = (x, y) => (x < 0 || y < 0 || x >= info.width || y >= info.height ? 0 : data[y * info.width + x]);
+  let ink = 0;
+  let stray = 0;
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      if (alpha(x, y) < 64) continue;
+      ink += 1;
+      const solid = [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => alpha(x + dx, y + dy) >= 230));
+      if (!solid) stray += 1;
+    }
+  }
+  return { ink, stray };
 }
 
 // Comments are removed until none is left: removing one can join the text
@@ -144,5 +179,28 @@ describe('fauna motif assets', () => {
         `${property}: ${value}`,
       );
     }
+  });
+});
+
+describe('wait drawings', () => {
+  it.each(WAIT_DRAWINGS)('$set/$file is a solid silhouette in motif ink', ({ set, file }) => {
+    const svg = readAsset(file, resolve(cwd(), 'public/motifs', set));
+    expect(strokeWidths(svg)).toEqual([]);
+    expect(parseViewBox(svg)).toEqual({ width: WAIT_SLOT, height: WAIT_SLOT });
+    for (const { property, value } of paintValues(svg)) {
+      expect(`${property}: ${value}`).toBe(`${property}: currentColor`);
+    }
+  });
+
+  it.each(WAIT_DRAWINGS)('$set/$file has no part thinner than a pixel at 32px', async ({ set, file }) => {
+    const { ink, stray } = await strayInk(readAsset(file, resolve(cwd(), 'public/motifs', set)), WAIT_SLOT);
+    expect(ink).toBeGreaterThan(0);
+    expect(stray / ink).toBeLessThanOrEqual(0.02);
+  });
+
+  it('the measure rejects a hairline', async () => {
+    const hairline = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M4 10 L28 22 L28 22.7 L4 10.7 Z"/></svg>';
+    const { ink, stray } = await strayInk(hairline, WAIT_SLOT);
+    expect(stray / ink).toBeGreaterThan(0.5);
   });
 });

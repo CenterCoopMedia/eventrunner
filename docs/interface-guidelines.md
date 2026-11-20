@@ -202,7 +202,7 @@ Under `prefers-reduced-motion: no-preference`, a waiting indicator may use a com
 
 Offer a retry only when the caller supplies a safe repeat of the operation. The shared loading component offers that retry at sixty seconds. Do not repeat an unresolved write, reload an editor, or delay an available result. Route changes remain immediate.
 
-Use the indeterminate ring when completion cannot be measured. The existing console waiting character and active build indicator follow the same rules for pending work and reduced motion. Chunk failures keep their explicit recovery mechanism.
+When completion cannot be measured, the public site shows the held-up figure: The active motif set's wait drawing, or the ampersand where the set has none (#1090). A busy public control shows the ampersand at 20px from one second, in its own text colour, in a slot it holds from the press so its width does not change. The admin uses the indeterminate ring. The existing console waiting character and active build indicator follow the same rules for pending work and reduced motion. Chunk failures keep their explicit recovery mechanism.
 
 The public loading component supports rows, schedule, and directory placeholders. Still, token-tinted text bars, time markers, and portrait shapes make the expected structure recognizable. They do not shimmer, pretend to be loaded content, or promise a measured layout-shift score. The specimen book exposes the loading shapes and stages for review.
 
