@@ -20,7 +20,7 @@ function setup({ seed = {}, consoleUser = user(), clientUser = user(), fetchStat
   const auth = verifier(consoleUser);
   const clientAuth = verifier(clientUser);
   const deps = {
-    db: makeFakeDb(seed), auth, authFor: () => clientAuth, consoleProject: 'er-console', extraProjects, intake: INTAKE, now: () => 0, log: { error() {} },
+    db: makeFakeDb(seed), auth, authFor: () => clientAuth, consoleProject: 'er-console', extraProjects, intake: INTAKE, now: () => 0, log: { error() {}, info() {} },
     fetch: async (url, init) => { sent.push({ url, init, body: JSON.parse(init.body) }); return { ok: fetchStatus === 200, status: fetchStatus, json: async () => ({ success: true, id: `er_${JSON.parse(init.body).request_id}` }) }; },
   };
   return { deps, sent, auth, clientAuth };
