@@ -367,7 +367,10 @@ describe('AdminContentBlockEditor value fields', () => {
       sections: [{ ...HOME_PAGE.sections[0], id: 'travel_map', allowedBlocks: [] }],
     }];
     await renderAt('/admin/content/travel/travel_map/_new');
-    fireEvent.change(screen.getByRole('combobox', { name: 'Block type' }), { target: { value: 'map' } });
+    expect(await screen.findByRole('radio', { name: 'Map' })).toHaveAccessibleDescription(
+      'An interactive street map for the event venue or another place.',
+    );
+    await chooseBlockType('Map');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Use the event’s venue' }));
     expect(screen.queryByRole('textbox', { name: 'Google Maps embed' })).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Map label' })).toHaveValue('Map of Test Hall');
@@ -377,7 +380,7 @@ describe('AdminContentBlockEditor value fields', () => {
     );
     expect(screen.getByRole('link', { name: 'Open in Google Maps' })).toHaveAttribute('href', mapUrl);
 
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsCreateContent'))).toBe(true));
     const [, request] = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
     expect(JSON.parse(request.body).fields).toMatchObject({

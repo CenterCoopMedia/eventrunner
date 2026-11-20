@@ -4,4 +4,4 @@
 
 ### Fixed
 
-- Show readable block titles in the editor when Rich text contains pasted HTML (#1203).
+- Show readable block titles in the editor when a Paragraphs block contains pasted HTML (#1203).

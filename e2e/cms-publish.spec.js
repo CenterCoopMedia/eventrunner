@@ -291,7 +291,7 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
     await visitor.route('https://www.google.com/maps/embed?*', stubMap);
     await signIn(page, ADMIN_EMAIL);
     await page.goto(`/admin/content/travel/${section}/_new`);
-    await page.getByRole('combobox', { name: 'Block type' }).selectOption('map');
+    await page.getByRole('radio', { name: 'Map', exact: true }).check();
 
     const embedField = page.getByRole('textbox', { name: 'Google Maps embed' });
     await embedField.fill(`<iframe width="600" src="${src.replaceAll('&', '&amp;')}" height="450"></iframe>`);
@@ -320,7 +320,7 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
     const published = page.waitForResponse((res) =>
       res.url().endsWith('/cmsPublish') && res.request().method() === 'POST',
     );
-    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await page.getByRole('button', { name: 'Save and publish', exact: true }).click();
     expect((await published).ok()).toBe(true);
     const live = (await adminDb().doc(`cmsContent/${docId}`).get()).data();
     expect(live).toMatchObject({ blockType: 'map', embedUrl: src, label, address });

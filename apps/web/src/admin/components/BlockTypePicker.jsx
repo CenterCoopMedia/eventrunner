@@ -10,6 +10,7 @@
 // so nobody has to guess why a familiar option is missing.
 import { memo, useEffect, useId, useRef, useState } from 'react';
 import SectionBlocks from '../../components/blocks/SectionBlocks.jsx';
+import WayfindingIcon from '../../components/editorial/WayfindingIcon.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { applyThemePreview, releaseThemePreviewTarget } from '../themePreview.js';
 import { BLOCK_TYPE_IDS, blockTypeFor, blockTypeLabel } from '../blockTypes.js';
@@ -20,6 +21,7 @@ export const BLOCK_TYPE_SUMMARIES = Object.freeze({
   text: 'A heading, label or one line of copy.',
   richtext: 'One or more paragraphs, with bold text, links and lists.',
   image: 'A picture from the media library.',
+  map: 'An interactive street map for the event venue or another place.',
   cta: 'A button that takes readers to another page.',
   stat: 'A number with its caption and where it came from.',
   fact: 'A term and its detail, such as Where or Who.',
@@ -59,10 +61,17 @@ const SAMPLE_BLOCKS = Object.freeze({
 // keystroke in the fields below.
 const Example = memo(function Example({ typeId }) {
   const sample = SAMPLE_BLOCKS[typeId];
-  if (!sample) return null;
+  if (!sample && typeId !== 'map') return null;
   return (
     <div className="admin-block-picker__example" inert="" aria-hidden="true">
-      <SectionBlocks blocks={[{ id: `example-${typeId}`, section: 'example', field: typeId, blockType: typeId, ...sample }]} />
+      {typeId === 'map' ? (
+        <div className="flex items-center gap-xs bg-surface-alt p-md">
+          <WayfindingIcon name="venue" />
+          <span>1 Example Street</span>
+        </div>
+      ) : (
+        <SectionBlocks blocks={[{ id: `example-${typeId}`, section: 'example', field: typeId, blockType: typeId, ...sample }]} />
+      )}
     </div>
   );
 });
