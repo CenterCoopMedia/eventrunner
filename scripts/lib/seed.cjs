@@ -661,6 +661,9 @@ function placeholderBlock(blockType, description) {
       return { layout: 'grid', images: [{ url: 'branding/og-default.svg', alt: text }] };
     case 'sponsor_package':
       return { name: text, benefits: '<p>[Replace] What this package includes.</p>' };
+    case 'timeline':
+      // This block places entries from the Timeline collection.
+      return {};
     default:
       // Unreachable while defaultBlocks pass validatePageDoc, which
       // rejects unknown block types by name before a seed is built.

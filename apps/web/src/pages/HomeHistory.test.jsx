@@ -151,7 +151,7 @@ describe('Home History section, on the real content provider', () => {
     expect(within(section).getByText(STORY_PATTERN)).toBeInTheDocument();
   });
 
-  it('draws the entries at the published Timeline block without repeating them', () => {
+  it('draws the entries at the published Timeline block without repeating them', async () => {
     renderHome();
     act(() => {
       subscriptions.get('cmsContent')([
@@ -160,6 +160,7 @@ describe('Home History section, on the real content provider', () => {
       ]);
     });
     const section = historySection();
+    await within(section).findByRole('heading', { name: SNAPSHOT_TITLES[0] });
     expect(section.querySelectorAll('ol.timeline')).toHaveLength(1);
     expect(titlesIn(section)).toEqual(SNAPSHOT_TITLES);
     expect(within(section).getByText(STORY_PATTERN)).toBeInTheDocument();

@@ -239,7 +239,8 @@ export default function AdminTimelineEditor({ mode }) {
       noValidate
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
-      <AdminPageHeader description="An entry describes one past edition. Published entries appear in Timeline blocks and in the History section on Home when that section is present."
+      <AdminPageHeader
+        description={mode === 'create' ? 'An entry describes one past edition. Published entries appear in Timeline blocks and in the History section on Home when that section is present.' : undefined}
         title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
         recentTitle={row?.current?.title}
         state={!creating && row ? <RecordState state={row.state} /> : null}

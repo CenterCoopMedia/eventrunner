@@ -113,13 +113,13 @@ function isTitleRepeatingSection(section, page) {
  * (an empty query matches every block, so this is the identity map then).
  * A block matches on its own text OR its section's label, so a query for
  * "Venue" finds every block filed under a Venue section. */
-function filterSections(sections, query) {
+function filterSections(sections, query, timeline) {
   const trimmed = query.trim().toLowerCase();
   return sections
     .map(({ section, blocks, map, areaMap }) => ({
       section,
       blocks: blocks.filter((block) =>
-        blockMatchesQuery(block, query, { sectionLabel: section.label }),
+        blockMatchesQuery(block, query, { sectionLabel: section.label, timeline }),
       ),
       // The venue map is not a block and carries no block text, so the
       // filter cannot narrow INSIDE it. It survives on its section's label,
@@ -137,7 +137,7 @@ function filterSections(sections, query) {
 
 export default function ContentPage() {
   const { pathname } = useLocation();
-  const { pages, getPublicPage, getSectionBlocks } = usePublicContent();
+  const { pages, getPublicPage, getSectionBlocks, timeline } = usePublicContent();
   const { text } = usePublicLanguage();
   const { eventConfig, features } = useEventConfig();
   // Declared before the early return below so hook order stays fixed across
@@ -277,9 +277,9 @@ export default function ContentPage() {
   // An empty query matches every block (blockMatchesQuery), so both of these
   // are safe to always compute — they equal baseSections when the field is
   // idle, filtered or not.
-  const filteredSections = isLongPage ? filterSections(baseSections, query) : baseSections;
+  const filteredSections = isLongPage ? filterSections(baseSections, query, timeline) : baseSections;
   const settledFilteredSections = isLongPage
-    ? filterSections(baseSections, settledQuery)
+    ? filterSections(baseSections, settledQuery, timeline)
     : baseSections;
 
   const trimmedQuery = query.trim();

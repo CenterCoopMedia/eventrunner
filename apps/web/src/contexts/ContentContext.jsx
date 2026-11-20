@@ -216,10 +216,9 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
     const timeline = prepareTimelineDocs(
       overlay.cmsTimeline != null ? overlay.cmsTimeline : snapshotTimelineData,
     );
-    const timelineSections = new Set(Object.values(siteContent)
-      .filter((block) => block?.blockType === 'timeline' && isDrawable(block))
-      .map((block) => block.section));
-    const pageHasTimelineBlock = (page) => (page?.sections ?? []).some((section) => timelineSections.has(section?.id));
+    const blocks = Object.values(siteContent);
+    const pageHasTimelineBlock = (page) => blocks.some((block) => block?.blockType === 'timeline'
+      && isDrawable(block) && page?.sections?.some((section) => section?.id === block.section));
     const live = Boolean(
       overlay.cmsContent != null ||
         overlay.cmsPages != null ||
@@ -237,7 +236,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
     };
 
     const getSectionBlocks = (section, options) =>
-      Object.values(siteContent)
+      blocks
         .filter((block) => block.section === section && isDrawable(block, options)
           && (block.blockType !== 'timeline' || timeline.length > 0))
         .sort(byOrder);
@@ -309,8 +308,9 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
   const pageNeedsTimeline = value.pageHasTimelineBlock(value.getPage(pathname?.replace(/\/+$/, '') || '/'));
   const neededCollections = useMemo(() => {
     const streams = publicSubscriptionsForRoute(pathname, search, publicTools);
-    if (languageNeedsSchedule && !streams.includes('cmsSchedule')) streams.push('cmsSchedule');
-    if (pageNeedsTimeline && !streams.includes('cmsTimeline')) streams.push('cmsTimeline');
+    // The session's requested set keeps each stream once.
+    if (languageNeedsSchedule) streams.push('cmsSchedule');
+    if (pageNeedsTimeline) streams.push('cmsTimeline');
     return streams.filter((name) => RUNTIME_COLLECTIONS.includes(name));
   }, [pathname, search, publicTools, languageNeedsSchedule, pageNeedsTimeline]);
 

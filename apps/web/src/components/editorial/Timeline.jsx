@@ -12,6 +12,7 @@
 // BESIDE the entry's title on the same line — never above it, because
 // nothing sits directly above a heading.
 import { PublicLink as Link } from '../PublicLink.jsx';
+import ExternalLink from '../ExternalLink.jsx';
 import { timelineHref, timelineImagePath } from '../../lib/timelineEntry.js';
 import AssetImage from '../media/AssetImage.jsx';
 
@@ -45,7 +46,7 @@ export default function Timeline({ entries, level = 3, className = '' }) {
         const alt = typeof entry.alt === 'string' ? entry.alt.trim() : '';
         let title = entry.title;
         if (href?.startsWith('https://')) {
-          title = <a href={href} target="_blank" rel="noopener" className="underline">{title}</a>;
+          title = <ExternalLink href={href} rel="noopener noreferrer" className="underline">{title}</ExternalLink>;
         } else if (href) {
           title = <Link to={href} className="underline">{title}</Link>;
         }

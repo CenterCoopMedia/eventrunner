@@ -54,9 +54,9 @@ describe('Timeline', () => {
       { id: 'unsafe', title: 'Unsafe link', href: '//example.org/recap', image: 'https://example.org/photo.png', alt: 'An untrusted image' },
       { id: 'undescribed', title: 'Undescribed image', image: 'cms-images/archive/photo.png' },
     ]} />);
-    const external = screen.getByRole('link', { name: 'External recap' });
+    const external = screen.getByRole('link', { name: 'External recap (opens in a new tab)', exact: true });
     expect(external).toHaveAttribute('target', '_blank');
-    expect(external).toHaveAttribute('rel', 'noopener');
+    expect(external).toHaveAttribute('rel', 'noopener noreferrer');
     expect(external).toHaveAttribute('href', 'https://example.org/recap');
     expect(screen.getByRole('heading', { name: 'Unsafe link' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Unsafe link' })).toBeNull();
