@@ -277,6 +277,34 @@ test('an operator comp uses the shared reservation and one ticket per assigned a
   assert.equal((await db.collection('admin_logs').get()).size, 1);
 });
 
+test('a confirmed complimentary CSV reserves a canonical batch once across operators', async () => {
+  const db = dbFor({ 'ticket_catalog/current': catalog(),
+    'config/bootstrap': { adminEmails: ['operator@example.org', 'second-operator@example.org'], staffEmails: ['staff@example.org'] },
+  });
+  const attendees = [
+    { firstName: 'Guest', lastName: 'One', email: 'guest@example.org' },
+    { firstName: 'Guest', lastName: 'Two', email: 'second@example.org' },
+  ];
+  const body = { action: 'issueCompCsv', ticketTypeId: 'general', attendees, reason: 'Speaker invitation.', confirmed: true };
+  const handler = admin(db);
+  assert.equal((await call(handler, body)).statusCode, 403);
+  assert.equal((await call(handler, { ...body, confirmed: false }, 'operator')).statusCode, 400);
+  assert.equal((await call(handler, { ...body, attendees: [attendees[0], { ...attendees[0], email: 'GUEST@EXAMPLE.ORG' }] }, 'operator')).statusCode, 400);
+  assert.equal((await db.collection('ticket_inventory').doc('current').get()).data().sold, 2);
+
+  const first = await call(handler, body, 'operator');
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.reused, false);
+  assert.equal(first.body.tickets.length, 2);
+  assert.equal(first.body.order.totalAmount, 0);
+  const repeat = await call(handler, { ...body, reason: 'Same attendee list.', attendees: [...attendees].reverse() }, 'second-operator');
+  assert.equal(repeat.statusCode, 200);
+  assert.equal(repeat.body.reused, true);
+  assert.equal(repeat.body.order.id, first.body.order.id);
+  assert.equal((await db.collection('ticket_inventory').doc('current').get()).data().sold, 4);
+  assert.equal((await db.collection('admin_logs').get()).size, 1);
+});
+
 // An order whose checkout outcome is unknown sits in 'exception' with its
 // seats held. Nothing released it, so it kept the seats, its promo code use
 // and the buyer's lock on new orders for ever.

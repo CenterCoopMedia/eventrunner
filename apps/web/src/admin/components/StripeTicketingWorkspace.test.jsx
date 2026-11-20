@@ -100,6 +100,40 @@ describe('complimentary tickets and online check-in', () => {
     expect(call.mock.calls[0][1]).toEqual(call.mock.calls[1][1]);
     expect(call.mock.calls[0][1]).toMatchObject({ action: 'issueComp', confirmed: true, requestId: expect.any(String), attendees: [{ firstName: 'Synthetic', lastName: 'Attendee', email: 'comp@example.test' }] });
   });
+  it('shows CSV row errors and reviews the corrected batch before any issue request', async () => {
+    const onComplete = vi.fn();
+    call.mockResolvedValue({ reused: true, order: { orderId: 'saved-comp-order' }, tickets: [TICKET] });
+    render(<StripeCompPanel call={call} catalog={CATALOG} onComplete={onComplete} />);
+    fireEvent.change(screen.getByLabelText('Comp ticket type'), { target: { value: 'general' } });
+    fireEvent.change(screen.getByLabelText('Reason for complimentary admission'), { target: { value: 'Speaker admission.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Upload attendees from CSV' }));
+    expect(screen.getByRole('button', { name: 'Download complimentary ticket CSV template' })).toBeInTheDocument();
+    const input = screen.getByLabelText('Complimentary ticket CSV');
+    const load = (body) => {
+      const text = `firstName,lastName,email\n${body}`;
+      fireEvent.change(input, { target: { files: [{ size: text.length, text: async () => text }] } });
+    };
+    load('Synthetic,Guest,not-an-email\nGuest,One,guest@example.org\nGuest,One,GUEST@EXAMPLE.ORG');
+    await screen.findByText(/Row 2: Enter a first name/);
+    expect(screen.getByText(/Row 4: This attendee appears earlier/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review complimentary tickets' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(call).not.toHaveBeenCalled();
+
+    load('Guest,One,GUEST@EXAMPLE.ORG');
+    await screen.findByText('1 valid attendee.');
+    fireEvent.click(screen.getByRole('button', { name: 'Review complimentary tickets' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/guest@example.org/)).toBeInTheDocument();
+    expect(call).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Issue 1 complimentary tickets' }));
+    await screen.findByText('This CSV already issued its complimentary tickets. The existing order is shown.');
+    expect(call).toHaveBeenCalledExactlyOnceWith('ticketingCommerceAdmin', {
+      action: 'issueCompCsv', ticketTypeId: 'general', reason: 'Speaker admission.', confirmed: true,
+      attendees: [{ firstName: 'Guest', lastName: 'One', email: 'guest@example.org' }],
+    });
+    expect(onComplete).toHaveBeenCalledWith('saved-comp-order');
+  });
   it('states duplicate scans and requires operator confirmation before undoing a check-in', async () => {
     call.mockResolvedValue({ result: 'already_checked_in', ticket: { ...TICKET, checkedInAt: '2026-01-03T10:00:00Z' } });
     render(<StripeCheckInPanel call={call} isOperator timezone="UTC" onChanged={vi.fn()} />);

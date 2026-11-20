@@ -186,11 +186,12 @@ async function reserveCommerceOrder({
   db, provider, getConfig, actor, request, source = 'checkout', reason = '', now = () => new Date(), env = process.env,
 }) {
   const scope = providerScope(provider);
+  const comp = source === 'comp';
+  const compCsv = comp && request.compCsv === true;
   const id = request.orderId || orderIdFor(actor.uid, request.requestId);
   const attemptId = attemptIdFor(id);
-  const fingerprint = request.resume ? null : requestFingerprint(request, source, reason);
+  const fingerprint = request.resume ? null : requestFingerprint(request, source, compCsv ? '' : reason);
   const config = typeof getConfig === 'function' ? await getConfig() : {};
-  const comp = source === 'comp';
   // Free and comp orders have no external redirect; paid configuration is
   // checked before their reservation below, once the catalog establishes price.
   return db.runTransaction(async (tx) => {
@@ -208,7 +209,7 @@ async function reserveCommerceOrder({
     }
     if (existing.exists) {
       const order = existing.data();
-      if (order.purchaserUid !== actor.uid || order.source !== source) {
+      if (order.source !== source || (compCsv ? order.compCsv !== true : order.purchaserUid !== actor.uid)) {
         throw new CommerceError('not-found', 'Order not found.', 404);
       }
       assertOrderScope(order, provider);
@@ -325,6 +326,7 @@ async function reserveCommerceOrder({
       refundStatus: 'none', refundedAmount: 0,
       createdAt: at, updatedAt: at,
       ...(comp ? { compReason: reason, compedByUid: actor.uid } : {}),
+      ...(compCsv ? { compCsv: true } : {}),
       // The questions as the purchaser saw them, copied with each seat's
       // answers to ticket_answers when that attendee claims the ticket.
       ...(hasAnswers ? {
@@ -499,17 +501,31 @@ function checkoutResponse(order) {
   };
 }
 
-async function createCompOrder({ db, provider, getConfig, actorUid, ticketTypeId, attendees, requestId, reason, formRevision, now, env }) {
+async function createCompOrder({ db, provider, getConfig, actorUid, ticketTypeId, attendees, requestId, reason, formRevision, csvUpload = false, now, env }) {
   if (typeof actorUid !== 'string' || !actorUid || typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
     throw new CommerceError('invalid-comp', 'An organizer and a reason of at most 500 characters are required.', 400);
   }
   const parsed = validateCheckoutRequest({
-    requestId, lines: [{ ticketTypeId, quantity: attendees?.length, attendees }],
+    requestId: csvUpload ? 'comp-csv-upload-v1' : requestId,
+    lines: [{ ticketTypeId, quantity: attendees?.length, attendees }],
     ...(formRevision === undefined ? {} : { formRevision }),
   });
   if (!parsed.ok) throw new CommerceError('invalid-comp', parsed.issues[0].message, 400);
+  const request = parsed.value;
+  if (csvUpload) {
+    const line = request.lines[0];
+    const rows = line.attendees.map((person) => JSON.stringify(person)).sort();
+    if (line.attendees.some((person) => person.answers !== undefined) || new Set(rows).size !== rows.length) {
+      throw new CommerceError('invalid-comp', 'Use one distinct attendee row per complimentary ticket.', 400);
+    }
+    // Claim the canonical batch in the order transaction, even across operators.
+    const batch = JSON.stringify([providerScope(provider), ticketTypeId, rows]);
+    request.orderId = orderIdFor('comp-csv', batch);
+    request.compCsv = true;
+    line.attendees = rows.map((row) => JSON.parse(row));
+  }
   const result = await reserveCommerceOrder({
-    db, provider, getConfig, actor: { uid: actorUid, email: null }, request: parsed.value,
+    db, provider, getConfig, actor: { uid: actorUid, email: null }, request,
     source: 'comp', reason: reason.trim(), now, env,
   });
   return { ...checkoutResponse(result.order), order: result.order, created: result.created };
