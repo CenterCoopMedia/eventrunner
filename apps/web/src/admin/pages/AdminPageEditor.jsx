@@ -239,10 +239,12 @@ function PageEditor({ mode }) {
   const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
     contentRows
       // The public shape first (shared/seed publicContentDoc), as the site's
-      // content provider does, so starter text is judged the same way.
-      .map((row) => (row.live ? inPublicLanguage(publicContentDoc(row.live), 'block') : null))
+      // content provider does, so starter text is judged the same way; then
+      // the reader's language, as PublicLanguageRuntime projects it after.
+      .map((row) => (row.live ? publicContentDoc(row.live) : null))
       .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((block) => inPublicLanguage(block, 'block')),
     features,
     linkTargetPages(),
   );
@@ -262,9 +264,12 @@ function PageEditor({ mode }) {
     || (section.id === AREA_MAP_SECTION_ID && current.id === VENUE_MAP_PAGE_ID && areaMapShown));
   const sectionHasContent = (current, section) => sectionPreviewBlocks(section).length > 0
     || sectionHasMap(current, section);
+  // The first section the page draws; it takes no gap above its blocks.
+  const firstShownSection = (current) => (current.sections ?? [])
+    .find((section) => sectionHasContent(current, section))?.id ?? null;
   const longReadSection = (current) => (current.systemPage || current.template !== 'long-read'
     ? null
-    : (current.sections ?? []).find((section) => sectionHasContent(current, section))?.id ?? null);
+    : firstShownSection(current));
   const sectionBlockCount = (section) => {
     if (!contentReady) return contentError ? '' : 'Counting blocks…';
     const count = contentRows.filter((row) => row.current?.section === section.id).length;
@@ -286,6 +291,16 @@ function PageEditor({ mode }) {
     getSectionBlocks: (id) => sectionPreviewBlocks({ id }),
   };
   const longReadSectionId = longReadSection(page);
+  const firstShownSectionId = firstShownSection(page);
+  // ContentPage hides a heading that repeats the page title, after the
+  // reader's language is applied to both.
+  const shownPage = inPublicLanguage(page, 'page');
+  const headingHidden = (section) => {
+    const shown = inPublicLanguage(section, 'section') ?? section;
+    return !page.systemPage && (shown.label === shownPage?.label
+      || shown.label === pageHeading(shownPage)
+      || /_intro$/.test(section.id) || /_header$/.test(section.id));
+  };
   // Layout draws the side navigation rail only when the site has public
   // pages to list, so the preview reserves it only then too.
   const publicNavShown = buildNavItems(
@@ -989,9 +1004,8 @@ function PageEditor({ mode }) {
                         longReadOpening={section.id === longReadSectionId}
                         map={sectionHasMap(page, section)}
                         previewLabel={inPublicLanguage(section, 'section')?.label}
-                        hideHeading={!page.systemPage && (section.label === page.label
-                          || section.label === pageHeading(page)
-                          || /_intro$/.test(section.id) || /_header$/.test(section.id))}
+                        hideHeading={headingHidden(section)}
+                        firstOnPage={!page.systemPage && section.id === firstShownSectionId}
                         sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side' && publicNavShown}
                         blocksError={Boolean(contentError) && !contentReady}
                       />
