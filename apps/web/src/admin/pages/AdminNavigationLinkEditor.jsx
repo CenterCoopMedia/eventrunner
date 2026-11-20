@@ -97,21 +97,26 @@ function NavigationLinkForm({ initial, rows, creating }) {
       {error ? <Notice tone="error" message={error} /> : null}
       <Panel>
         <div className="flex flex-col gap-sm">
-          <TextField label="Menu label" value={draft.label} maxLength={80} required disabled={busy !== null}
+          <TextField label="Menu label" help="The name visitors see in the site menu."
+            value={draft.label} maxLength={80} required disabled={busy !== null}
             onChange={(label) => setDraft((current) => ({ ...current, label }))} />
-          <SelectField label="Link destination" value={kind} disabled={busy !== null}
+          <SelectField label="Link destination" help="Choose an existing page or enter an external website address."
+            value={kind} disabled={busy !== null}
             options={[{ value: 'internal', label: 'A page on this site' }, { value: 'external', label: 'An external website' }]}
             onChange={(value) => { setKind(value); setDraft((current) => ({ ...current, url: '' })); }} />
           {kind === 'internal' ? (
-            <SelectField label="Page" value={draft.url} required disabled={busy !== null}
+            <SelectField label="Page" help="The link appears once the destination page is published and visible."
+              value={draft.url} required disabled={busy !== null}
               options={[{ value: '', label: 'Choose a page' }, ...Array.from(paths, ([value, label]) => ({ value, label }))]}
               onChange={(url) => setDraft((current) => ({ ...current, url }))} />
           ) : (
-            <TextField label="HTTPS URL" type="url" value={draft.url} maxLength={2048} required disabled={busy !== null}
+            <TextField label="HTTPS URL" help="Copy the full address, starting with https://."
+              type="url" value={draft.url} maxLength={2048} required disabled={busy !== null}
               hint="Visitors open this link in a new tab."
               onChange={(url) => setDraft((current) => ({ ...current, url }))} />
           )}
-          <CheckboxField label="Show in the navigation" checked={draft.visible} disabled={busy !== null}
+          <CheckboxField label="Show in the navigation" help="Clear this to keep the link in Pages and hide it from the site menu."
+            checked={draft.visible} disabled={busy !== null}
             onChange={(visible) => setDraft((current) => ({ ...current, visible }))} />
         </div>
       </Panel>

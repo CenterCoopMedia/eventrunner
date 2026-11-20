@@ -18,7 +18,11 @@ function isNavigationLink(record) {
 
 function navigationLinkUrl(value) {
   const url = typeof value === 'string' ? value.trim() : '';
-  return isCanonicalPagePath(url) ? url : httpsUrlHref(url);
+  if (isCanonicalPagePath(url)) return url;
+  const href = httpsUrlHref(url);
+  if (!href) return '';
+  const { username, password } = new URL(href);
+  return username || password ? '' : href;
 }
 
 // These sections have dedicated renderers in Home, InfoCards, and
