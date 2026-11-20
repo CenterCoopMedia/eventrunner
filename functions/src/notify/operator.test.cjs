@@ -78,6 +78,26 @@ function fakeLog() {
   return { warn: (...args) => warns.push(args), warns };
 }
 
+test('a failed submission alert logs its record and sink without the provider response', async () => {
+  const log = fakeLog();
+  const notify = createSubmissionNotifier({
+    env: WEBHOOK_ENV,
+    fetchImpl: async () => ({ status: 503, text: async () => 'private provider response' }),
+    getConfig: fakeGetConfig({
+      ...CONFIG,
+      tierA: { projectId: 'proj-1', publicUrl: 'https://conference.example.org/summit' },
+    }),
+    log,
+  });
+  const alert = { kind: 'feedback', id: 'failed-alert-123', screenshotCount: 1 };
+  await notify(alert);
+  await notify(alert);
+  assert.deepEqual(log.warns, [[
+    'The submission alert could not be delivered.',
+    { kind: 'feedback', id: 'failed-alert-123', sink: 'webhook' },
+  ]]);
+});
+
 const EVENT = { kind: 'error', title: 'db down', summary: 'primary unreachable' };
 
 test.beforeEach(() => internals.resetDedupeForTest());

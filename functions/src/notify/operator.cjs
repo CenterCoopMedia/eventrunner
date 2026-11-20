@@ -140,8 +140,14 @@ function createSubmissionNotifier({ getConfig, sendEmail, env = process.env, log
         link: address ? `${address}?request=${encodeURIComponent(id)}` : null,
         allowLoopback: env.FUNCTIONS_EMULATOR === 'true',
       });
-      if (alert) await notifier.notify(alert);
-      else log.warn('The submission alert is missing a valid site address or record ID.');
+      if (!alert) {
+        log.warn('The submission alert is missing a valid site address or record ID.');
+        return;
+      }
+      const result = await notifier.notify(alert);
+      if (!result.delivered && result.error !== 'suppressed-duplicate') {
+        log.warn('The submission alert could not be delivered.', { kind, id, sink: result.sink });
+      }
     } catch {
       log.warn('The submission alert could not be delivered.');
     }
