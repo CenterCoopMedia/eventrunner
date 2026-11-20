@@ -36,7 +36,7 @@ Every control and every interactive row defines these states, in both modes, on 
 | Active (pressed) | Scale 0.98 over 200ms ease-out; static under reduced motion | The pressed action ground; no scale |
 | Selected or current | Weight plus a rule or a filled ground plus `aria-pressed`, `aria-current`, or `aria-selected` | The rail's four signals; a filled row marker elsewhere |
 | Disabled | Native `disabled` on a control that must not act, with the disabled ink; `aria-disabled="true"` only on a control that must stay focusable to explain itself, and then its handler suppresses every activation path and a test proves it. A submit control is never disabled before the request starts. Never a removed control | The same |
-| Busy | `aria-busy="true"` and immediate words inside the control ("Saving…"). Reject duplicate activation immediately. A decorative indicator may appear at one second if work is still pending | The same, and the result stays in place after |
+| Busy | `aria-busy="true"` and immediate words inside the control that name the work ("Saving the session…"). Reject duplicate activation immediately. A decorative indicator may appear at one second if work is still pending | The same, and the result stays in place after |
 | Error | `aria-invalid="true"`, the alarm rule, a message under the field named by `aria-describedby`, focus moved to the first error on submit | The same |
 | Success | A stated line in place that stays, in a `role="status"` region so it is announced; a toast may repeat it visually, and then the toast carries no live role, so one result is announced once | The same |
 | Empty | A sentence that names what was searched or filtered, plus one action | The desk's empty state |

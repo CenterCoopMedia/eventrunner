@@ -43,6 +43,7 @@ import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 import { Checkbox, Radio } from '../components/forms/Choice.jsx';
+import BusyLabel from '../components/BusyLabel.jsx';
 
 const VISIBILITY_COPY = {
   public: {
@@ -535,7 +536,7 @@ export default function Profile() {
         ) : null}
 
         <button type="submit" className={primaryActionClass} disabled={saving || photoPending}>
-          {saving ? 'Saving…' : 'Save profile'}
+          <BusyLabel busy={saving} pending="Saving your profile…">Save profile</BusyLabel>
         </button>
       </form>
     </article>

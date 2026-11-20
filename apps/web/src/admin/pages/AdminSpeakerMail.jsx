@@ -32,6 +32,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const ENDPOINT = 'speakerMailTemplates';
 
@@ -259,7 +260,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
         <div className="flex flex-wrap items-center gap-xs">
           {supported ? (
             <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
-              {busy === 'save' ? 'Saving…' : 'Save wording'}
+              <BusyLabel busy={busy === 'save'} pending="Saving the wording…">Save wording</BusyLabel>
             </button>
           ) : null}
           <button type="button" className={secondaryButtonClass} onClick={runPreview} aria-busy={busy === 'preview'}>

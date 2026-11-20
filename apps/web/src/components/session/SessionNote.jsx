@@ -17,7 +17,7 @@ import { inputClass, quietActionClass } from '../controlClasses.js';
 
 const STATE_TEXT = {
   editing: '',
-  saving: 'Saving…',
+  saving: 'Saving your note…',
   saved: 'Saved.',
   error: 'The note could not be saved. Try again.',
   denied: 'Access updating, or your ticket does not include this session. Your note is still here. Try again later.',

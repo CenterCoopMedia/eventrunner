@@ -11,6 +11,7 @@ import { Radio } from '../../components/forms/Choice.jsx';
 import { sameCallSettings } from '../pitchCallSettings.js';
 import { Panel, Notice, SaveStatus, TextField, SelectField,
   ServerErrorSummary, fieldHintClass, fieldLabelClass, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 // A stored null deadline is "Open until I close it" (issue #476). A
 // missing deadline (no saved call yet) starts on a set date and time.
@@ -99,7 +100,7 @@ export default function PitchCallSettings({ settings, call, timeZone }) {
         <SelectField label="Where people pitch" value={intake} onChange={setIntake} options={intakeOptions} hint="With an external form, the site links to it. Pitches reach this queue through a refresh from Airtable or a CSV import." />
         {intake === 'external' ? <TextField name="externalFormUrl" label="External form address" type="url" value={formUrl} onChange={(v) => { setFormUrl(v); setFormUrlError(''); }} required maxLength={2048} error={formUrlError} hint="Use the form’s public https:// share link." /> : null}
       </fieldset>
-      <button aria-label="Save call settings" className={primaryButtonClass} aria-disabled={busy} aria-busy={busy}>{busy ? 'Saving…' : 'Save'}</button>
+      <button aria-label="Save call settings" className={primaryButtonClass} aria-disabled={busy} aria-busy={busy}><BusyLabel busy={busy} pending="Saving the call settings…">Save</BusyLabel></button>
       {result ? <SaveStatus message={result} /> : null}
     </form>
   </Panel>;

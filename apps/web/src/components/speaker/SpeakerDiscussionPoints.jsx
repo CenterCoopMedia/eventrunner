@@ -186,7 +186,7 @@ export default function SpeakerDiscussionPoints({ discussion }) {
       <div className="flex flex-wrap gap-sm">
         <button type="submit" className={primaryActionClass} disabled={!canSave && phase !== 'saving'}
           aria-disabled={phase === 'saving' || undefined} aria-busy={phase === 'saving'}>
-          {phase === 'saving' ? 'Saving…' : phase === 'uncertain' ? 'Retry previous save'
+          {phase === 'saving' ? 'Saving discussion points…' : phase === 'uncertain' ? 'Retry previous save'
             : submission ? 'Replace saved discussion points' : 'Save discussion points'}
         </button>
         {['load-error', 'uncertain', 'conflict'].includes(phase) ? (

@@ -15,6 +15,7 @@ import {
 } from './formControls.jsx';
 import AdminIconControl from './AdminIconControl.jsx';
 import { AddItemButton } from './listItemControls.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const withStored = (list, value) => (value === null || value === undefined || value === '' || list.includes(value) ? list : [...list, value]);
 const orEmpty = (value) => (value === null || value === undefined ? '' : value);
@@ -143,7 +144,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
       {error ? <Notice tone="error" message={error.message} /> : null}
       <div className="flex flex-wrap gap-xs">
         <button type="submit" className={primaryButtonClass} aria-busy={busy || undefined} aria-disabled={busy || undefined}>
-          {busy ? 'Saving…' : 'Save'}
+          <BusyLabel busy={busy} pending="Saving the pitch…">Save</BusyLabel>
         </button>
         <button type="button" className={secondaryButtonClass} onClick={onCancel} disabled={busy}>Cancel</button>
       </div>

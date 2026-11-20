@@ -48,6 +48,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const STATE_TONES = { on: 'ok', paused: 'caution', off: 'dead' };
 const STATE_LABELS = { on: 'On', paused: 'Paused', off: 'Off' };
@@ -227,6 +228,7 @@ function SpeakerSchedule({ call }) {
 
   function save(event) {
     event.preventDefault();
+    if (busyRef.current) return;
     const offsets = readOffsetInputs(form.offsets, data.limits);
     setOffsetsProblem(offsets.problem);
     if (offsets.problem || dueProblem) {
@@ -382,8 +384,8 @@ function SpeakerSchedule({ call }) {
 
           </fieldset>
           <div className="flex flex-wrap items-center gap-xs">
-            <button type="submit" className={primaryButtonClass} disabled={Boolean(busy)} aria-busy={busy === 'save'}>
-              {busy === 'save' ? 'Saving…' : 'Save'}
+            <button type="submit" className={primaryButtonClass} aria-disabled={Boolean(busy) || undefined} aria-busy={busy === 'save'}>
+              <BusyLabel busy={busy === 'save'} pending="Saving the schedule…">Save</BusyLabel>
             </button>
             <button type="button" className={secondaryButtonClass} onClick={runPreview} disabled={Boolean(busy)} aria-busy={busy === 'preview'}>
               {busy === 'preview' ? 'Preparing…' : 'Preview'}

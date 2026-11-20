@@ -206,7 +206,7 @@ describe('AdminReminderSchedules', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Save', exact: true })[0]);
     expect(screen.getByLabelText('Send time')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Preview', exact: true })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Saving…' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: 'Saving the schedule…' })).toHaveAttribute('aria-busy', 'true');
     await act(async () => finish(state()));
     expect(screen.getByLabelText('Send time')).not.toBeDisabled();
   });

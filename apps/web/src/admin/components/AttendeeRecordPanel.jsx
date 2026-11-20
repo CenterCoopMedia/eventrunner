@@ -30,6 +30,7 @@ import {
   primaryButtonClass,
 } from './formControls.jsx';
 import { AttendeeAnswers } from './RegistrationAnswers.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 /** The name a person reads for a row: display name, then address, then id. */
 export function attendeeName(row) {
@@ -133,6 +134,7 @@ export default function AttendeeRecordPanel({
 
   async function save(event) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(null);
     setStatus('');
@@ -182,10 +184,10 @@ export default function AttendeeRecordPanel({
           <button
             type="submit"
             className={primaryButtonClass}
-            disabled={saving}
+            aria-disabled={saving ? 'true' : undefined}
             aria-busy={saving ? 'true' : undefined}
           >
-            {saving ? 'Saving…' : 'Save'}
+            <BusyLabel busy={saving} pending="Saving the attendee record…">Save</BusyLabel>
           </button>
           {status ? <SaveStatus message={status} /> : null}
         </div>

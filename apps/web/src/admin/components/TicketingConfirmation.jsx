@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
+import BusyLabel from '../../components/BusyLabel.jsx';
 import { dangerButtonClass, Notice, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
 
 function tabStops(dialog) {
@@ -12,8 +13,12 @@ function tabStops(dialog) {
   });
 }
 
-/** Action-time confirmation keeps keyboard focus inside and returns it to its opener. */
-export default function TicketingConfirmation({ title, children, confirmLabel, onConfirm, onClose, busy, error, destructive = false, busyLabel = 'Saving…' }) {
+/**
+ * Action-time confirmation keeps keyboard focus inside and returns it to its
+ * opener. `busyLabel` names the work the confirm button is doing; there is no
+ * default, so every caller says what it does.
+ */
+export default function TicketingConfirmation({ title, children, confirmLabel, onConfirm, onClose, busy, error, destructive = false, busyLabel }) {
   const dialogRef = useRef(null);
   const headingRef = useRef(null);
   const headingId = useId();
@@ -51,7 +56,7 @@ export default function TicketingConfirmation({ title, children, confirmLabel, o
         <div id={bodyId} className="space-y-sm">{children}</div>
         {error ? <Notice tone="error" message={error} /> : null}
         <div className="flex flex-wrap gap-sm">
-          <button type="submit" className={destructive ? dangerButtonClass : primaryButtonClass} aria-busy={busy} aria-disabled={busy}>{busy ? busyLabel : confirmLabel}</button>
+          <button type="submit" className={destructive ? dangerButtonClass : primaryButtonClass} aria-busy={busy} aria-disabled={busy}><BusyLabel busy={busy} pending={busyLabel}>{confirmLabel}</BusyLabel></button>
           <button type="button" className={secondaryButtonClass} aria-disabled={busy} onClick={() => { if (!busy) onClose(); }}>Go back</button>
         </div>
       </form>

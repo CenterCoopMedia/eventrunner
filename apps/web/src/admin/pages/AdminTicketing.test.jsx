@@ -476,7 +476,7 @@ describe('AdminTicketing sync all tickets', () => {
     expect(callMock).not.toHaveBeenCalledWith('ticketingSync', expect.anything());
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sync all tickets' }));
-    const busy = within(dialog).getByRole('button', { name: 'Syncing…' });
+    const busy = within(dialog).getByRole('button', { name: 'Syncing all tickets…' });
     expect(busy).toHaveAttribute('aria-busy', 'true');
     fireEvent.click(busy);
     expect(callMock.mock.calls.filter(([name]) => name === 'ticketingSync')).toHaveLength(1);
@@ -508,7 +508,7 @@ describe('AdminTicketing sync all tickets', () => {
     expect(callMock.mock.calls.filter(([name]) => name === 'ticketingSync')[0][1]).toEqual({});
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue sync' }));
-    const busy = screen.getByRole('button', { name: 'Syncing…' });
+    const busy = screen.getByRole('button', { name: 'Syncing the remaining tickets…' });
     expect(busy).toHaveAttribute('aria-busy', 'true');
     fireEvent.click(busy);
     expect(callMock.mock.calls.filter(([name]) => name === 'ticketingSync')).toHaveLength(2);
@@ -645,7 +645,7 @@ describe('AdminTicketing create account from ticket', () => {
     expect(dialog).toHaveTextContent('The person then signs in with a code sent to this address.');
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create account and claim ticket' }));
-    expect(within(dialog).getByRole('button', { name: 'Creating…' })).toHaveAttribute('aria-busy', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Creating the account…' })).toHaveAttribute('aria-busy', 'true');
     expect(callMock).toHaveBeenCalledWith('createUserFromTicket', { externalId: 'tkt-open' });
 
     await act(async () => create.resolve({ ok: true, uid: 'new-1', created: true, registrationStatus: 'ticketed' }));

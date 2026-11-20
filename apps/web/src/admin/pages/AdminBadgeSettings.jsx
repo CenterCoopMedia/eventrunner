@@ -24,6 +24,7 @@ import {
 } from '../components/formControls.jsx';
 import FeatureSwitch from '../components/FeatureSwitch.jsx';
 import AdminPageHeader from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 function toForm(badges) {
   const categories = Array.isArray(badges?.categories) ? badges.categories : [];
@@ -118,8 +119,8 @@ export default function AdminBadgeSettings() {
         description="The badge set attendees pick from, grouped into categories with a cap on how many each attendee may choose."
         identifiers={`${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
         actions={
-          <button type="submit" className={primaryButtonClass} disabled={saving} aria-busy={saving || undefined}>
-            {saving ? 'Saving…' : 'Save badges'}
+          <button type="submit" className={primaryButtonClass} aria-disabled={saving || undefined} aria-busy={saving || undefined}>
+            <BusyLabel busy={saving} pending="Saving the badges…">Save badges</BusyLabel>
           </button>
         }
       />

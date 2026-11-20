@@ -67,7 +67,7 @@ export default function CreateAccountFromTicket({ call, ticket, ticketId, onDone
         <TicketingConfirmation
           title="Create an account from this ticket?"
           confirmLabel="Create account and claim ticket"
-          busyLabel="Creating…"
+          busyLabel="Creating the account…"
           busy={busy}
           error={error}
           onClose={() => { setOpen(false); setError(''); }}

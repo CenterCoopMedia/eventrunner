@@ -30,6 +30,7 @@ import {
 } from '../components/formControls.jsx';
 import { messageOf } from '../invoiceDoc.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 /** One id per preview, sent with every press of Send for it. */
 export function mintSendId() {
@@ -256,8 +257,8 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
           ) : null}
           <div className="flex flex-wrap items-center gap-xs">
             {preview.canSend ? (
-              <button type="button" className={primaryButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={send}>
-                {busy ? 'Sending…' : 'Send'}
+              <button type="button" className={primaryButtonClass} aria-disabled={busy || undefined} aria-busy={busy || undefined} onClick={send}>
+                <BusyLabel busy={busy} pending="Sending the invoice…">Send</BusyLabel>
               </button>
             ) : null}
             <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>

@@ -64,6 +64,7 @@ import {
 } from './formControls.jsx';
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import AnnouncementSavedMessages from './AnnouncementSavedMessages.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const EMPTY_DRAFT = { audience: '', subject: '', message: '', linkUrl: '', linkLabel: '' };
 /** A safety bound on the continue loop: far above 5,000 / 200 calls. */
@@ -279,7 +280,7 @@ function SendHistory({
                   aria-disabled={sending || send.busy ? 'true' : undefined}
                   onClick={() => { if (!sending && !send.busy) onContinue(send); }}
                 >
-                  {continuingId === send.id ? 'Sending…' : 'Continue sending'}
+                  <BusyLabel busy={continuingId === send.id} pending="Continuing the send…">Continue sending</BusyLabel>
                 </button>
               ) : null}
             </div>
@@ -785,7 +786,7 @@ export default function AnnouncementEmailComposer() {
                     aria-disabled={busy ? 'true' : undefined}
                     onClick={sendTest}
                   >
-                    {busy === 'test' ? 'Sending…' : 'Send test'}
+                    <BusyLabel busy={busy === 'test'} pending="Sending the test email…">Send test</BusyLabel>
                   </button>
                 </div>
               ) : null}
@@ -807,7 +808,7 @@ export default function AnnouncementEmailComposer() {
                       aria-disabled={busy || continuingId !== null ? 'true' : undefined}
                       onClick={confirmSend}
                     >
-                      {busy === 'send' ? 'Sending…' : `Send to ${recipients(count)}`}
+                      <BusyLabel busy={busy === 'send'} pending={`Sending to ${recipients(count)}…`}>{`Send to ${recipients(count)}`}</BusyLabel>
                     </button>
                     <button
                       type="button"

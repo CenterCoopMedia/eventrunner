@@ -116,16 +116,6 @@ export const rowMetaClass = 'font-admin-data text-admin-xs text-admin-ink-data';
 /** One list row's inner padding, so every galley in the room keeps one rhythm. */
 export const rowClass = 'flex flex-wrap items-center justify-between gap-sm px-md py-sm';
 
-/** Reserve both labels' width while exposing only the current action name. */
-export function ActionLabel({ busy, pending, children }) {
-  return (
-    <span className="inline-grid">
-      <span className={`[grid-area:1/1] ${busy ? 'invisible' : ''}`} aria-hidden={busy || undefined}>{children}</span>
-      <span className={`[grid-area:1/1] ${busy ? '' : 'invisible'}`} aria-hidden={!busy || undefined}>{pending}</span>
-    </span>
-  );
-}
-
 /** A labelled text-ish input. `error` is the server's message, verbatim. */
 export function TextField({
   label,

@@ -340,7 +340,7 @@ describe('the Home hero image slot', () => {
     silentCollections = ['cmsContent_drafts'];
     await renderAt('/admin/content/home/hero');
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByText('Loading the home page…')).toBeInTheDocument();
   });
 
   it('keeps an existing image in the normal editor and updates the same field', async () => {

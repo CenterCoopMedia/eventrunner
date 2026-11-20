@@ -57,7 +57,7 @@ export default function FeatureSwitch({ featureKeys }) {
             onChange={(checked) => change(key, checked)}
             disabled={!ready || saving || Boolean(awaiting)}
             aria-busy={saving || undefined}
-            hint={saving ? 'Saving…' : !ready || awaiting ? 'Waiting for the current settings…' : 'Changes save immediately.'}
+            hint={saving ? 'Saving the setting…' : !ready || awaiting ? 'Waiting for the current settings…' : 'Changes save immediately.'}
           />
         ) : (
           <p key={key} className="text-admin-sm text-admin-ink-secondary">{label}: {enabled ? 'On' : 'Off'}. Only an operator can change this setting.</p>

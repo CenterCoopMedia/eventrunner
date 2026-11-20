@@ -265,7 +265,7 @@ describe('preview and send', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Send 1 reminder' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Send 1 reminder' }));
-    const busy = await within(dialog).findByRole('button', { name: 'Sending…' });
+    const busy = await within(dialog).findByRole('button', { name: 'Sending the reminders…' });
     fireEvent.click(busy);
     expect(callsFor('send')).toHaveLength(1);
     finish({ batchId: 'x', sent: [], alreadySent: [], skipped: [], failed: [{ speakerId: 'ada', name: 'Ada Lee' }] });

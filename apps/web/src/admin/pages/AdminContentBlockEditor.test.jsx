@@ -657,7 +657,7 @@ describe('content editing workspace', () => {
     await renderAt('/admin/content/home/hero/register');
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
-    expect(screen.getByRole('button', { name: 'Saving…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Saving the block…' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
     expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Discard changes' })).not.toBeInTheDocument();

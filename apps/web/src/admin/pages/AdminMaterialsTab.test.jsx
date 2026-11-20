@@ -526,7 +526,7 @@ describe('AdminMaterialsTab: page states', () => {
     fireEvent.click(retry);
     await waitFor(() => expect(retry).toHaveAttribute('aria-busy', 'true'));
     expect(retry).toHaveAttribute('aria-disabled', 'true');
-    expect(retry).toHaveTextContent('Loading…');
+    expect(retry).toHaveTextContent('Loading the materials…');
     expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.click(retry);
     expect(callsTo('listAllSessionMaterials')).toHaveLength(2);

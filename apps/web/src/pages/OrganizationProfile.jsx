@@ -27,6 +27,7 @@ import {
   representativeFields,
   validateRepresentativeForm,
 } from '../lib/organizationProfileForm.js';
+import BusyLabel from '../components/BusyLabel.jsx';
 
 const FIELDS = [
   {
@@ -262,7 +263,7 @@ export default function OrganizationProfile() {
           );
         })}
         <button type="submit" className={primaryActionClass} aria-busy={saving || undefined}>
-          {saving ? 'Sending…' : 'Send for review'}
+          <BusyLabel busy={saving} pending="Sending your changes for review…">Send for review</BusyLabel>
         </button>
       </form>
     </article>

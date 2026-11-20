@@ -1,5 +1,6 @@
 import HelpDisclosure from '../components/HelpDisclosure.jsx';
 import HelpTooltip from '../components/HelpTooltip.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 // Speaker reminders: email accepted speakers about the items they still owe
 // (functions/src/speakers/reminders.cjs, one staff endpoint with actions).
 //
@@ -334,7 +335,7 @@ function WordingEditor({ call, timeZone }) {
         <div className="flex flex-wrap items-center gap-xs">
           {supported ? (
             <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
-              {busy === 'save' ? 'Saving…' : 'Save wording'}
+              <BusyLabel busy={busy === 'save'} pending="Saving the reminder wording…">Save wording</BusyLabel>
             </button>
           ) : null}
           {data.saved ? (
@@ -610,7 +611,7 @@ export default function AdminSpeakerReminders() {
         <TicketingConfirmation
           title={`${sendLabel(preview.recipients.length)}?`}
           confirmLabel={sendLabel(preview.recipients.length)}
-          busyLabel="Sending…"
+          busyLabel="Sending the reminders…"
           busy={busy === 'send'}
           error={sendError}
           onConfirm={send}

@@ -68,6 +68,7 @@ import EventTracksEditor, {
   submittedTrackLetters,
   tracksPayload,
 } from '../components/EventTracksEditor.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 /** Shared empty result, so a render with no errors is not a new Map. */
 const NO_ERRORS = new Map();
@@ -567,10 +568,10 @@ export default function AdminEventSettings() {
           <button
             type="submit"
             className={primaryButtonClass}
-            disabled={saving}
+            aria-disabled={saving || undefined}
             aria-busy={saving || undefined}
           >
-            {saving ? 'Saving…' : 'Save event settings'}
+            <BusyLabel busy={saving} pending="Saving event settings…">Save event settings</BusyLabel>
           </button>
         }
       />

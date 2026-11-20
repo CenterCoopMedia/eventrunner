@@ -19,6 +19,14 @@ Do not introduce an instruction with sales language, a rhetorical question, or a
 
 Error messages follow [the interface writing rule](interface-guidelines.md#error-messages): State the failure and the next action, preserve typed input, and avoid blame, apology filler and "Oops".
 
+## Name the work in a busy control
+
+A busy control names the work it is doing, from the press: "Saving the session…", "Sending the invoice…", "Loading more tickets…". Do not use a bare "Saving…", "Loading…", "Sending…" or "Working…". Start with the verb, name the object, and end with one ellipsis character. One exception: The state word in a list of sent files ("Sending…", "Sent", "Failed") sits beside the file name, which names the work.
+
+If the work is still running at ten seconds, the words change to "Still" and the same words: "Still saving the session…". A screen reader hears one line, once: "Still saving the session. This is taking longer than usual." Do not blame the reader, the network or the server, and do not apologize.
+
+A **Try again** control appears beside a late control only where a repeat is safe: a read, or a write that reuses a stored request id. A late send, charge or invoice with no such id keeps its words; its confirmation says where to check, such as the Email log. `components/BusyLabel.jsx` holds the rule.
+
 ## Use one term for one concept
 
 Use the same term in the interface, documentation, email, and support text.

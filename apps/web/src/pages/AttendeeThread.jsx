@@ -130,7 +130,7 @@ export default function AttendeeThread() {
   const reports = useSocialReports(feedKey, activeKey, user);
 
   if (access === 'closed') {
-    if (resolving) return <LoadingState shape="rows" label="Loading…" />;
+    if (resolving) return <LoadingState shape="rows" label="Loading the page…" />;
     return <NotFound />;
   }
 

@@ -242,14 +242,14 @@ describe('AdminChangeRequests: status changes', () => {
     expect(callMock).toHaveBeenCalledTimes(5);
   });
 
-  it('shows Saving… with aria-busy on the pressed control and disables the row’s others', async () => {
+  it('shows the saving words with aria-busy on the pressed control and disables the row’s others', async () => {
     let settle;
     callMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
     renderPage();
     pushRows([request('one')]);
     fireEvent.click(screen.getByRole('button', { name: 'Mark in progress' }));
 
-    const saving = screen.getByRole('button', { name: 'Saving…' });
+    const saving = screen.getByRole('button', { name: 'Saving the status…' });
     expect(saving).toHaveAttribute('aria-busy', 'true');
     expect(saving).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
@@ -265,8 +265,8 @@ describe('AdminChangeRequests: status changes', () => {
 
   // Review finding 4: the listener can deliver the committed status before
   // the HTTP answer. The pressed control must stay the pressed control,
-  // "Saving…" and aria-busy, until the call settles.
-  it('keeps Saving… on the pressed control when the new status arrives before the answer', async () => {
+  // "Saving the status…" and aria-busy, until the call settles.
+  it('keeps the saving words on the pressed control when the new status arrives before the answer', async () => {
     let settle;
     callMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
     renderPage();
@@ -277,7 +277,7 @@ describe('AdminChangeRequests: status changes', () => {
 
     // The snapshot lands first: under Open, a done row would leave the list.
     pushRows([request('one', { status: 'done' })]);
-    const saving = screen.getByRole('button', { name: 'Saving…' });
+    const saving = screen.getByRole('button', { name: 'Saving the status…' });
     expect(saving).toBe(pressed);
     expect(saving).toHaveAttribute('aria-busy', 'true');
     expect(saving).toBeEnabled();
@@ -285,7 +285,7 @@ describe('AdminChangeRequests: status changes', () => {
     expect(screen.queryByRole('button', { name: 'Reopen' })).toBeNull();
 
     await act(async () => { settle({}); });
-    expect(screen.queryByRole('button', { name: 'Saving…' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Saving the status…' })).toBeNull();
   });
 
   it('keeps a pressed Decline in place, saving, when the declined status arrives first', async () => {
@@ -299,7 +299,7 @@ describe('AdminChangeRequests: status changes', () => {
 
     pushRows([request('one', { status: 'declined' })]);
     expect(pressed).toBeInTheDocument();
-    expect(pressed).toHaveTextContent('Saving…');
+    expect(pressed).toHaveTextContent('Declining the request…');
     expect(pressed).toHaveAttribute('aria-busy', 'true');
     expect(pressed).toHaveFocus();
     // The following step is drawn, but it is not the pressed control.

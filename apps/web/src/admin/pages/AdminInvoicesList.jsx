@@ -29,6 +29,7 @@ import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 export const STATUS_FILTERS = Object.freeze([
   { value: '', label: 'All statuses' },
@@ -117,6 +118,7 @@ export default function AdminInvoicesList() {
   }
 
   async function showMore() {
+    if (loadingMore) return;
     const generation = generationRef.current;
     const current = () => generation === generationRef.current;
     setLoadingMore(true);
@@ -138,11 +140,11 @@ export default function AdminInvoicesList() {
     <button
       type="button"
       className={secondaryButtonClass}
-      disabled={loadingMore}
+      aria-disabled={loadingMore || undefined}
       aria-busy={loadingMore || undefined}
       onClick={showMore}
     >
-      {loadingMore ? 'Loading…' : label}
+      <BusyLabel busy={loadingMore} pending="Loading more invoices…">{label}</BusyLabel>
     </button>
   );
 

@@ -33,12 +33,16 @@ describe('media action feedback', () => {
     const request = deferred();
     const remove = vi.fn(() => request.promise);
     const onClose = vi.fn();
-    render(<AssetModal asset={asset} operator onClose={onClose} scanUsage={vi.fn().mockResolvedValue({ [asset.path]: [] })} updateMetadata={vi.fn()} remove={remove} />);
+    const updateMetadata = vi.fn();
+    render(<AssetModal asset={asset} operator onClose={onClose} scanUsage={vi.fn().mockResolvedValue({ [asset.path]: [] })} updateMetadata={updateMetadata} remove={remove} />);
     await screen.findByText('This file is not used in your event.');
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(save);
+    expect(updateMetadata).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
     expect(onClose).not.toHaveBeenCalled();

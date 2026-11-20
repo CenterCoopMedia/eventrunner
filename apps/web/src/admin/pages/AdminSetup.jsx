@@ -36,6 +36,7 @@ import {
 } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import AdminIconControl from '../components/AdminIconControl.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const stepPath = (step) => `/admin/setup/${step.slug}`;
 
@@ -89,7 +90,7 @@ function LegalSignOff({ onSaved }) {
           aria-busy={busy || undefined}
           aria-disabled={busy || undefined}
         >
-          {busy ? 'Saving…' : 'Approve'}
+          <BusyLabel busy={busy} pending="Saving the approval…">Approve</BusyLabel>
         </button>
       </div>
       {error ? <Notice tone="error" message={error.message} /> : null}

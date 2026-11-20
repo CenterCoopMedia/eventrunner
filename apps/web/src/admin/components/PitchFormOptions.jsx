@@ -14,6 +14,7 @@ import {
 import {
   AddOneListField, Notice, Panel, SaveStatus, SelectField, primaryButtonClass,
 } from './formControls.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 /**
  * An entry that is not a whole number stays in the list as NaN, so the shared
@@ -106,7 +107,7 @@ export default function PitchFormOptions({ settings, call }) {
         </fieldset>
         <SelectField label="Co-presenters per pitch" value={form.maxCoPresenters} onChange={edit('maxCoPresenters')} options={CO_PRESENTER_CHOICES} hint="The person who pitches is always the lead presenter." />
         <button type="submit" aria-label="Save pitch form options" className={primaryButtonClass} aria-busy={busy || undefined} aria-disabled={busy || undefined}>
-          {busy ? 'Saving…' : 'Save'}
+          <BusyLabel busy={busy} pending="Saving the form options…">Save</BusyLabel>
         </button>
         {result ? <SaveStatus message={result} /> : null}
       </form>

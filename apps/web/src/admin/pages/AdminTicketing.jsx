@@ -47,6 +47,7 @@ import AdminPageHeader, {
 import AdminTableScroll from '../components/AdminTableScroll.jsx';
 import { ticketStatusLabel } from '../../lib/ticketingDetails.js';
 import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from '../components/CreateAccountFromTicket.jsx';
 
 const StripeTicketingWorkspace = lazy(() => import('../components/StripeTicketingWorkspace.jsx'));
@@ -214,7 +215,7 @@ function SyncAllTickets({ call, providerLabel, onSynced }) {
         {cursor ? (
           <button type="button" className={secondaryButtonClass} aria-busy={busy && !open} aria-disabled={busy}
             onClick={() => run(cursor)}>
-            {busy && !open ? 'Syncing…' : 'Continue sync'}
+            <BusyLabel busy={busy && !open} pending="Syncing the remaining tickets…">Continue sync</BusyLabel>
           </button>
         ) : null}
       </div>
@@ -225,7 +226,7 @@ function SyncAllTickets({ call, providerLabel, onSynced }) {
         <TicketingConfirmation
           title="Sync all tickets?"
           confirmLabel="Sync all tickets"
-          busyLabel="Syncing…"
+          busyLabel="Syncing all tickets…"
           busy={busy}
           error={error}
           onClose={() => { setOpen(false); setError(''); }}
@@ -629,8 +630,14 @@ function TicketList({ call, refreshToken }) {
 
       {cursor ? (
         <div className="mt-sm">
-          <button type="button" className={secondaryButtonClass} onClick={() => search(true)} disabled={loading}>
-            {loading ? 'Loading…' : 'Load more'}
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            aria-busy={loading || undefined}
+            aria-disabled={loading || undefined}
+            onClick={() => { if (!loading) search(true); }}
+          >
+            <BusyLabel busy={loading} pending="Loading more tickets…">Load more</BusyLabel>
           </button>
         </div>
       ) : null}

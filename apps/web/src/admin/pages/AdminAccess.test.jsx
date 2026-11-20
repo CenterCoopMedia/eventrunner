@@ -311,9 +311,14 @@ describe('AdminAccess', () => {
     fireEvent.click(rowFor('desk@example.org').querySelector('button'));
     const surface = screen.getByRole('region', { name: 'Change desk@example.org to operator' });
     fireEvent.click(within(surface).getByRole('button', { name: 'Change to operator' }));
-    const busyButton = await within(surface).findByRole('button', { name: 'Saving…' });
+    const busyButton = await within(surface).findByRole('button', { name: 'Saving the access change…' });
     expect(busyButton).toHaveAttribute('aria-busy', 'true');
-    expect(busyButton).toBeDisabled();
+    // Busy, not disabled: the control keeps the keyboard and refuses the press.
+    expect(busyButton).toHaveAttribute('aria-disabled', 'true');
+    expect(busyButton).not.toBeDisabled();
+    const calls = callMock.mock.calls.length;
+    fireEvent.click(busyButton);
+    expect(callMock.mock.calls.length).toBe(calls);
   });
 
   it('says so when a change changed nothing', async () => {
@@ -369,7 +374,7 @@ describe('AdminAccess', () => {
     retry.focus();
     fireEvent.click(retry);
     // In flight: the SAME control, busy, still where the keyboard is.
-    const busy = await screen.findByRole('button', { name: 'Loading…' });
+    const busy = await screen.findByRole('button', { name: 'Loading the access list…' });
     expect(busy).toBe(retry);
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(document.activeElement).toBe(retry);
@@ -383,6 +388,99 @@ describe('AdminAccess', () => {
     expect(screen.getByRole('alert').textContent).toContain('The access list could not be loaded. Try again.');
     expect(document.activeElement).toBe(retry);
     expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('offers a fresh read beside a retry still waiting at ten seconds, and only the newest read lands', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers = [];
+      callMock.mockImplementation((name) => {
+        if (name !== 'listAdminAccess') return Promise.resolve({});
+        if (answers.length === 0) {
+          answers.push(null);
+          return Promise.reject(serverError(500, 'internal', 'down'));
+        }
+        return new Promise((resolve) => answers.push(resolve));
+      });
+      const reads = () => callMock.mock.calls.filter(([name]) => name === 'listAdminAccess').length;
+      render(<AdminAccess />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(reads()).toBe(2);
+      act(() => vi.advanceTimersByTime(9999));
+      expect(screen.getByRole('button', { name: 'Loading the access list…' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByRole('button', { name: 'Still loading the access list…' })).toHaveAttribute('aria-busy', 'true');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(reads()).toBe(3);
+      await act(async () => answers[2](LIST));
+      expect(screen.getByRole('table', { name: 'Admin accounts and their roles' })).toBeInTheDocument();
+      expect(rowFor('desk@example.org')).toBeTruthy();
+
+      // The read that never answered in time lands last and changes nothing.
+      await act(async () => answers[1]({ accounts: [], callerEmail: 'ops@example.org' }));
+      expect(rowFor('desk@example.org')).toBeTruthy();
+      expect(reads()).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the first list to answer at once, even while a newer read is still out', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers = [];
+      callMock.mockImplementation((name) => {
+        if (name !== 'listAdminAccess') return Promise.resolve({});
+        if (answers.length === 0) {
+          answers.push(null);
+          return Promise.reject(serverError(500, 'internal', 'down'));
+        }
+        return new Promise((resolve) => answers.push(resolve));
+      });
+      render(<AdminAccess />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      act(() => vi.advanceTimersByTime(10000));
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      // The older retry answers first: its list shows without waiting.
+      await act(async () => answers[1](LIST));
+      expect(rowFor('desk@example.org')).toBeTruthy();
+      // The newer read still lands after it.
+      const later = { ...LIST, accounts: [...LIST.accounts, { email: 'new@example.org', tier: 'staff' }] };
+      await act(async () => answers[2](later));
+      expect(rowFor('new@example.org')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a newer failed read when an older list answers after it', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers = [];
+      callMock.mockImplementation((name) => {
+        if (name !== 'listAdminAccess') return Promise.resolve({});
+        if (answers.length === 0) {
+          answers.push(null);
+          return Promise.reject(serverError(500, 'internal', 'down'));
+        }
+        return new Promise((resolve, reject) => answers.push({ resolve, reject }));
+      });
+      render(<AdminAccess />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      act(() => vi.advanceTimersByTime(10000));
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await act(async () => answers[2].reject(serverError(500, 'internal', 'down again')));
+      await act(async () => answers[1].resolve(LIST));
+      expect(screen.queryByRole('table')).toBeNull();
+      expect(screen.getByRole('alert').textContent).toContain('The access list could not be loaded. Try again.');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a list load that lands while a confirmation is open does not pull focus back onto the surface', async () => {
@@ -737,7 +835,8 @@ describe('access sign-in instructions', () => {
     fireEvent.click(confirm);
     fireEvent.click(confirm);
     expect(resendCalls()).toHaveLength(1);
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
+    expect(confirm).toHaveAccessibleName('Sending sign-in instructions…');
     await act(async () => rejectFirst(new Error('response lost')));
     expect(await screen.findByText('Email acceptance could not be confirmed. Try again checks this attempt without sending a second copy.')).toBeInTheDocument();
     fireEvent.click(within(surface).getByRole('button', { name: 'Send sign-in instructions' }));

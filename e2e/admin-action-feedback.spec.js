@@ -182,7 +182,7 @@ test('editor actions stay anchored through save, newer edits, publish and failur
         nextSave = saved;
         await page.getByRole('button', { name: 'Save', exact: true }).click();
         await saved.received.promise;
-        await expect(page.getByRole('button', { name: 'Saving…', exact: true })).toHaveAttribute('aria-busy', 'true');
+        await expect(page.getByRole('button', { name: 'Saving the timeline…', exact: true })).toHaveAttribute('aria-busy', 'true');
         expect(await geometry()).toEqual(baseline);
         saved.release.resolve();
         const feedback = page.getByRole('region', { name: 'Editor action status' });
@@ -198,7 +198,7 @@ test('editor actions stay anchored through save, newer edits, publish and failur
         nextPublish = publish;
         await page.getByRole('button', { name: 'Publish', exact: true }).click();
         await saveForPublish.received.promise;
-        await expect(page.getByRole('button', { name: 'Publishing…', exact: true })).toHaveAttribute('aria-busy', 'true');
+        await expect(page.getByRole('button', { name: 'Publishing the timeline…', exact: true })).toHaveAttribute('aria-busy', 'true');
         expect(await geometry()).toEqual(baseline);
         saveForPublish.release.resolve();
         await publish.received.promise;

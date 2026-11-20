@@ -13,6 +13,7 @@ import { formatPublishedAt } from '../versionHistory.js';
 import { AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { Notice, SaveStatus, TextField, SelectField, ServerErrorSummary,
   secondaryButtonClass } from '../components/formControls.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const BASE_ID_RE = /^app[A-Za-z0-9]{14}$/;
 function baseIdFromLink(value) {
@@ -200,7 +201,7 @@ function ConnectionSettings({ stored, call }) {
         </fieldset>
         <SelectField label="Automatic refresh" value={form.scheduleMinutes} onChange={set('scheduleMinutes')} options={SCHEDULES} hint="Choose how often to check for new proposals." />
       </fieldset>
-      <button className={secondaryButtonClass} aria-busy={busy || undefined}>{busy ? 'Saving…' : 'Save'}</button>
+      <button className={secondaryButtonClass} aria-busy={busy || undefined}><BusyLabel busy={busy} pending="Saving the Airtable sync…">Save</BusyLabel></button>
       {result ? <SaveStatus message={result} /> : null}
     </form>
   </details>;

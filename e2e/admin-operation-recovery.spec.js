@@ -59,7 +59,7 @@ test('a phone edit opens the composer, keeps a failed draft and exposes its retr
     });
     await page.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(message).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Saving…', exact: true })).toHaveAttribute('aria-busy', 'true');
+    await expect(page.getByRole('button', { name: 'Saving the update…', exact: true })).toHaveAttribute('aria-busy', 'true');
     await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled();
     releaseHeld();
     const refusal = page.getByRole('alert').filter({ hasText: 'The update could not be saved. Try again.' });

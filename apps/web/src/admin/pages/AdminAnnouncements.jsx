@@ -26,6 +26,7 @@ import AdminPageHeader, {
 } from '../components/adminChrome.jsx';
 import AnnouncementEmailComposer from '../components/AnnouncementEmailComposer.jsx';
 import '../communicationsWorkspace.css';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const EMPTY_FORM = {
   message: '', level: 'info', startsAt: '', endsAt: '', linkUrl: '', linkLabel: '',
@@ -134,6 +135,7 @@ export default function AdminAnnouncements() {
 
   async function submit(event) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -256,8 +258,8 @@ export default function AdminAnnouncements() {
               />
             </div>
             <div className="flex flex-wrap gap-xs">
-              <button type="submit" className={primaryButtonClass} disabled={saving}>
-                {saving ? 'Saving…' : 'Save'}
+              <button type="submit" className={primaryButtonClass} aria-disabled={saving || undefined} aria-busy={saving || undefined}>
+                <BusyLabel busy={saving} pending="Saving the announcement…">Save</BusyLabel>
               </button>
               {editingId ? (
                 <button type="button" className={secondaryButtonClass} onClick={cancelEdit}>Cancel</button>

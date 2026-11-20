@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
 
 function confirmation(props = {}) {
-  return <TicketingConfirmation title="Cancel the selected admission tickets?" confirmLabel="Cancel admission" onConfirm={() => {}} onClose={() => {}} {...props}>
+  return <TicketingConfirmation title="Cancel the selected admission tickets?" confirmLabel="Cancel admission" busyLabel="Cancelling the tickets…" onConfirm={() => {}} onClose={() => {}} {...props}>
     {props.children ?? <label>Reason for this action<textarea /></label>}
   </TicketingConfirmation>;
 }
@@ -48,7 +48,7 @@ describe('TicketingConfirmation keyboard boundaries', () => {
     const view = render(confirmation({ onConfirm, onClose }));
     view.rerender(confirmation({ onConfirm, onClose, busy: true, children: <p>Saving the reviewed change.</p> }));
     const last = screen.getByRole('button', { name: 'Go back' });
-    const first = screen.getByRole('button', { name: 'Saving…' });
+    const first = screen.getByRole('button', { name: 'Cancelling the tickets…' });
     last.focus();
 
     expect(fireEvent.keyDown(last, { key: 'Tab' })).toBe(false);

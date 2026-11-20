@@ -59,7 +59,6 @@ import {
 } from '../../lib/pageTemplates.js';
 import { summarizePublish } from '../publishResult.js';
 import {
-  ActionLabel,
   CheckboxField,
   DestructiveConfirm,
   Notice,
@@ -84,6 +83,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 // THE OPERATOR PICKS A TASK, NOT A LAYOUT (this review).
 //
@@ -570,7 +570,7 @@ function PageEditor({ mode }) {
               Back to pages
             </Link>
             <button type="submit" className={secondaryButtonClass} disabled={busy !== null || Boolean(localDraft.recovery)} aria-busy={busy === 'draft' || undefined}>
-              <ActionLabel busy={busy === 'draft'} pending="Saving…">Save draft</ActionLabel>
+              <BusyLabel busy={busy === 'draft'} pending="Saving the page draft…">Save draft</BusyLabel>
             </button>
             <button
               type="button"
@@ -579,7 +579,7 @@ function PageEditor({ mode }) {
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              <ActionLabel busy={busy === 'publish'} pending="Publishing…">Save and publish</ActionLabel>
+              <BusyLabel busy={busy === 'publish'} pending="Publishing the page…">Save and publish</BusyLabel>
             </button>
           </>
         }
