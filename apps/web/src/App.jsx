@@ -21,8 +21,6 @@ import { installDeferredRoutePrefetch } from './lib/deferredRoutePrefetch.js';
 import { IS_DEMO } from './lib/demoMode.js';
 import FieldVitals from './components/FieldVitals.jsx';
 
-const routesWithSharedWait = new Set(['schedule/mine', 'tickets/mine', 'ticket/claim']);
-
 export function AppRoutes() {
   const { pathname } = useLocation();
   useEffect(() => installDeferredRoutePrefetch(document, prefetchRoutes, IS_DEMO), []);
@@ -43,7 +41,7 @@ export function AppRoutes() {
           { index: true, element: <Home /> },
           ...publicRoutes.map(({ path, Component, label, shape }) => ({
             path, element: <DeferredPage component={Component} shape={shape} label={label}
-              routeKey={routesWithSharedWait.has(path) ? pathname : undefined} />,
+              routeKey={(path === 'schedule/mine' || path === 'tickets/mine' || path === 'ticket/claim') && pathname} />,
           })),
         ],
       }],
