@@ -24,7 +24,7 @@
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
 // the BLOCK_TYPES registry, and `defaultBlocks` are the placeholders a new
 // site is seeded with. Neither is edited here; both pass through a save.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -39,7 +39,7 @@ import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
 import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
-import { prepareTimelineDocs } from '../../contexts/ContentContext.jsx';
+import ContentContext, { prepareTimelineDocs } from '../../contexts/ContentContext.jsx';
 import { useAdminTimeline } from '../useAdminTimeline.js';
 import { contentLanguages, resolveContentVariant } from 'shared/contentLanguages';
 import { buildNavItems } from '../../lib/siteNavigation.js';
@@ -229,8 +229,19 @@ function PageEditor({ mode }) {
     : record);
   // The published timeline entries, from the timeline collection itself:
   // the page's content provider may be showing drafts (?preview=1).
-  const { rows: timelineRows } = useAdminTimeline();
-  const publishedTimeline = prepareTimelineDocs(timelineRows.map((row) => row.live).filter(Boolean));
+  // Only visible entries, as the public query asks for (visible == true).
+  const { rows: timelineRows, ready: timelineReady, error: timelineError } = useAdminTimeline();
+  const publishedTimeline = useMemo(
+    () => prepareTimelineDocs(timelineRows.map((row) => row.live).filter((live) => live?.visible === true)),
+    [timelineRows],
+  );
+  // The preview draws that published timeline too, whatever the page's own
+  // content provider is showing.
+  const contentContext = useContext(ContentContext);
+  const previewContent = useMemo(
+    () => (contentContext ? { ...contentContext, timeline: publishedTimeline } : null),
+    [contentContext, publishedTimeline],
+  );
   // The pages a link can lead to once this page is published: the
   // published pages, with this page as it is being edited in place of its
   // published record (a new path or visibility counts).
@@ -1000,12 +1011,13 @@ function PageEditor({ mode }) {
                       layout choice would change nothing there. */}
                   {builtInSectionBlockTypes(page, section) ? null : (
                     <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+                      <ContentContext.Provider value={previewContent}>
                       <SectionLayoutChoice
                         value={section.layout}
                         onChange={(layout) => updateSection(sectionIndex, { layout })}
                         label={section.label}
                         blocks={sectionPreviewBlocks(section)}
-                        blocksReady={contentReady}
+                        blocksReady={contentReady && timelineReady}
                         previewId={`admin-section-preview-${sectionIndex}`}
                         budget={quoteBudget}
                         readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
@@ -1015,8 +1027,9 @@ function PageEditor({ mode }) {
                         hideHeading={headingHidden(section)}
                         firstOnPage={!page.systemPage && section.id === firstShownSectionId}
                         sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side' && publicNavShown}
-                        blocksError={Boolean(contentError) && !contentReady}
+                        blocksError={(Boolean(contentError) && !contentReady) || (Boolean(timelineError) && !timelineReady)}
                       />
+                      </ContentContext.Provider>
                     </div>
                   )}
 
