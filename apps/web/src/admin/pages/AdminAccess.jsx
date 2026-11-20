@@ -579,7 +579,7 @@ export default function AdminAccess() {
         title="Grant access"
         description={`Add a team member by email. Staff access can end within ${MAX_STAFF_ACCESS_DAYS} days; leave the end time empty for ongoing access. Times use your time zone.`}
       >
-        <form ref={formRef} onSubmit={submitGrant} className="flex flex-col gap-sm" noValidate>
+        <form ref={formRef} onSubmit={submitGrant} className="flex max-w-3xl flex-col gap-sm" noValidate>
           <fieldset disabled={busy} className="flex min-w-0 flex-wrap items-end gap-sm">
             <div className="min-w-0 flex-1">
               <TextField
