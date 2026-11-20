@@ -99,4 +99,26 @@ describe('useTeam', () => {
     await act(async () => reads.find((read) => read.orgId === 'orgB').resolve(teamB));
     expect(result.current.data).toEqual(teamB);
   });
+
+  it('lets a mutation that finishes after leaving its organization leave the new one alone', async () => {
+    const reads = [];
+    let finishInvite;
+    callApi.mockImplementation((name, body) => (name === 'getTeam'
+      ? new Promise((resolve) => reads.push({ orgId: body.orgId, resolve }))
+      : new Promise((resolve) => { finishInvite = resolve; })));
+    const { result, rerender } = renderHook(({ orgId }) => useTeam(orgId), { initialProps: { orgId: 'orgA' } });
+    const teamA = { ...TEAM, organization: { name: 'Org A' } };
+    await act(async () => reads[0].resolve(teamA));
+    let changed;
+    act(() => { changed = result.current.change('inviteMember', { email: 'a@example.org' }, 'Invite sent.'); });
+    rerender({ orgId: 'orgB' });
+    await act(async () => finishInvite({ ok: true }));
+    await act(async () => changed);
+    // No follow-up read for A starts, and B's own read still lands.
+    expect(reads.filter((read) => read.orgId === 'orgA')).toHaveLength(1);
+    const teamB = { ...TEAM, organization: { name: 'Org B' } };
+    await act(async () => reads.find((read) => read.orgId === 'orgB').resolve(teamB));
+    expect(result.current.data).toEqual(teamB);
+    expect(result.current.outcome).toBeNull();
+  });
 });

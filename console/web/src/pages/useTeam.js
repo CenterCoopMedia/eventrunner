@@ -14,12 +14,14 @@ export function useTeam(orgId) {
   // Reads land in the order they started: the first answer shows at once,
   // and an older read that answers after a newer one has landed (with a
   // team or a failure) returns null, so its caller leaves the state to the
-  // newer read. A new organization starts a new count, so an answer for the
-  // previous one never lands.
+  // newer read. The count belongs to the organization on screen: a new one
+  // starts a new count, and a read or a mutation's follow-up for a previous
+  // organization never starts, lands or resets it.
   const reads = useRef({ orgId, started: 0, landed: 0 });
+  if (reads.current.orgId !== orgId) reads.current = { orgId, started: 0, landed: 0 };
   const refreshes = useRef(0);
   const load = useCallback(async () => {
-    if (reads.current.orgId !== orgId) reads.current = { orgId, started: 0, landed: 0 };
+    if (reads.current.orgId !== orgId) return null;
     const count = reads.current;
     const attempt = ++count.started;
     const current = () => count === reads.current && attempt >= count.landed;
@@ -59,6 +61,7 @@ export function useTeam(orgId) {
     setOutcome(null);
     try {
       await callApi(name, { orgId, ...body });
+      if (reads.current.orgId !== orgId) return true;
       const problem = await load();
       if (problem !== null) setStale(Boolean(problem));
       setOutcome({ key, kind: 'success', message, refreshError: problem ? `The change is saved, but we could not refresh the team. ${problem}` : '' });
