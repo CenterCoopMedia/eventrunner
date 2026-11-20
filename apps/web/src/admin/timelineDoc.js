@@ -6,6 +6,7 @@
 // module gives the editor its form shape and the same limits, so a field
 // names its problem before the server has to.
 import { recordStateOf } from './recordState.js';
+import { timelineHref, timelineImagePath } from '../lib/timelineEntry.js';
 
 /**
  * The bounds each field keeps. Mirrors TIMELINE_LIMITS in
@@ -17,6 +18,7 @@ export const TIMELINE_LIMITS = Object.freeze({
   yearMax: 2100,
   titleMax: 120,
   descriptionMax: 600,
+  altMax: 240,
 });
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
@@ -64,20 +66,19 @@ function yearValue(value) {
 }
 
 /**
- * The `fields` cmsCreateContent and cmsUpdateContent receive: the three
- * fields an entry stores and nothing else. The server drops the seed's
- * bookkeeping on every admin write, so an edited demo entry is the
- * client's from then on.
- *
- * @param {{ year: string, title: string, description: string }} form
- * @returns {{ year: number|string, title: string, description: string|null }}
+ * Blank optional fields are sent as null so an update can clear a link or
+ * remove an image and its alternative text.
  */
 export function timelineFields(form) {
   const description = String(form.description ?? '').trim();
+  const image = timelineImagePath(form.image);
   return {
     year: yearValue(form.year),
     title: String(form.title ?? '').trim(),
     description: description || null,
+    url: timelineHref(form.url),
+    image,
+    alt: image ? (String(form.alt ?? '').trim() || null) : null,
   };
 }
 
@@ -85,7 +86,7 @@ export function timelineFields(form) {
  * The editor's own checks, field by field. The server repeats each one;
  * these name the problem while the operator is still looking at the field.
  *
- * @param {{ year: string, title: string, description: string }} form
+ * @param {{ year: string, title: string, description: string, url?: string, image?: string, alt?: string }} form
  * @returns {Map<string, string>} field → message
  */
 export function validateTimelineForm(form) {
@@ -104,6 +105,17 @@ export function validateTimelineForm(form) {
     errors.set('description', `Use ${TIMELINE_LIMITS.descriptionMax} characters or fewer.`);
   } else if (CONTROL_CHARACTER.test(description.replaceAll('\n', ''))) {
     errors.set('description', 'Use plain text. A line break is the only control character allowed.');
+  }
+  if (String(form.url ?? '').trim() && !timelineHref(form.url)) {
+    errors.set('url', 'Use a full HTTPS address or an internal path such as /schedule.');
+  }
+  const image = timelineImagePath(form.image);
+  if (String(form.image ?? '').trim() && !image) errors.set('image', 'Choose an image from the media library.');
+  if (image) {
+    const alt = String(form.alt ?? '').trim();
+    if (!alt || alt.length > TIMELINE_LIMITS.altMax || CONTROL_CHARACTER.test(alt)) {
+      errors.set('alt', `Describe the image in ${TIMELINE_LIMITS.altMax} characters or fewer.`);
+    }
   }
   return errors;
 }

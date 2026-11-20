@@ -44,7 +44,23 @@ describe('Timeline', () => {
   it('links a title that has somewhere to go, and leaves the rest as text', () => {
     inRouter(<Timeline entries={EDITIONS} />);
     expect(screen.getByRole('link', { name: 'Second edition' })).toHaveAttribute('href', '/recap');
+    expect(screen.getByRole('link', { name: 'Second edition' })).not.toHaveAttribute('target');
     expect(screen.queryByRole('link', { name: 'Third edition' })).toBeNull();
+  });
+
+  it('isolates external links and renders invalid destinations as headings', () => {
+    inRouter(<Timeline entries={[
+      { id: 'external', title: 'External recap', href: 'https://example.org/recap' },
+      { id: 'unsafe', title: 'Unsafe link', href: '//example.org/recap', image: 'https://example.org/photo.png', alt: 'An untrusted image' },
+      { id: 'undescribed', title: 'Undescribed image', image: 'cms-images/archive/photo.png' },
+    ]} />);
+    const external = screen.getByRole('link', { name: 'External recap' });
+    expect(external).toHaveAttribute('target', '_blank');
+    expect(external).toHaveAttribute('rel', 'noopener');
+    expect(external).toHaveAttribute('href', 'https://example.org/recap');
+    expect(screen.getByRole('heading', { name: 'Unsafe link' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Unsafe link' })).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
   });
 
   it('takes the heading level the outline needs', () => {

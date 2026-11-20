@@ -15,7 +15,7 @@ const {
 
 const TYPE_IDS = [
   'text', 'richtext', 'image', 'cta', 'stat', 'fact', 'quote', 'list_item', 'faq_item', 'link_group',
-  'gallery', 'sponsor_package', 'map',
+  'gallery', 'sponsor_package', 'map', 'timeline',
 ];
 
 test('registry ships exactly the supported block types', () => {
@@ -126,7 +126,7 @@ test('every block type is a well-formed contract', () => {
     assert.equal(typeof def.label, 'string');
     assert.ok(def.label.length > 0);
     assert.equal(typeof def.description, 'string');
-    assert.ok(Array.isArray(def.fields) && def.fields.length > 0, `${key}: needs fields`);
+    assert.ok(Array.isArray(def.fields), `${key}: needs a field list`);
     const fieldIds = def.fields.map((f) => f.id);
     assert.equal(new Set(fieldIds).size, fieldIds.length, `${key}: duplicate field ids`);
     for (const f of def.fields) {
@@ -134,7 +134,8 @@ test('every block type is a well-formed contract', () => {
       assert.ok(internals.FIELD_TYPES.includes(f.type), `${key}.${f.id}: bad field type ${f.type}`);
       assert.equal(typeof f.required, 'boolean');
     }
-    assert.ok(def.fields.some((f) => f.required), `${key}: at least one required field`);
+    if (key === 'timeline') assert.deepEqual(def.fields, []);
+    else assert.ok(def.fields.some((f) => f.required), `${key}: at least one required field`);
   }
 });
 

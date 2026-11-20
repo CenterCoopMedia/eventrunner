@@ -1,11 +1,14 @@
 'use strict';
 
+const { internalRoutePath } = require('shared/languageUrls');
+const { safeUrlHref } = require('shared/urlSafety');
+const { isMediaLibraryPath, storageObjectPath } = require('shared/venue');
+
 /**
  * Timeline entry rules at the content-write seam (issue #194).
  *
- * A cmsTimeline document is one past edition of the event: its year, a
- * title, and an optional description. The home page's History section
- * lists them oldest first (apps/web/src/components/HistorySection.jsx).
+ * A cmsTimeline document records one past edition of the event. Timeline
+ * blocks and the home page's History section list the entries oldest first.
  * They go through the generic content endpoints (content.cjs), which
  * check reserved key NAMES and never a TYPE, so these rules refuse a bad
  * value at the save, where the editor can put the message on the field it
@@ -22,9 +25,6 @@
  * key before this seam) is dropped from the merged result, so the next
  * save cleans the entry instead of locking it.
  *
- * Every field is plain text. Nothing here is markup, and the page renders
- * each value as text.
- *
  * Pure: no db, no clock. content.cjs calls this inside the write
  * transaction and throws the joined messages as a 400.
  */
@@ -36,7 +36,7 @@ const COLLECTION = 'cmsTimeline';
  * seed's own bookkeeping (scripts/lib/idempotency.cjs); content.cjs drops
  * both from every admin write before this check runs.
  */
-const TIMELINE_FIELDS = Object.freeze(['year', 'title', 'description', 'seeded', 'seededAt']);
+const TIMELINE_FIELDS = Object.freeze(['year', 'title', 'description', 'url', 'image', 'alt', 'seeded', 'seededAt']);
 
 /**
  * The bounds each field keeps. The editor mirrors them
@@ -48,6 +48,7 @@ const TIMELINE_LIMITS = Object.freeze({
   yearMax: 2100,
   titleMax: 120,
   descriptionMax: 600,
+  altMax: 240,
 });
 
 const MESSAGES = Object.freeze({
@@ -58,12 +59,30 @@ const MESSAGES = Object.freeze({
   descriptionType: 'description: must be text',
   descriptionLength: `description: use ${TIMELINE_LIMITS.descriptionMax} characters or fewer`,
   descriptionControl: 'description: use plain text; a line break is the only control character allowed',
+  url: 'url: use a full HTTPS address or an internal path such as /schedule',
+  image: 'image: choose an image from the media library',
+  alt: `alt: describe the image in ${TIMELINE_LIMITS.altMax} characters or fewer`,
 });
 
 // Unicode control characters: C0, DEL and C1, line breaks and tabs included.
 const CONTROL_CHARACTER = /\p{Cc}/u;
 
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object ?? {}, key);
+
+// The editor and public renderer mirror these checks in lib/timelineEntry.js.
+function timelineHref(value) {
+  if (typeof value !== 'string') return null;
+  const href = value.trim();
+  if (CONTROL_CHARACTER.test(href) || href.includes('\\')) return null;
+  if (internalRoutePath(href)) return href;
+  const absolute = safeUrlHref(href);
+  return absolute.startsWith('https://') && !/^https:\/\/[^/?#]*@/.test(absolute) ? absolute : null;
+}
+
+function timelineImagePath(value) {
+  const path = storageObjectPath(value);
+  return isMediaLibraryPath(path) && !CONTROL_CHARACTER.test(path) && !path.includes('\\') ? path : null;
+}
 
 /**
  * Check and normalize one timeline entry.
@@ -119,6 +138,25 @@ function validateTimelineFields(fields, sent = {}) {
     if (trimmed.length > TIMELINE_LIMITS.descriptionMax) errors.push(MESSAGES.descriptionLength);
     else if (CONTROL_CHARACTER.test(trimmed.replaceAll('\n', ''))) errors.push(MESSAGES.descriptionControl);
     else out.description = trimmed || null;
+  }
+
+  const url = fields?.url;
+  if (hasOwn(out, 'url')) {
+    out.url = timelineHref(url);
+    if (url != null && !(typeof url === 'string' && !url.trim()) && !out.url) errors.push(MESSAGES.url);
+  }
+
+  const image = fields?.image;
+  if (hasOwn(out, 'image')) {
+    out.image = timelineImagePath(image);
+    if (image != null && !(typeof image === 'string' && !image.trim()) && !out.image) errors.push(MESSAGES.image);
+  }
+  if (out.image) {
+    const alt = typeof fields.alt === 'string' ? fields.alt.trim() : '';
+    if (!alt || alt.length > TIMELINE_LIMITS.altMax || CONTROL_CHARACTER.test(alt)) errors.push(MESSAGES.alt);
+    else out.alt = alt;
+  } else if (hasOwn(out, 'alt')) {
+    out.alt = null;
   }
 
   return errors.length > 0 ? { ok: false, errors } : { ok: true, fields: out };

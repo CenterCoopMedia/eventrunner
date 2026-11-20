@@ -1,18 +1,16 @@
-// The timeline list (issue #194): every past edition the home page's
-// History section can list, live and draft, in the order it lists them.
+// The timeline list (issue #194): every past edition, live and draft, in the
+// order it appears in a Timeline block or the history on Home.
 //
 // A galley of rows, as the sessions list draws, not a ruled table: an entry
 // is a year and a title, and there is nothing to compare across columns.
 // Each row states its record state as a word, and an entry the page will
 // not draw says "Hidden" beside it, so no state is left to the tint.
 //
-// The list appears on the site only inside the home page's History section.
-// A home page with no such section draws no entry at all, so the page says
-// so above the list rather than leaving an operator to publish into nothing.
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { useContent } from '../../contexts/ContentContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import { useContent } from '../../contexts/ContentContext.jsx';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { contentError } from '../contentError.js';
@@ -43,7 +41,8 @@ const text = (value) => (typeof value === 'string' && value.trim() ? value.trim(
 
 export default function AdminTimelineList() {
   const { rows, loading, error } = useAdminTimeline();
-  const { getPage } = useContent();
+  const { pages, getPublicPage, pageHasTimelineBlock, publicPagesConfirmed, contentSource } = useContent();
+  const { features } = useEventConfig();
   const { publish, run } = usePublishRun(useAdminApi());
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
@@ -52,8 +51,9 @@ export default function AdminTimelineList() {
   // against those ids, not the drafts that are dirty when it is pressed.
   const [resume, setResume] = useState(null);
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
-  const home = getPage('home') ?? getPage('/');
-  const hasHistorySection = (home?.sections ?? []).some((section) => section?.id === 'history');
+  const showPlacementNotice = rows.length > 0 && publicPagesConfirmed && contentSource === 'live'
+    && !pages.some((page) => getPublicPage(page.id, features) && (pageHasTimelineBlock(page)
+      || (page.id === 'home' && page.sections?.some((section) => section?.id === 'history'))));
 
   function reportPublish(response, ids) {
     const verdict = summarizePublish(response, COLLECTION, ids, 'timeline entries');
@@ -105,10 +105,10 @@ export default function AdminTimelineList() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader help="Past editions of the event, oldest first."
+      <AdminPageHeader help="Add a Timeline block in a page’s content editor to show these entries."
         title="Timeline"
         identifiers={`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}`}
-        description="Past editions of the event, oldest first."
+        description="Published entries appear in Timeline blocks and in the History section on Home when that section is present."
         actions={
           <>
             {resume ? (
@@ -142,15 +142,11 @@ export default function AdminTimelineList() {
       <DeletedRecordResult />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
-      {hasHistorySection ? null : (
-        <Notice
-          tone="caution"
-          message={<>
-            Add a History section to the home page to show these entries.{' '}
-            <Link to="/admin/pages/home" className="underline">Edit home page</Link>
-          </>}
-        />
-      )}
+      {showPlacementNotice ? (
+        <Notice tone="caution" message={(
+          <>Published entries have no place to appear yet. Add a Timeline block in <Link to="/admin/content" className="underline">page content</Link>.</>
+        )} />
+      ) : null}
 
       {error ? (
         <Notice
@@ -164,7 +160,7 @@ export default function AdminTimelineList() {
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title="No timeline entries yet"
-          description="Add your first past event."
+          description="An entry describes one past edition. To display published entries on a page, add a Timeline block in its content editor."
           action={addLink}
         />
       ) : (

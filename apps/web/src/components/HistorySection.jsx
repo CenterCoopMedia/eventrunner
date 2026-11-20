@@ -14,7 +14,7 @@
 import { useContent } from '../contexts/ContentContext.jsx';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
-import Timeline from './editorial/Timeline.jsx';
+import TimelineBlock from './blocks/TimelineBlock.jsx';
 
 /**
  * @param {{
@@ -23,18 +23,12 @@ import Timeline from './editorial/Timeline.jsx';
  *   blocks: object[],                 // the section's visible blocks, in order
  *   arrangement: 'grid' | 'list',     // the page's arrangement
  *   action?: import('react').ReactNode, // the section's edit link (issue #198)
+ *   showTimeline?: boolean,
  * }} props
  */
-export default function HistorySection({ id, title, blocks, arrangement, action = null }) {
+export default function HistorySection({ id, title, blocks, arrangement, action = null, showTimeline = true }) {
   const { timeline } = useContent();
-  const entries = (timeline ?? []).map((entry) => ({
-    id: entry.id,
-    title: entry.title,
-    date: String(entry.year),
-    dateLabel: String(entry.year),
-    body: entry.description || undefined,
-  }));
-  if (blocks.length === 0 && entries.length === 0) return null;
+  if (blocks.length === 0 && (!showTimeline || !timeline?.length)) return null;
   return (
     <section aria-labelledby={id} className="page-section">
       <SectionHead level={2} id={id} title={title} action={action} />
@@ -42,7 +36,7 @@ export default function HistorySection({ id, title, blocks, arrangement, action 
           blocks keep the width the page's arrangement gives them. */}
       <div className={arrangement === 'grid' ? 'mt-md' : 'measure mt-md'}>
         {blocks.length > 0 ? <SectionBlocks blocks={blocks} /> : null}
-        <Timeline entries={entries} level={3} className={blocks.length > 0 ? 'mt-lg' : ''} />
+        {showTimeline ? <TimelineBlock className={blocks.length > 0 ? 'mt-lg' : ''} /> : null}
       </div>
     </section>
   );

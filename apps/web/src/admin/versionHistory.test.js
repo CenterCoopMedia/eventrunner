@@ -142,13 +142,21 @@ describe('restoreRequestFor', () => {
   });
 
   it('restores timeline fields without sending stored-only legacy keys', () => {
-    const current = { id: 't1', year: 2025, title: 'Now', description: 'Remove this', legacyColor: 'blue' };
-    const request = restoreRequestFor('cmsTimeline', 't1', entry({ year: 2020, title: 'Then', oldLink: 'legacy' }), current);
-    expect(request.body.fields).toEqual({ year: 2020, title: 'Then', description: DELETE_FIELD_SENTINEL });
+    const current = {
+      id: 't1', year: 2025, title: 'Now', description: 'Remove this', legacyColor: 'blue',
+      image: 'cms-images/current/photo.webp', alt: 'New meeting',
+    };
+    const request = restoreRequestFor('cmsTimeline', 't1', entry({ year: 2020, title: 'Then', url: '/recap', oldLink: 'legacy' }), current);
+    expect(request.body.fields).toEqual({
+      year: 2020, title: 'Then', description: DELETE_FIELD_SENTINEL, url: '/recap',
+      image: DELETE_FIELD_SENTINEL, alt: DELETE_FIELD_SENTINEL,
+    });
     const merged = { ...current, ...request.body.fields };
     delete merged.description;
+    delete merged.image;
+    delete merged.alt;
     const checked = validateTimelineFields(merged, request.body.fields);
-    expect(checked).toEqual({ ok: true, fields: { year: 2020, title: 'Then', description: null } });
+    expect(checked).toEqual({ ok: true, fields: { year: 2020, title: 'Then', description: null, url: '/recap' } });
   });
 
   it('sends a page and update through their whole-record save endpoints', () => {

@@ -150,4 +150,18 @@ describe('Home History section, on the real content provider', () => {
     expect(within(section).getByRole('heading', { level: 2, name: 'History' })).toBeInTheDocument();
     expect(within(section).getByText(STORY_PATTERN)).toBeInTheDocument();
   });
+
+  it('draws the entries at the published Timeline block without repeating them', () => {
+    renderHome();
+    act(() => {
+      subscriptions.get('cmsContent')([
+        snapshotSiteContent.history__story,
+        { id: 'history__timeline', section: 'history', field: 'timeline', blockType: 'timeline', order: 1, visible: true },
+      ]);
+    });
+    const section = historySection();
+    expect(section.querySelectorAll('ol.timeline')).toHaveLength(1);
+    expect(titlesIn(section)).toEqual(SNAPSHOT_TITLES);
+    expect(within(section).getByText(STORY_PATTERN)).toBeInTheDocument();
+  });
 });

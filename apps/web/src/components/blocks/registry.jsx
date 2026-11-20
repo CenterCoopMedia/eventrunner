@@ -32,6 +32,7 @@ export const BLOCK_RENDERERS = Object.freeze({
   link_group: lazy(() => import('./LinkGroupBlock.jsx')),
   sponsor_package: lazy(() => import('./SponsorPackageBlock.jsx')),
   gallery: lazy(() => import('./GalleryBlock.jsx')),
+  timeline: lazy(() => import('./TimelineBlock.jsx')),
 });
 
 function MapPlaceholder({ address }) {

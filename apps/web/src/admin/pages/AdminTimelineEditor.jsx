@@ -11,10 +11,6 @@
 // the same id, so a publish that fails after a create is retried as an
 // update rather than as a second entry or a refusal.
 //
-// THERE IS NO DRAFT PREVIEW. The entries appear only on the home page, and
-// the home page is a landing path: ProfileSetupRedirect sends an account
-// with no display name from it to /profile, so a preview link could land an
-// admin somewhere else.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -44,11 +40,13 @@ import AdminPageHeader, {
   RecordState,
 } from '../components/adminChrome.jsx';
 import BusyLabel from '../../components/BusyLabel.jsx';
+import ImagePicker from '../components/media/ImagePicker.jsx';
 
 const COLLECTION = 'cmsTimeline';
 const TIMELINE_LIST = '/admin/timeline';
 
-const EMPTY = Object.freeze({ year: '', title: '', description: '', visible: true });
+const EMPTY = Object.freeze({ year: '', title: '', description: '', url: '', image: '', alt: '', visible: true });
+const FIELD_LABELS = { year: 'Year', title: 'Title', description: 'Description', url: 'Link', image: 'Image', alt: 'Alt text' };
 
 const textOf = (value) => (typeof value === 'string' ? value : '');
 
@@ -58,6 +56,9 @@ function toForm(row) {
     year: Number.isInteger(entry.year) ? String(entry.year) : textOf(entry.year),
     title: textOf(entry.title),
     description: textOf(entry.description),
+    url: textOf(entry.url),
+    image: textOf(entry.image),
+    alt: textOf(entry.alt),
     visible: entry.visible !== false,
   };
 }
@@ -178,7 +179,7 @@ export default function AdminTimelineEditor({ mode }) {
       }
     } catch (err) {
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
-      setError(contentError(err, { fallback: stage === 'publish' ? 'Publishing did not finish. Your draft is saved. Try again.' : undefined, labels: { year: 'Year', title: 'Title', description: 'Description' } }));
+      setError(contentError(err, { fallback: stage === 'publish' ? 'Publishing did not finish. Your draft is saved. Try again.' : undefined, labels: FIELD_LABELS }));
     } finally {
       setAction(null);
     }
@@ -193,7 +194,7 @@ export default function AdminTimelineEditor({ mode }) {
       reportDeleted({ ...deleted, collection: COLLECTION, docId, editorPath: `${TIMELINE_LIST}/${encodeURIComponent(docId)}` }, TIMELINE_LIST);
     } catch (err) {
       setErrorTitle('Could not delete. Try again.');
-      setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: { year: 'Year', title: 'Title', description: 'Description' } }));
+      setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: FIELD_LABELS }));
     } finally {
       setAction(null);
     }
@@ -238,7 +239,7 @@ export default function AdminTimelineEditor({ mode }) {
       noValidate
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
-      <AdminPageHeader help="Describe a past event and publish it to the public timeline."
+      <AdminPageHeader description="An entry describes one past edition. Published entries appear in Timeline blocks and in the History section on Home when that section is present."
         title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
         recentTitle={row?.current?.title}
         state={!creating && row ? <RecordState state={row.state} /> : null}
@@ -268,7 +269,7 @@ export default function AdminTimelineEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
-      <Panel help="Describe one past event for the public timeline." title="Entry">
+      <Panel help="Use the year and title to tell readers which past edition this was." title="Entry">
         <div className="flex flex-col gap-sm">
           <TextField help="Enter the year of this past event."
             label="Year"
@@ -296,6 +297,35 @@ export default function AdminTimelineEditor({ mode }) {
             onChange={(value) => set('description', value)}
             error={errorFor('description')}
           />
+          <TextField
+            label="Link"
+            help="Make the title a link. Enter a full HTTPS address or an internal path like /schedule."
+            inputMode="url"
+            value={form.url}
+            onChange={(value) => set('url', value)}
+            error={errorFor('url')}
+          />
+          <ImagePicker
+            label="Image"
+            help="Choose a photo or illustration for this edition from the media library."
+            value={form.image}
+            onChange={(value) => set('image', value)}
+            onSelectionChange={(value) => {
+              set('image', value);
+              if (value !== form.image) setForm((current) => ({ ...current, alt: '' }));
+            }}
+            error={errorFor('image')}
+          />
+          {form.image ? (
+            <TextField
+              label="Alt text"
+              help="Describe the image for someone who cannot see it."
+              value={form.alt}
+              onChange={(value) => set('alt', value)}
+              error={errorFor('alt')}
+              required
+            />
+          ) : null}
           <CheckboxField help="Include this past event in the public timeline after publishing."
             label="Show this entry when it is published"
             checked={form.visible}

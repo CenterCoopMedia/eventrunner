@@ -32,12 +32,36 @@ const YEAR = 'year: enter a year from 1900 to 2100 as four digits';
 
 test('the collection, the field set and the limits are the ones the seam names', () => {
   assert.equal(TIMELINE_COLLECTION, 'cmsTimeline');
-  assert.deepEqual(TIMELINE_FIELDS, ['year', 'title', 'description', 'seeded', 'seededAt']);
-  assert.deepEqual(TIMELINE_LIMITS, { yearMin: 1900, yearMax: 2100, titleMax: 120, descriptionMax: 600 });
+  assert.deepEqual(TIMELINE_FIELDS, ['year', 'title', 'description', 'url', 'image', 'alt', 'seeded', 'seededAt']);
+  assert.deepEqual(TIMELINE_LIMITS, { yearMin: 1900, yearMax: 2100, titleMax: 120, descriptionMax: 600, altMax: 240 });
 });
 
 test('a complete entry passes with every field kept', () => {
   assert.deepEqual(accepted({ ...VALID }), { ...VALID });
+});
+
+test('an optional link is a canonical HTTPS address or an internal path', () => {
+  assert.equal(accepted({ ...VALID, url: ' HTTPS://Example.org/recap ' }).url, 'https://example.org/recap');
+  assert.equal(accepted({ ...VALID, url: '/schedule?year=2024#recap' }).url, '/schedule?year=2024#recap');
+  assert.equal(accepted({ ...VALID, url: '   ' }).url, null);
+  for (const url of ['http://example.org', '//example.org', '/\\example.org', 'https:example.org',
+    'https://alias@example.org', 'javascript:alert(1)', 'recap', { href: '/recap' }]) {
+    assert.match(refused({ ...VALID, url })[0], /^url:/);
+  }
+});
+
+test('an image must be a library path and have usable alternative text', () => {
+  const image = 'cms-images/edition/recap.png';
+  assert.deepEqual(accepted({ ...VALID, image, alt: '  Organizers meet. ' }), {
+    ...VALID, image, alt: 'Organizers meet.',
+  });
+  for (const invalid of ['https://example.org/photo.png', 'private/photo.png', 'cms-images/../photo.png']) {
+    assert.match(refused({ ...VALID, image: invalid, alt: 'Recap' })[0], /^image:/);
+  }
+  for (const alt of [undefined, '', 'x'.repeat(241), 'one\ntwo']) {
+    assert.match(refused({ ...VALID, image, alt })[0], /^alt:/);
+  }
+  assert.deepEqual(accepted({ ...VALID, image: null, alt: 'Old description' }), { ...VALID, image: null, alt: null });
 });
 
 test('the year is a whole number from 1900 to 2100', () => {
