@@ -156,8 +156,7 @@ export function blankSection() {
  * The wire payload for cmsSavePage. Types are coerced where a form control
  * can only produce strings (order, maxBlocks); `description` is sent as null
  * when blank because the server accepts `string | null` and an empty string
- * is not a meaningful description. Client-side coercion only — validation
- * itself stays on the server, whose messages are surfaced verbatim.
+ * is not a meaningful description.
  *
  * @param {object} page editable form state
  * @returns {object} cmsPages doc
