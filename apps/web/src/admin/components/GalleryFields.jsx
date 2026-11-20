@@ -48,6 +48,20 @@ function LayoutPicture({ id }) {
   );
 }
 
+/**
+ * A key per picture that survives a move: its path, plus how many earlier
+ * pictures share that path. A row keyed by its index remounts on every
+ * move, and that drops focus and the reorder grip's keyboard move.
+ */
+function pictureKeys(images) {
+  const seen = new Map();
+  return images.map((image) => {
+    const n = seen.get(image.url) ?? 0;
+    seen.set(image.url, n + 1);
+    return `${image.url}#${n}`;
+  });
+}
+
 function thumbnailSrc(url) {
   return bundledDemoAssetUrl(url) ?? assetUrl(url);
 }
@@ -62,6 +76,7 @@ function thumbnailSrc(url) {
 export default function GalleryFields({ values, onChange, errorFor }) {
   const id = useId();
   const images = Array.isArray(values.images) ? values.images : [];
+  const keys = pictureKeys(images);
   const [choosing, setChoosing] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const chooseRef = useRef(null);
@@ -126,7 +141,7 @@ export default function GalleryFields({ values, onChange, errorFor }) {
           <ol className="admin-gallery-images__list">
             {images.map((image, index) => (
               <li
-                key={`${image.url}-${index}`}
+                key={keys[index]}
                 className="admin-gallery-images__row"
                 {...bindReorderDrop('gallery:', index, move)}
               >

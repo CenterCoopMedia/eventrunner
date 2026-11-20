@@ -8,8 +8,11 @@
 import { describe, expect, it } from 'vitest';
 import * as contentCjs from '../../../../functions/src/cms/content.cjs';
 import * as firestoreFakeCjs from '../../../../functions/src/cms/firestoreFake.cjs';
+import * as contentBlockTypesCjs from '../../../../functions/src/cms/blockTypes.cjs';
 import {
   DELETE_FIELD_SENTINEL,
+  GALLERY_MAX_ALT_LENGTH,
+  GALLERY_MAX_IMAGES,
   blankContent,
   contentBlockTitle,
   contentIdSource,
@@ -370,5 +373,21 @@ describe('gallery content', () => {
     expect(validateRequiredContent(missingAlt)).toEqual([
       { field: 'images.2.alt', message: 'Picture 2: needs alt text.' },
     ]);
+  });
+
+  it('refuses before the save what the server refuses: a long alt text and more than the cap', () => {
+    const { GALLERY_MAX_IMAGES: serverMax } = (contentBlockTypesCjs.default ?? contentBlockTypesCjs).internals;
+    expect(GALLERY_MAX_IMAGES).toBe(serverMax);
+    const server = contentBlockTypesCjs.default ?? contentBlockTypesCjs;
+    const longAlt = { url: 'cms-images/a1/hall.webp', alt: 'x'.repeat(GALLERY_MAX_ALT_LENGTH + 1) };
+    expect(server.galleryErrors({ blockType: 'gallery', layout: 'grid', images: [longAlt] })).toHaveLength(1);
+    expect(validateRequiredContent(toEditableContent({ ...stored, images: [longAlt] }))).toEqual([
+      { field: 'images.1.alt', message: 'Picture 1: keep alt text under 500 characters.' },
+    ]);
+    const atMax = { ...longAlt, alt: 'x'.repeat(GALLERY_MAX_ALT_LENGTH) };
+    expect(server.galleryErrors({ blockType: 'gallery', layout: 'grid', images: [atMax] })).toEqual([]);
+    expect(validateRequiredContent(toEditableContent({ ...stored, images: [atMax] }))).toEqual([]);
+    const tooMany = toEditableContent({ ...stored, images: Array(GALLERY_MAX_IMAGES + 1).fill(stored.images[0]) });
+    expect(validateRequiredContent(tooMany)).toEqual([{ field: 'images', message: 'Pictures: a gallery holds at most 24.' }]);
   });
 });

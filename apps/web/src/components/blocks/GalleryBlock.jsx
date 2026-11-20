@@ -104,23 +104,28 @@ function Slides({ images, layout, name }) {
     setAtEnd(scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1);
   }, []);
 
+  // Measured again whenever the pictures or the layout change (the editor
+  // preview changes both in place) and whenever the scroller's size changes.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return undefined;
     let frame = 0;
-    const onScroll = () => {
+    const onChange = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(measure);
     };
     measure();
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    scroller.addEventListener('scroll', onChange, { passive: true });
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(onChange) : null;
+    resize?.observe(scroller);
+    if (!resize) window.addEventListener('resize', onChange);
     return () => {
       cancelAnimationFrame(frame);
-      scroller.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      scroller.removeEventListener('scroll', onChange);
+      resize?.disconnect();
+      if (!resize) window.removeEventListener('resize', onChange);
     };
-  }, [measure]);
+  }, [measure, count, layout]);
 
   const atStart = current === 0;
   const lastInView = Math.min(count, current + inView);

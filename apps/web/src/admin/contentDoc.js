@@ -25,6 +25,10 @@ import { googleMapsEmbedUrl } from 'shared/urlSafety';
  */
 export const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
 
+/** Mirror functions/src/cms/blockTypes.cjs gallery limits (pinned by contentDoc.test.js). */
+export const GALLERY_MAX_IMAGES = 24;
+export const GALLERY_MAX_ALT_LENGTH = 500;
+
 /**
  * A block type's EDITABLE value fields — everything the registry declares
  * except `order`. `order` is real registry data for stat/list_item/
@@ -290,9 +294,17 @@ export function validateRequiredContent(content) {
   }
   if (content.blockType === 'gallery') {
     const images = Array.isArray(content.values?.images) ? content.values.images : [];
+    // The same limits the server applies (blockTypes.cjs galleryErrors),
+    // checked here so the editor names the picture instead of failing the save.
+    if (images.length > GALLERY_MAX_IMAGES) {
+      errors.push({ field: 'images', message: `Pictures: a gallery holds at most ${GALLERY_MAX_IMAGES}.` });
+    }
     images.forEach((image, index) => {
-      if (typeof image?.alt !== 'string' || !image.alt.trim()) {
+      const alt = typeof image?.alt === 'string' ? image.alt.trim() : '';
+      if (!alt) {
         errors.push({ field: `images.${index + 1}.alt`, message: `Picture ${index + 1}: needs alt text.` });
+      } else if (alt.length > GALLERY_MAX_ALT_LENGTH) {
+        errors.push({ field: `images.${index + 1}.alt`, message: `Picture ${index + 1}: keep alt text under ${GALLERY_MAX_ALT_LENGTH} characters.` });
       }
     });
   }

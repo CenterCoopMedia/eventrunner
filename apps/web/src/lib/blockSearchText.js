@@ -106,6 +106,12 @@ function typeSearchText(block) {
       return joined(verbatim(block.question), stripHtml(block.answer));
     case 'link_group':
       return joined(block.label, block.group);
+    case 'gallery':
+      // The gallery's name and every picture's alt text (#1176).
+      return joined(
+        verbatim(block.label),
+        ...(Array.isArray(block.images) ? block.images.map((image) => verbatim(image?.alt)) : []),
+      );
     case 'sponsor_package':
       // The name and the price are plain input; the benefits are rich text.
       return joined(verbatim(block.name), verbatim(block.price), stripHtml(block.benefits));
