@@ -218,7 +218,7 @@ function usePublishRuns() {
 
 export default function AdminUnpublishedChanges() {
   const { ready, error, docsByCollection, total, sentence } = useDirtyDrafts();
-  const { rows: pages } = useAdminPages();
+  const { rows: pages } = useAdminPages({ includeNavigationLinks: true });
   const { eventConfig } = useEventConfig();
   const timeZone = typeof eventConfig?.timezone === 'string' && eventConfig.timezone ? eventConfig.timezone : undefined;
   const runs = usePublishRuns();

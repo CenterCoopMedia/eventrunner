@@ -15,7 +15,7 @@ import { adminRoute } from '../routes.jsx';
 let pageRenderFails = false;
 let pageRenderPending = null;
 let overviewRenderPending = null;
-vi.mock('./pages/AdminPagesList.jsx', async (importOriginal) => {
+vi.mock('./pages/AdminSpeakersList.jsx', async (importOriginal) => {
   const actual = await importOriginal();
   return { ...actual, default: (props) => {
     if (pageRenderFails) throw new Error('Synthetic admin page render failure');
@@ -223,7 +223,7 @@ describe('admin route gating', () => {
     try {
       pageRenderFails = true;
       sessionStorage.setItem(RELOAD_FLAG, '1');
-      await renderAt('/admin/pages');
+      await renderAt('/admin/speakers');
       expect(await screen.findByRole('heading', { name: 'This admin page could not be shown' })).toBeInTheDocument();
       expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
       expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
@@ -238,7 +238,7 @@ describe('admin route gating', () => {
 
   it('re-arms recovery after a successful static leaf, then reloads only once for later missing lazy leaves', async () => {
     sessionStorage.setItem(RELOAD_FLAG, '1');
-    const healthy = await renderAt('/admin/pages');
+    const healthy = await renderAt('/admin/speakers');
     await waitFor(() => expect(sessionStorage.getItem(RELOAD_FLAG)).toBeNull());
     healthy.unmount();
     const reload = vi.fn();
@@ -265,7 +265,7 @@ describe('admin route gating', () => {
     pageRenderPending = new Promise((resolve) => { finish = resolve; });
     let pending;
     await act(async () => {
-      pending = render(<MemoryRouter initialEntries={['/admin/pages']}><App /></MemoryRouter>);
+      pending = render(<MemoryRouter initialEntries={['/admin/speakers']}><App /></MemoryRouter>);
     });
     expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
     await act(async () => { pageRenderPending = null; finish(); });

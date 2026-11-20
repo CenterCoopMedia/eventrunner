@@ -6,10 +6,11 @@
 // failures fail soft: `error` is set for a non-blocking notice and the last
 // known rows keep rendering.
 import { useEffect, useMemo, useState } from 'react';
+import { isNavigationLink } from 'shared/page';
 import { subscribeAdminCollection } from './adminSource.js';
 import { mergePageRevisions } from './pageDoc.js';
 
-export function useAdminPages() {
+export function useAdminPages({ includeNavigationLinks = false } = {}) {
   const [live, setLive] = useState(null);
   const [drafts, setDrafts] = useState(null);
   const [liveError, setLiveError] = useState(null);
@@ -35,7 +36,10 @@ export function useAdminPages() {
     };
   }, []);
 
-  const rows = useMemo(() => mergePageRevisions(live, drafts), [live, drafts]);
+  const rows = useMemo(() => {
+    const merged = mergePageRevisions(live, drafts);
+    return includeNavigationLinks ? merged : merged.filter((row) => !isNavigationLink(row.current));
+  }, [live, drafts, includeNavigationLinks]);
   const error = liveError ?? draftsError ?? null;
   const ready = live !== null && drafts !== null;
 

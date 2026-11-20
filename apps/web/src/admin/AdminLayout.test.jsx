@@ -386,12 +386,17 @@ describe('the admin shell', () => {
       await waitFor(() => expect(docket).not.toHaveAttribute('open'));
       expect(summary).toHaveFocus();
 
-      fireEvent.click(sessions);
+      fireEvent.click(summary);
+      // The browser sets `open` before React receives the toggle event.
+      await waitFor(() => expect(summary).toHaveAccessibleName('Close menu'));
+      expect(docket).toHaveAttribute('open');
+      fireEvent.click(within(nav).getByRole('link', { name: 'Sessions' }));
+      expect(await within(summary).findByText('Sessions')).toBeInTheDocument();
       await waitFor(() => expect(docket).not.toHaveAttribute('open'));
       expect(summary).toHaveFocus();
-      expect(within(summary).getByText('Sessions')).toBeInTheDocument();
       fireEvent.click(summary);
-      await waitFor(() => expect(docket).toHaveAttribute('open'));
+      await waitFor(() => expect(summary).toHaveAccessibleName('Close menu'));
+      expect(docket).toHaveAttribute('open');
       setDesktop(true);
       await waitFor(() => expect(document.documentElement.style.overflow).toBe(''));
       expect(container.querySelector('#admin-content')).not.toHaveAttribute('inert');

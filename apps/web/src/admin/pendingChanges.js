@@ -5,6 +5,7 @@
 // cmsPublishQueue rows cmsPublish writes (functions/src/cms/publish.cjs),
 // read as the progress and failure record beside them.
 import { COLLECTION_CHOICES, countWords } from './collectionWords.js';
+import { isNavigationLink } from 'shared/page';
 import { summarizePublish } from './publishResult.js';
 import { state } from './recordState.js';
 import { sectionTier } from './AdminLayout.jsx';
@@ -93,6 +94,9 @@ export function editorPathFor(collection, row, pages = []) {
     path = owner && row.field
       ? `/admin/content/${encode(owner.id)}/${encode(row.section)}/${encode(row.field)}`
       : '/admin/content';
+  } else if (collection === 'cmsPages' && row?.id &&
+    isNavigationLink(pages.find((page) => page.id === row.id)?.current)) {
+    path = `/admin/pages/links/${encode(row.id)}`;
   } else if (EDITOR_SEGMENT[collection] && row?.id) {
     path = `/admin/${EDITOR_SEGMENT[collection]}/${encode(row.id)}`;
   }

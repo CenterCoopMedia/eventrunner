@@ -191,7 +191,7 @@ function PageEditor({ mode }) {
   const { user } = useAuth();
   const call = useAdminApi();
   const reportDeleted = useDeletedRecord();
-  const { rows, ready, error: listenerError, findRow } = useAdminPages();
+  const { rows, ready, error: listenerError, findRow } = useAdminPages({ includeNavigationLinks: mode === 'create' });
   const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
   // The count staff see is the content the section holds (both revisions of
   // one block are one block), not its seed list.

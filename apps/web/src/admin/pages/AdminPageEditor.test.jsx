@@ -465,6 +465,17 @@ describe('page editor', () => {
     expect(bodyOf(0).page.path).toBe('/welcome');
   });
 
+  it('allocates a new page after existing navigation links without reusing their ids', async () => {
+    liveDocs = [{ id: 'visit', label: 'Visit', url: 'https://example.org/visit', order: 8, visible: true, systemPage: false }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'visit-2', status: 'dirty' }));
+    await renderAt('/admin/pages/new');
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Visit' } });
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/visit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page).toMatchObject({ id: 'visit-2', order: 9 });
+  });
+
   it('does not reuse a section id that content still holds', async () => {
     draftDocs = [{ id: 'old-faq', section: 'questions' }];
     fetch.mockResolvedValueOnce(okResponse({ id: 'faq', status: 'dirty' }));

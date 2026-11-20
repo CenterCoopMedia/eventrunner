@@ -1,4 +1,4 @@
-// The site navigation, built from page documents (spec §5.2).
+// The site navigation, built from published page and link documents (spec §5.2).
 //
 // The navigation used to be a fixed list in the shell, so the six seeded
 // content pages — travel, FAQ, conduct, contact, privacy, terms — existed,
@@ -46,7 +46,8 @@ import {
   isCanonicalPagePath,
   isReservedPathSegment,
 } from 'shared/routing';
-import { isPublicPage } from 'shared/page';
+import { isNavigationLink, isPublicPage, navigationLinkUrl } from 'shared/page';
+import { leadsToNoPublicPage, switchedOffSectionFor } from './linkTargets.js';
 
 /**
  * The system pages, by the stable document id the seed writes, and for each
@@ -71,10 +72,17 @@ function isNonEmptyString(v) {
  *
  * @param {unknown} page a cmsPages document
  * @param {object|null|undefined} features config/features
- * @returns {{ to: string, label: string, end: boolean }|null}
+ * @returns {{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }|null}
  */
-function navItemFor(page, features) {
+function navItemFor(page, features, pages) {
   if (!page || typeof page !== 'object') return null;
+  if (isNavigationLink(page)) {
+    const to = navigationLinkUrl(page.url);
+    if (page.visible !== true || page.systemPage !== false || !isNonEmptyString(page.id) ||
+        !isNonEmptyString(page.label) || !to || switchedOffSectionFor(to, features) ||
+        leadsToNoPublicPage(to, pages, features)) return null;
+    return { to, label: page.label.trim(), custom: true, external: to.startsWith('https://'), key: `link:${page.id}` };
+  }
   // Visible, and its feature on — the shared read, so this list and the
   // sitemap cannot disagree about which pages a stranger can see.
   if (!isPublicPage(page, features)) return null;
@@ -117,12 +125,12 @@ function navItemFor(page, features) {
  *
  * @param {Array<object>|null|undefined} pages cmsPages documents
  * @param {object|null|undefined} features config/features
- * @returns {Array<{ to: string, label: string, end: boolean }>}
+ * @returns {Array<{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }>}
  */
 export function buildNavItems(pages, features) {
   const seen = new Set();
   return (pages ?? [])
-    .map((page) => ({ order: page?.order, item: navItemFor(page, features) }))
+    .map((page) => ({ order: page?.order, item: navItemFor(page, features, pages) }))
     .filter((entry) => entry.item !== null)
     .sort(
       (a, b) =>
@@ -134,8 +142,9 @@ export function buildNavItems(pages, features) {
       // straight into Firestore, or two docs claiming the same system id.
       // Render the first in reading order; a repeated link is noise a reader
       // has to resolve.
-      if (seen.has(item.to)) return false;
-      seen.add(item.to);
+      const key = item.key ?? item.to;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
 }

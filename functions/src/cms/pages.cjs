@@ -35,8 +35,8 @@ const { isAlreadyExistsError } = require('./store.cjs');
 const { PAGE_TEMPLATE_IDS, isKnownPageTemplate } = require('./pageTemplates.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { PAGE_PATH_SEGMENT_RE, isReservedPathSegment } = require('shared/routing');
-const { builtInSectionBlockTypes } = require('shared/page');
+const { PAGE_PATH_SEGMENT_RE, SYSTEM_PAGE_ROUTES, isReservedPathSegment } = require('shared/routing');
+const { builtInSectionBlockTypes, isNavigationLink, navigationLinkUrl } = require('shared/page');
 const { collectionVariantErrors } = require('shared/contentLanguages');
 
 const PAGES_COLLECTION = 'cmsPages';
@@ -53,6 +53,7 @@ const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
 const PAGE_KEYS = Object.freeze(['id', 'label', 'title', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template', 'translations']);
+const NAVIGATION_LINK_KEYS = Object.freeze(['id', 'label', 'url', 'order', 'visible', 'systemPage']);
 const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot', 'translations']);
 const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
 
@@ -132,14 +133,27 @@ function validatePageDoc(doc) {
   if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) {
     return { ok: false, errors: ['page: must be an object'] };
   }
-  errors.push(...collectionVariantErrors(doc, PAGES_COLLECTION));
+  const navigationLink = isNavigationLink(doc);
+  const allowedKeys = navigationLink ? NAVIGATION_LINK_KEYS : PAGE_KEYS;
+  if (!navigationLink) errors.push(...collectionVariantErrors(doc, PAGES_COLLECTION));
   for (const key of Object.keys(doc)) {
-    if (!PAGE_KEYS.includes(key)) errors.push(`${key}: unknown field`);
+    if (!allowedKeys.includes(key)) errors.push(`${key}: unknown field`);
   }
   if (!isNonEmptyString(doc.id) || !DOC_ID_RE.test(doc.id)) {
     errors.push('id: must be 1-64 chars of letters, digits, hyphen, underscore');
   }
   if (!isNonEmptyString(doc.label)) errors.push('label: must be a non-empty string');
+  if (typeof doc.order !== 'number' || !Number.isFinite(doc.order)) errors.push('order: must be a finite number');
+  if (typeof doc.visible !== 'boolean') errors.push('visible: must be a boolean');
+  if (typeof doc.systemPage !== 'boolean') errors.push('systemPage: must be a boolean');
+  if (navigationLink) {
+    if (doc.systemPage !== false || (typeof doc.id === 'string' && Object.hasOwn(SYSTEM_PAGE_ROUTES, doc.id))) {
+      errors.push('systemPage: navigation links need their own id');
+    }
+    if (doc.label?.length > 80) errors.push('label: use at most 80 characters');
+    if (doc.url?.length > 2048 || !navigationLinkUrl(doc.url)) errors.push('url: choose an internal page or enter an https URL');
+    return { ok: errors.length === 0, errors };
+  }
   // The heading, and OPTIONAL: a page that states no title is headed by its
   // label (shared/page pageHeading). `null` is how the editor sends "no
   // title", so it has to be accepted as readily as the key being absent —
@@ -179,11 +193,6 @@ function validatePageDoc(doc) {
   if (doc.icon !== null && !isNonEmptyString(doc.icon)) {
     errors.push('icon: must be a non-empty string or null');
   }
-  if (typeof doc.order !== 'number' || !Number.isFinite(doc.order)) {
-    errors.push('order: must be a finite number');
-  }
-  if (typeof doc.visible !== 'boolean') errors.push('visible: must be a boolean');
-  if (typeof doc.systemPage !== 'boolean') errors.push('systemPage: must be a boolean');
 
   // `template` is the task the operator picked, and it is optional twice
   // over: a document written before templates existed carries none, and an
@@ -334,27 +343,32 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
     const page = req.body?.page;
     const verdict = validatePageDoc(page);
     if (!verdict.ok) return badRequest(res, `Invalid page: ${verdict.errors.join('; ')}`);
+    const navigationLink = isNavigationLink(page);
 
     // systemPage may never be flipped true -> false: cmsDeletePage refuses to
     // delete a system page, and letting a draft edit clear the flag would let
     // save -> publish -> delete launder one into deletability (stranding its
     // dedicated React route, §5.2). Checked against BOTH revisions, same as
     // the delete guard.
+    const creating = req.body?.create === true;
     if (page.systemPage === false) {
-      let isSystem;
+      let revisions;
       try {
         const [draftSnap, liveSnap] = await Promise.all([
           db.collection(PAGES_DRAFTS).doc(page.id).get(),
           db.collection(PAGES_COLLECTION).doc(page.id).get(),
         ]);
-        isSystem = (draftSnap.exists && draftSnap.data().systemPage === true) ||
-          (liveSnap.exists && liveSnap.data().systemPage === true);
+        revisions = [draftSnap, liveSnap].filter((snapshot) => snapshot.exists).map((snapshot) => snapshot.data());
       } catch (err) {
         log.error('cmsSavePage systemPage check failed', err);
         return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
       }
-      if (isSystem) {
+      if (revisions.some((revision) => revision.systemPage === true)) {
         return forbidden(res, 'systemPage: a system page cannot be changed into a regular page.');
+      }
+      if (revisions.some((revision) => isNavigationLink(revision) !== navigationLink)) {
+        if (creating) return sendError(res, 409, 'already-exists', `id: '${page.id}' already belongs to a page or navigation link`);
+        return forbidden(res, 'A page and a navigation link must use separate records.');
       }
     }
 
@@ -374,6 +388,9 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
           db.collection(PAGES_DRAFTS).doc(page.id).get(),
           db.collection(PAGES_COLLECTION).doc(page.id).get(),
         ]);
+        if ([draftSnap, liveSnap].some((snapshot) => snapshot.exists && isNavigationLink(snapshot.data()))) {
+          return forbidden(res, 'A navigation link cannot become a system page.');
+        }
         // Live first: it is the path the public site is actually serving.
         // The draft stands in only before a first publish.
         storedPath = (liveSnap.exists && liveSnap.data().path)
@@ -398,24 +415,25 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
     // id already claiming this exact path. Draft AND live are checked: a
     // collision with an unpublished draft is just as real to an admin about
     // to save as one already live.
-    try {
-      const [draftPathSnap, livePathSnap] = await Promise.all([
-        db.collection(PAGES_DRAFTS).where('path', '==', page.path).get(),
-        db.collection(PAGES_COLLECTION).where('path', '==', page.path).get(),
-      ]);
-      const collision = [...draftPathSnap.docs, ...livePathSnap.docs].find((doc) => doc.id !== page.id);
-      if (collision) {
-        return badRequest(res, `path: '${page.path}' is already used by page '${collision.id}'`);
+    if (!navigationLink) {
+      try {
+        const [draftPathSnap, livePathSnap] = await Promise.all([
+          db.collection(PAGES_DRAFTS).where('path', '==', page.path).get(),
+          db.collection(PAGES_COLLECTION).where('path', '==', page.path).get(),
+        ]);
+        const collision = [...draftPathSnap.docs, ...livePathSnap.docs].find((doc) => doc.id !== page.id);
+        if (collision) {
+          return badRequest(res, `path: '${page.path}' is already used by page '${collision.id}'`);
+        }
+      } catch (err) {
+        log.error('cmsSavePage path uniqueness check failed', err);
+        return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
       }
-    } catch (err) {
-      log.error('cmsSavePage path uniqueness check failed', err);
-      return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
     }
 
     // `create: true` is a new page. The store then refuses an existing draft
     // and an existing live doc, so two creators cannot overwrite one id.
     // An edit omits the flag and keeps the upsert path.
-    const creating = req.body?.create === true;
     try {
       // The store strips reserved publish-model keys (visible/status/
       // revision/...) from `fields` itself; visible rides separately.
@@ -423,7 +441,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
         db,
         collection: PAGES_COLLECTION,
         docId: page.id,
-        fields: page,
+        fields: navigationLink ? { ...page, label: page.label.trim(), url: navigationLinkUrl(page.url) } : page,
         visible: page.visible,
         actor: { uid: gate.uid, email: gate.email },
         now,

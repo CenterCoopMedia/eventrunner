@@ -540,6 +540,24 @@ describe('Layout navigation (built from page documents)', () => {
     expect(side.container.querySelector('header')).toContainElement(signIn);
   });
 
+  it('puts external navigation links in More and the side rail but keeps them out of the footer', () => {
+    const pageDocs = [...MANY_PAGES, { id: 'help-desk', label: 'Help desk', url: 'https://example.org/help', order: 20,
+      visible: true, systemPage: false }];
+    const top = renderShell({}, { pageDocs });
+    const more = top.getByRole('navigation', { name: 'Main' }).querySelector('details.site-nav-more');
+    const link = within(more).getByRole('link', { name: 'Help desk (opens in a new tab)' });
+    expect(link).toHaveAttribute('href', 'https://example.org/help');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(within(top.getByRole('navigation', { name: 'Site pages' })).queryByText(/Help desk/)).toBeNull();
+    top.unmount();
+
+    const side = renderShell({}, { pageDocs, themeDoc: { navPlacement: 'side' } });
+    const nav = side.getByRole('navigation', { name: 'Main' });
+    expect(nav.querySelector('details.site-nav-more')).toBeNull();
+    expect(within(nav).getByRole('link', { name: 'Help desk (opens in a new tab)' })).toBeInTheDocument();
+  });
+
   it('still gates a system page on its feature flag', () => {
     const { container } = renderShell({}, { featureFlags: {} });
     expect(navLabels(container)).not.toContain('Schedule');

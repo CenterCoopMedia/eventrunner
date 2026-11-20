@@ -16,7 +16,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
-import { isPublicPage, pageFeatureGate } from 'shared/page';
+import { isNavigationLink, isPublicPage, pageFeatureGate } from 'shared/page';
+import { buildNavItems } from '../../lib/siteNavigation.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { featureLabel } from '../featureChoices.js';
@@ -71,17 +72,19 @@ import AdminPageHeader, {
  *
  * @returns {{ word: 'Visible'|'Hidden', reason: string|null }}
  */
-function pageVisibility(row, features) {
+function pageVisibility(row, features, visibleLinks) {
   const live = row.live ?? null;
   if (!live) return { word: 'Hidden', reason: null };
-  const word = isPublicPage(live, features) ? 'Visible' : 'Hidden';
+  const visible = isNavigationLink(live) ? visibleLinks.has(`link:${row.id}`) : isPublicPage(live, features);
+  const word = visible ? 'Visible' : 'Hidden';
   const draftVisible = row.draft ? row.draft.visible === true : live.visible === true;
   if (draftVisible !== (live.visible === true)) {
+    const noun = isNavigationLink(live) ? 'link' : 'page';
     return {
       word,
       reason: draftVisible
-        ? 'Your unpublished changes show this page. Publish to show it.'
-        : 'Your unpublished changes hide this page. Publish to hide it.',
+        ? `Your unpublished changes show this ${noun}. Publish to show it.`
+        : `Your unpublished changes hide this ${noun}. Publish to hide it.`,
     };
   }
   const gate = live.visible === true ? pageFeatureGate(live) : null;
@@ -91,9 +94,11 @@ function pageVisibility(row, features) {
   return { word, reason: null };
 }
 
-function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
+function PageRow({ row, index, count, moveRow, disabled, resolved, features, visibleLinks }) {
   const label = row.current?.label || 'Untitled page';
-  const visibility = pageVisibility(row, features);
+  const custom = isNavigationLink(row.current);
+  const editPath = custom ? `links/${row.id}` : row.id;
+  const visibility = pageVisibility(row, features, visibleLinks);
   const drag = useRowDrag(`page:${index}`, disabled);
   const drop = bindReorderDrop('page:', index, moveRow);
   const [over, setOver] = useState(false);
@@ -121,18 +126,17 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
       <div className={rowClass}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
-            <Link to={row.id} className={rowTitleLinkClass} data-reorder-block="">
+            <Link to={editPath} className={rowTitleLinkClass} data-reorder-block="">
               {label}
             </Link>
             <RecordState state={row.state} />
-            {row.current?.systemPage ? (
+            {custom ? <StatusBadge tone="neutral">Navigation link</StatusBadge> : row.current?.systemPage ? (
               <StatusBadge tone="neutral">Built-in page</StatusBadge>
             ) : null}
             <StatusBadge tone="neutral">{visibility.word}</StatusBadge>
           </div>
           <p className={`mt-3xs truncate ${rowMetaClass}`} data-reorder-block="">
-            {sections.length} section
-            {sections.length === 1 ? '' : 's'}
+            {custom ? row.current.url : `${sections.length} section${sections.length === 1 ? '' : 's'}`}
           </p>
           {visibility.reason ? (
             <p className={`mt-3xs ${fieldHintClass}`} data-reorder-block="">
@@ -149,7 +153,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
             onMove={moveRow}
             disabled={disabled}
           />
-          <AdminIconControl as={Link} to={row.id} label={`Edit ${label}`} icon="edit" data-reorder-block="" />
+          <AdminIconControl as={Link} to={editPath} label={`Edit ${label}`} icon="edit" data-reorder-block="" />
         </div>
       </div>
     </li>
@@ -157,7 +161,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
 }
 
 export default function AdminPagesList() {
-  const { rows, loading, error } = useAdminPages();
+  const { rows, loading, error } = useAdminPages({ includeNavigationLinks: true });
   const call = useAdminApi();
   const { publish, run } = usePublishRun(call);
   const { showToast } = useToast();
@@ -186,6 +190,9 @@ export default function AdminPagesList() {
   }, [leaveGuard.pending]);
 
   const ordered = draft.rows;
+  const linkCount = rows.filter((row) => isNavigationLink(row.current)).length;
+  const pageCount = rows.length - linkCount;
+  const visibleLinks = new Set(buildNavItems(rows.map((row) => row.live), features).map((item) => item.key));
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
 
   function moveRow(from, to) {
@@ -281,7 +288,7 @@ export default function AdminPagesList() {
     <div ref={frameRef} className="flex flex-col gap-md">
       <AdminPageHeader help="Manage page names, web addresses and structure. Edit their text and images under Content."
         title="Pages"
-        identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
+        identifiers={`${pageCount} page${pageCount === 1 ? '' : 's'}${linkCount ? ` · ${linkCount} navigation link${linkCount === 1 ? '' : 's'}` : ''}`}
         actions={
           <>
             <OrderDraftButtons
@@ -313,6 +320,9 @@ export default function AdminPagesList() {
             ) : null}
             <Link to="new" className={primaryButtonClass}>
               Create a page
+            </Link>
+            <Link to="links/new" className={secondaryButtonClass}>
+              Add a navigation link
             </Link>
           </>
         }
@@ -358,6 +368,7 @@ export default function AdminPagesList() {
                 disabled={savingOrder || publishing !== null}
                 resolved={resolvedIds.has(row.id)}
                 features={features}
+                visibleLinks={visibleLinks}
               />
             ))}
           </ul>
