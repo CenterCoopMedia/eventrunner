@@ -40,7 +40,7 @@ import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
 import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
 import ContentContext, { prepareTimelineDocs } from '../../contexts/ContentContext.jsx';
-import { useAdminTimeline } from '../useAdminTimeline.js';
+import { subscribeAdminCollection } from '../adminSource.js';
 import { contentLanguages, resolveContentVariant } from 'shared/contentLanguages';
 import { buildNavItems } from '../../lib/siteNavigation.js';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
@@ -229,12 +229,24 @@ function PageEditor({ mode }) {
     : record);
   // The published timeline entries, from the timeline collection itself:
   // the page's content provider may be showing drafts (?preview=1).
-  // Only visible entries, as the public query asks for (visible == true).
-  const { rows: timelineRows, ready: timelineReady, error: timelineError } = useAdminTimeline();
+  // The published timeline only (cmsTimeline, not its drafts), visible
+  // entries as the public query asks for. A listener failure stays stated
+  // until a fresh snapshot arrives, so a stale timeline is never shown as
+  // current.
+  const [liveTimeline, setLiveTimeline] = useState(null);
+  const [timelineError, setTimelineError] = useState(null);
+  useEffect(() => subscribeAdminCollection('cmsTimeline', (docs, metadata) => {
+    if (metadata?.fromCache) return;
+    setLiveTimeline(docs);
+    setTimelineError(null);
+  }, setTimelineError), []);
   const publishedTimeline = useMemo(
-    () => prepareTimelineDocs(timelineRows.map((row) => row.live).filter((live) => live?.visible === true)),
-    [timelineRows],
+    () => prepareTimelineDocs((liveTimeline ?? []).filter((doc) => doc?.visible === true)),
+    [liveTimeline],
   );
+  // Only a section that holds a published timeline block waits for it.
+  const holdsTimeline = (section) => contentRows.some((row) => row.live?.section === section.id
+    && row.live.blockType === 'timeline');
   // The preview draws that published timeline too, whatever the page's own
   // content provider is showing.
   const contentContext = useContext(ContentContext);
@@ -1017,7 +1029,7 @@ function PageEditor({ mode }) {
                         onChange={(layout) => updateSection(sectionIndex, { layout })}
                         label={section.label}
                         blocks={sectionPreviewBlocks(section)}
-                        blocksReady={contentReady && timelineReady}
+                        blocksReady={contentReady && (!holdsTimeline(section) || liveTimeline !== null)}
                         previewId={`admin-section-preview-${sectionIndex}`}
                         budget={quoteBudget}
                         readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
@@ -1027,7 +1039,7 @@ function PageEditor({ mode }) {
                         hideHeading={headingHidden(section)}
                         firstOnPage={!page.systemPage && section.id === firstShownSectionId}
                         sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side' && publicNavShown}
-                        blocksError={(Boolean(contentError) && !contentReady) || (Boolean(timelineError) && !timelineReady)}
+                        blocksError={(Boolean(contentError) && !contentReady) || (Boolean(timelineError) && holdsTimeline(section))}
                       />
                       </ContentContext.Provider>
                     </div>
