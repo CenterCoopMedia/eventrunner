@@ -28,6 +28,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import postcss from 'postcss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import publicTailwind from '../../../tailwind.config.js';
 import adminTailwind from '../../../tailwind.admin.config.js';
@@ -231,12 +232,19 @@ describe('the built stylesheet', () => {
   it('never leaves a masked device without its mask', () => {
     // The failure mode this file exists for: a `.motif--*` or
     // `.wayfinding-icon--*` rule purged while the base class — which paints
-    // the ink — survives.
+    // the ink — survives. A specimen override can mention the same class
+    // before its standalone rule, so match the selectors on the mask rule.
+    const maskedSelectors = new Set();
+    postcss.parse(bundled).walkDecls('mask-image', (declaration) => {
+      const rule = declaration.parent;
+      if (rule.type === 'rule' && declaration.value !== 'none') {
+        rule.selectors.forEach((selector) => maskedSelectors.add(selector));
+      }
+    });
     for (const selector of DEVICE_CLASSES.filter(
       (name) => name.startsWith('.motif--') || name.startsWith('.wayfinding-icon--'),
     )) {
-      const rule = bundled.slice(bundled.indexOf(selector));
-      expect(rule.slice(0, 400), `${selector} still carries a mask`).toContain('mask-image');
+      expect(maskedSelectors, `${selector} still carries a mask`).toContain(selector);
     }
   });
 
