@@ -809,7 +809,10 @@ describe('publishing the theme', () => {
     // header the way it always has. The description is always written, so
     // clearing it overrides the built snapshot's text.
     await renderBranding({ ...PRESET_THEME, logos: { primary: 'branding/abc/logo.png' } });
-    expect(screen.getByLabelText('Header shows')).toHaveValue('both');
+    // Nothing chosen: the control says so instead of naming a mode the
+    // public header does not draw on phones.
+    expect(screen.getByLabelText('Header shows')).toHaveValue('');
+    expect(within(screen.getByLabelText('Header shows')).getAllByRole('option')).toHaveLength(4);
     expect(screen.getByLabelText('Show the logo in the footer')).toBeChecked();
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
     fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));

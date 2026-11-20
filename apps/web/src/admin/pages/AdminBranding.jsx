@@ -47,12 +47,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import {
   THEME_HEADERS,
+  THEME_HEADER_LOGOS,
   THEME_LOGO_ALT_MAX,
   contrastRatio,
   getPreset,
   findThemeContrastFailures,
   resolveFontRoles,
-  resolveHeaderLogo,
   resolveOptionPicks,
   resolveThemePalettes,
 } from 'shared/theme';
@@ -155,10 +155,12 @@ const HERO_LOGO_OPTIONS = [
   { value: 'instead', label: 'Logo instead of the event name' },
 ];
 
-/** An uploaded primary logo: the only kind the header draws. */
-function hasUploadedLogo(path) {
-  return typeof path === 'string' && path.trim().split('/').length > 2;
-}
+/**
+ * A site that has not chosen keeps the header it always had: the logo or
+ * icon first, the name beside it on wider screens. It is offered only
+ * while nothing is chosen, so the control shows what the site draws.
+ */
+const HEADER_LOGO_AUTOMATIC = { value: '', label: 'Automatic: logo first, name on wider screens' };
 
 /**
  * The option groups the normal workflow asks about, in the order it asks.
@@ -244,7 +246,7 @@ function toForm(theme) {
     density: pick(theme?.density, DENSITY_IDS),
     // Blank means "not chosen": the header and footer follow the logos the
     // site has, so uploading a first logo still shows it (#1167).
-    headerLogo: ['name', 'logo', 'both'].includes(theme?.headerLogo) ? theme.headerLogo : '',
+    headerLogo: THEME_HEADER_LOGOS.includes(theme?.headerLogo) ? theme.headerLogo : '',
     footerLogo: typeof theme?.footerLogo === 'boolean' ? theme.footerLogo : '',
     logoAlt: typeof theme?.logoAlt === 'string' ? theme.logoAlt : '',
     heroLogo: ['off', 'above', 'instead'].includes(theme?.heroLogo) ? theme.heroLogo : '',
@@ -485,6 +487,8 @@ export default function AdminBranding() {
   }, [sources.theme, theme, reseedFromTheme]);
 
   const candidate = useMemo(() => toThemeDoc(form), [form]);
+  // Whether the saved theme has a header choice (#1167).
+  const savedHeaderLogo = THEME_HEADER_LOGOS.includes(theme?.headerLogo);
   const saved = useMemo(() => JSON.stringify(toThemeDoc(toForm(theme))), [theme]);
   const isDirty = JSON.stringify(candidate) !== saved;
 
@@ -715,8 +719,8 @@ export default function AdminBranding() {
               <div className="admin-branding-grid mt-md grid gap-md">
                 <SelectField
                   label="Header shows"
-                  value={form.headerLogo || resolveHeaderLogo({}, hasUploadedLogo(form.logos.primary))}
-                  options={HEADER_LOGO_OPTIONS}
+                  value={form.headerLogo}
+                  options={savedHeaderLogo ? HEADER_LOGO_OPTIONS : [HEADER_LOGO_AUTOMATIC, ...HEADER_LOGO_OPTIONS]}
                   onChange={(value) => setForm((c) => ({ ...c, headerLogo: value }))}
                   hint="The logo is the primary logo. Without one, the header shows the name."
                   error={fieldErrors.get('theme.headerLogo')}
