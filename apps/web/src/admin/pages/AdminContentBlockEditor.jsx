@@ -525,6 +525,8 @@ export default function AdminContentBlockEditor({ mode }) {
   }
 
   async function save({ publish }) {
+    // A switch made while this save runs keeps its own undo.
+    const shortTextAtSave = shortTextRef.current;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -595,6 +597,9 @@ export default function AdminContentBlockEditor({ mode }) {
       setSavedDocId(docId);
       loadedKeyRef.current = `${sectionId}__${nextFieldId}`;
       savedBlockTypeRef.current = savedContent.blockType;
+      // A saved type change is the new starting point: an undo goes no
+      // further back than the last save.
+      if (shortTextRef.current === shortTextAtSave) shortTextRef.current = null;
       setSavedEdit(contentEditSnapshot(nextFieldId, savedContent));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
