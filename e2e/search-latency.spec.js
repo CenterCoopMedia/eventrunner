@@ -204,6 +204,8 @@ function percentile(values, fraction) {
   return sorted[Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)];
 }
 
+const elapsed = (from, to) => (from === null || to === null || to < from ? null : to - from);
+
 function summarize(action, resultNodes) {
   const keyInputs = action.inputs.filter(({ type }) => type === 'keydown');
   const interactions = new Map();
@@ -225,9 +227,13 @@ function summarize(action, resultNodes) {
     // Inputs below the 16 ms reporting floor, or never reported, are absent.
     missingEventTimingSamples: Math.max(0, action.inputs.length - durations.length),
     inputToNextPaintMs: { max: durations.length ? Math.max(...durations) : null, p75: percentile(durations, 0.75), samples: durations },
+    // A result frame that ended before an anchor did not answer it (a
+    // trailing Backspace on an empty field changes nothing). That sample is
+    // unavailable, never a negative duration.
     resultSettleMs: {
-      fromFirstInput: first === null || action.settledFrame === null ? null : action.settledFrame - first,
-      fromLastInput: last === null || action.settledFrame === null ? null : action.settledFrame - last,
+      fromFirstInput: elapsed(first, action.settledFrame),
+      fromLastInput: elapsed(last, action.settledFrame),
+      lastResultFrameBeforeLastInput: last !== null && action.settledFrame !== null && action.settledFrame < last,
     },
     layoutShift: {
       total: sum(action.shifts, ({ value }) => value),
