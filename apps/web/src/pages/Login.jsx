@@ -84,9 +84,15 @@ export default function Login() {
   return (
     <article className="mx-auto max-w-md">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">{text('Sign in', 'Iniciar sesión')}</h1>
-      {checkingSignIn ? (
-        <LoadingState label={text('Checking your sign-in…', 'Comprobando el inicio de sesión…')} rows={0} onRetry={retryAuth} />
-      ) : null}
+      <LoadingState
+        active={checkingSignIn}
+        label={text('Checking your sign-in…', 'Comprobando el inicio de sesión…')}
+        completion={panelOnly ? '' : user
+          ? text('You are signed in.', 'Iniciaste sesión.')
+          : text('Sign-in options are ready.', 'Las opciones de inicio de sesión están listas.')}
+        rows={0}
+        onRetry={retryAuth}
+      />
       <section aria-label={text('Sign-in options', 'Opciones de inicio de sesión')} aria-busy={checkingSignIn}>
         {renderSignInContent()}
       </section>

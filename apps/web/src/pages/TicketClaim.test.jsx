@@ -141,7 +141,7 @@ describe('signed out', () => {
     await act(async () => setAuthUser(signedInUser));
     expect(screen.getByLabelText('Order number')).toHaveValue('group-order-123');
     expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(waiting).not.toBeInTheDocument();
+    expect(waiting).toBeEmptyDOMElement();
     expect(screen.getByTestId('current-route')).toHaveTextContent(entry);
     expect(claimRequests()).toHaveLength(0);
   });
@@ -170,19 +170,18 @@ describe('signed out', () => {
       const accountLabel = screen.getByText('Setting up your account…');
       expect(accountLabel).toBeVisible();
       expect(accountLabel.closest('[aria-hidden="true"]')).toBeNull();
+      expect(account).toBe(auth);
       expect(account).toBeEmptyDOMElement();
-      expect(auth).not.toBeInTheDocument();
       act(() => vi.advanceTimersByTime(29_999));
-      expect(account.parentElement).toHaveAttribute('data-loading-stage', 'slow');
+      expect(accountLabel.closest('[data-loading-stage]')).toHaveAttribute('data-loading-stage', 'slow');
       expect(screen.queryByRole('link', { name: 'Reload claim page' })).not.toBeInTheDocument();
       act(() => vi.advanceTimersByTime(1));
-      expect(account.parentElement).toHaveAttribute('data-loading-stage', 'prolonged');
       expect(account).toHaveTextContent('Check your connection and reload this page');
       expect(heldUp).toHaveBeenCalledOnce();
 
       await act(async () => profileListeners.get(signedInUser.uid)({ id: signedInUser.uid }));
       expect(screen.getByLabelText('Order number')).toHaveValue('group-order-123');
-      expect(account).not.toBeInTheDocument();
+      expect(account).toHaveTextContent('The ticket claim form is ready.');
       expect(claimRequests()).toHaveLength(0);
     } finally {
       globalThis.removeEventListener('eventrunner:held-up', heldUp);
@@ -314,9 +313,10 @@ describe('signed in', () => {
       expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
 
       act(() => vi.advanceTimersByTime(999));
-      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      const feedback = screen.getByText('Setting up your account…').closest('[data-loading-stage]');
+      expect(feedback).toHaveAttribute('data-loading-stage', 'initial');
       act(() => vi.advanceTimersByTime(1));
-      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'active');
+      expect(feedback).toHaveAttribute('data-loading-stage', 'active');
       act(() => vi.advanceTimersByTime(9000));
       expect(status).toHaveTextContent('This is taking longer than usual.');
       expect(heldUp).toHaveBeenCalledOnce();
@@ -332,7 +332,7 @@ describe('signed in', () => {
       await act(async () => profileListeners.get(signedInUser.uid)({ id: signedInUser.uid }));
       expect(screen.getByLabelText('Order number')).toHaveValue('edited & verified');
       expect(region).toHaveAttribute('aria-busy', 'false');
-      expect(status).not.toBeInTheDocument();
+      expect(status).toHaveTextContent('The ticket claim form is ready.');
       expect(claimRequests()).toHaveLength(0);
     } finally {
       globalThis.removeEventListener('eventrunner:held-up', heldUp);

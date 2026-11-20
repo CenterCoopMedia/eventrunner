@@ -2,7 +2,7 @@
 // auth (see src/test/setup.js). Covers send→verify→custom-token happy path,
 // 429 rate-limit copy, error focus handling, and the never-block-paste rule.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import App from '../App.jsx';
@@ -75,7 +75,7 @@ describe('functions origin convention', () => {
 });
 
 describe('emailed-code sign-in', () => {
-  it('announces the pending auth check outside the region that receives the sign-in options', async () => {
+  it('announces the sign-in result outside the busy region after a held auth check', async () => {
     let finishAuth;
     vi.mocked(onAuthStateChanged).mockImplementationOnce((_auth, next) => {
       finishAuth = next;
@@ -89,9 +89,15 @@ describe('emailed-code sign-in', () => {
     expect(status.closest('[aria-busy="true"]')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'true');
     await waitFor(() => expect(finishAuth).toBeTypeOf('function'));
-    await act(async () => finishAuth(null));
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 400);
+    try {
+      await act(async () => finishAuth(null));
+    } finally {
+      clock.mockRestore();
+    }
     expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(status).not.toBeInTheDocument();
+    expect(status).toHaveTextContent('Sign-in options are ready.');
+    expect(screen.queryByText('Checking your sign-in…')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
   });
 
@@ -217,7 +223,7 @@ describe('emailed-code sign-in', () => {
     const submit = screen.getByRole('button', { name: 'Email me a code' });
     fireEvent.click(submit);
 
-    const status = await screen.findByRole('status');
+    const status = await within(screen.getByRole('region', { name: 'Sign-in options' })).findByRole('status');
     expect(status).toHaveTextContent(/request another in/i);
     expect(status).toHaveTextContent('1:30');
     // Not styled or announced as an error, and submit stays available.
@@ -265,7 +271,7 @@ describe('emailed-code sign-in', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
 
-    const status = await screen.findByRole('status');
+    const status = await within(screen.getByRole('region', { name: 'Sign-in options' })).findByRole('status');
     expect(status).toHaveTextContent('Too many code requests. Try again later.');
   });
 

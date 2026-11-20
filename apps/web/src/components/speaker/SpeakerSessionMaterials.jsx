@@ -235,7 +235,14 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
 
   return (
     <>
-      {loading ? <LoadingState key={`${scopeKey}:${attempt}`} label="Loading materials…" rows={0} onRetry={canRead ? retryRead : undefined} /> : null}
+      <LoadingState
+        key={`${scopeKey}:${attempt}`}
+        active={loading}
+        label="Loading materials…"
+        completion={ready && !notice ? 'Session materials are ready.' : ''}
+        rows={0}
+        onRetry={canRead ? retryRead : undefined}
+      />
       <div role="region" aria-label="Session materials" aria-busy={loading} className="grid gap-lg">
         {!loading && load.status === 'error' ? (
           <div>

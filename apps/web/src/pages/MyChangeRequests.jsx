@@ -181,7 +181,12 @@ export default function MyChangeRequests() {
         </button>
       </div>
       {mine && !mine.ok ? <p role="alert" className="text-danger">{mine.error}</p> : null}
-      {!mine ? <LoadingState label="Loading your change requests…" rows={0} /> : null}
+      <LoadingState
+        active={!mine}
+        label="Loading your change requests…"
+        completion={mine?.ok ? 'Your change requests are ready.' : ''}
+        rows={0}
+      />
       <section aria-label="Change requests" aria-busy={busy || !mine} className="space-y-md">
       {mine?.ok && mine.requests.length === 0 ? (
         <section className="space-y-sm">

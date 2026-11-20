@@ -91,12 +91,14 @@ describe('PhotoCrop', () => {
       expect(onApply).not.toHaveBeenCalled();
 
       act(() => finish());
-      expect(status).not.toBeInTheDocument();
       if (fail) {
+        expect(status).not.toBeInTheDocument();
         expect(screen.getByRole('alert')).toHaveTextContent('That picture could not be opened.');
         fireEvent.click(screen.getByRole('button', { name: 'Back' }));
         expect(onCancel).toHaveBeenCalledOnce();
       } else {
+        expect(status).toHaveTextContent('The image is ready to crop.');
+        expect(status.closest('.loading-state')).toBeNull();
         expect(frame).toHaveAttribute('aria-busy', 'false');
         expect(screen.getByRole('button', { name: 'Use this crop' })).toBeEnabled();
       }
