@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import DeferredPage from '../components/DeferredPage.jsx';
 import MyTickets from './MyTickets.jsx';
 import TicketStatus from './TicketStatus.jsx';
 import MyChangeRequests from './MyChangeRequests.jsx';
@@ -18,7 +19,7 @@ vi.mock('../lib/fieldVitals.js', async (original) => ({ ...await original(), rep
 
 const READER = { uid: 'reader', email: 'reader@example.test', emailVerified: true };
 const CASES = [
-  { name: 'tickets', Page: MyTickets, path: '/tickets/mine', label: 'Loading your tickets…', region: 'Tickets',
+  { name: 'tickets', Page: MyTickets, path: '/tickets/mine', label: 'Loading your tickets…', region: 'Tickets', sharedWait: true,
     result: { tickets: [], nextCursor: null }, ready: 'No tickets found for this account' },
   { name: 'order', Page: TicketStatus, path: '/tickets/status?orderId=order-1', label: 'Loading your order…', region: 'Order status content',
     result: { orderId: 'order-1', status: 'free', paymentStatus: 'succeeded', totalAmount: 0, currency: 'usd', lines: [], tickets: [] }, ready: 'Your order is confirmed' },
@@ -33,12 +34,16 @@ beforeEach(() => {
   const pending = new Promise((resolve) => { finish = resolve; });
   state.tickets.mockReset().mockReturnValue(pending);
   state.changes.mockReset().mockReturnValue(pending);
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
 });
 afterEach(() => vi.useRealTimers());
 
-function tree({ Page, path }) {
-  return <MemoryRouter initialEntries={[path]}><Page /></MemoryRouter>;
+function tree({ Page, path, sharedWait }) {
+  return (
+    <MemoryRouter initialEntries={[path]}>
+      {sharedWait ? <DeferredPage component={Page} label="your tickets" routeKey={path} /> : <Page />}
+    </MemoryRouter>
+  );
 }
 
 describe.each(CASES)('$name loading feedback', (page) => {
@@ -63,11 +68,11 @@ describe.each(CASES)('$name loading feedback', (page) => {
     expect(screen.getByText(page.ready, { exact: true })).toBeInTheDocument();
   });
 
-  it('uses shared feedback for the auth handshake and starts a fresh named data wait afterwards', async () => {
+  it('names the data wait after sign-in and keeps the original deadline on shared routes', async () => {
     state.user = null; state.loading = true;
     const view = render(tree(page));
     const auth = screen.getByRole('status', { name: 'Checking your sign-in…' });
-    act(() => vi.advanceTimersByTime(10000));
+    act(() => vi.advanceTimersByTime(30_000));
     expect(auth).toHaveTextContent('This is taking longer than usual.');
     expect(state.tickets).not.toHaveBeenCalled();
     expect(state.changes).not.toHaveBeenCalled();
@@ -76,8 +81,15 @@ describe.each(CASES)('$name loading feedback', (page) => {
     view.rerender(tree(page));
     expect(screen.queryByRole('status', { name: 'Checking your sign-in…' })).toBeNull();
     const data = screen.getByRole('status', { name: page.label });
-    expect(data.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'initial');
+    expect(data.closest('.loading-state')).toHaveAttribute('data-loading-stage', page.sharedWait ? 'slow' : 'initial');
     expect(data.closest('[aria-busy="true"]')).toBeNull();
+    if (page.sharedWait) {
+      expect(data).toHaveTextContent('This is taking longer than usual.');
+      act(() => vi.advanceTimersByTime(29_999));
+      expect(data).not.toHaveTextContent('We haven’t received a result after a minute.');
+      act(() => vi.advanceTimersByTime(1));
+      expect(data).toHaveTextContent('We haven’t received a result after a minute.');
+    }
     await act(async () => finish(page.result));
     expect(screen.queryByRole('status', { name: page.label })).toBeNull();
     expect(screen.getByRole('region', { name: page.region })).toHaveAttribute('aria-busy', 'false');

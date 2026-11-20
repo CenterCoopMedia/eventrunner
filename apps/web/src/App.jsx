@@ -41,7 +41,7 @@ export function AppRoutes() {
           { index: true, element: <Home /> },
           ...publicRoutes.map(({ path, Component, label, shape }) => ({
             path, element: <DeferredPage component={Component} shape={shape} label={label}
-              routeKey={path === 'schedule/mine' ? pathname : undefined} />,
+              routeKey={(path === 'schedule/mine' || path === 'tickets/mine' || path === 'ticket/claim') && pathname} />,
           })),
         ],
       }],

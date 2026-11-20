@@ -12,6 +12,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
 import { signInWithCustomToken } from 'firebase/auth';
+import { loadFirebase } from '../lib/firebaseLoader.js';
+import { publicRoutes } from '../routes.jsx';
 
 vi.mock('../lib/configSource.js', () => ({ subscribeConfigDoc: (id, onNext) => {
   if (id === 'event') onNext({ historicalDemo: false });
@@ -140,6 +142,44 @@ describe('signed out', () => {
     expect(waiting).not.toBeInTheDocument();
     expect(screen.getByTestId('current-route')).toHaveTextContent(entry);
     expect(claimRequests()).toHaveLength(0);
+  });
+
+  it('keeps the original wait deadline when sign-in hands off to account setup', async () => {
+    authPending = true;
+    profileAvailable = false;
+    await Promise.all([
+      loadFirebase(),
+      publicRoutes.find(({ path }) => path === 'ticket/claim').prefetch(),
+    ]);
+    const heldUp = vi.fn();
+    globalThis.addEventListener('eventrunner:held-up', heldUp);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      await act(async () => { renderClaim('/ticket/claim?order=group-order-123'); });
+      const auth = screen.getByRole('status', { name: 'Checking your sign-in…' });
+      act(() => vi.advanceTimersByTime(30_000));
+      expect(auth).toHaveTextContent('This is taking longer than usual.');
+
+      await act(async () => setAuthUser(signedInUser));
+      const account = screen.getByRole('status', { name: 'Setting up your account…' });
+      expect(account).toHaveTextContent('This is taking longer than usual.');
+      expect(auth).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(29_999));
+      expect(account.parentElement).toHaveAttribute('data-loading-stage', 'slow');
+      expect(screen.queryByRole('link', { name: 'Reload claim page' })).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      expect(account.parentElement).toHaveAttribute('data-loading-stage', 'prolonged');
+      expect(account).toHaveTextContent('We haven’t received a result after a minute.');
+      expect(heldUp).toHaveBeenCalledOnce();
+
+      await act(async () => profileListeners.get(signedInUser.uid)({ id: signedInUser.uid }));
+      expect(screen.getByLabelText('Order number')).toHaveValue('group-order-123');
+      expect(account).not.toBeInTheDocument();
+      expect(claimRequests()).toHaveLength(0);
+    } finally {
+      globalThis.removeEventListener('eventrunner:held-up', heldUp);
+      vi.useRealTimers();
+    }
   });
 
   it('offers the shared sign-in form in place without requesting or claiming the order', async () => {
