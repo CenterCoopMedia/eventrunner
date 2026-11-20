@@ -64,12 +64,12 @@ export default function Header({
     ? ' sr-only'
     : mark && !nameShown ? ' site-header-title--with-mark' : '';
   const title = (
-    <span className={`site-header-title block min-w-0 truncate${titleClass}`}>
+    <span className={`site-header-title block min-w-0 max-w-full truncate${titleClass}`}>
       {name}
     </span>
   );
   const wordmark = (
-    <span className={`inline-flex max-w-full gap-xs ${logoAndName ? 'site-header-wordmark--both' : 'items-start'}`}>
+    <span className={`inline-flex max-w-full items-start gap-xs${logoAndName ? ' site-header-wordmark--both' : ''}`}>
       {mark}
       {title}
     </span>

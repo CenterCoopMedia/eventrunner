@@ -63,7 +63,7 @@ export default function EventHero({
       {figure}
       <div className="event-hero__copy">
         {showLogo ? (
-          <img className="event-hero__logo" src={logo} alt="" onError={() => setFailedLogo(logo)} />
+          <img className="event-hero__logo mb-sm block" src={logo} alt="" onError={() => setFailedLogo(logo)} />
         ) : null}
         {name ? <Name id={nameId} className={`event-hero__title font-heading${nameHidden ? ' sr-only' : ''}`}>{name}</Name> : null}
         {dates || place ? (
