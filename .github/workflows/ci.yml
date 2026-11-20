@@ -432,7 +432,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Public demo screenshots compare the demo built at the PR base
+          # Public demo screenshots compare the demo built at the event base
           # with the one built from the checked-out (normally merge) HEAD.
           fetch-depth: 0
       - uses: actions/setup-node@v4
@@ -495,10 +495,10 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.e2eConsoleOnly != 'true' && matrix.shard == 1 && steps.e2e_journeys.outcome != 'skipped' }}
         timeout-minutes: 15
         env:
-          DEMO_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEMO_VISUAL_BASE_SHA: ${{ env.GITHUB_BASE_SHA }}
           DEMO_VISUAL_BEFORE_DIR: ${{ runner.temp }}/demo-before
         # docs/demo is build output, not committed. Build HEAD's demo in
-        # place, and the PR base's demo in a temporary worktree. A manual
+        # place, and the event base's demo in a temporary worktree. A manual
         # run has no base and records after-only evidence.
         run: |
           node scripts/build-demo.cjs
@@ -510,8 +510,8 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 1 && steps.demo_builds.outcome == 'success' }}
         timeout-minutes: 15
         env:
-          DEMO_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          DEMO_VISUAL_BEFORE_DIR: ${{ github.event.pull_request.base.sha && format('{0}/demo-before', runner.temp) || '' }}
+          DEMO_VISUAL_BASE_SHA: ${{ env.GITHUB_BASE_SHA }}
+          DEMO_VISUAL_BEFORE_DIR: ${{ env.GITHUB_BASE_SHA && format('{0}/demo-before', runner.temp) || '' }}
           DEMO_VISUAL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/dev/capture-demo-visuals.mjs --out test-results/demo-visual-evidence
       - name: Upload public demo visual evidence

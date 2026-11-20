@@ -3,12 +3,12 @@
 /**
  * Reproducible, read-only public demo evidence from built demo directories.
  *
- * node scripts/dev/capture-demo-visuals.mjs --base <PR-base-SHA> --before <dir> --out <directory>
+ * node scripts/dev/capture-demo-visuals.mjs --base <base-SHA> --before <dir> --out <directory>
  * Add --plan to verify sources and list the matrix without starting a browser.
  * DEMO_VISUAL_BASE_SHA supplies --base and DEMO_VISUAL_BEFORE_DIR supplies
  * --before in CI. --after defaults to docs/demo, the checked-out HEAD's build
  * (node scripts/build-demo.cjs). A manual run without a base records
- * after-only evidence explicitly; a PR run must name its base.
+ * after-only evidence explicitly. Pull requests and merge groups require a base.
  * scripts/dev/build-demo-at.cjs builds the base's demo into --before.
  *
  * A focused 51-image comparison: 12 before and 39 after. Newsroom/light Home
@@ -76,7 +76,9 @@ export function parseArgs(argv, env = process.env) {
   }
   if (options.help) return options;
   if (options.base && !SHA.test(options.base)) throw new Error('--base must be a full commit SHA');
-  if (env.GITHUB_EVENT_NAME === 'pull_request' && !options.base) throw new Error('PR capture requires its base SHA');
+  if (['pull_request', 'merge_group'].includes(env.GITHUB_EVENT_NAME) && !options.base) {
+    throw new Error('Visual capture requires its base SHA for pull requests and merge groups');
+  }
   if (options.base && !options.before) throw new Error('--base requires --before, the base commit\'s built demo');
   if (!options.base && options.before) throw new Error('--before requires --base, the commit it was built from');
   if (!options.out && !options.plan) throw new Error('--out is required');
@@ -435,7 +437,7 @@ export async function main(argv, env = process.env) {
   const manifest = {
     version: 1, status: options.plan ? 'plan-only' : 'running',
     createdAt: new Date().toISOString(),
-    comparison: options.base ? 'PR base versus checked-out HEAD' : 'after-only; no baseline supplied',
+    comparison: options.base ? 'Base commit versus checked-out HEAD' : 'after-only; no baseline supplied',
     sources: snapshots.map(({ label, sha, demoDigest, fileCount }) => ({ label, sha, demoDigest, fileCount, expectedCaptures: captureMatrix(label).length })),
     prHeadSha: env.DEMO_VISUAL_HEAD_SHA || null,
     expectedCaptures: snapshots.reduce((count, snapshot) => count + captureMatrix(snapshot.label).length, 0),
