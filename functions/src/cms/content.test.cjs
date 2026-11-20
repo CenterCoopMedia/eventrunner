@@ -703,16 +703,22 @@ test('cmsMoveContent publishes a draft-only block and keeps hidden visibility', 
   assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 0);
 });
 
-test('cmsMoveContent checks both page revisions and rechecks capacity after a concurrent write', async () => {
+test('cmsMoveContent protects assigned and Home hero blocks and rechecks capacity after a concurrent write', async () => {
   const owned = makeFakeDb({
     'cmsContent/removed__answer': ORPHAN,
+    'cmsContent/hero__title': { section: 'hero', field: 'title', blockType: 'text', value: 'Our event heading' },
+    'cmsPages/test-page': { sections: [{ id: 'faq', maxBlocks: 1 }] },
     'cmsPages/removed-page': { sections: [{ id: 'removed' }] },
     'cmsPages_drafts/removed-page': { sections: [] },
   });
+  const move = createCmsMoveContentHandler(deps(owned));
   const denied = fakeRes();
-  await createCmsMoveContentHandler(deps(owned))(req({ body: MOVE_REQUEST }), denied);
+  await move(req({ body: MOVE_REQUEST }), denied);
   assert.equal(denied.statusCode, 409);
-  assert.deepEqual(owned.ids('cmsContent'), ['removed__answer']);
+  const hero = fakeRes();
+  await move(req({ body: { ...MOVE_REQUEST, docId: 'hero__title' } }), hero);
+  assert.equal(hero.statusCode, 409);
+  assert.deepEqual(owned.ids('cmsContent'), ['removed__answer', 'hero__title']);
 
   const capped = makeFakeDb({
     'cmsContent/removed__answer': ORPHAN,

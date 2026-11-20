@@ -85,8 +85,9 @@ export default function OrphanedContent({ pages, pagesReady }) {
   const headingId = useId();
   useEffect(() => { if (result) resultRef.current?.focus(); }, [result]);
 
-  const ownedSections = new Set(pages.flatMap(({ live, draft }) =>
-    [...sectionsOf(live), ...sectionsOf(draft)].map((section) => section?.id)));
+  // Home reads hero blocks even when its page document has no hero section.
+  const ownedSections = new Set(['hero', ...pages.flatMap(({ live, draft }) =>
+    [...sectionsOf(live), ...sectionsOf(draft)].map((section) => section?.id))]);
   const orphans = ready && pagesReady && !error
     ? rows.filter(({ live, draft }) => ![live, draft].some((block) => block?.section && ownedSections.has(block.section)))
     : [];

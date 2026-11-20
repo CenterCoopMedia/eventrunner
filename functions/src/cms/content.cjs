@@ -703,10 +703,11 @@ function createCmsMoveContentHandler({ db, auth, getConfig, now = Date.now, log 
           tx.get(db.collection(PAGES_COLLECTION)),
           tx.get(db.collection(PAGES_DRAFTS)),
         ]);
-        const ownsSource = [...livePages.docs, ...draftPages.docs].some((page) => {
+        const sourceSections = [live?.section, draft?.section];
+        // Home also reads hero blocks directly, even without a section record.
+        const ownsSource = sourceSections.includes('hero') || [...livePages.docs, ...draftPages.docs].some((page) => {
           const sections = page.data().sections;
-          return Array.isArray(sections) && sections.some((entry) =>
-            entry?.id && (entry.id === live?.section || entry.id === draft?.section));
+          return Array.isArray(sections) && sections.some((entry) => entry?.id && sourceSections.includes(entry.id));
         });
         if (ownsSource) {
           throw new RequestError(409, 'conflict', 'This block already belongs to a page. Refresh Content and try again.');

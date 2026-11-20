@@ -377,8 +377,9 @@ describe('content browsing', () => {
     };
     const orphanDraft = { ...orphan, status: 'dirty', value: '<p>Bring two notebooks.</p>' };
     const owned = { ...orphan, id: 'still-live__body', section: 'still-live', value: '<p>Keep this here.</p>' };
+    const hero = { ...HERO_TEXT[0], value: 'Our event heading' };
     sources.cmsPages = [{ ...SCHOLARSHIPS_PAGE, sections: [...SCHOLARSHIPS_PAGE.sections, sectionStillLive] }];
-    sources.cmsContent = [owned, orphan];
+    sources.cmsContent = [owned, orphan, hero];
     sources.cmsContent_drafts = [orphanDraft];
     silentCollections = ['cmsPages_drafts'];
     await renderAt('/admin/content');
@@ -389,6 +390,7 @@ describe('content browsing', () => {
     const recovery = await screen.findByRole('region', { name: 'Not on any page' });
     expect(within(recovery).getByText('Bring a notebook.')).toBeInTheDocument();
     expect(within(recovery).queryByText('Keep this here.')).not.toBeInTheDocument();
+    expect(within(recovery).queryByText('Our event heading')).not.toBeInTheDocument();
     fireEvent.click(within(recovery).getByRole('button', { name: 'Move to section…' }));
     const submit = within(recovery).getByRole('button', { name: 'Move and publish' });
     expect(submit).toBeDisabled();
@@ -407,7 +409,7 @@ describe('content browsing', () => {
     expect(urlOf(1)).toMatch(/\/cmsMoveContent$/);
     expect(bodyOf(1)).toEqual({ docId: orphan.id, pageId: 'scholarships', section: 'intro' });
     act(() => {
-      adminSubscriptions.get('cmsContent')([owned, { ...orphan, id: 'intro__body', section: 'intro' }]);
+      adminSubscriptions.get('cmsContent')([owned, hero, { ...orphan, id: 'intro__body', section: 'intro' }]);
       adminSubscriptions.get('cmsContent_drafts')([{ ...orphanDraft, id: 'intro__body', section: 'intro' }]);
     });
     expect(screen.queryByRole('region', { name: 'Not on any page' })).not.toBeInTheDocument();
