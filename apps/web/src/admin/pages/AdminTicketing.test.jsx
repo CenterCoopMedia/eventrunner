@@ -78,6 +78,31 @@ describe('AdminTicketing', () => {
     expect(callMock).not.toHaveBeenCalledWith('ticketingListTickets', expect.anything());
   });
 
+  it('previews and saves only the ticket button fields under event registration', async () => {
+    callMock.mockImplementation((name, body) => {
+      if (name === 'getTicketingStatus') return Promise.resolve({ ...STATUS, provider: 'stripe' });
+      if (name === 'updateEventConfig') return Promise.resolve({ docPath: 'config/event' });
+      if (body.action === 'catalog') return Promise.resolve({ mode: 'test', catalog: { published: false, currency: 'usd', ticketTypes: [] } });
+      if (body.action === 'orders') return Promise.resolve({ orders: [], nextCursor: null });
+      if (body.action === 'tickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    const preview = within(await screen.findByRole('group', { name: 'Ticket button preview' }));
+    expect(preview.getByText('Get tickets')).toHaveClass('bg-accent');
+    const label = screen.getByLabelText('Button label');
+    expect(label).toHaveAttribute('maxlength', '30');
+    fireEvent.change(label, { target: { value: ' Reserve your seat ' } });
+    fireEvent.change(screen.getByLabelText('Button style'), { target: { value: 'outline' } });
+    expect(preview.getByText('Reserve your seat')).toHaveClass('bg-surface', 'border-control');
+    expect(callMock).not.toHaveBeenCalledWith('updateEventConfig', expect.anything());
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket button' }));
+    expect(await screen.findByText('Ticket button saved.')).toBeInTheDocument();
+    expect(callMock).toHaveBeenCalledWith('updateEventConfig', {
+      event: { registration: { ticketButtonLabel: 'Reserve your seat', ticketButtonStyle: 'outline' } },
+    });
+  });
+
   it('keeps provider workspaces closed after a status failure and recovers through Refresh', async () => {
     let statusCalls = 0;
     callMock.mockImplementation((name) => {

@@ -104,6 +104,12 @@ async function evidence(page, name, extra = {}) {
   return timeline;
 }
 
+async function waitForFirstContentfulPaint(page) {
+  await expect.poll(() => page.evaluate(() =>
+    globalThis.bootTimeline.paints.some(({ name }) => name === 'first-contentful-paint'),
+  )).toBe(true);
+}
+
 async function captureUnfinishedPage(page, name) {
   // Playwright's screenshot waits for document.fonts.ready, which cannot
   // settle while this test deliberately holds the document's entry script.
@@ -120,7 +126,7 @@ test('a fast production load paints content without fallback text', async ({ pag
   await recordTimeline(page);
   await page.goto(`${origin}${BASE}`);
   await expect(page.getByRole('heading', { name: 'Page ready' })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => globalThis.bootTimeline.paints.length)).toBeGreaterThan(0);
+  await waitForFirstContentfulPaint(page);
   const timeline = await evidence(page, 'fast');
   expect(timeline.changes.some(({ text }) => text)).toBe(false);
   const ready = timeline.changes.find((state) => state.ready);
@@ -219,7 +225,7 @@ test('a blocking production stylesheet delays the fallback paint too', async ({ 
     expect(blocked.paints).toEqual([]);
     release.css();
     await expect(page.locator('#app-boot [role="status"]')).toHaveText('Opening this site…');
-    await expect.poll(() => page.evaluate(() => globalThis.bootTimeline.paints.length)).toBeGreaterThan(0);
+    await waitForFirstContentfulPaint(page);
     const timeline = await evidence(page, 'stylesheet', { blocked });
     expect(timeline.paints.find(({ name }) => name === 'first-contentful-paint').startTime).toBeGreaterThanOrEqual(blocked.elapsed);
     release.entry();

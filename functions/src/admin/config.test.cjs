@@ -1256,6 +1256,24 @@ test('the registration goal round-trips inside registration, and a bad one is re
   assert.equal(deps.db.docs.get('config/event').registration.goal, null);
 });
 
+test('staff update ticket button fields without replacing other registration settings', async () => {
+  const event = validEvent();
+  const deps = tieredDeps({ 'config/event': event });
+  const save = createUpdateEventConfigHandler(deps);
+  const settings = { ticketButtonLabel: 'Reserve a seat', ticketButtonStyle: 'outline' };
+  const response = makeRes();
+  await save(makeReq({ event: { registration: settings } }, { token: 'staff-token' }), response);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').registration, { ...event.registration, ...settings });
+
+  const cleared = makeRes();
+  await save(makeReq({ event: { registration: { ticketButtonLabel: null } } }, { token: 'staff-token' }), cleared);
+  assert.equal(cleared.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').registration, {
+    ...event.registration, ...settings, ticketButtonLabel: null,
+  });
+});
+
 test('a staff caller saves milestones and the goal: alone, and in the whole form without the sender', async () => {
   const stored = validEvent();
   const deps = tieredDeps({ 'config/event': stored });

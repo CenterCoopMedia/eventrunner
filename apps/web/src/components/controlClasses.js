@@ -86,6 +86,11 @@ export const secondaryActionClass =
   'border-hairline border-control bg-surface px-md py-xs font-data text-caption ' +
   'font-semibold text-text-primary';
 
+export function ticketButtonClass(style) {
+  const actionClass = style === 'outline' ? secondaryActionClass : primaryActionClass;
+  return `${actionClass} min-w-0 text-center [overflow-wrap:anywhere]`;
+}
+
 /**
  * A page-level action in the editorial register: a ruled rectangle with no
  * fill, for a control that offers something rather than completing a task.

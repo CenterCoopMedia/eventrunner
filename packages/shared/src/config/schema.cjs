@@ -12,6 +12,7 @@
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 const { languageConfigErrors } = require('../contentLanguages.cjs');
 const { safeUrlHref } = require('../urlSafety.cjs');
+const { MAX_TICKET_BUTTON_LABEL_LENGTH, TICKET_BUTTON_STYLES } = require('../registration.cjs');
 const { MAX_SOCIAL_LABEL_LENGTH, httpsUrlHref, isHttpsUrl, isValidCalendarDate } = require('./values.cjs');
 // Deliberately loose (local@domain.tld) — deliverability is the sender
 // domain verification's job, not the schema's. This only refuses values
@@ -571,6 +572,13 @@ function validateEventConfig(event) {
       }
       if (reg.actionLabel != null && !isNonEmptyString(reg.actionLabel)) {
         errors.push('registration.actionLabel: must be null or a nonempty string');
+      }
+      if (reg.ticketButtonLabel != null && (!isNonEmptyString(reg.ticketButtonLabel)
+        || reg.ticketButtonLabel.length > MAX_TICKET_BUTTON_LABEL_LENGTH || /[\r\n]/u.test(reg.ticketButtonLabel))) {
+        errors.push(`registration.ticketButtonLabel: must be null or a single line of 1 to ${MAX_TICKET_BUTTON_LABEL_LENGTH} characters`);
+      }
+      if (reg.ticketButtonStyle != null && !TICKET_BUTTON_STYLES.includes(reg.ticketButtonStyle)) {
+        errors.push('registration.ticketButtonStyle: must be primary, outline or null');
       }
       // THE REGISTRATION GOAL (issue #180): how many approved accounts the
       // organizer is aiming for, which the overview sets against the

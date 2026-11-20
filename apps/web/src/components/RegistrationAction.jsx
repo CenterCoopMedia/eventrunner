@@ -2,19 +2,18 @@
 // native ticketing; other providers keep the configured external action.
 import { PublicLink as Link } from './PublicLink.jsx';
 import { useRegistrationLink } from '../lib/useRegistrationLink.js';
-import { primaryActionClass, quietActionClass } from './controlClasses.js';
+import { primaryActionClass, quietActionClass, ticketButtonClass } from './controlClasses.js';
 import ExternalLink from './ExternalLink.jsx';
 
 export { DEFAULT_REGISTRATION_LABEL, resolveRegistrationLink, useRegistrationLink } from '../lib/useRegistrationLink.js';
 
 export function RegistrationLink({ action, placement = 'lead' }) {
   if (!action) return null;
-  const className = placement === 'header' ? quietActionClass : primaryActionClass;
   const link = action.native
-    ? <Link to={action.url} className={className}>{action.label}</Link>
-    : <ExternalLink href={action.url} className={className}>{action.label}</ExternalLink>;
+    ? <Link to={action.url} className={ticketButtonClass(action.style)}>{action.label}</Link>
+    : <ExternalLink href={action.url} className={placement === 'header' ? quietActionClass : primaryActionClass}>{action.label}</ExternalLink>;
   return placement === 'header'
-    ? <div className="ms-auto flex justify-end py-2xs">{link}</div>
+    ? <div className="ms-auto flex min-w-0 justify-end py-2xs">{link}</div>
     : link;
 }
 
