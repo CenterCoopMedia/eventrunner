@@ -10,6 +10,7 @@ import RouteBoundary, { lazyPage } from './RouteBoundary.jsx';
 import { SetupSaveContext } from './setup/useAutosave.js';
 import { clearKeptAnswers } from './setup/keptAnswers.js';
 
+// Keep these pages behind dynamic imports so the console loads each route on demand.
 const AcceptInvite = lazyPage(() => import('./pages/AcceptInvite.jsx'));
 const AcceptedAgreement = lazyPage(() => import('./pages/AcceptedAgreement.jsx'));
 const ApplicationStatus = lazyPage(() => import('./pages/ApplicationStatus.jsx'));
