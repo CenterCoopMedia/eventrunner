@@ -872,6 +872,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pages can read image display-size manifests from Storage. Each client deploy sets the Storage bucket's
+  CORS rule to the site's allowed origins, so the browser uses the smaller copies in place of the
+  full original (#1128).
 - Homepage hero-image edits keep save and publish feedback visible when the draft listener updates.
   Branding edits the visible image used by Home, and local URL/alt changes warn before navigation
   or reload. A failed save keeps edits dirty until the draft is confirmed (#726).

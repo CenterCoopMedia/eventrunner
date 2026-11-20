@@ -107,6 +107,14 @@ test('storage rules deploy does not grant project IAM', () => {
   assert.doesNotMatch(provision, /firestoreServiceAgent/);
 });
 
+test('provision lets only the allowed origins read Storage media', () => {
+  const cors = step("Let the site's origins read Storage media");
+  assert.match(cors, /EVENT_ALLOWED_ORIGINS: \$\{\{ vars\.EVENT_ALLOWED_ORIGINS \}\}/);
+  assert.match(cors, /method: \["GET", "HEAD"\]/);
+  assert.match(cors, /gcloud storage buckets update "gs:\/\/\$EVENT_STORAGE_BUCKET" --cors-file=/);
+  assert.doesNotMatch(cors, /"\*"/);
+});
+
 test('deploy validation gates every job that consumes the validated environment', () => {
   for (const name of ['provision', 'functions', 'content']) {
     assert.match(job(name), /needs: \[[^\]\n]*validate-env[^\]\n]*\]/);
