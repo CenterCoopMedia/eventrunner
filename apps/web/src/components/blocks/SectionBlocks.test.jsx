@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import SectionBlocks from './SectionBlocks.jsx';
 
 const text = (value) => ({ blockType: 'text', value });
@@ -42,11 +42,13 @@ describe('SectionBlocks layout', () => {
     expect(left).not.toContain('Question 3?');
   });
 
-  it('keeps a run of link groups in one column, one list per group', () => {
+  it('keeps a run of link groups in one column, one list per group', async () => {
     const link = (n, group) => ({ id: `l${n}`, blockType: 'link_group', group, label: `Link ${n}`, url: `https://example.org/${n}` });
     const { container } = render(
       <SectionBlocks layout="columns" blocks={[text('Intro'), link(1, 'A'), link(2, 'B'), link(3, 'A'), link(4, 'B')]} />,
     );
+    // The run is drawn by the lazy LinkGroupBlock (#1201): wait for its links.
+    await waitFor(() => expect(container.querySelectorAll('a')).toHaveLength(4));
     const [left] = columnTexts(container);
     expect(left).toBe('Intro');
     // The four links are one run on the right: one heading per group.
