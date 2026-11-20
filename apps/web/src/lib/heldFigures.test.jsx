@@ -85,6 +85,18 @@ describe('held-up figures', () => {
     expect(other.getAttribute('data-held-stage')).toBe('active');
   });
 
+  it('gives the figure to a route fallback when Suspense hides a busy control', async () => {
+    button.setAttribute('aria-busy', 'true');
+    await flush();
+    await tick(1000);
+    expect(button.getAttribute('data-held-stage')).toBe('active');
+    // Suspense hides the old page but keeps its nodes connected.
+    button.style.display = 'none';
+    const fallback = render(<LoadingStatus label="Loading schedule…" stage="active" />);
+    expect(fallback.container.querySelector('.held-figure__glyph')).not.toBeNull();
+    expect(button.hasAttribute('data-held-stage')).toBe(false);
+  });
+
   it('lets a waiting status and a busy control share one figure', async () => {
     const view = render(<LoadingStatus label="Loading tickets…" stage="active" />);
     button.setAttribute('aria-busy', 'true');

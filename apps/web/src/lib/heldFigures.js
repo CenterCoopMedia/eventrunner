@@ -4,15 +4,26 @@ import '../components/heldFigure.css';
 
 // A page shows one held-up figure (brief §2.3, #1090). Every wait that
 // reaches one second joins this queue: a loading status's figure, or a busy
-// public control. The earliest owns the figure, a wait inside an open dialog
-// goes first, and the next takes over the moment the owner ends.
+// public control. A wait inside an open dialog goes first, a loading status
+// outranks a busy control, the earliest goes next, and the next takes over the
+// moment the owner ends.
+//
+// A status outranking a control also covers a page that Suspense hides while
+// one of its controls is busy: the hidden control stays connected and in this
+// queue, and the route fallback that replaces it is a status, so the fallback
+// draws the figure. Invariant: a hidden page always has a visible fallback
+// status, so a hidden control never holds the figure over nothing.
 const waiting = [];
 const listeners = new Set();
 let owner = null;
 
+const isStatus = (element) => element.classList.contains('held-figure');
+
 function settleOwner() {
   const dialog = document.querySelector('dialog[open]');
-  owner = (dialog && waiting.find((element) => dialog.contains(element))) || waiting[0] || null;
+  const inDialog = dialog ? waiting.filter((element) => dialog.contains(element)) : [];
+  const pool = inDialog.length > 0 ? inDialog : waiting;
+  owner = pool.find(isStatus) || pool[0] || null;
   listeners.forEach((listener) => listener());
 }
 

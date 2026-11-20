@@ -278,9 +278,10 @@ These rules bind every motif:
   `pointer-events: none`.
 - A motif that carries meaning is an icon, not a motif. Give an icon a label.
 - Keep motif density low. Use at most three motifs on a page. The held-up figure is exempt: It
-  shows only while a wait is pending, and a page shows one figure at a time: The earliest wait
-  past one second holds it, a wait inside an open dialog goes first, and the next wait takes it
-  when the holder ends (`apps/web/src/lib/heldFigures.js`).
+  shows only while a wait is pending, and a page shows one figure at a time: A wait inside an
+  open dialog goes first, a loading status outranks a busy control, the earliest wait past one
+  second goes next, and the next wait takes the figure when the holder ends
+  (`apps/web/src/lib/heldFigures.js`).
 - **Held-up figure (owner ruling, 2026-11-04; #1090).** A public wait past one second shows a small
   figure in the active set's drawing: A body and one moving part that makes one gesture. A set
   with no wait drawing uses the ampersand, which rocks on its heel. At ten seconds the gesture
