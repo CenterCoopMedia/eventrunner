@@ -171,6 +171,12 @@ describe('Rich text block titles', () => {
     expect(contentBlockTitle(block)).toBe('Arriving after lunch & checking in.');
     expect(contentBlockTitle({ ...block, label: 'Venue directions' })).toBe('Venue directions');
   });
+
+  it('keeps comparison signs that are part of the text', () => {
+    const block = { blockType: 'richtext', value: '<p>Kids &lt; 12 free, adults &gt; 65 save</p>' };
+    expect(contentBlockTitle(block)).toBe('Kids < 12 free, adults > 65 save');
+    expect(contentIdSource(block)).toBe('Kids < 12 free, adults > 65 save');
+  });
 });
 
 describe('validateRequiredContent', () => {

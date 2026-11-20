@@ -194,7 +194,7 @@ const TITLE_KEYS = ['label', 'name', 'question', 'alt', 'text', 'attribution', '
 
 function plainContentText(value) {
   return String(value ?? '')
-    .replace(/<[^>]*>/g, ' ')
+    .replace(/<\/?[a-z][\w:-]*(?=[\s/>])[^<>]*>/gi, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
