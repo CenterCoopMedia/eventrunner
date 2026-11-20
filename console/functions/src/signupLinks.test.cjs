@@ -7,7 +7,8 @@ const { hostName } = require('./hostName.cjs');
 const {
   EXPIRES_IN_DAYS, createLink, createSignupLink, getSignupLink, listSignupLinks, redeemSignupLink, revokeSignupLink,
 } = require('./signupLinks.cjs');
-const { NOW, ana, ben, fakeMailer, ops, quietLog, seededDb, signupTerms } = require('./testData.cjs');
+const { listApplications } = require('./applications.cjs');
+const { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms } = require('./testData.cjs');
 
 const DAY = 24 * 60 * 60 * 1000;
 const PUBLIC_URL = 'https://console.example';
@@ -147,7 +148,9 @@ test('a wrong token and a missing link read the same, whatever state the link is
 test('a client reads the name, and an expired link says so', async () => {
   const db = open();
   const { linkId, token } = await made(db);
-  assert.deepEqual((await getSignupLink(deps(db), { body: { linkId, token }, user: ana })).body, { organizationName: 'Example Press', status: 'open' });
+  assert.deepEqual((await getSignupLink(deps(db), { body: { linkId, token }, user: ana })).body, {
+    organizationName: 'Example Press', status: 'open', organizations: [{ id: 'o1', name: 'NC Local' }],
+  });
   const later = { now: () => NOW + EXPIRES_IN_DAYS * DAY };
   await assert.rejects(getSignupLink(deps(db, later), { body: { linkId, token }, user: ana }), { status: 410, code: 'link-expired', message: /new link/ });
   await assert.rejects(redeemSignupLink(deps(db, later), { body: { linkId, token, ...REDEEM }, user: ana }), { status: 410, code: 'link-expired' });
@@ -219,6 +222,92 @@ test('a refused redeem leaves nothing behind', async () => {
   await assert.rejects(redeemSignupLink(deps(db), { body: { linkId, token, ...REDEEM }, user: ana }), { status: 409, code: 'signups-closed' });
   assert.equal(db.paths('').length, before, 'no organization, member or draft');
   assert.equal(db.read(`signup_links/${linkId}`).status, 'open', 'the link can still be used');
+});
+
+/** o1 has an older open request and a newer withdrawn one; o2, another organization, has the newest. */
+function withRequests() {
+  const answers = (website, address, replyTo) => {
+    const a = applicationDoc().answers;
+    return { ...a, organization: { ...a.organization, website, address }, email: { ...a.email, replyTo } };
+  };
+  return seededDb({
+    ...signupTerms(),
+    'applications/o1-first': applicationDoc({ status: 'launched', createdAt: new Date(NOW - 3000), answers: answers('first.example', '1 First St', 'first@example.org') }),
+    'applications/o1-withdrawn': applicationDoc({ status: 'withdrawn', createdAt: new Date(NOW - 2000), answers: answers('withdrawn.example', '2 Gone St', 'gone@example.org') }),
+    'applications/o2-newest': applicationDoc({ orgId: 'o2', createdBy: 'cy', createdAt: new Date(NOW - 1000), answers: answers('other.example', '9 Other St', 'other@example.org') }),
+  });
+}
+
+test('the link lists only the organizations the signed-in person is an Owner of', async () => {
+  const db = withRequests();
+  const { linkId, token } = await made(db);
+  const listed = async (user) => (await getSignupLink(deps(db), { body: { linkId, token }, user })).body.organizations;
+  assert.deepEqual(await listed(ana), [{ id: 'o1', name: 'NC Local' }]);
+  assert.deepEqual(await listed(ben), [], 'an Editor is not offered the organization');
+  assert.deepEqual(await listed(cy), [{ id: 'o2', name: 'Org two' }]);
+  assert.deepEqual(await listed({ uid: 'newbie', email: 'new@example.org' }), []);
+});
+
+test('an Owner adds the event to their organization, which carries answers from its own latest open request only', async () => {
+  const db = withRequests();
+  const { linkId, token } = await made(db);
+  const organizations = orgsBefore(db);
+  const result = await redeemSignupLink(deps(db), { body: { linkId, token, orgId: 'o1', organizationName: 'Ignored', timezone: 'America/Chicago' }, user: ana });
+  assert.equal(result.status, 201);
+  const { orgId, appId } = result.body;
+  assert.equal(orgId, 'o1');
+  assert.equal(orgsBefore(db), organizations, 'no new organization');
+  assert.deepEqual(db.paths('organizations/o1/members/'), ['organizations/o1/members/ana', 'organizations/o1/members/ben'], 'the team is unchanged');
+  const app = db.read(`applications/${appId}`);
+  assert.equal(app.orgId, 'o1');
+  assert.equal(app.status, 'draft');
+  assert.equal(app.signupLinkId, linkId);
+  assert.deepEqual(app.answers.organization, { name: 'NC Local', website: 'first.example', address: '1 First St' });
+  assert.equal(app.answers.email.replyTo, 'first@example.org');
+  assert.equal(app.answers.email.senderName, '');
+  assert.equal(app.answers.event.name, '', 'event answers start empty');
+  assert.equal(app.answers.event.timezone, 'America/Chicago');
+  const text = JSON.stringify(app.answers);
+  for (const other of ['other.example', '9 Other St', 'other@example.org', 'withdrawn.example', 'gone@example.org']) {
+    assert.ok(!text.includes(other), `${other} is not carried`);
+  }
+  const link = db.read(`signup_links/${linkId}`);
+  assert.equal(link.status, 'used');
+  assert.equal(link.orgId, 'o1');
+  assert.equal(link.appId, appId);
+  const { applications } = (await listApplications(deps(db), { body: { orgId: 'o1' }, user: ben })).body;
+  assert.ok(applications.some((r) => r.id === appId), 'the existing Editor sees the new event without an invite');
+
+  const again = await redeemSignupLink(deps(db), { body: { linkId, token, orgId: 'o1' }, user: ana });
+  assert.equal(again.status, 200);
+  assert.deepEqual(again.body, result.body);
+});
+
+test('an organization with no open request carries nothing', async () => {
+  const db = seededDb({ ...signupTerms(), 'applications/gone': applicationDoc({ status: 'declined' }) });
+  const { linkId, token } = await made(db);
+  const { appId } = (await redeemSignupLink(deps(db), { body: { linkId, token, orgId: 'o1' }, user: ana })).body;
+  const { answers } = db.read(`applications/${appId}`);
+  assert.deepEqual(answers.organization, { name: 'NC Local', website: '', address: '' });
+  assert.equal(answers.email.replyTo, '');
+});
+
+test('only a current Owner can add the event to an organization, and a refusal leaves the link open', async () => {
+  const db = withRequests();
+  const { linkId, token } = await made(db);
+  const before = db.paths('').length;
+  const redeem = (orgId, user) => redeemSignupLink(deps(db), { body: { linkId, token, orgId, ...REDEEM }, user });
+  await assert.rejects(redeem('o1', ben), { status: 403, code: 'forbidden', message: /Only an Owner/ });
+  await assert.rejects(redeem('o1', cy), { status: 404 }, 'an Owner of another organization reads it as missing');
+  await assert.rejects(redeem('o2', ana), { status: 404 });
+  await assert.rejects(redeem('nope', ana), { status: 404 });
+  await assert.rejects(redeem('a/b', ana), { status: 400 });
+  await assert.rejects(redeem(42, ana), { status: 400 });
+  await db.collection('organizations').doc('o1').collection('members').doc('ana').delete();
+  await assert.rejects(redeem('o1', ana), { status: 404 }, 'a removed Owner is refused');
+  assert.equal(db.paths('').length, before - 1, 'only the removed membership is gone');
+  assert.equal(db.read(`signup_links/${linkId}`).status, 'open');
+  assert.deepEqual(db.paths('applications/'), ['applications/o1-first', 'applications/o1-withdrawn', 'applications/o2-newest']);
 });
 
 test('a refusal names the person the deployment names, or the team', () => {

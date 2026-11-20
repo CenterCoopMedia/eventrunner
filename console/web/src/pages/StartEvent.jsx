@@ -11,6 +11,8 @@ import LoadingState from '../LoadingState.jsx';
 
 /** Refusals about the link itself. Trying again cannot help; the message says to ask for a new one. */
 const LINK_REFUSALS = ['link-invalid', 'link-used', 'link-revoked', 'link-expired'];
+/** The choice value for a new organization; any other value is an organization id. */
+const NEW_ORG = 'new';
 
 function Panel({ children }) {
   return (
@@ -31,6 +33,7 @@ export default function StartEvent() {
   const [link, setLink] = useState(null);
   const [refusal, setRefusal] = useState(null);
   const [name, setName] = useState('');
+  const [target, setTarget] = useState(NEW_ORG);
   const [fieldError, setFieldError] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,6 +45,7 @@ export default function StartEvent() {
       const body = await callApi('getSignupLink', { linkId, token });
       setLink(body);
       setName(body.organizationName || '');
+      setTarget(body.organizations?.[0]?.id || NEW_ORG);
     } catch (err) {
       setRefusal({ code: err.code, message: err.message });
     }
@@ -54,8 +58,9 @@ export default function StartEvent() {
   async function onSubmit(event) {
     event.preventDefault();
     if (busy) return;
+    const isNew = target === NEW_ORG;
     const clean = cleanOrganizationName(name);
-    if (!clean) {
+    if (isNew && !clean) {
       setFieldError(ORGANIZATION_NAME_ERROR);
       fieldRef.current?.focus();
       return;
@@ -63,8 +68,9 @@ export default function StartEvent() {
     setFieldError('');
     setError('');
     setBusy(true);
+    const destination = isNew ? { organizationName: clean } : { orgId: target };
     try {
-      const { orgId, appId } = await callApi('redeemSignupLink', { linkId, token, organizationName: clean, timezone: browserTimeZone() });
+      const { orgId, appId } = await callApi('redeemSignupLink', { linkId, token, ...destination, timezone: browserTimeZone() });
       navigate(setupPath(orgId, appId, STEPS[0]), { replace: true });
     } catch (err) {
       setBusy(false);
@@ -104,12 +110,30 @@ export default function StartEvent() {
   if (!link) return <LoadingState long>Checking your signup link.</LoadingState>;
   if (link.status === 'used') return <Navigate to={statusPath(link.orgId, link.appId)} replace />;
 
+  const owned = link.organizations || [];
+
   return (
     <Panel>
       <p className="lead">Set up an event site for your organization.</p>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       <form noValidate onSubmit={onSubmit} className="stack">
-        <div className="field">
+        {owned.length ? (
+          <fieldset className="choices" disabled={busy} aria-describedby="start-target-hint">
+            <legend>Organization</legend>
+            <p id="start-target-hint" className="hint">Add this event to an organization you own to keep its team and details.</p>
+            {owned.map((org) => (
+              <label key={org.id} className="choice">
+                <input type="radio" name="start-target" value={org.id} checked={target === org.id} onChange={() => setTarget(org.id)} />
+                <span>Add to <strong>{org.name}</strong></span>
+              </label>
+            ))}
+            <label className="choice">
+              <input type="radio" name="start-target" value={NEW_ORG} checked={target === NEW_ORG} onChange={() => setTarget(NEW_ORG)} />
+              <span>A new organization</span>
+            </label>
+          </fieldset>
+        ) : null}
+        {target === NEW_ORG ? <div className="field">
           <label htmlFor="start-org-name">Organization name</label>
           <p id="start-org-name-hint" className="hint">Use the name your audience knows.</p>
           <input
@@ -125,7 +149,7 @@ export default function StartEvent() {
             aria-describedby={['start-org-name-hint', fieldError ? 'start-org-name-error' : null].filter(Boolean).join(' ')}
           />
           {fieldError ? <p id="start-org-name-error" className="field-error">{fieldError}</p> : null}
-        </div>
+        </div> : null}
         <div><button type="submit" className="button primary" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Starting…' : 'Start'}</button></div>
       </form>
     </Panel>
