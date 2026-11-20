@@ -28,6 +28,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const NO_STRIPE = 'Card payments are not connected. Contact support to connect Stripe.';
 
@@ -258,8 +259,8 @@ function ReviewForm({ busy, onSubmit, onCancel }) {
         maxLength={INVOICE_LIMITS.reviewNote}
       />
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="button" className={primaryButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={submit}>
-          {busy ? 'Saving…' : 'Save review'}
+        <button type="button" className={primaryButtonClass} aria-disabled={busy || undefined} aria-busy={busy || undefined} onClick={submit}>
+          <BusyLabel busy={busy} pending="Saving the review…">Save review</BusyLabel>
         </button>
         <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
           Cancel

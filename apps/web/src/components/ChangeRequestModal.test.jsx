@@ -125,7 +125,7 @@ describe('ChangeRequestModal', () => {
     expect(screen.getByLabelText('What should change?')).not.toHaveAttribute('aria-invalid');
   });
 
-  it('shows Sending… with aria-busy while the request is in flight, and disables only then', async () => {
+  it('names the work with aria-busy while the request is in flight, keeps focus, and refuses a second press', async () => {
     let settle;
     submitMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
     renderModal();
@@ -134,9 +134,13 @@ describe('ChangeRequestModal', () => {
     fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: 'Hello' } });
     fireEvent.click(submit);
 
-    const busy = screen.getByRole('button', { name: 'Sending…' });
+    const busy = screen.getByRole('button', { name: 'Sending your request…' });
     expect(busy).toHaveAttribute('aria-busy', 'true');
-    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    busy.focus();
+    fireEvent.click(busy);
+    expect(submitMock).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(busy);
     await act(async () => {
       settle({ ok: true, id: 'k1' });
     });

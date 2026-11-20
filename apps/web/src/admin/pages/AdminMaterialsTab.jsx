@@ -53,6 +53,7 @@ import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const RULED_ITEM_CLASS = 'border-b-admin-hairline border-admin-rule-hairline py-xs last:border-b-0';
 
@@ -501,7 +502,7 @@ export default function AdminMaterialsTab() {
           aria-busy={listing ? 'true' : undefined}
           aria-disabled={listing ? 'true' : undefined}
         >
-          {listing ? 'Loading…' : 'Try again'}
+          <BusyLabel busy={listing} pending="Loading the materials…">Try again</BusyLabel>
         </button>
       </div>
     );

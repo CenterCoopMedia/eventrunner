@@ -6,8 +6,9 @@ import { uniqueEditorialId } from '../editorialId.js';
 import { byStoredOrder, nextStoredOrder } from '../reorder.js';
 import { summarizePublish } from '../publishResult.js';
 import { EditorActionFeedback } from './ActionFeedback.jsx';
-import { ActionLabel, Notice, Panel, ServerErrorSummary, TextField, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
+import { Notice, Panel, ServerErrorSummary, TextField, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
 import ImagePicker from './media/ImagePicker.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 // Both entry points edit cmsContent/hero__<field>. Theme configuration never
 // holds a second copy. Read merged live/draft rows, as the content editor does.
@@ -136,7 +137,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
         />
         <div className="flex flex-wrap gap-xs">
           <button type="button" className={secondaryButtonClass} onClick={() => save(false)}>
-            <ActionLabel busy={busy} pending="Saving…">Save draft</ActionLabel>
+            <BusyLabel busy={busy} pending="Saving the draft…">Save draft</BusyLabel>
           </button>
           <button type="button" className={primaryButtonClass} onClick={() => save(true)}>
             Publish
@@ -144,7 +145,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
         </div>
       </fieldset>
       {unavailable ? <Notice tone="caution" message={!ready
-        ? 'Loading…'
+        ? 'Loading the home page…'
         : full
           ? `The top of your home page is full (${maxBlocks} items). Remove one to add a picture.`
           : 'This home page has no place for a picture at the top.'} /> : null}

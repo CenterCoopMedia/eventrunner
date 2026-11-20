@@ -53,6 +53,7 @@ import {
   pageIdForSection,
   restoreRequestFor,
 } from '../versionHistory.js';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const PAGE_SIZE = 20;
 /** A non-destructive restore confirmation when no unpublished work is lost. */
@@ -375,7 +376,7 @@ export default function AdminVersionHistory() {
             aria-busy={pending === 'load' ? 'true' : undefined}
             onClick={() => load('load')}
           >
-            {pending === 'load' ? 'Loading…' : 'Try again'}
+            <BusyLabel busy={pending === 'load'} pending="Loading version history…">Try again</BusyLabel>
           </button>
         </div>
       );
@@ -562,7 +563,7 @@ export default function AdminVersionHistory() {
             aria-disabled={pagerRefused ? 'true' : undefined}
             onClick={loadMore}
           >
-            {pending === 'more' ? 'Loading…' : pagerRefused ? 'Load older versions after the refresh' : 'Load older versions'}
+            <BusyLabel busy={pending === 'more'} pending="Loading older versions…">{pagerRefused ? 'Load older versions after the refresh' : 'Load older versions'}</BusyLabel>
           </button>
         </div>
       ) : null}

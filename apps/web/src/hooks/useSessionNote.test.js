@@ -459,7 +459,7 @@ describe('useSessionNote', () => {
       fireEvent.blur(textarea);
       await Promise.resolve();
     });
-    expect(view.getByRole('status').textContent).toBe('Saving…');
+    expect(view.getByRole('status').textContent).toBe('Saving your note…');
     // A write in flight cannot be withdrawn: Discard waits for its answer.
     const discard = view.getByRole('button', { name: 'Discard unsaved text' });
     expect(discard).toHaveAttribute('aria-disabled', 'true');

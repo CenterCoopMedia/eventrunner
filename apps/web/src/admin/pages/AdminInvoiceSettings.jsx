@@ -27,6 +27,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const FIELDS = Object.freeze(['prefix', 'currency', 'issuerName', 'issuerAddress', 'issuerEmail', 'taxId', 'paymentInstructions']);
 
@@ -159,8 +160,8 @@ export default function AdminInvoiceSettings() {
               Back to invoices
             </Link>
             {canEdit ? (
-              <button type="submit" className={primaryButtonClass} disabled={saving} aria-busy={saving || undefined}>
-                {saving ? 'Saving…' : 'Save'}
+              <button type="submit" className={primaryButtonClass} aria-disabled={saving || undefined} aria-busy={saving || undefined}>
+                <BusyLabel busy={saving} pending="Saving invoice settings…">Save</BusyLabel>
               </button>
             ) : null}
           </>

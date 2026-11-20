@@ -56,6 +56,7 @@
 // end time does not make the account read-only: until it comes, staff
 // edit and publish like any staff account, and the confirmation says so.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import BusyLabel, { useBusyLate } from '../../components/BusyLabel.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
@@ -240,6 +241,13 @@ function emailNotice(outcome, saved = false) {
   return { tone: 'caution', message: `${prefix}Email acceptance is uncertain. This attempt will not send another copy. Check the Email log before choosing a new send.` };
 }
 
+/** The work the confirm control names while it runs. */
+function busyWords({ action, tier }) {
+  if (action === 'resend') return 'Sending sign-in instructions…';
+  if (tier === 'none') return 'Removing access…';
+  return 'Saving the access change…';
+}
+
 /**
  * The still surface a pending change is confirmed on. The page owns the
  * focus moves; this only exposes the two elements they land on.
@@ -271,11 +279,11 @@ function ChangeConfirm({ change, busy, error, onConfirm, onCancel, surfaceRef, e
         <button
           type="button"
           className={words.destructive ? dangerButtonClass : primaryButtonClass}
-          disabled={busy}
+          aria-disabled={busy || undefined}
           aria-busy={busy || undefined}
           onClick={onConfirm}
         >
-          {busy ? (change.action === 'resend' ? 'Sending…' : 'Saving…') : words.confirmLabel}
+          <BusyLabel busy={busy} pending={busyWords(change)}>{words.confirmLabel}</BusyLabel>
         </button>
         <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
           Cancel
@@ -318,20 +326,25 @@ export default function AdminAccess() {
   const focusListRef = useRef(false);
   const listRef = useRef(null);
 
+  // A read repeated while an older one hangs: only the newest one lands.
+  const loadRef = useRef(0);
   const load = useCallback(async ({ focusList = false } = {}) => {
+    const attempt = ++loadRef.current;
     setLoading(true);
     try {
       const response = await call('listAdminAccess', {});
+      if (attempt !== loadRef.current) return;
       focusListRef.current = focusList;
       setAccounts(Array.isArray(response?.accounts) ? response.accounts : []);
       setCallerEmail(typeof response?.callerEmail === 'string' ? response.callerEmail : null);
       setLoadError(null);
     } catch (err) {
-      setLoadError(err);
+      if (attempt === loadRef.current) setLoadError(err);
     } finally {
-      setLoading(false);
+      if (attempt === loadRef.current) setLoading(false);
     }
   }, [call]);
+  const loadLate = useBusyLate(accounts === null && loading && Boolean(loadError));
 
   useEffect(() => {
     load();
@@ -634,8 +647,19 @@ export default function AdminAccess() {
                 if (!loading) load({ focusList: true });
               }}
             >
-              {loading ? 'Loading…' : 'Try again'}
+              <BusyLabel busy={loading} pending="Loading the access list…">Try again</BusyLabel>
             </button>
+            {/* A read is safe to repeat: past ten seconds a fresh one may
+                replace the one that has not answered. */}
+            {loadLate ? (
+              <button
+                type="button"
+                className={`${secondaryButtonClass} ms-xs`}
+                onClick={() => load({ focusList: true })}
+              >
+                Try again
+              </button>
+            ) : null}
           </div>
         </div>
       ) : (

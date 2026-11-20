@@ -54,7 +54,6 @@ import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedCha
 import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
-  ActionLabel,
   CheckboxField,
   DestructiveConfirm,
   Notice,
@@ -73,6 +72,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 // Quill stays outside both the public entry and the general content-editor
 // route. It loads only when the registry says this particular field is rich
@@ -652,7 +652,7 @@ export default function AdminContentBlockEditor({ mode }) {
               Back to section
             </Link>
             <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
-              <ActionLabel busy={busy === 'draft'} pending="Saving…">Save</ActionLabel>
+              <BusyLabel busy={busy === 'draft'} pending="Saving the block…">Save</BusyLabel>
             </button>
             <button
               type="button"
@@ -661,7 +661,7 @@ export default function AdminContentBlockEditor({ mode }) {
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              <ActionLabel busy={busy === 'publish'} pending="Publishing…">Publish</ActionLabel>
+              <BusyLabel busy={busy === 'publish'} pending="Publishing the block…">Publish</BusyLabel>
             </button>
           </>
         }

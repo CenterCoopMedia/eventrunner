@@ -372,13 +372,13 @@ describe('one record’s versions', () => {
     expect(screen.queryByRole('button', { name: 'Load older versions' })).toBeNull();
   });
 
-  it('says Loading… while the pager runs, and ignores a second press', async () => {
+  it('says Loading older versions… while the pager runs, and ignores a second press', async () => {
     const older = deferred();
     await renderPage(undefined, {
       pages: [{ entries: [entry(5), entry(4)], nextCursor: 4 }, () => older.promise],
     });
     fireEvent.click(screen.getByRole('button', { name: 'Load older versions' }));
-    const pager = screen.getByRole('button', { name: 'Loading…' });
+    const pager = screen.getByRole('button', { name: 'Loading older versions…' });
     expect(pager).toHaveAttribute('aria-busy', 'true');
     fireEvent.click(pager);
     expect(historyCalls()).toHaveLength(2);
@@ -405,7 +405,7 @@ describe('one record’s versions', () => {
     await act(async () => refreshed.resolve({ entries: [entry(5), entry(4)], nextCursor: 4 }));
     fireEvent.click(screen.getByRole('button', { name: 'Load older versions' }));
     // Busy is its own state: the label says so, and the control keeps its own look.
-    const busy = screen.getByRole('button', { name: 'Loading…' });
+    const busy = screen.getByRole('button', { name: 'Loading older versions…' });
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(busy).not.toHaveAttribute('aria-disabled');
     expect(busy.className).not.toContain('aria-disabled:text-admin-ink-disabled');

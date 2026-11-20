@@ -35,7 +35,6 @@ import {
   toUpdatePayload,
 } from '../updatesDoc.js';
 import {
-  ActionLabel,
   CheckboxField,
   DestructiveConfirm,
   Notice,
@@ -54,6 +53,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 /** A server field name → the form field it marks. */
 const SERVER_FIELD = Object.freeze({ title: 'title', body: 'body', publishAt: 'date', category: 'category' });
@@ -308,7 +308,7 @@ export default function AdminUpdateEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              <ActionLabel busy={action === 'draft'} pending="Saving…">Save</ActionLabel>
+              <BusyLabel busy={action === 'draft'} pending="Saving the update…">Save</BusyLabel>
             </button>
             <button
               type="button"
@@ -317,7 +317,7 @@ export default function AdminUpdateEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              <ActionLabel busy={action === 'publish'} pending="Publishing…">Publish</ActionLabel>
+              <BusyLabel busy={action === 'publish'} pending="Publishing the update…">Publish</BusyLabel>
             </button>
           </>
         }

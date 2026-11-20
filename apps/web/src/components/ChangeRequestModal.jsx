@@ -28,6 +28,7 @@ import { markChangeRequestSent } from '../lib/changeRequestMarker.js';
 import { DIALOG_FRAME_CLASS } from './FeedbackModal.jsx';
 import { focusFirstError, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
+import BusyLabel from './BusyLabel.jsx';
 
 /** The server's limits (functions/src/admin/changeRequests.cjs). */
 export const MAX_MESSAGE_LENGTH = 2000;
@@ -163,15 +164,15 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
               <button type="button" className={secondaryActionClass} onClick={onClose}>
                 Cancel
               </button>
-              {/* State the busy action immediately. Disable the control only
-                  once the request has started. */}
+              {/* State the busy action immediately. The control keeps focus
+                  while the request runs; submit() refuses a second press. */}
               <button
                 type="submit"
                 className={primaryActionClass}
-                disabled={submitting}
+                aria-disabled={submitting || undefined}
                 aria-busy={submitting || undefined}
               >
-                {submitting ? 'Sending…' : 'Send request'}
+                <BusyLabel busy={submitting} pending="Sending your request…">Send request</BusyLabel>
               </button>
             </div>
           </form>

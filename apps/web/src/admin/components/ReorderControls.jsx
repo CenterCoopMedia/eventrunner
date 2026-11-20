@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ActionLabel, secondaryButtonClass } from './formControls.jsx';
+import { secondaryButtonClass } from './formControls.jsx';
 import { dragIndex } from '../reorder.js';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const quietMoveClass =
   'inline-flex min-h-11 min-w-11 min-h-admin-control items-center justify-center rounded-admin text-admin-ink hover:bg-admin-action-soft disabled:cursor-not-allowed disabled:opacity-60';
@@ -203,7 +204,7 @@ export function OrderDraftButtons({ dirty, saving, onSave, onCancel, saveDisable
         Cancel
       </button>
       <button type="button" className={secondaryButtonClass} onClick={onSave} disabled={saving || saveDisabled}>
-        <ActionLabel busy={saving} pending="Saving…">Save draft</ActionLabel>
+        <BusyLabel busy={saving} pending="Saving the new order…">Save draft</BusyLabel>
       </button>
     </>
   );

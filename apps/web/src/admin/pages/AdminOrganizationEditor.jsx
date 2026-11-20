@@ -40,7 +40,6 @@ import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
-  ActionLabel,
   DestructiveConfirm,
   Notice,
   Panel,
@@ -57,6 +56,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const COLLECTION = 'cmsOrganizations';
 const ORGANIZATIONS_LIST = '/admin/organizations';
@@ -320,7 +320,7 @@ export default function AdminOrganizationEditor({ mode }) {
                 disabled={saving}
                 aria-busy={action === 'draft' || undefined}
               >
-                <ActionLabel busy={action === 'draft'} pending="Saving…">Save</ActionLabel>
+                <BusyLabel busy={action === 'draft'} pending="Saving the organization…">Save</BusyLabel>
               </button>
               <button
                 type="button"
@@ -329,7 +329,7 @@ export default function AdminOrganizationEditor({ mode }) {
                 aria-busy={action === 'publish' || undefined}
                 onClick={() => save({ publish: true })}
               >
-                <ActionLabel busy={action === 'publish'} pending="Publishing…">Publish</ActionLabel>
+                <BusyLabel busy={action === 'publish'} pending="Publishing the organization…">Publish</BusyLabel>
               </button>
           </>
           }

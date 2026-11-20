@@ -31,6 +31,7 @@ import {
   secondaryButtonClass,
 } from './formControls.jsx';
 import { AdminLoadingState } from './adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const MAX_NAME_LENGTH = 80;
 
@@ -250,7 +251,7 @@ export default function AnnouncementSavedMessages({
               aria-disabled={busy || full ? 'true' : undefined}
               onClick={() => { if (!full) save(null); }}
             >
-              {busy === 'save' ? 'Saving…' : 'Save new message'}
+              <BusyLabel busy={busy === 'save'} pending="Saving the new message…">Save new message</BusyLabel>
             </button>
             {loaded ? (
               <button
@@ -260,7 +261,7 @@ export default function AnnouncementSavedMessages({
                 aria-disabled={busy ? 'true' : undefined}
                 onClick={() => save(loaded.id)}
               >
-                {busy === 'update' ? 'Saving…' : 'Save changes'}
+                <BusyLabel busy={busy === 'update'} pending="Saving the message…">Save changes</BusyLabel>
               </button>
             ) : null}
           </div>
@@ -319,7 +320,7 @@ export default function AnnouncementSavedMessages({
                         <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="New name" value={newName} maxLength={MAX_NAME_LENGTH} onChange={setNewName} />
                         <div className="flex flex-wrap gap-xs">
                           <button type="submit" className={secondaryButtonClass} aria-busy={busy === `rename:${message.id}` ? 'true' : undefined}>
-                            {busy === `rename:${message.id}` ? 'Saving…' : 'Save name'}
+                            <BusyLabel busy={busy === `rename:${message.id}`} pending="Saving the name…">Save name</BusyLabel>
                           </button>
                           <button type="button" className={secondaryButtonClass} onClick={() => closeQuestion('rename')}>
                             Cancel

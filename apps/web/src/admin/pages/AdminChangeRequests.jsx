@@ -59,6 +59,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 /** The server's limits (functions/src/admin/changeRequests.cjs). */
 const MAX_MESSAGE_LENGTH = 2000;
@@ -205,7 +206,7 @@ function RequestForm({ call }) {
             className={primaryButtonClass}
             aria-busy={sending || undefined}
           >
-            {sending ? 'Sending…' : 'Send request'}
+            <BusyLabel busy={sending} pending="Sending the change request…">Send request</BusyLabel>
           </button>
           {status ? <SaveStatus message={status} /> : null}
         </div>
@@ -228,7 +229,7 @@ export default function AdminChangeRequests() {
   // The action in flight, keyed to the control that was pressed:
   // { id, control: 'next' | 'decline' | 'remove', row }. The listener can
   // deliver the committed status, or the removal, before the HTTP answer,
-  // so the pressed control, not the status it asked for, carries "Saving…"
+  // so the pressed control, not the status it asked for, carries "Saving the status…"
   // until the call settles, and `row` (the row as pressed) holds a removed
   // row on screen until then.
   const [pending, setPending] = useState(null);
@@ -457,7 +458,7 @@ export default function AdminChangeRequests() {
                             disabled={locked && busy?.control !== 'next'}
                             aria-busy={busy?.control === 'next' ? 'true' : undefined}
                           >
-                            {busy?.control === 'next' ? 'Saving…' : next.label}
+                            <BusyLabel busy={busy?.control === 'next'} pending="Saving the status…">{next.label}</BusyLabel>
                           </button>
                           {OPEN_STATUSES.includes(status) || busy?.control === 'decline' ? (
                             <button
@@ -467,7 +468,7 @@ export default function AdminChangeRequests() {
                               disabled={locked && busy?.control !== 'decline'}
                               aria-busy={busy?.control === 'decline' ? 'true' : undefined}
                             >
-                              {busy?.control === 'decline' ? 'Saving…' : 'Decline'}
+                              <BusyLabel busy={busy?.control === 'decline'} pending="Declining the request…">Decline</BusyLabel>
                             </button>
                           ) : null}
                           <DestructiveConfirm

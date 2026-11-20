@@ -13,6 +13,7 @@ import {
   secondaryActionClass,
 } from '../controlClasses.js';
 import { TextField } from '../forms/publicForm.jsx';
+import BusyLabel from '../BusyLabel.jsx';
 
 const REVIEW_LABELS = Object.freeze({
   pending: 'Awaiting review',
@@ -72,7 +73,7 @@ function MaterialEditor({ material, user, onSaved, onCancel }) {
           aria-disabled={saving ? 'true' : undefined}
           aria-busy={saving ? 'true' : undefined}
         >
-          {saving ? 'Saving…' : 'Save changes'}
+          <BusyLabel busy={saving} pending="Saving your materials…">Save changes</BusyLabel>
         </button>
         <button type="button" className={secondaryActionClass} onClick={onCancel}>
           Cancel
@@ -290,7 +291,7 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
               aria-disabled={linkState.busy ? 'true' : undefined}
               aria-busy={linkState.busy ? 'true' : undefined}
             >
-              {linkState.busy ? 'Sending…' : 'Send link'}
+              <BusyLabel busy={linkState.busy} pending="Sending the link…">Send link</BusyLabel>
             </button>
           </form>
 

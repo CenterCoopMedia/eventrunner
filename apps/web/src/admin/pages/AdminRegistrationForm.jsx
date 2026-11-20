@@ -22,6 +22,7 @@ import RegistrationQuestionEditor, { isChoiceKind, newQuestion } from '../compon
 import {
   CheckboxField, Notice, Panel, SaveStatus, ServerErrorSummary, fieldHintClass, primaryButtonClass, secondaryButtonClass,
 } from '../components/formControls.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const FORM_ID = 'registration-form-editor';
 
@@ -133,7 +134,7 @@ export default function AdminRegistrationForm() {
         description="The questions each attendee answers when they register. Phone numbers, diet and access answers are private to staff."
         // The editor form is named here: the preview sits outside it, so Enter
         // in a preview answer can never save the form.
-        actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save'}</button>}
+        actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}><BusyLabel busy={busy} pending="Saving the registration form…">Save</BusyLabel></button>}
       />
       <p className={fieldHintClass}>For Stripe tickets, attendees answer the Registration form questions at checkout after you publish tickets; other attendees answer on Complete your registration.</p>
       {listError ? <Notice tone="caution" message="The saved form did not load. Trying again…" /> : null}

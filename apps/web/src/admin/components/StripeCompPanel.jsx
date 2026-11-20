@@ -60,7 +60,7 @@ export default function StripeCompPanel({ call, catalog, onComplete }) {
       {notice ? <Notice tone="ok" message={notice} /> : null}
       <button type="submit" className={secondaryButtonClass}>Review complimentary tickets</button>
     </form>
-    {confirmation ? <TicketingConfirmation title="Issue complimentary admission?" confirmLabel={`Issue ${confirmation.attendees.length} complimentary tickets`} busy={busy} error={error} onClose={() => { setConfirmation(null); setError(''); }} onConfirm={issue}>
+    {confirmation ? <TicketingConfirmation title="Issue complimentary admission?" confirmLabel={`Issue ${confirmation.attendees.length} complimentary tickets`} busyLabel="Issuing complimentary tickets…" busy={busy} error={error} onClose={() => { setConfirmation(null); setError(''); }} onConfirm={issue}>
       <p>{confirmation.attendees.length} × {type?.name}. Charge: {formatTicketMoney(0, catalog.currency)}. These seats count against event and ticket-type capacity.</p>
       <ul>{confirmation.attendees.map((attendee, index) => <li key={index} className="wrap-anywhere">{attendee.firstName} {attendee.lastName} — {attendee.email}</li>)}</ul>
       <p>Each attendee must claim their own admission using a verified email.</p>

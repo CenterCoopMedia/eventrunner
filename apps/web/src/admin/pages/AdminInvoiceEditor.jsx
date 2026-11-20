@@ -68,6 +68,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 export default function AdminInvoiceEditor({ mode }) {
   const params = useParams();
@@ -564,10 +565,10 @@ export default function AdminInvoiceEditor({ mode }) {
               <button
                 type="submit"
                 className={primaryButtonClass}
-                disabled={busy !== null}
+                aria-disabled={busy !== null || undefined}
                 aria-busy={busy === 'save' || undefined}
               >
-                {busy === 'save' ? 'Saving…' : 'Save'}
+                <BusyLabel busy={busy === 'save'} pending="Saving the invoice…">Save</BusyLabel>
               </button>
             </>
           )

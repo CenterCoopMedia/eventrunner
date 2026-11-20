@@ -32,7 +32,6 @@ import SpeakerSessionConfirmations from '../components/SpeakerSessionConfirmatio
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
-  ActionLabel,
   DestructiveConfirm,
   Panel,
   SelectField,
@@ -53,6 +52,7 @@ import AdminPageHeader, {
 import { speakerRecordState, speakerStatusOptions } from '../speakerRecord.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft' },
@@ -294,7 +294,7 @@ export default function AdminSpeakerEditor({ mode }) {
         actions={
           <>
             <button type="submit" className={primaryButtonClass} disabled={saving || photoBusy} aria-busy={action === 'draft' || undefined}>
-              <ActionLabel busy={action === 'draft'} pending="Saving…">{mode === 'create' ? 'Create' : 'Save'}</ActionLabel>
+              <BusyLabel busy={action === 'draft'} pending="Saving the speaker…">{mode === 'create' ? 'Create' : 'Save'}</BusyLabel>
             </button>
           </>
         }

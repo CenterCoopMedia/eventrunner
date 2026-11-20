@@ -18,6 +18,7 @@ import { StatusBadge } from './adminChrome.jsx';
 import { Panel, Notice, SaveStatus, TextField, TextAreaField, SelectField, CheckboxField,
   ServerErrorSummary, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
 import { toMillis } from '../versionHistory.js';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const templateNames = {
   'pitch.receipt': 'Receipt',
@@ -104,7 +105,7 @@ export function PitchEmailSettings({ settings, call }) {
           </button>
         </fieldset>)}
       </fieldset>
-      <button className={primaryButtonClass} disabled={busy || conflict}>{busy ? 'Saving…' : 'Save email settings'}</button>
+      <button className={primaryButtonClass} disabled={busy || conflict}><BusyLabel busy={busy} pending="Saving the email settings…">Save email settings</BusyLabel></button>
       {result ? <SaveStatus message={result} /> : null}
     </form>
   </Panel>;
@@ -186,7 +187,7 @@ function SendEmail({ pitch, kind, slot, disabled, call, onSent }) {
       {preview?.mayHaveBeenSent ? <CheckboxField help="Confirm the earlier message failed before sending another copy." label="I checked the Email log. The earlier email was not delivered." checked={checkedLog} onChange={setCheckedLog} /> : null}
       {preview ? <CheckboxField help="Confirm the recipient and wording before sending this proposal email." label={`I reviewed this email. Send it to ${preview.to}.`} checked={confirmed} onChange={setConfirmed} /> : null}
     </fieldset>
-    {preview ? <button className={primaryButtonClass} disabled={busy || disabled || !confirmed || (preview.mayHaveBeenSent && !checkedLog)}>{busy ? 'Sending…' : `Send the ${name}`}</button> : null}
+    {preview ? <button className={primaryButtonClass} disabled={busy || disabled || !confirmed || (preview.mayHaveBeenSent && !checkedLog)}><BusyLabel busy={busy} pending={`Sending the ${name}…`}>{`Send the ${name}`}</BusyLabel></button> : null}
   </form>;
 }
 

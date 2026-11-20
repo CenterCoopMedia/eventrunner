@@ -25,7 +25,6 @@ import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import {
-  ActionLabel,
   DestructiveConfirm,
   Notice,
   Panel,
@@ -44,6 +43,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const EMPTY = {
   id: '',
@@ -394,7 +394,7 @@ export default function AdminSessionEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              <ActionLabel busy={action === 'draft'} pending="Saving…">Save</ActionLabel>
+              <BusyLabel busy={action === 'draft'} pending="Saving the session…">Save</BusyLabel>
             </button>
             <button
               type="button"
@@ -403,7 +403,7 @@ export default function AdminSessionEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              <ActionLabel busy={action === 'publish'} pending="Publishing…">Publish</ActionLabel>
+              <BusyLabel busy={action === 'publish'} pending="Publishing the session…">Publish</BusyLabel>
             </button>
           </>
         }

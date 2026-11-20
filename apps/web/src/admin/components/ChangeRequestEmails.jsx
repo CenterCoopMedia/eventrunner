@@ -27,6 +27,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from './formControls.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 /** The server's limit (functions/src/admin/changeRequests.cjs). */
 const MAX_REPLY_LENGTH = 1000;
@@ -150,7 +151,7 @@ export function ChangeRequestEmailSettings({ settings, call }) {
           />
           <div className="flex flex-wrap items-center gap-sm">
             <button type="submit" className={primaryButtonClass} disabled={busy || conflict} aria-busy={busy || undefined}>
-              {busy ? 'Saving…' : 'Save email settings'}
+              <BusyLabel busy={busy} pending="Saving the email settings…">Save email settings</BusyLabel>
             </button>
             {result ? <SaveStatus message={result} /> : null}
           </div>
@@ -239,7 +240,7 @@ function DeliveryLine({ row, slot, record, settings, call }) {
             disabled={busy || (unsure && !checkedLog)}
             aria-busy={busy || undefined}
           >
-            {busy ? 'Sending…' : `Retry the ${name}`}
+            <BusyLabel busy={busy} pending={`Sending the ${name}…`}>{`Retry the ${name}`}</BusyLabel>
           </button>
         </div>
       ) : null}
@@ -359,7 +360,7 @@ export function OutcomeDetails({ row, call }) {
           ) : null}
           <div className="flex flex-wrap items-center gap-sm">
             <button type="submit" className={secondaryButtonClass} aria-busy={busy || undefined}>
-              {busy ? 'Saving…' : done ? 'Save the reply and link' : 'Save the reply'}
+              <BusyLabel busy={busy} pending="Saving the reply…">{done ? 'Save the reply and link' : 'Save the reply'}</BusyLabel>
             </button>
             {result ? <SaveStatus message={result} /> : null}
           </div>

@@ -114,11 +114,13 @@ describe('AttendeeRecordPanel', () => {
     callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     openPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    const busy = screen.getByRole('button', { name: 'Saving…' });
-    expect(busy).toBeDisabled();
+    const busy = screen.getByRole('button', { name: 'Saving the attendee record…' });
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
     expect(busy).toHaveAttribute('aria-busy', 'true');
+    fireEvent.click(busy);
+    expect(callMock).toHaveBeenCalledTimes(1);
     await act(async () => { finish({ ok: true, pastAttendance: [] }); });
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('marks the field and moves focus to the summary when the server refuses the list', async () => {

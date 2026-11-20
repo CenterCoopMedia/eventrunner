@@ -17,7 +17,7 @@ const RING = (
  * @param {{ label?: string, stage?: string, figure?: 'held' | 'ring' | 'none', still?: boolean, clock?: object, announce?: boolean, prolongedAnnouncement?: string }} props
  */
 export default function LoadingStatus({
-  label = 'Loading…', stage = 'initial', figure = 'held', still = false, clock, announce = true, prolongedAnnouncement,
+  label, stage = 'initial', figure = 'held', still = false, clock, announce = true, prolongedAnnouncement,
 }) {
   const detail = WAITING_DETAILS[stage];
   const waiting = stage !== 'initial';

@@ -25,6 +25,7 @@ import { contentError } from '../contentError.js';
 import { FEATURE_CHOICES } from '../featureChoices.js';
 import { SOCIAL_FEED_RELEASED } from '../socialFeedRelease.js';
 import '../components/featureSwitch.css';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 
 const FEATURE_GROUPS = [
@@ -183,8 +184,8 @@ export default function AdminFeatureSettings() {
         title="Features"
         description="Choose what visitors can use on your event site."
         actions={
-          <button type="submit" className={primaryButtonClass} disabled={saving} aria-busy={saving || undefined}>
-            {saving ? 'Saving…' : 'Save'}
+          <button type="submit" className={primaryButtonClass} aria-disabled={saving || undefined} aria-busy={saving || undefined}>
+            <BusyLabel busy={saving} pending="Saving features…">Save</BusyLabel>
           </button>
         }
       />

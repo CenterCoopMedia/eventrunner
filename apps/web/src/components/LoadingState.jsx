@@ -9,7 +9,7 @@ const SHAPES = new Set(['rows', 'schedule', 'directory']);
  * Still text and portrait shapes reserve space without inventing content.
  */
 export function LoadingStateView({
-  label = 'Loading…',
+  label,
   rows = 3,
   shape = 'rows',
   stage = 'initial',

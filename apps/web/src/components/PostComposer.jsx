@@ -33,6 +33,7 @@ import { createSubmissionKey } from '../lib/submissionKey.js';
 import { createSocialPost } from '../lib/socialPostSource.js';
 import { TextAreaField, focusFirstError } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
+import BusyLabel from './BusyLabel.jsx';
 
 const LIMIT_TEXT = MAX_SOCIAL_TEXT_LENGTH.toLocaleString('en-US');
 
@@ -152,8 +153,8 @@ export default function PostComposer({ user, parentPostId = null, onPosted, onUn
         </p>
       ) : null}
       <div className="flex flex-wrap gap-xs">
-        <button type="submit" className={primaryActionClass} disabled={sending} aria-busy={sending || undefined}>
-          {sending ? 'Sending…' : action}
+        <button type="submit" className={primaryActionClass} aria-disabled={sending || undefined} aria-busy={sending || undefined}>
+          <BusyLabel busy={sending} pending={reply ? 'Sending your reply…' : 'Sending your post…'}>{action}</BusyLabel>
         </button>
         {text && !sending ? (
           <button type="button" className={secondaryActionClass} onClick={discard}>

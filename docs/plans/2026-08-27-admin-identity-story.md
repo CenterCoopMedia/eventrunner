@@ -211,7 +211,7 @@ preference — see part 5.
   more contrast surface nobody tested.
 - **Refuses decorative motion.** Page transitions, skeleton shimmer, animated save checkmarks,
   and decorative count-ups remain banned. State pending work immediately ("Loading sessions",
-  "Saving…"). An indicator may appear at one second. Update the words at ten and sixty seconds.
+  "Saving the session…"). An indicator may appear at one second. Update the words at ten and sixty seconds.
   Keep the indicator static under reduced motion and remove it in the same render as the result,
   with no exit motion. Offer a retry only when the caller supplies a safe repeat. See
   [Waiting and progress](../interface-guidelines.md#waiting-and-progress).

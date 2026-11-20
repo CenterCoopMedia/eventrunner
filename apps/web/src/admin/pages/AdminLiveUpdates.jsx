@@ -35,6 +35,7 @@ import AdminPageHeader, {
 import { UPDATE_CATEGORY_MAX } from 'shared/update';
 import OperationIcon from '../components/OperationIcon.jsx';
 import '../operationRecovery.css';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const EMPTY_FORM = { message: '', pinned: false, category: '', audience: 'everyone' };
 
@@ -231,7 +232,7 @@ export default function AdminLiveUpdates() {
           {outcome ? <Notice tone="ok" message={outcome.message} /> : null}
           <div className="flex flex-wrap gap-xs">
             <button type="submit" className={primaryButtonClass} disabled={saving || Boolean(deletingId)} aria-busy={saving || undefined}>
-              {saving ? 'Saving…' : editingId ? 'Save changes' : 'Post update'}
+              <BusyLabel busy={saving} pending={editingId ? 'Saving the update…' : 'Posting the update…'}>{editingId ? 'Save changes' : 'Post update'}</BusyLabel>
             </button>
             {editingId ? (
               <button type="button" className={secondaryButtonClass} onClick={cancelEdit} disabled={saving || Boolean(deletingId)}>

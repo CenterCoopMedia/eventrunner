@@ -40,6 +40,7 @@ import {
   secondaryButtonClass,
 } from './formControls.jsx';
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const STATE_TONES = { on: 'ok', paused: 'caution', off: 'dead' };
 const STATE_LABELS = { on: 'On', paused: 'Paused', off: 'Off' };
@@ -396,8 +397,8 @@ export default function AttendeeReminderSchedule({ call }) {
           />
 
           <div className="flex flex-wrap items-center gap-xs">
-            <button type="submit" className={primaryButtonClass} disabled={Boolean(busy)} aria-busy={busy === 'save'}>
-              {busy === 'save' ? 'Saving…' : 'Save'}
+            <button type="submit" className={primaryButtonClass} aria-disabled={Boolean(busy) || undefined} aria-busy={busy === 'save' || undefined}>
+              <BusyLabel busy={busy === 'save'} pending="Saving the reminder schedule…">Save</BusyLabel>
             </button>
             <button type="button" className={secondaryButtonClass} onClick={runPreview} disabled={Boolean(busy)} aria-busy={busy === 'preview'}>
               {busy === 'preview' ? 'Preparing…' : 'Preview attendee reminders'}

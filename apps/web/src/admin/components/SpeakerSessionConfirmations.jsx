@@ -23,6 +23,7 @@ import { StatusBadge } from './adminChrome.jsx';
 import {
   Notice, Panel, SaveStatus, ServerErrorSummary, primaryButtonClass, secondaryButtonClass,
 } from './formControls.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const stateLabels = {
   none: 'Not sent',
@@ -134,12 +135,12 @@ function SessionConfirmation({ session, speakerId, record, call, disabled }) {
       ) : null}
       {preview && !preview.blocked && !preview.mayHaveBeenSent ? (
         <button type="button" className={primaryButtonClass} onClick={() => send()} disabled={busy || disabled}>
-          {busy ? 'Sending…' : 'Send confirmation'}
+          <BusyLabel busy={busy} pending="Sending the confirmation…">Send confirmation</BusyLabel>
         </button>
       ) : null}
       {preview && !preview.blocked && preview.mayHaveBeenSent ? (
         <button type="button" className={primaryButtonClass} onClick={() => send({ confirmUnknown: true })} disabled={busy || disabled}>
-          {busy ? 'Sending…' : 'I checked the Email log, send again'}
+          <BusyLabel busy={busy} pending="Sending the confirmation again…">I checked the Email log, send again</BusyLabel>
         </button>
       ) : null}
       {result ? <SaveStatus message={result} /> : null}

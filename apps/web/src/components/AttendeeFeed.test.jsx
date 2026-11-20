@@ -867,11 +867,12 @@ describe('the post composer', () => {
     const button = screen.getByRole('button', { name: 'Post' });
     fireEvent.click(button);
     fireEvent.click(button);
-    expect(button).toBeDisabled();
-    expect(button).toHaveTextContent('Sending…');
+    // Busy, not disabled: the control keeps focus and refuses the second press.
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAccessibleName('Sending your post…');
     await act(async () => pending.resolve(answer(201, { postId: 'n', state: 'active' })));
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(button).toBeEnabled();
+    expect(button).not.toHaveAttribute('aria-disabled');
   });
 
   it('a removed answer drops the key, keeps the text, explains it, and never resends on its own', async () => {
@@ -976,7 +977,7 @@ describe('the thread page', () => {
       return () => {};
     });
     renderThread();
-    expect(screen.getByText('Loading…', { selector: '.loading-status__label' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the page…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByText('Not found page')).not.toBeInTheDocument();
     expect(listenersFor('social_posts')).toHaveLength(0);
     expect(listenersFor('social_posts/root1')).toHaveLength(0);
@@ -985,7 +986,7 @@ describe('the thread page', () => {
     pushDoc('users/ada', { uid: 'ada', ...APPROVED });
     pushDoc('config/features', FEED_ON, { fromCache: true });
     await act(async () => {});
-    expect(screen.getByText('Loading…', { selector: '.loading-status__label' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the page…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByText('Not found page')).not.toBeInTheDocument();
     expect(listenersFor('social_posts')).toHaveLength(0);
     expect(listenersFor('social_posts/root1')).toHaveLength(0);

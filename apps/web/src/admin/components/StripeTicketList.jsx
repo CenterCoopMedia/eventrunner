@@ -6,6 +6,7 @@ import { AdminEmptyState, AdminLoadingState, StatusBadge } from './adminChrome.j
 import { Notice, Panel, secondaryButtonClass, SelectField, TextField, linkButtonClass } from './formControls.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from './CreateAccountFromTicket.jsx';
 import AdminTableScroll from './AdminTableScroll.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 export function TicketingTable({ label, children }) {
   return <AdminTableScroll role="region" aria-label={label} tabIndex={0} className="max-h-[32rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline"><table className="w-full min-w-[48rem] border-collapse text-admin-sm">{children}</table></AdminTableScroll>;
@@ -103,6 +104,6 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
         </tr>)}</tbody>
       </TicketingTable>
     </> : null}
-    {cursor ? <button type="button" className={`${secondaryButtonClass} mt-sm`} aria-busy={busy} aria-disabled={busy} onClick={() => search(submitted, cursor)}>{busy ? 'Loading…' : `Load more ${isOrders ? 'orders' : 'tickets'}`}</button> : null}
+    {cursor ? <button type="button" className={`${secondaryButtonClass} mt-sm`} aria-busy={busy} aria-disabled={busy} onClick={() => search(submitted, cursor)}><BusyLabel busy={busy} pending={`Loading more ${isOrders ? 'orders' : 'tickets'}…`}>{`Load more ${isOrders ? 'orders' : 'tickets'}`}</BusyLabel></button> : null}
   </Panel>;
 }

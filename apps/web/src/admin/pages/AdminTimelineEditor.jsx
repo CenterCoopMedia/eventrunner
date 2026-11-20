@@ -27,7 +27,6 @@ import { timelineFields, validateTimelineForm } from '../timelineDoc.js';
 import { useAdminTimeline } from '../useAdminTimeline.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import {
-  ActionLabel,
   CheckboxField,
   DestructiveConfirm,
   Notice,
@@ -44,6 +43,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+import BusyLabel from '../../components/BusyLabel.jsx';
 
 const COLLECTION = 'cmsTimeline';
 const TIMELINE_LIST = '/admin/timeline';
@@ -251,7 +251,7 @@ export default function AdminTimelineEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              <ActionLabel busy={action === 'draft'} pending="Saving…">Save</ActionLabel>
+              <BusyLabel busy={action === 'draft'} pending="Saving the timeline…">Save</BusyLabel>
             </button>
             <button
               type="button"
@@ -260,7 +260,7 @@ export default function AdminTimelineEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              <ActionLabel busy={action === 'publish'} pending="Publishing…">Publish</ActionLabel>
+              <BusyLabel busy={action === 'publish'} pending="Publishing the timeline…">Publish</BusyLabel>
             </button>
           </>
         }

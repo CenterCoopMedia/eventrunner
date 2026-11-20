@@ -37,6 +37,7 @@ import {
   referencedByBranding,
 } from './mediaErrors.js';
 import ModalShell from './ModalShell.jsx';
+import BusyLabel from '../../../components/BusyLabel.jsx';
 
 function usageLocation(reference) {
   const [stored, id] = (reference.docPath ?? '').split('/');
@@ -202,9 +203,9 @@ export default function AssetModal({
           {status ? <SaveStatus message={status} /> : null}
           {saveError ? <Notice tone="error" message={saveError} /> : null}
           <div className="flex flex-wrap gap-xs">
-            <button type="submit" className={primaryButtonClass} disabled={busy}>
+            <button type="submit" className={primaryButtonClass} aria-disabled={busy || undefined} aria-busy={action === 'save' || undefined}>
               {action === 'save' ? <span className="admin-busy-mark" aria-hidden="true" /> : null}
-              {action === 'save' ? 'Saving…' : 'Save'}
+              <BusyLabel busy={action === 'save'} pending="Saving the file details…">Save</BusyLabel>
             </button>
           </div>
         </form>
