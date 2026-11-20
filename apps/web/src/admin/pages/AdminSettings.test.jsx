@@ -1470,7 +1470,8 @@ describe('feature switches on the pages that use them', () => {
     fireEvent.click(toggle);
     await screen.findByText(`${label} setting saved.`);
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/updateFeatures$/);
-    expect(bodyOf(0).features).toEqual(Object.fromEntries(KNOWN_FEATURE_KEYS.map((feature) => [feature, feature === 'schedule' || feature === key])));
+    const enabled = new Set(['schedule', 'coreWebVitals', key]);
+    expect(bodyOf(0).features).toEqual(Object.fromEntries(KNOWN_FEATURE_KEYS.map((feature) => [feature, enabled.has(feature)])));
     expect(toggle).not.toBeChecked();
     await pushConfig('features', { ...bodyOf(0).features });
     expect(toggle).toBeChecked();
