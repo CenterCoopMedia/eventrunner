@@ -221,7 +221,7 @@ describe('the built stylesheet', () => {
       '.pull-quote__mark', '.long-read-opening', '.venue-map__frame', '.ruled-table__sort',
       '.dropzone__sent', '.repeater__row', '.specimen-motif-row', '.admin-rich-text',
       '.admin-proof-row', '.bg-admin-ground-proof', '.progress-bar', '.standfirst',
-      '.byline', '.public-dialog',
+      '.byline', '.public-dialog', '.site-account-sheet',
     ]) {
       expect(bundled).toContain(selector);
       expect(startup).not.toContain(selector);
