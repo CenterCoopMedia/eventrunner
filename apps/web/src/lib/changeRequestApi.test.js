@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./demoMode.js', () => ({ IS_DEMO: false, default: false }));
 
-import { listMyChangeRequests, submitChangeRequest } from './changeRequestApi.js';
+import { CHANGE_REQUEST_TIMEOUT_MS, listMyChangeRequests, submitChangeRequest } from './changeRequestApi.js';
 
 const ENV = { VITE_FUNCTIONS_ORIGIN: 'https://functions.example.test/' };
 const PAYLOAD = { message: 'The travel page lists the wrong hotel.', page: '/travel', submissionKey: 'key0000000000001' };
@@ -16,6 +16,7 @@ function respond(status, body) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.doUnmock('./demoMode.js');
 });
 
@@ -56,6 +57,34 @@ describe('submitChangeRequest', () => {
       ok: false,
       error: 'We could not reach the server. Check your connection and try again.',
     });
+  });
+
+  it('ends a stalled token lookup and never posts when the token arrives late', async () => {
+    vi.useFakeTimers();
+    let resolveToken;
+    const slowUser = { getIdToken: () => new Promise((resolve) => { resolveToken = resolve; }) };
+    const fetchImpl = respond(201, { id: 'late' });
+    const pending = submitChangeRequest(PAYLOAD, { user: slowUser, env: ENV, fetchImpl });
+
+    await vi.advanceTimersByTimeAsync(CHANGE_REQUEST_TIMEOUT_MS);
+    expect(await pending).toEqual({ ok: false, error: 'Your change request could not be confirmed. Try again.' });
+    resolveToken('late-token');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(['transport', 'response body'])('settles and aborts a stalled %s', async (stall) => {
+    vi.useFakeTimers();
+    const never = () => new Promise(() => {});
+    const fetchImpl = stall === 'transport' ? vi.fn(never) : vi.fn(async () => ({ ok: true, json: never }));
+    const pending = submitChangeRequest(PAYLOAD, { user, env: ENV, fetchImpl });
+    await vi.advanceTimersByTimeAsync(CHANGE_REQUEST_TIMEOUT_MS - 1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const { signal } = fetchImpl.mock.calls[0][1];
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toEqual({ ok: false, error: 'Your change request could not be confirmed. Try again.' });
+    expect(signal.aborted).toBe(true);
   });
 
   it('sends nothing without a signed-in user, or when the token cannot be read', async () => {
