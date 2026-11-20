@@ -326,7 +326,7 @@ function ColourOverride({ field, value, palette, onChange, backgroundFailure, er
   const colour = palette[field.key];
   const text = accent ? colour : palette.ink;
   const background = accent ? palette.surface : colour;
-  const picker = toPickerHex(value) || (colour && rgbTripleToHex(colour.join(' '))) || '#000000';
+  const picker = toPickerHex(value) || (colour && rgbTripleToHex(colour.join(' '))) || '';
   const accentRatio = accent && text && background ? contrastRatio(text, background) : null;
   const warning = accent
     ? accentRatio !== null && accentRatio < 4.5
