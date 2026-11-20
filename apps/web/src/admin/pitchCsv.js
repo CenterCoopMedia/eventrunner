@@ -1,4 +1,4 @@
-import { IMPORT_FIELDS, PRESENTER_COLUMNS, readPresenters } from 'shared/pitchForm';
+import { IMPORT_FIELDS, PRESENTER_COLUMNS, readImportedExtras, readPresenters } from 'shared/pitchForm';
 import { parseCsv } from '../lib/csv.js';
 
 export const PITCH_COLUMNS = ['externalId', 'email', 'title', 'description', 'organization', 'format', 'consent'];
@@ -25,15 +25,29 @@ function parsePitchCsv(text) {
   }
   const rows = table.filter((cells) => cells.some((cell) => cell.trim()));
   if (!rows.length || rows.length > 50) throw new Error('Import 1-50 proposals at a time.');
-  rows.forEach((cells, index) => {
-    if (cells.length !== headers.length) throw new Error(`Row ${index + 1}: The column count does not match the headers.`);
-  });
   return { headers, rows };
 }
 
 export function inspectPitchCsv(text) {
   const { headers, rows } = parsePitchCsv(text);
   return { headers, count: rows.length };
+}
+
+function rowProblem(row, ids) {
+  if (!row.externalId || row.externalId.length > 128 || ids.has(row.externalId)) {
+    return 'Enter a unique source ID of at most 128 characters.';
+  }
+  ids.add(row.externalId);
+  if (row.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) return 'Enter a valid email address.';
+  if (!row.title || row.title.length > 160) return 'Enter a proposal title of at most 160 characters.';
+  if (!row.description || row.description.length > 5000) return 'Enter a description of at most 5,000 characters.';
+  if (row.organization?.length > 200) return 'Use at most 200 characters for the organization.';
+  if (row.format?.length > 120) return 'Use at most 120 characters for the format.';
+  if (row.consent !== 'true' && row.consent !== 'checked') return 'Consent must be true or checked and evidenced in the source form.';
+  const extras = readImportedExtras(row, { email: row.email.toLowerCase() });
+  if (extras.ok) return null;
+  const label = PITCH_IMPORT_FIELDS.find(({ id }) => id === extras.field)?.label ?? 'Presenter details';
+  return `${label} — ${extras.message.slice(extras.field.length + 2)}`;
 }
 
 export function readPitchCsv(text, mapping) {
@@ -50,16 +64,13 @@ export function readPitchCsv(text, mapping) {
   }
   const ids = new Set();
   return rows.map((cells, index) => {
-    const value = (key) => selected[key] ? cells[headers.indexOf(selected[key])].trim() : '';
-    const row = Object.fromEntries(PITCH_COLUMNS.map((key) => [key, value(key)]));
-    for (const key of OPTIONAL_PITCH_COLUMNS) if (selected[key]) row[key] = value(key);
-    if (!row.externalId || row.externalId.length > 128 || ids.has(row.externalId)) throw new Error(`Row ${index + 1}: A unique source ID is required.`);
-    ids.add(row.externalId);
-    if (row.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) throw new Error(`Row ${index + 1}: A valid email is required.`);
-    if (!row.title || row.title.length > 160 || !row.description || row.description.length > 5000 || row.organization.length > 200 || row.format.length > 120) throw new Error(`Row ${index + 1}: Check required text and field lengths.`);
-    // Airtable exports a ticked checkbox as "checked".
-    if (row.consent !== 'true' && row.consent !== 'checked') throw new Error(`Row ${index + 1}: Consent must be true or checked and evidenced in the source form.`);
-    return { ...row, consent: true };
+    const number = index + 1;
+    if (cells.length !== headers.length) return { number, error: 'Use the same number of columns as the header row.' };
+    const row = Object.fromEntries(PITCH_IMPORT_FIELDS.flatMap(({ id }) =>
+      selected[id] ? [[id, cells[headers.indexOf(selected[id])].trim()]] : [],
+    ));
+    const error = rowProblem(row, ids);
+    return error ? { number, error } : { number, row: { ...row, consent: true } };
   });
 }
 function cell(value) {

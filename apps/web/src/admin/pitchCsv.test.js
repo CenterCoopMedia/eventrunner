@@ -4,25 +4,25 @@ import { inspectPitchCsv, readPitchCsv, pitchQueueCsv } from './pitchCsv.js';
 describe('reviewed pitch CSV contract', () => {
   const headers = 'externalId,email,title,description,organization,format,consent\n';
   it('preserves external IDs and quoted multiline proposal content', () => {
-    expect(readPitchCsv(headers + 'external-17,one@example.test,"Local, together","First line\nSecond line",Example,Panel,true')).toEqual([
+    expect(readPitchCsv(headers + 'external-17,one@example.test,"Local, together","First line\nSecond line",Example,Panel,true').map(({ row }) => row)).toEqual([
       { externalId: 'external-17', email: 'one@example.test', title: 'Local, together', description: 'First line\nSecond line', organization: 'Example', format: 'Panel', consent: true },
     ]);
   });
   it('accepts a UTF-8 BOM and surrounding header whitespace', () => {
-    expect(readPitchCsv('\uFEFF externalId , email , title , description , organization , format , consent \n' + 'id,one@example.test,Title,Description,,Panel,true')[0].externalId).toBe('id');
+    expect(readPitchCsv('\uFEFF externalId , email , title , description , organization , format , consent \n' + 'id,one@example.test,Title,Description,,Panel,true')[0].row.externalId).toBe('id');
   });
   it('rejects missing consent, duplicate IDs, and ambiguous headers before import', () => {
-    expect(() => readPitchCsv(headers + 'id,one@example.test,Title,Description,,,false')).toThrow(/Consent/);
-    expect(() => readPitchCsv(headers + 'id,one@example.test,Title,Description,,,true\nid,two@example.test,Other,Description,,,true')).toThrow(/unique source ID/);
+    expect(readPitchCsv(headers + 'id,one@example.test,Title,Description,,,false')[0].error).toMatch(/Consent/);
+    expect(readPitchCsv(headers + 'id,one@example.test,Title,Description,,,true\nid,two@example.test,Other,Description,,,true')[1].error).toMatch(/unique source ID/);
     expect(() => readPitchCsv('email,email,title,description,organization,format,consent')).toThrow(/unique, nonempty headers/);
   });
   it('reads an Airtable export: a ticked checkbox as consent and extra view columns ignored', () => {
     const airtable = 'externalId,Created,email,title,description,organization,format,consent,Status\n'
       + 'rec001,10/19/2026 9:00am,one@example.test,Title,Description,,Panel,checked,Todo';
-    expect(readPitchCsv(airtable)).toEqual([
+    expect(readPitchCsv(airtable).map(({ row }) => row)).toEqual([
       { externalId: 'rec001', email: 'one@example.test', title: 'Title', description: 'Description', organization: '', format: 'Panel', consent: true },
     ]);
-    expect(() => readPitchCsv(airtable.replace(',checked,', ',,'))).toThrow(/Consent/);
+    expect(readPitchCsv(airtable.replace(',checked,', ',,'))[0].error).toMatch(/Consent/);
   });
   it('rejects a missing required column or a repeated column name', () => {
     expect(() => readPitchCsv('externalId,email,title,description,organization,format\nid,one@example.test,T,D,,')).toThrow(/headers/);
@@ -40,25 +40,25 @@ describe('reviewed pitch CSV contract', () => {
   it('reads the optional stepper columns and leaves them out when absent', () => {
     const text = 'externalId,email,title,description,organization,format,consent,summary,lengthMinutes,leadName,presenter_1_name,presenter_1_email\n'
       + 'id,one@example.test,T,D,,Panel,true,One line.,60,Ada,Bo,bo@example.test';
-    expect(readPitchCsv(text)[0]).toMatchObject({ summary: 'One line.', lengthMinutes: '60', leadName: 'Ada', presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test' });
-    expect(Object.keys(readPitchCsv(headers + 'id,one@example.test,T,D,,,true')[0])).not.toContain('summary');
+    expect(readPitchCsv(text)[0].row).toMatchObject({ summary: 'One line.', lengthMinutes: '60', leadName: 'Ada', presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test' });
+    expect(Object.keys(readPitchCsv(headers + 'id,one@example.test,T,D,,,true')[0].row)).not.toContain('summary');
   });
 
   it('matches reordered source columns explicitly without shifting blank cells or changing IDs', () => {
     const text = 'Answer,Record,Contact,Agreement,Idea,Unused,Presenter\n"First line\nSecond, line",rec-017,one@example.test,checked,Local together,,Ada';
     expect(inspectPitchCsv(text)).toEqual({ headers: ['Answer', 'Record', 'Contact', 'Agreement', 'Idea', 'Unused', 'Presenter'], count: 1 });
-    expect(readPitchCsv(text, { description: 'Answer', externalId: 'Record', email: 'Contact', consent: 'Agreement', title: 'Idea', leadName: 'Presenter' })).toEqual([
-      { externalId: 'rec-017', email: 'one@example.test', title: 'Local together', description: 'First line\nSecond, line', organization: '', format: '', consent: true, leadName: 'Ada' },
+    expect(readPitchCsv(text, { description: 'Answer', externalId: 'Record', email: 'Contact', consent: 'Agreement', title: 'Idea', leadName: 'Presenter' }).map(({ row }) => row)).toEqual([
+      { externalId: 'rec-017', email: 'one@example.test', title: 'Local together', description: 'First line\nSecond, line', consent: true, leadName: 'Ada' },
     ]);
   });
 
-  it('refuses ambiguous or missing matches and malformed row shapes before producing a review', () => {
+  it('refuses ambiguous or missing matches and reports malformed rows in the review', () => {
     const text = headers + 'id,one@example.test,T,D,,,true';
     const mapping = Object.fromEntries(headers.trim().split(',').map((name) => [name, name]));
     expect(() => readPitchCsv(text, { ...mapping, title: 'description' })).toThrow(/matched more than once/);
     expect(() => readPitchCsv(text, { ...mapping, email: 'Missing column' })).toThrow(/existing column/);
     expect(() => readPitchCsv(text, { ...mapping, consent: '' })).toThrow(/Choose a column for consent/);
-    expect(() => inspectPitchCsv(text + ',extra')).toThrow(/column count/);
+    expect(readPitchCsv(text + ',extra')).toEqual([{ number: 1, error: 'Use the same number of columns as the header row.' }]);
     expect(() => inspectPitchCsv(text.replace(',consent', ','))).toThrow(/nonempty headers/);
     expect(() => readPitchCsv(headers + 'id,one@example.test,T,D,,,"true\nid2,two@example.test,T,D,,,true')).toThrow(/unclosed quoted field/);
   });

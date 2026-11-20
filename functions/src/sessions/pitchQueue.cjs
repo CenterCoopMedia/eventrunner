@@ -6,7 +6,7 @@ const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId, writeDraft } = require('../cms/store.cjs');
 const { validateSessionShape, validateSessionStructure } = require('../schedule/sessions.cjs');
 const { internals: { readSubmission, MAX_BODY_BYTES } } = require('./pitches.cjs');
-const { readImportedExtras, sameValue, speakerCandidates } = require('shared/pitchForm');
+const { IMPORT_FIELDS, readImportedExtras, sameValue, speakerCandidates } = require('shared/pitchForm');
 const { inviteSpeaker, internals: { DEFAULT_INVITE_TYPE } } = require('../speakers/invites.cjs');
 
 const hash = (text) => createHash('sha256').update(text).digest('hex');
@@ -14,8 +14,23 @@ const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&a
 function fail(status, code, message) { const err = new Error(message); err.status = status; err.code = code; throw err; }
 function revisionOf(row) { return Number.isSafeInteger(row.reviewRevision) ? row.reviewRevision : 0; }
 
-// Staff-only imports have stable source/external-id identities. All rows are
-// validated before the transaction; a conflict leaves the entire batch unchanged.
+const SOURCE_FIELDS = ['email', 'title', 'description', 'organization', 'format', ...IMPORT_FIELDS, 'presenters'];
+
+function lastSourceValues(pitch) {
+  if (pitch.sourceValues) return pitch.sourceValues;
+  const submitted = { ...pitch, ...pitch.submitted };
+  return Object.fromEntries(SOURCE_FIELDS.filter((field) => submitted[field] !== undefined).map((field) => [field, submitted[field]]));
+}
+
+// The lead's contact fields are tracked separately from the presenter list.
+function compareSourceValue(field, value) {
+  if (field !== 'presenters' || !Array.isArray(value) || !value.length) return value;
+  const [{ name, role }, ...coPresenters] = value;
+  return [{ name, role }, ...coPresenters];
+}
+
+// Staff-only imports have stable source/external-id identities. Validate the
+// whole file before writing any proposals.
 function readImport(body) {
   const source = typeof body?.source === 'string' ? body.source.trim() : '';
   if (!/^[A-Za-z0-9_-]{1,80}$/.test(source)) return { error: 'source: Use 1-80 letters, numbers, underscores, or hyphens.' };
@@ -35,7 +50,10 @@ function readImport(body) {
     if (!extra.ok) return { error: `Row ${index + 1}: ${extra.message}` };
     ids.add(externalId);
     rows.push({ id: hash(`import\0${source}\0${externalId}`), source, externalId, email,
-      title: pitch.title, description: pitch.description, organization: pitch.organization, format: pitch.format, ...extra.extras });
+      title: pitch.title, description: pitch.description,
+      ...(Object.hasOwn(row, 'organization') ? { organization: pitch.organization } : {}),
+      ...(Object.hasOwn(row, 'format') ? { format: pitch.format } : {}),
+      ...extra.extras });
   }
   return { rows };
 }
@@ -47,22 +65,48 @@ async function importPitches({ db, actor, body, at }) {
     const refs = parsed.rows.map((row) => db.collection('session_pitches').doc(row.id));
     const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
     let imported = 0;
-    snaps.forEach((snap, i) => {
-      if (!snap.exists) return;
-      const stored = snap.data();
-      const incoming = parsed.rows[i];
-      // By value: a presenter list read back from Firestore may hold its
-      // keys in another order than the one it was written in.
-      if (Object.keys(incoming).filter((key) => key !== 'id').some((key) => !sameValue(stored[key], incoming[key]))) fail(409, 'import-conflict', `Row ${i + 1}: This source ID already exists with different content.`);
+    let updated = 0;
+    parsed.rows.forEach(({ id: _id, source, externalId, ...incoming }, i) => {
+      if (!snaps[i].exists) {
+        imported += 1;
+        tx.create(refs[i], { organization: null, format: null, ...incoming, source, externalId, sourceValues: incoming,
+          uid: null, status: 'new', reviewRevision: 0, privateNotes: null,
+          consent: { version: 'source-form', at, recordedBy: actor.email }, createdAt: at, reviewedAt: null, reviewedBy: null });
+        return;
+      }
+      const stored = snaps[i].data();
+      const baseline = lastSourceValues(stored);
+      const changed = Object.keys(incoming).filter((field) =>
+        !sameValue(compareSourceValue(field, incoming[field]), compareSourceValue(field, baseline[field])),
+      );
+      if (!changed.length) return;
+      const patch = Object.fromEntries(changed.map((field) => [field, incoming[field]]));
+      // An unmapped presenter list stays intact. The stored lead mirrors the
+      // required contact fields so review and conversion agree on its address.
+      const email = patch.email ?? stored.email;
+      const organization = Object.hasOwn(patch, 'organization') ? patch.organization : stored.organization ?? null;
+      const presenters = patch.presenters ?? stored.presenters;
+      if (presenters?.length && (patch.presenters || patch.email || Object.hasOwn(patch, 'organization'))) {
+        const [lead, ...coPresenters] = presenters;
+        if (coPresenters.some((person) => person.email === email)) {
+          fail(400, 'bad-request', `Row ${i + 1}: The lead email is already used by a co-presenter. Match the presenter columns to update both.`);
+        }
+        const nextLead = { ...lead, email, organization };
+        const currentLead = stored.presenters?.[0];
+        if (patch.presenters && currentLead) {
+          const previousLead = baseline.presenters?.[0] ?? { name: baseline.leadName, role: baseline.leadRole };
+          for (const field of ['name', 'role']) {
+            if (sameValue(lead[field], previousLead[field])) nextLead[field] = currentLead[field] ?? null;
+          }
+        }
+        patch.presenters = [nextLead, ...coPresenters];
+      }
+      updated += 1;
+      tx.update(refs[i], { ...patch, reviewRevision: revisionOf(stored) + 1,
+        sourceValues: { ...baseline, ...incoming }, sourceUpdatedAt: at, sourceChangedFields: changed });
     });
-    parsed.rows.forEach(({ id: _id, ...row }, i) => {
-      if (snaps[i].exists) return;
-      imported += 1;
-      tx.create(refs[i], { ...row, uid: null, status: 'new', reviewRevision: 0, privateNotes: null,
-        consent: { version: 'source-form', at, recordedBy: actor.email }, createdAt: at, reviewedAt: null, reviewedBy: null });
-    });
-    if (imported) tx.set(db.collection('admin_logs').doc(), { action: 'importSessionPitches', docPath: 'session_pitches', uid: actor.uid, email: actor.email, at, details: { count: imported, source: body.source } });
-    return { imported, unchanged: snaps.length - imported };
+    if (imported || updated) tx.set(db.collection('admin_logs').doc(), { action: 'importSessionPitches', docPath: 'session_pitches', uid: actor.uid, email: actor.email, at, details: { count: imported, updated, source: parsed.rows[0].source } });
+    return { imported, updated, unchanged: snaps.length - imported - updated };
   });
 }
 

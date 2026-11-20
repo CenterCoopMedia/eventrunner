@@ -23,7 +23,7 @@ Draft and live are separate. Publishing copies the draft to what attendees see. 
 
 ## Session pitches
 
-Share `/pitch` for proposals. The form requires a verified email, title, description, and review consent. If the call uses an external form, such as Airtable, `/pitch` links to that form instead. Bring Airtable responses in with **Refresh from Airtable**, or import any form's responses as CSV. A refresh keeps every decision and note. It marks a pitch **Updated in Airtable** when the submitter changed it, and **Removed from Airtable** when the record left the table. Open **Session pitches** to search and filter the private queue. Save a review decision and private notes explicitly. A conflict keeps your notes visible; copy them before loading the current review. Decisions do not send notifications.
+Share `/pitch` for proposals. The form requires a verified email, title, description, and review consent. If the call uses an external form, such as Airtable, `/pitch` links to that form instead. Bring Airtable responses in with **Refresh from Airtable**, or upload a grid CSV under **Import pitches**. A refresh or CSV update keeps decisions and notes and marks a changed pitch **Updated from source**. A refresh also marks **Removed from Airtable** when the record leaves the table. Open **Session pitches** to search and filter the private queue. Save a review decision and private notes explicitly. A conflict keeps your notes visible; copy them before loading the current review. Decisions do not send notifications.
 
 Import outside proposals only after reviewing the CSV preview and verifying the source form's consent. Export downloads the filtered queue with contact details and excludes private notes. Keep the file private.
 

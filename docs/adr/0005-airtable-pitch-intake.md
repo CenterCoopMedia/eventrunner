@@ -10,7 +10,7 @@ ADR 0001 did not port the reference implementation's Airtable sync: four exports
 
 Two things changed:
 
-1. Session pitches arrived (`functions/src/sessions/`). A call for sessions can already send people to an external form, such as an Airtable form, and staff bring the answers in with a reviewed CSV import. That import blocks a whole batch when one row changes, and it needs a person to export and upload a file for every update.
+1. Session pitches arrived (`functions/src/sessions/`). A call for sessions could send people to an external form, such as an Airtable form. Staff brought answers in with a reviewed CSV import. At the time, the import stopped the batch when a row changed. Each update required someone to export and upload a file.
 2. The first paying client was sent proposals that include an Airtable connection in every tier: bring pitch records from an approved table into the private review queue, refresh them without duplicates, keep review decisions, and keep publication under staff control.
 
 ## Decision
@@ -29,7 +29,7 @@ Event Runner reads one operator-approved Airtable table into `session_pitches`. 
 ## Consequences
 
 - Clients that use an Airtable form get updates without CSV round trips, and staff see what changed.
-- The CSV import keeps its rule that a changed row blocks the batch. A file does not show which copy is current, so a silent overwrite there is less safe than a refusal.
+- The November 20, 2026 CSV update applies changed source fields by source name and record ID. It compares against the previous import, keeps staff corrections to unchanged fields, and identifies updated pitches in the queue. Use the newest export to apply changes.
 - The scope of Airtable is fixed at pitch intake. A request to sync content, speakers or schedule with Airtable needs a new record.
 - One refresh reads at most 1,000 records. A larger table needs a smaller view.
 - If the client edits an accepted proposal in Airtable after conversion, the drafts do not change. The queue marks the pitch, and staff edit the drafts.
