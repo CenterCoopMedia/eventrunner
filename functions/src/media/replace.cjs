@@ -212,7 +212,10 @@ async function runMediaReplacement({ db, getBucket, queueRef, body, actor, now, 
       };
     });
     const { finished, publishLive, ...result } = outcome;
-    if (finished) await logAdminAction({ db, action: 'mediaReplace', docPath: queueRef.path, actor, now, log });
+    if (finished || (result.status === 'failed' && result.changed.length > 0)) {
+      const action = finished ? 'mediaReplace' : 'mediaReplaceFailed';
+      await logAdminAction({ db, action, docPath: queueRef.path, actor, now, log });
+    }
     const publisher = finished && publishLive ? await publish(queueRef.id) : undefined;
     return res.status(200).json({ queueId: queueRef.id, ...result, ...(publisher ? { publisher } : {}) });
   } catch (err) {

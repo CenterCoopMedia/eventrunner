@@ -83,6 +83,9 @@ test('replacement resumes committed groups through the publish receipt without p
   assert.equal(partial.body.status, 'failed');
   assert.ok(partial.body.changed.length > 0);
   assert.ok(partial.body.failed.length > 0);
+  const [partialLog] = db.ids('admin_logs');
+  assert.equal(db.read('admin_logs', partialLog).action, 'mediaReplaceFailed');
+  assert.equal(db.read('admin_logs', partialLog).docPath, `cmsPublishQueue/${requestId}`);
   const completedBefore = db.writes.filter(({ path }) => path === 'cmsContent/hero__image').length;
   assert.equal(completedBefore, 1);
 
