@@ -113,7 +113,7 @@ Adding a font set is a deliberate, reviewable pull request:
 2. Add the row above, with the designer, the licence, and how it was prepared.
 3. Add the set id to `FONT_SETS` in `scripts/lib/theme.cjs` — family, stack,
    and the faces to emit — and to `FONT_SETS` in
-   `apps/web/src/lib/themeRuntime.js`. `THEME_FONT_SET_IDS` in
+   `apps/web/src/lib/themeCss.js`. `THEME_FONT_SET_IDS` in
    `packages/shared/src/theme.cjs` is the allowlist the server validates
    against; `themeRuntime.parity.test.js` fails if the three drift.
 4. Point a preset's type map or one of its heading options at the set id.

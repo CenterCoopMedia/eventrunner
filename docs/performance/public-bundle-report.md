@@ -2,6 +2,19 @@
 
 The report measures the entry module and each static JavaScript import required before route interaction. Dynamic route chunks are separate.
 
+## 2026-11-19 – Route-only helpers leave the entry (#1122)
+
+Production builds of `5d286454` and the split used Node 22.23.5 and gzip level 9. Both modes still have three initial JavaScript chunks.
+
+| Build | Initial raw before | Initial raw after | Initial gzip before | Initial gzip after |
+| --- | ---: | ---: | ---: | ---: |
+| Normal | 425,616 | 417,852 | 134,449 | 132,022 |
+| Demo | 430,101 | 422,388 | 135,509 | 133,101 |
+
+Branding editor diagnostics load with the admin and specimen routes. Checkout attempt storage, ticket formatting and status labels load with the ticket and admin routes. The route fallback keeps the figure and its queue in the entry. The demo stylesheet stays at 194,130 raw / 28,629 gzip bytes. The Firebase SDK remains deferred at 554,980 raw / 162,782 gzip bytes in the demo.
+
+The initial ceilings fall from 431,000 raw / 136,000 gzip to 430,900 / 135,800. These are the larger measured sizes plus 2%, rounded up to 100 bytes. The demo has 8,512 raw / 2,699 gzip bytes of headroom. [Source-map attribution for the demo baseline](https://github.com/CenterCoopMedia/eventrunner/issues/1122#issuecomment-7029361429)
+
 ## 2026-11-19: held-up figure (#1090)
 
 Local builds of `main` at `5b635a77` and of the change, with the same environment and gzip level 9. Each initial graph has three chunks.

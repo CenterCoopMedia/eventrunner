@@ -4,7 +4,7 @@ import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import ExternalLink from '../../components/ExternalLink.jsx';
 import { Checkbox } from '../../components/forms/Choice.jsx';
-import { formatTicketMoney, formatTicketTime, newTicketingRequestId, safeStripeDashboardUrl, disputeStatusLabel, paymentStatusLabel, refundLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
+import { formatTicketMoney, formatTicketTime, newTicketingRequestId, safeStripeDashboardUrl, disputeStatusLabel, paymentStatusLabel, refundLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingDetails.js';
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, secondaryButtonClass, dangerButtonClass, linkButtonClass, TextAreaField, TextField, SelectField } from './formControls.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';

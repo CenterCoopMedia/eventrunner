@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ticketingRequest } from './ticketingCommerce.js';
 import {
   formatTicketMoney, readCheckoutAttempt, rememberCheckoutAttempt, safeCheckoutUrl,
-  safeStripeDashboardUrl, ticketingRequest,
+  safeStripeDashboardUrl,
   disputeStatusLabel, orderStatusLabel, paymentStatusLabel, refundLabel, refundStateLabel, ticketStatusLabel,
-} from './ticketingCommerce.js';
+} from './ticketingDetails.js';
 import {
   ORDER_STATUSES, PAYMENT_STATUSES, REFUND_STATUSES, TICKET_STATUSES,
 } from 'shared/ticketCommerce';

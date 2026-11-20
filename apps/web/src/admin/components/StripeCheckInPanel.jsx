@@ -1,6 +1,6 @@
 import { plannerMessage } from '../plannerErrors.js';
 import { useRef, useState } from 'react';
-import { formatTicketTime } from '../../lib/ticketingCommerce.js';
+import { formatTicketTime } from '../../lib/ticketingDetails.js';
 import { Notice, Panel, primaryButtonClass, secondaryButtonClass, TextAreaField, TextField } from './formControls.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
 

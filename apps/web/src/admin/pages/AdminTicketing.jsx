@@ -45,7 +45,7 @@ import AdminPageHeader, {
   StatusBadge,
 } from '../components/adminChrome.jsx';
 import AdminTableScroll from '../components/AdminTableScroll.jsx';
-import { ticketStatusLabel } from '../../lib/ticketingCommerce.js';
+import { ticketStatusLabel } from '../../lib/ticketingDetails.js';
 import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from '../components/CreateAccountFromTicket.jsx';
 

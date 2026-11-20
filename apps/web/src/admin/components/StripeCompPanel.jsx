@@ -2,7 +2,7 @@ import { plannerMessage } from '../plannerErrors.js';
 import '../plannerFields.css';
 import AdminIconControl from './AdminIconControl.jsx';
 import { useRef, useState } from 'react';
-import { formatTicketMoney, newTicketingRequestId } from '../../lib/ticketingCommerce.js';
+import { formatTicketMoney, newTicketingRequestId } from '../../lib/ticketingDetails.js';
 import { Notice, Panel, secondaryButtonClass, SelectField, TextAreaField, TextField } from './formControls.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
 

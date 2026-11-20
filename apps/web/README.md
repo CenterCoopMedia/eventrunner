@@ -293,9 +293,10 @@ outage never selects a possibly stale external checkout source. Historical
 and static demos skip the lookup. The rest of the shell still renders from its snapshot;
 commerce availability and financial state require current server responses.
 
-`ticketingCommerce.js` sends App Check and bearer credentials where appropriate, requests
-private responses with `no-store`, accepts a payment handoff only as an `https` URL with no credentials and no port,
-and stores only account-scoped request/order identifiers for recovery. The browser never
+`ticketingCommerce.js` sends App Check and bearer credentials where appropriate and requests
+private responses with `no-store`. `ticketingDetails.js` accepts payment handoff URLs
+over `https` with no credentials or port and stores account-scoped request and order
+identifiers for recovery. The browser never
 submits a price, currency, Stripe Price ID, entitlement, or claimed user ID as purchase
 authority. Unknown responses retry a saved attempt; owner-scoped order recovery also works
 from another device. A declined card on an open Session is recoverable. Return URL flags

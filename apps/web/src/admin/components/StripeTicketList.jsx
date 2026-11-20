@@ -1,7 +1,7 @@
 import { plannerMessage } from '../plannerErrors.js';
 import { ORDER_STATUSES, PAYMENT_STATUSES, REFUND_STATUSES, TICKET_STATUSES } from 'shared/ticketCommerce';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatTicketMoney, formatTicketTime, orderStatusLabel, paymentStatusLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
+import { formatTicketMoney, formatTicketTime, orderStatusLabel, paymentStatusLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingDetails.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, secondaryButtonClass, SelectField, TextField, linkButtonClass } from './formControls.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from './CreateAccountFromTicket.jsx';

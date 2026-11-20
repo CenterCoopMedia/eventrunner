@@ -1,6 +1,6 @@
 import { PublicLink as Link } from './PublicLink.jsx';
 import { secondaryActionClass } from './controlClasses.js';
-import { formatTicketTime, ticketStatusLabel } from '../lib/ticketingCommerce.js';
+import { formatTicketTime, ticketStatusLabel } from '../lib/ticketingDetails.js';
 
 /** The printed credential is an opaque admission ID. It contains no embedded personal data. */
 export default function TicketDocuments({ tickets, eventName, timezone }) {

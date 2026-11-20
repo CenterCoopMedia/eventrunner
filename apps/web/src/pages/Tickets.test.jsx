@@ -33,7 +33,8 @@ vi.mock('../lib/registrationFormSource.js', () => ({
   subscribeRegistrationForm: (onNext) => { state.pushForm = onNext; onNext(state.form); return () => {}; },
 }));
 vi.mock('../lib/ticketingCommerce.js', async (original) => ({ ...await original(), ticketingRequest: vi.fn() }));
-import { readCheckoutAttempt, ticketingRequest, TicketingRequestError } from '../lib/ticketingCommerce.js';
+import { ticketingRequest, TicketingRequestError } from '../lib/ticketingCommerce.js';
+import { readCheckoutAttempt } from '../lib/ticketingDetails.js';
 import Tickets from './Tickets.jsx';
 
 const CATALOG = {

@@ -8,7 +8,7 @@ import HelpTooltip from './HelpTooltip.jsx';
 // them one by one on each attendee's record.
 import { activeQuestions, answerText, summarizeAnswers } from 'shared/registrationForm';
 import { Panel, fieldHintClass } from './formControls.jsx';
-import { ticketStatusLabel } from '../../lib/ticketingCommerce.js';
+import { ticketStatusLabel } from '../../lib/ticketingDetails.js';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 

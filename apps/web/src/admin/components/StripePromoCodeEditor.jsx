@@ -6,7 +6,7 @@ import '../plannerFields.css';
 import PlannerSwitch from './PlannerSwitch.jsx';
 import { useState } from 'react';
 import { validatePromoCode } from 'shared/promoCodes';
-import { currencyDigits } from '../../lib/ticketingCommerce.js';
+import { currencyDigits } from '../../lib/ticketingDetails.js';
 import EventDateTimeField from './EventDateTimeField.jsx';
 import { CheckboxField, FieldError, primaryButtonClass, secondaryButtonClass, SelectField, TextField } from './formControls.jsx';
 
