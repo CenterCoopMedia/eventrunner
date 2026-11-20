@@ -157,8 +157,6 @@
   --motif-divider: none;
   --motif-nameplate-mark: none;
   --motif-empty-state: none;
-  --motif-wait-glyph: inline-block;
-  --motif-wait-drawn: none;
 
   /* Tier 3 — session-card contract (brief §3.1). */
   --session-card-rule-width: var(--rule-hairline-width);

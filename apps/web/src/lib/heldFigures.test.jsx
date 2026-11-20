@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import LoadingStatus from '../components/LoadingStatus.jsx';
-import { installBusyControlFigures } from './heldFigures.js';
+import { installBusyControlFigures } from './busyControlFigures.js';
 
 const flush = () => act(() => Promise.resolve());
 const tick = (ms) => act(() => { vi.advanceTimersByTime(ms); });

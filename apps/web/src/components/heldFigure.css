@@ -60,7 +60,7 @@
   transform-origin: var(--motif-wait-pivot, 50% 50%);
 }
 
-/* The held-up figure in a busy control (lib/heldFigures.js, #1090):
+/* The held-up figure in a busy control (lib/busyControlFigures.js, #1090):
    always the ampersand, whatever the motif set. Its 20px slot is held from the press, so the ampersand arriving at one
    second does not change the control's width. It is the control's own text
    colour, so a filled button draws it in the button's ink, and it has no

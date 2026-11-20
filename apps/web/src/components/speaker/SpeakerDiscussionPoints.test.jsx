@@ -156,12 +156,12 @@ describe('speaker-wide private discussion draft', () => {
       expect(form).toHaveAttribute('aria-busy', 'true');
       expect(status.closest('[aria-busy="true"]')).toBeNull();
       expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
-      expect(status.parentElement.querySelector('svg')).toBeNull();
+      expect(status.parentElement.querySelector('.held-figure')).toBeNull();
 
       act(() => vi.advanceTimersByTime(999));
-      expect(status.parentElement.querySelector('svg')).toBeNull();
+      expect(status.parentElement.querySelector('.held-figure')).toBeNull();
       act(() => vi.advanceTimersByTime(1));
-      expect(status.parentElement.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(status.parentElement.querySelector('.held-figure')).toHaveAttribute('aria-hidden', 'true');
       edit('Still editing.');
       fireEvent.click(screen.getByRole('tab', { name: 'Details' }));
       act(() => vi.advanceTimersByTime(8999));
