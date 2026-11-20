@@ -131,6 +131,7 @@ function PreviewFrame({ width, label, scopeId, sideNav, children }) {
  *   readingMeasure?: boolean,
  *   longReadOpening?: boolean,
  *   sideNav?: boolean,
+ *   map?: boolean,
  *   blocksError?: boolean,
  * }} props
  *   `readingMeasure` is true where the public page holds a Reading width
@@ -142,7 +143,7 @@ function PreviewFrame({ width, label, scopeId, sideNav, children }) {
  *   `longReadOpening` is true for the section that opens a Long read page,
  *   so the preview draws the style's drop cap or standfirst there too.
  */
-export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false, longReadOpening = false, sideNav = false, blocksError = false }) {
+export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false, longReadOpening = false, sideNav = false, blocksError = false, map = false }) {
   const name = useId();
   // A closed section keeps its fields mounted; its preview documents are
   // made only once the preview is first shown.
@@ -170,6 +171,9 @@ export default function SectionLayoutChoice({ value, onChange, label, blocks, bl
           <LongReadOpening active={longReadOpening}>
             <SectionBlocks blocks={blocks} layout={current} />
           </LongReadOpening>
+          {/* The venue or area map the page draws after the blocks; its
+              own page cannot run in the preview's sandbox. */}
+          {map ? <div className="admin-section-layout__map">Map: shows on the published page</div> : null}
         </div>
       </>
     );
@@ -210,7 +214,7 @@ export default function SectionLayoutChoice({ value, onChange, label, blocks, bl
           <p className="admin-section-layout__empty" role="alert">The preview could not load this section’s content. Reload the page to try again.</p>
         ) : !blocksReady ? (
           <p className="admin-section-layout__empty">Loading this section’s content…</p>
-        ) : blocks.length === 0 ? (
+        ) : blocks.length === 0 && !map ? (
           <p className="admin-section-layout__empty">No block in this section can be drawn here yet. The preview draws published, visible blocks, without starter text or links to pages that are off.</p>
         ) : !shown ? null : (
           <div className="admin-section-layout__frames">

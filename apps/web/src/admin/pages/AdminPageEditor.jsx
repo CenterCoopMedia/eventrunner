@@ -218,6 +218,17 @@ function PageEditor({ mode }) {
   // (lib/linkTargets.js), so the columns split the blocks the reader gets.
   // Targets are the published pages: publishing this page does not publish
   // the page a link leads to.
+  // The pages a link can lead to once this page is published: the
+  // published pages, with this page as it is being edited in place of its
+  // published record (a new path or visibility counts).
+  const linkTargetPages = () => {
+    if (!ready) return null;
+    const own = rows.find((row) => row.live?.id === page.id)?.live ?? {};
+    return [
+      ...rows.map((row) => row.live).filter((live) => live && live.id !== page.id),
+      { ...own, id: page.id, path: page.path, visible: page.visible },
+    ];
+  };
   const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
     contentRows
       // The public shape first (shared/seed publicContentDoc), as the site's
@@ -226,7 +237,7 @@ function PageEditor({ mode }) {
       .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     features,
-    ready ? rows.map((row) => row.live).filter(Boolean) : null,
+    linkTargetPages(),
   );
   // The section that takes the Long read opening on the public page
   // (ContentPage): the first section with something in it, on a custom page
@@ -237,9 +248,13 @@ function PageEditor({ mode }) {
   const venueMapImage = useVenueMapImage(resolveVenueMap(eventConfig));
   const venueMapShown = Boolean(venueMapImage);
   const areaMapShown = Boolean(openStreetMapCoordinates(eventConfig?.venue?.mapUrl));
+  // Whether the public page draws a map in this section (ContentPage, for
+  // custom pages only).
+  const sectionHasMap = (current, section) => !current.systemPage && (
+    (section.id === VENUE_MAP_SECTION_ID && venueMapShown)
+    || (section.id === AREA_MAP_SECTION_ID && current.id === VENUE_MAP_PAGE_ID && areaMapShown));
   const sectionHasContent = (current, section) => sectionPreviewBlocks(section).length > 0
-    || (section.id === VENUE_MAP_SECTION_ID && venueMapShown)
-    || (section.id === AREA_MAP_SECTION_ID && current.id === VENUE_MAP_PAGE_ID && areaMapShown);
+    || sectionHasMap(current, section);
   const longReadSection = (current) => (current.systemPage || current.template !== 'long-read'
     ? null
     : (current.sections ?? []).find((section) => sectionHasContent(current, section))?.id ?? null);
@@ -965,6 +980,7 @@ function PageEditor({ mode }) {
                         budget={quoteBudget}
                         readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
                         longReadOpening={section.id === longReadSectionId}
+                        map={sectionHasMap(page, section)}
                         sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side' && publicNavShown}
                         blocksError={Boolean(contentError) && !contentReady}
                       />
