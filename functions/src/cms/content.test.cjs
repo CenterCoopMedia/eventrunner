@@ -7,6 +7,7 @@ const {
   createCmsCreateContentHandler,
   createCmsUpdateContentHandler,
   createCmsDeleteContentHandler,
+  createCmsMoveContentHandler,
   createGetSiteContentHandler,
   DELETE_FIELD_SENTINEL,
   internals,
@@ -113,6 +114,7 @@ test('mutation handlers: no token → 401, non-admin → 403, non-POST → 405',
     createCmsCreateContentHandler,
     createCmsUpdateContentHandler,
     createCmsDeleteContentHandler,
+    createCmsMoveContentHandler,
   ]) {
     const handler = create(deps(db));
 
@@ -643,6 +645,86 @@ test('cmsUpdateContent → 404 when neither draft nor live doc exists', async ()
     res,
   );
   assert.equal(res.statusCode, 404);
+});
+
+// --- cmsMoveContent -----------------------------------------------------------
+
+const ORPHAN = {
+  section: 'removed', field: 'answer', blockType: 'faq_item',
+  question: 'When do doors open?', answer: 'At nine.', order: 1, visible: true,
+};
+const MOVE_REQUEST = { docId: 'removed__answer', pageId: 'test-page', section: 'faq' };
+
+test('cmsMoveContent publishes to the next available destination key and keeps edits private', async () => {
+  const db = makeFakeDb({
+    'cmsContent/removed__answer': { ...ORPHAN, revision: 4 },
+    'cmsContent_drafts/removed__answer': { ...ORPHAN, answer: 'At ten.', status: 'dirty', basedOnRevision: 4 },
+    'cmsContent/faq__answer': { ...ORPHAN, section: 'faq', order: 7, revision: 2 },
+    'cmsVersionHistory/previous-destination': { docPath: 'cmsContent/faq__answer-2', revision: 3 },
+    'cmsVersionHistory/source': { docPath: 'cmsContent/removed__answer', revision: 4 },
+  });
+  const move = createCmsMoveContentHandler(deps(db));
+  const res = fakeRes();
+  await move(req({ body: MOVE_REQUEST }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { docId: 'faq__answer-2' });
+  assert.equal(db.read('cmsContent', 'removed__answer'), undefined);
+  assert.equal(db.read('cmsContent_drafts', 'removed__answer'), undefined);
+  const published = db.read('cmsContent', 'faq__answer-2');
+  assert.equal(published.answer, 'At nine.');
+  assert.equal(published.section, 'faq');
+  assert.equal(published.field, 'answer-2');
+  assert.equal(published.order, 8);
+  assert.equal(published.revision, 4);
+  assert.equal(db.read('cmsContent', 'faq__answer').order, 7);
+  const draft = db.read('cmsContent_drafts', 'faq__answer-2');
+  assert.equal(draft.answer, 'At ten.');
+  assert.equal(draft.status, 'dirty');
+  assert.equal(draft.basedOnRevision, 4);
+  assert.equal(db.read('cmsVersionHistory', 'source').revision, 4);
+  const versions = db.ids('cmsVersionHistory').map((id) => db.read('cmsVersionHistory', id));
+  assert.equal(versions.find((version) => version.docPath === 'cmsContent/faq__answer-2' && version.revision === 4).fields.answer, 'At nine.');
+
+  const repeated = fakeRes();
+  await move(req({ body: MOVE_REQUEST }), repeated);
+  assert.equal(repeated.statusCode, 404);
+  assert.equal(db.ids('cmsContent').length, 2);
+});
+
+test('cmsMoveContent publishes a draft-only block and keeps hidden visibility', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/removed__answer': { ...ORPHAN, status: 'dirty', visible: false },
+  });
+  const res = fakeRes();
+  await createCmsMoveContentHandler(deps(db))(req({ body: MOVE_REQUEST }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsContent', 'faq__answer').visible, false);
+  assert.equal(db.read('cmsContent_drafts', 'faq__answer').status, 'clean');
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 0);
+});
+
+test('cmsMoveContent checks both page revisions and rechecks capacity after a concurrent write', async () => {
+  const owned = makeFakeDb({
+    'cmsContent/removed__answer': ORPHAN,
+    'cmsPages/removed-page': { sections: [{ id: 'removed' }] },
+    'cmsPages_drafts/removed-page': { sections: [] },
+  });
+  const denied = fakeRes();
+  await createCmsMoveContentHandler(deps(owned))(req({ body: MOVE_REQUEST }), denied);
+  assert.equal(denied.statusCode, 409);
+  assert.deepEqual(owned.ids('cmsContent'), ['removed__answer']);
+
+  const capped = makeFakeDb({
+    'cmsContent/removed__answer': ORPHAN,
+    'cmsPages/test-page': { sections: [{ id: 'faq', maxBlocks: 1 }] },
+  });
+  capped.beforeCommit = () => capped.collection('cmsContent_drafts').doc('faq__other').set({ ...ORPHAN, section: 'faq' });
+  const full = fakeRes();
+  await createCmsMoveContentHandler(deps(capped))(req({ body: MOVE_REQUEST }), full);
+  assert.equal(full.statusCode, 400);
+  assert.match(full.body.error.message, /maximum of 1 blocks/);
+  assert.deepEqual(capped.ids('cmsContent'), ['removed__answer']);
+  assert.deepEqual(capped.ids('cmsContent_drafts'), ['faq__other']);
 });
 
 // --- cmsDeleteContent ---------------------------------------------------------

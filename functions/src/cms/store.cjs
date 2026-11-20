@@ -7,8 +7,8 @@
  * exactly one place:
  *
  *   - Editing writes DRAFTS ONLY. writeDraft never touches `C/{docId}`;
- *     the only functions that write a live collection are publishDocs
- *     and deleteBoth. Hiding a doc is a published `visible: false` edit.
+ *     publishDocs and content recovery set live revisions. deleteBoth
+ *     removes them. Hiding a doc is a published `visible: false` edit.
  *   - Publish is an atomic per-doc batch: live copy at revision+1, draft
  *     marked clean with basedOnRevision, cmsVersionHistory append — all
  *     three writes commit together or not at all.
@@ -251,19 +251,40 @@ async function listDirty({ db, collection }) {
  * Uses the same (docPath ==, revision desc) composite index the history
  * endpoint declares in firestore.indexes.json.
  *
- * @param {{ db: FirebaseFirestore.Firestore, docPath: string }} args
+ * @param {{ db: FirebaseFirestore.Firestore, tx?: FirebaseFirestore.Transaction, docPath: string }} args
  * @returns {Promise<number>}
  */
-async function maxHistoryRevision({ db, docPath }) {
-  const snap = await db
+async function maxHistoryRevision({ db, tx, docPath }) {
+  const query = db
     .collection('cmsVersionHistory')
     .where('docPath', '==', docPath)
     .orderBy('revision', 'desc')
-    .limit(1)
-    .get();
+    .limit(1);
+  const snap = await (tx ? tx.get(query) : query.get());
   if (snap.empty) return 0;
   const rev = snap.docs[0].data()?.revision;
   return typeof rev === 'number' ? rev : 0;
+}
+
+function publicationOf({ collection, docId, draft, live, revision, publishedAt, actor }) {
+  const fields = sanitizeRichTextVariants(contentFieldsOf(draft));
+  const errors = collectionVariantErrors(fields, collection);
+  if (errors.length) throw new Error(`Invalid translated content: ${errors.join('; ')}`);
+  const visible = isVisible(draft);
+  const materialCountFields =
+    typeof live?.materialCount === 'number' ? { materialCount: live.materialCount } : {};
+  return {
+    live: { ...fields, ...materialCountFields, visible, revision, publishedAt, publishedBy: actor.uid },
+    version: {
+      docPath: `${collection}/${docId}`,
+      revision,
+      fields,
+      visible,
+      publishedAt,
+      publishedBy: actor.email,
+      publishedByUid: actor.uid,
+    },
+  };
 }
 
 /** How often one chunk retries after losing a draft-update precondition. */
@@ -383,25 +404,9 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
           ? live.revision
           : historyRevisions.get(docId);
         const revision = baseRevision + 1;
-        const contentFields = sanitizeRichTextVariants(contentFieldsOf(draft));
-        const variantErrors = collectionVariantErrors(contentFields, collection);
-        if (variantErrors.length) throw new Error(`Invalid translated content: ${variantErrors.join('; ')}`);
-        const visible = isVisible(draft);
-        // Carried over from the CURRENT live doc, not the draft — see the
-        // RESERVED_FIELDS comment on 'materialCount'. Absent on a doc with
-        // no materials yet (or a first publish), which is the same "no
-        // field yet" state materials/store.cjs already treats as 0.
-        const materialCountFields =
-          typeof live?.materialCount === 'number' ? { materialCount: live.materialCount } : {};
+        const publication = publicationOf({ collection, docId, draft, live, revision, publishedAt, actor });
 
-        batch.set(liveRefs[j], {
-          ...contentFields,
-          ...materialCountFields,
-          visible,
-          revision,
-          publishedAt,
-          publishedBy: actor.uid,
-        });
+        batch.set(liveRefs[j], publication.live);
         batch.update(
           draftRefs[j],
           { status: 'clean', basedOnRevision: revision },
@@ -410,15 +415,7 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
           // content went live".
           { lastUpdateTime: draftSnaps[j].updateTime },
         );
-        batch.set(db.collection('cmsVersionHistory').doc(), {
-          docPath: `${collection}/${docId}`,
-          revision,
-          fields: contentFields,
-          visible,
-          publishedAt,
-          publishedBy: actor.email,
-          publishedByUid: actor.uid,
-        });
+        batch.set(db.collection('cmsVersionHistory').doc(), publication.version);
         keptIds.push(docId);
         chunkPublished.push(docId);
       }
@@ -542,6 +539,7 @@ module.exports = {
     MAX_DOC_ID_LENGTH,
     MAX_CHUNK_ATTEMPTS,
     maxHistoryRevision,
+    publicationOf,
     isPreconditionFailure,
     sameUpdateTime,
   },

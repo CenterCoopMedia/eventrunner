@@ -26,6 +26,7 @@ import AdminPageHeader, {
   RecordState,
 } from '../components/adminChrome.jsx';
 import AdminIconControl from '../components/AdminIconControl.jsx';
+import OrphanedContent from '../components/OrphanedContent.jsx';
 import '../contentBrowser.css';
 
 function PageSections({ row }) {
@@ -164,6 +165,7 @@ export default function AdminContentPages() {
           )}
         </>
       )}
+      <OrphanedContent pages={rows} pagesReady={ready && !error} />
     </div>
   );
 }

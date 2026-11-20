@@ -8,6 +8,7 @@
  *   cmsUpdateContent  admin POST — merge onto the draft (forking one from
  *                     the live doc if only that exists); DRAFTS ONLY
  *   cmsDeleteContent  admin POST — removes live + draft in one transaction
+ *   cmsMoveContent    admin POST — recovers a block into a page section
  *   getSiteContent    PUBLIC GET — published cmsContent where visible==true
  *
  * cmsContent docs are keyed section+field (spec §4.1): the doc id is
@@ -16,9 +17,8 @@
  * collections address docs by explicit docId; cmsPages/cmsUpdates are out
  * of scope here (see GENERIC_COLLECTIONS).
  *
- * None of the mutation handlers ever writes a live collection — that is
- * publish's job (store.publishDocs) — so a keystroke saved to an
- * already-published doc is never visible to anonymous readers.
+ * Saves write drafts only. Recovery publishes the moved block and keeps
+ * any separate unpublished changes in its draft.
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
@@ -52,6 +52,7 @@ const { TIMELINE_COLLECTION, validateTimelineFields } = require('./timeline.cjs'
 const { readOrganizationAccess, removeOrganizationAccess } = require('./organizationRepresentatives.cjs');
 const { sanitizeRichTextFields } = require('./richText.cjs');
 const { collectionVariantErrors } = require('shared/contentLanguages');
+const { writePendingDelta } = require('./pendingCounts.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const PAGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -293,12 +294,11 @@ function checkBlockContract({ collection, fields }) {
 }
 
 /**
- * Read and enforce the owning page section's create rules in the caller's
- * transaction. The returned lock is written after all reads. Every create
- * for one section reads and writes that same document, so concurrent creates
- * serialize and the retry sees the first create before applying maxBlocks.
+ * Check the section's type and capacity rules before adding a block. Creates
+ * and moves write the same section lock after all reads, so a concurrent
+ * addition is included in the next capacity check.
  */
-async function checkContentCreateSection({ db, tx, collection, pageId, sectionId, blockType }) {
+async function checkContentCreateSection({ db, tx, collection, pageId, sectionId, blockTypes }) {
   if (collection !== 'cmsContent') return { ok: true, lock: null };
   if (!PAGE_ID_RE.test(pageId ?? '')) {
     return { ok: false, message: 'pageId: must name the page that owns this content section.' };
@@ -323,10 +323,12 @@ async function checkContentCreateSection({ db, tx, collection, pageId, sectionId
       message: `section: "${sectionId}" does not exist on page "${pageId}".`,
     };
   }
-  if (!sectionBlockTypes({ ...page, id: pageId }, section, Object.keys(BLOCK_TYPES)).includes(blockType)) {
+  const allowed = sectionBlockTypes({ ...page, id: pageId }, section, Object.keys(BLOCK_TYPES));
+  const unsupported = blockTypes.findIndex((type) => !allowed.includes(type));
+  if (unsupported !== -1) {
     return {
       ok: false,
-      message: `allowedBlocks: section "${sectionId}" does not allow block type "${String(blockType)}".`,
+      message: `allowedBlocks: section "${sectionId}" does not allow block type "${String(blockTypes[unsupported])}".`,
     };
   }
   if (!Number.isInteger(section.maxBlocks) || section.maxBlocks < 1) {
@@ -340,10 +342,8 @@ async function checkContentCreateSection({ db, tx, collection, pageId, sectionId
     tx.get(db.collection('cmsContent').where('section', '==', sectionId)),
     tx.get(db.collection('cmsContent_drafts').where('section', '==', sectionId)),
   ]);
-  const ids = new Set([
-    ...liveBlocks.docs.map((doc) => doc.id),
-    ...draftBlocks.docs.map((doc) => doc.id),
-  ]);
+  const blocks = [...liveBlocks.docs, ...draftBlocks.docs];
+  const ids = new Set(blocks.map((doc) => doc.id));
   if (ids.size >= section.maxBlocks) {
     return {
       ok: false,
@@ -356,6 +356,7 @@ async function checkContentCreateSection({ db, tx, collection, pageId, sectionId
     : 0;
   return {
     ok: true,
+    blocks,
     lock: {
       ref: lockRef,
       data: { pageId, sectionId, sequence: priorSequence + 1 },
@@ -496,7 +497,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
           collection,
           pageId: req.body?.pageId,
           sectionId: extraFields.section,
-          blockType: references.fields.blockType,
+          blockTypes: [references.fields.blockType],
         });
         if (!sectionRule.ok) throw new RequestError(400, 'bad-request', sectionRule.message);
 
@@ -669,6 +670,114 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
   };
 }
 
+/** @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps */
+function createCmsMoveContentHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+  return async function cmsMoveContent(req, res) {
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
+    if (!actor) return;
+    const { docId, pageId, section } = req.body ?? {};
+    if (!isValidDocId(docId) || !PAGE_ID_RE.test(typeof pageId === 'string' ? pageId : '') ||
+        !SECTION_FIELD_RE.test(typeof section === 'string' ? section : '')) {
+      return badRequest(res, 'Choose a block and a destination section.');
+    }
+
+    const collection = 'cmsContent';
+    const liveCollection = db.collection(collection);
+    const draftCollection = db.collection(draftCollectionFor(collection));
+    const sourceLiveRef = liveCollection.doc(docId);
+    const sourceDraftRef = draftCollection.doc(docId);
+    let destinationId;
+    try {
+      destinationId = await db.runTransaction(async (tx) => {
+        const [liveSnap, draftSnap] = await tx.getAll(sourceLiveRef, sourceDraftRef);
+        const live = liveSnap.data();
+        const draft = draftSnap.data();
+        const source = live ?? draft;
+        if (!source) throw new RequestError(404, 'not-found', 'This block is no longer available to move.');
+        if (typeof source.field !== 'string' || !SECTION_FIELD_RE.test(source.field)) {
+          throw new RequestError(400, 'bad-request', 'This block has an invalid saved address.');
+        }
+
+        // A section can still belong to the live page while a draft removes it.
+        const [livePages, draftPages] = await Promise.all([
+          tx.get(db.collection(PAGES_COLLECTION)),
+          tx.get(db.collection(PAGES_DRAFTS)),
+        ]);
+        const ownsSource = [...livePages.docs, ...draftPages.docs].some((page) => {
+          const sections = page.data().sections;
+          return Array.isArray(sections) && sections.some((entry) =>
+            entry?.id && (entry.id === live?.section || entry.id === draft?.section));
+        });
+        if (ownsSource) {
+          throw new RequestError(409, 'conflict', 'This block already belongs to a page. Refresh Content and try again.');
+        }
+
+        const pendingDraft = draft?.status === 'dirty';
+        const keepDraft = live && pendingDraft;
+        const sectionRule = await checkContentCreateSection({
+          db, tx, collection, pageId, sectionId: section,
+          blockTypes: keepDraft ? [live.blockType, draft.blockType] : [source.blockType],
+        });
+        if (!sectionRule.ok) throw new RequestError(400, 'bad-request', sectionRule.message);
+
+        const ids = new Set(sectionRule.blocks.map((block) => block.id));
+        ids.add(docId);
+        let field = source.field;
+        for (let index = 2; ids.has(`${section}__${field}`); index += 1) {
+          const suffix = `-${index}`;
+          field = `${source.field.slice(0, 128 - suffix.length)}${suffix}`;
+        }
+        const newId = `${section}__${field}`;
+        const order = sectionRule.blocks.reduce((last, block) => {
+          const value = block.data().order;
+          return Number.isSafeInteger(value) ? Math.max(last, value) : last;
+        }, 0) + 1;
+        const moved = { section, field, order };
+        const publishedAt = new Date(now());
+        const revision = 1 + await storeInternals.maxHistoryRevision({ db, tx, docPath: `${collection}/${newId}` });
+        const publication = storeInternals.publicationOf({
+          collection, docId: newId, revision, publishedAt, actor,
+          draft: sanitizeRichTextFields(withoutSeedFlag({ ...source, ...moved })),
+        });
+        if (pendingDraft && !keepDraft) await writePendingDelta({ db, tx, collection, delta: -1, now });
+
+        // The destination uses the normal section/field key so edits,
+        // ordering and deletion keep working after the move.
+        tx.create(liveCollection.doc(newId), publication.live);
+        tx.create(draftCollection.doc(newId), {
+          ...(keepDraft ? withoutSeedFlag({ ...draft, ...moved }) : {
+            ...publication.version.fields,
+            visible: publication.live.visible,
+            status: 'clean',
+            updatedAt: publishedAt,
+            updatedBy: actor.email,
+          }),
+          basedOnRevision: revision,
+        });
+        tx.set(db.collection('cmsVersionHistory').doc(), publication.version);
+        tx.set(sectionRule.lock.ref, sectionRule.lock.data);
+        tx.delete(sourceLiveRef);
+        tx.delete(sourceDraftRef);
+        return newId;
+      });
+    } catch (err) {
+      if (err?.httpError) {
+        const { status, code, message } = err.httpError;
+        return sendError(res, status, code, message);
+      }
+      if (isAlreadyExistsError(err)) {
+        return sendError(res, 409, 'already-exists', 'That section already has a block at this address. Try another section.');
+      }
+      throw err;
+    }
+    await logAdminAction({
+      db, action: 'cms-move-content', docPath: `${collection}/${destinationId}`, actor, now, log,
+      details: { from: `${collection}/${docId}` },
+    });
+    res.status(200).json({ docId: destinationId });
+  };
+}
+
 /**
  * @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps
  */
@@ -816,6 +925,9 @@ function buildHandlers() {
     cmsDeleteContent: onRequest({ region }, withCors(['POST'], async (req, res) => {
       await createCmsDeleteContentHandler(buildDeps())(req, res);
     })),
+    cmsMoveContent: onRequest({ region }, withCors(['POST'], async (req, res) => {
+      await createCmsMoveContentHandler(buildDeps())(req, res);
+    })),
     getSiteContent: onRequest({ region }, withCors(['GET'], async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');
       await createGetSiteContentHandler({ db: getDb() })(req, res);
@@ -827,6 +939,7 @@ module.exports = {
   createCmsCreateContentHandler,
   createCmsUpdateContentHandler,
   createCmsDeleteContentHandler,
+  createCmsMoveContentHandler,
   createGetSiteContentHandler,
   // Mirrored client-side by apps/web/src/admin/contentDoc.js
   // (DELETE_FIELD_SENTINEL) — see the constant's own doc comment above for

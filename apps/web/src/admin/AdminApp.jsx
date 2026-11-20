@@ -25,7 +25,6 @@ import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
 import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
-import AdminContentPages from './pages/AdminContentPages.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
 import AdminContentSection from './pages/AdminContentSection.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
@@ -70,6 +69,7 @@ const AdminTicketing = lazy(() => import('./pages/AdminTicketing.jsx'), 'AdminTi
 // (the fact and the quote, design wave 2) added its fields to the entry
 // chunk. It opens from one link in a section list, so it loads the same way.
 const AdminContentBlockEditor = lazy(() => import('./pages/AdminContentBlockEditor.jsx'), 'AdminContentBlockEditor');
+const AdminContentPages = lazy(() => import('./pages/AdminContentPages.jsx'), 'AdminContentPages');
 // Branding is the largest page left in the entry chunk (the style picker,
 // the option groups and the preview frame), and only an operator opens it.
 const AdminBranding = lazy(() => import('./pages/AdminBranding.jsx'), 'AdminBranding');
@@ -299,7 +299,7 @@ export default function AdminApp({ routeAttempt }) {
             path="updates/:updateId"
             element={<DeferredAdminPage label="update"><AdminUpdateEditor mode="edit" /></DeferredAdminPage>}
           />
-          <Route path="content" element={<StaticAdminPage><AdminContentPages /></StaticAdminPage>} />
+          <Route path="content" element={<DeferredAdminPage label="content"><AdminContentPages /></DeferredAdminPage>} />
           <Route path="content/:pageId" element={<StaticAdminPage><AdminContentSections /></StaticAdminPage>} />
           <Route path="content/:pageId/:sectionId" element={<StaticAdminPage><AdminContentSection /></StaticAdminPage>} />
           {/* '_new', not 'new': a cmsContent field id may legitimately BE

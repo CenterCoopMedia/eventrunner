@@ -367,6 +367,53 @@ describe('the Home hero image slot', () => {
 });
 
 describe('content browsing', () => {
+  it('recovers a block once both page revisions confirm it has no section', async () => {
+    const sectionStillLive = {
+      ...SCHOLARSHIPS_PAGE.sections[0], id: 'still-live', label: 'Still live',
+    };
+    const orphan = {
+      ...BODY_BLOCK_DRAFT, id: 'removed__body', section: 'removed', status: undefined,
+      value: '<p>Bring a notebook.</p>',
+    };
+    const orphanDraft = { ...orphan, status: 'dirty', value: '<p>Bring two notebooks.</p>' };
+    const owned = { ...orphan, id: 'still-live__body', section: 'still-live', value: '<p>Keep this here.</p>' };
+    sources.cmsPages = [{ ...SCHOLARSHIPS_PAGE, sections: [...SCHOLARSHIPS_PAGE.sections, sectionStillLive] }];
+    sources.cmsContent = [owned, orphan];
+    sources.cmsContent_drafts = [orphanDraft];
+    silentCollections = ['cmsPages_drafts'];
+    await renderAt('/admin/content');
+    expect(await screen.findByRole('heading', { name: 'Content' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Not on any page' })).not.toBeInTheDocument();
+
+    act(() => adminSubscriptions.get('cmsPages_drafts')([SCHOLARSHIPS_PAGE]));
+    const recovery = await screen.findByRole('region', { name: 'Not on any page' });
+    expect(within(recovery).getByText('Bring a notebook.')).toBeInTheDocument();
+    expect(within(recovery).queryByText('Keep this here.')).not.toBeInTheDocument();
+    fireEvent.click(within(recovery).getByRole('button', { name: 'Move to section…' }));
+    const submit = within(recovery).getByRole('button', { name: 'Move and publish' });
+    expect(submit).toBeDisabled();
+    expect(within(recovery).getByText('This moves the published block. Its saved changes stay in a draft.')).toBeInTheDocument();
+
+    const target = '/admin/content/scholarships/intro';
+    fireEvent.change(within(recovery).getByRole('combobox', { name: 'Destination section' }), { target: { value: target } });
+    globalThis.fetch.mockImplementationOnce(async () => errorResponse(409, 'conflict', 'Choose another section.'));
+    fireEvent.click(submit);
+    expect(await within(recovery).findByRole('alert')).toHaveTextContent('Choose another section.');
+    expect(within(recovery).getByText('Bring a notebook.')).toBeInTheDocument();
+
+    globalThis.fetch.mockImplementationOnce(async () => okResponse({ docId: 'intro__body' }));
+    fireEvent.click(submit);
+    expect(await screen.findByRole('link', { name: 'Open Scholarships · Intro' })).toHaveAttribute('href', target);
+    expect(urlOf(1)).toMatch(/\/cmsMoveContent$/);
+    expect(bodyOf(1)).toEqual({ docId: orphan.id, pageId: 'scholarships', section: 'intro' });
+    act(() => {
+      adminSubscriptions.get('cmsContent')([owned, { ...orphan, id: 'intro__body', section: 'intro' }]);
+      adminSubscriptions.get('cmsContent_drafts')([{ ...orphanDraft, id: 'intro__body', section: 'intro' }]);
+    });
+    expect(screen.queryByRole('region', { name: 'Not on any page' })).not.toBeInTheDocument();
+    expect(screen.getByText('Moved “Bring a notebook.” and published the block.', { exact: false })).toBeInTheDocument();
+  });
+
   it('lists pages, then the sections of the one chosen, then its blocks', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
