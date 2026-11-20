@@ -255,8 +255,8 @@ test('a refresh adopts a row from an earlier CSV import under the same source na
     description: 'A practical session, number 1.', organization: 'Example newsroom', format: 'Workshop', consent: true,
     leadName: 'Ada', leadRole: 'Editor' }] };
   assert.equal(readImport(csv).rows[0].id, pitchIdFor(recId(1)), 'the same identity as the CSV import');
-  const legacy = readImport({ source: 'airtable', rows: [{ ...csv.rows[0], externalId: recId(2),
-    email: 'presenter2@example.test', title: 'Pitch 2', description: 'A practical session, number 2.' }] }).rows[0];
+  const [{ presenterMapping: _mapping, ...legacy }] = readImport({ source: 'airtable', rows: [{ ...csv.rows[0], externalId: recId(2),
+    email: 'presenter2@example.test', title: 'Pitch 2', description: 'A practical session, number 2.' }] }).rows;
   const db = makeDb({ 'session_pitch_sources/airtable': { ...sourceDoc, fieldMap: { ...fieldMap, leadName: 'Lead', leadRole: 'Role' } },
     [`session_pitches/${legacy.id}`]: { ...legacy, status: 'in_review', reviewRevision: 1 } });
   const imported = await invoke((deps) => createQueueHandler(deps, 'import'), { db, now: () => tick }, 'staff', csv);

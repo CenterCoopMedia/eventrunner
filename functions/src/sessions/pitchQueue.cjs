@@ -29,6 +29,19 @@ function compareSourceValue(field, value) {
   return [{ name, role }, ...coPresenters];
 }
 
+function sourcePresenters(baseline) {
+  return baseline.presenters ?? [{ name: baseline.leadName ?? null, role: baseline.leadRole ?? null }];
+}
+
+function matchedPresenters(incoming, previous, mapping) {
+  const [lead, ...coPresenters] = incoming;
+  const [previousLead, ...previousCoPresenters] = previous;
+  return [{ ...lead,
+    name: mapping.name ? lead.name : previousLead?.name ?? null,
+    role: mapping.role ? lead.role : previousLead?.role ?? null,
+  }, ...(mapping.coPresenters ? coPresenters : previousCoPresenters)];
+}
+
 // Staff-only imports have stable source/external-id identities. Validate the
 // whole file before writing any proposals.
 function readImport(body) {
@@ -53,6 +66,7 @@ function readImport(body) {
       title: pitch.title, description: pitch.description,
       ...(Object.hasOwn(row, 'organization') ? { organization: pitch.organization } : {}),
       ...(Object.hasOwn(row, 'format') ? { format: pitch.format } : {}),
+      ...(extra.presenterMapping ? { presenterMapping: extra.presenterMapping } : {}),
       ...extra.extras });
   }
   return { rows };
@@ -66,7 +80,7 @@ async function importPitches({ db, actor, body, at }) {
     const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
     let imported = 0;
     let updated = 0;
-    parsed.rows.forEach(({ id: _id, source, externalId, ...incoming }, i) => {
+    parsed.rows.forEach(({ id: _id, source, externalId, presenterMapping, ...incoming }, i) => {
       if (!snaps[i].exists) {
         imported += 1;
         tx.create(refs[i], { organization: null, format: null, ...incoming, source, externalId, sourceValues: incoming,
@@ -76,8 +90,10 @@ async function importPitches({ db, actor, body, at }) {
       }
       const stored = snaps[i].data();
       const baseline = lastSourceValues(stored);
+      const previousPresenters = sourcePresenters(baseline);
+      if (presenterMapping) incoming.presenters = matchedPresenters(incoming.presenters, previousPresenters, presenterMapping);
       const changed = Object.keys(incoming).filter((field) =>
-        !sameValue(compareSourceValue(field, incoming[field]), compareSourceValue(field, baseline[field])),
+        !sameValue(compareSourceValue(field, incoming[field]), compareSourceValue(field, field === 'presenters' ? previousPresenters : baseline[field])),
       );
       if (!changed.length) return;
       const patch = Object.fromEntries(changed.map((field) => [field, incoming[field]]));
@@ -87,16 +103,17 @@ async function importPitches({ db, actor, body, at }) {
       const organization = Object.hasOwn(patch, 'organization') ? patch.organization : stored.organization ?? null;
       const presenters = patch.presenters ?? stored.presenters;
       if (presenters?.length && (patch.presenters || patch.email || Object.hasOwn(patch, 'organization'))) {
-        const [lead, ...coPresenters] = presenters;
+        const [lead, ...incomingCoPresenters] = presenters;
+        const [currentLead, ...currentCoPresenters] = stored.presenters ?? [];
+        const [previousLead, ...previousCoPresenters] = previousPresenters;
+        const coPresenters = currentLead && sameValue(incomingCoPresenters, previousCoPresenters) ? currentCoPresenters : incomingCoPresenters;
         if (coPresenters.some((person) => person.email === email)) {
           fail(400, 'bad-request', `Row ${i + 1}: The lead email is already used by a co-presenter. Match the presenter columns to update both.`);
         }
         const nextLead = { ...lead, email, organization };
-        const currentLead = stored.presenters?.[0];
         if (patch.presenters && currentLead) {
-          const previousLead = baseline.presenters?.[0] ?? { name: baseline.leadName, role: baseline.leadRole };
           for (const field of ['name', 'role']) {
-            if (sameValue(lead[field], previousLead[field])) nextLead[field] = currentLead[field] ?? null;
+            if (sameValue(lead[field], previousLead?.[field])) nextLead[field] = currentLead[field] ?? null;
           }
         }
         patch.presenters = [nextLead, ...coPresenters];

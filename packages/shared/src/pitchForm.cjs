@@ -370,7 +370,7 @@ function readLevel(value) {
  *
  * @param {object} source the row, with the legacy fields as well
  * @param {{ email: string }} context the row's (lead) email
- * @returns {{ ok: true, extras: object } | { ok: false, field: string, message: string }}
+ * @returns {{ ok: true, extras: object, presenterMapping?: object } | { ok: false, field: string, message: string }}
  */
 function readImportedExtras(source, { email }) {
   const input = isPlainObject(source) ? source : {};
@@ -383,7 +383,7 @@ function readImportedExtras(source, { email }) {
     presenterRows[index] = { ...(presenterRows[index] || {}), [match[2]]: value };
   }
   const coPresenters = presenterRows.filter((row) => row && Object.values(row).some((v) => String(v).trim()));
-  if (!present.length && !coPresenters.length) return { ok: true, extras: {} };
+  if (!present.length && !presenterRows.length) return { ok: true, extras: {} };
 
   const rawLength = input.lengthMinutes;
   const length = rawLength === undefined || rawLength === null || String(rawLength).trim() === ''
@@ -420,13 +420,15 @@ function readImportedExtras(source, { email }) {
     if (field === 'leadName' || field === 'leadRole') continue;
     extras[field] = checked.pitch[field] ?? null;
   }
-  if (present.includes('leadName') || present.includes('leadRole') || coPresenters.length) {
+  const presenterMapping = { name: present.includes('leadName'), role: present.includes('leadRole'), coPresenters: presenterRows.length > 0 };
+  if (presenterMapping.name || presenterMapping.role || presenterMapping.coPresenters) {
     extras.presenters = presenterList({
       leadName: leadName || null,
       leadRole: checked.pitch.leadRole ?? null,
       organization: typeof input.organization === 'string' && input.organization.trim() ? input.organization.trim() : null,
       presenters: checked.pitch.presenters,
     }, email);
+    return { ok: true, extras, presenterMapping };
   }
   return { ok: true, extras };
 }

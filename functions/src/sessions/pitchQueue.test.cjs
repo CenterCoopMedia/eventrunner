@@ -63,6 +63,18 @@ test('re-importing a pitch updates its content and retains review decisions and 
   assert.equal(withContact.presenters[0].organization, withContact.organization);
   assert.equal(withContact.format, 'Panel');
   assert.equal(withContact.presenters[1].name, 'Someone else');
+
+  const leadOnly = { ...body, rows: [{ ...contact.rows[0], leadRole: 'Presenter' }] };
+  assert.deepEqual((await send(leadOnly)).body, { imported: 0, updated: 1, unchanged: 0 });
+  assert.equal(db.read('session_pitches', id).presenters[1].name, 'Someone else');
+
+  const removed = { ...body, rows: [{ ...contact.rows[0], presenter_1_name: '', presenter_1_email: '' }] };
+  assert.deepEqual((await send(removed)).body, { imported: 0, updated: 1, unchanged: 0 });
+  const [remainingLead, ...remainingCoPresenters] = db.read('session_pitches', id).presenters;
+  assert.equal(remainingLead.name, 'Staff lead correction');
+  assert.equal(remainingLead.role, 'Presenter');
+  assert.deepEqual(remainingCoPresenters, []);
+  assert.deepEqual((await send(removed)).body, { imported: 0, updated: 0, unchanged: 1 });
 });
 
 test('a pitch imported before source tracking keeps the staff correction on replay', async () => {

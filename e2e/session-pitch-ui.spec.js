@@ -253,7 +253,7 @@ test('an Airtable grid CSV previews mapped answers and updates a pitch by source
   await expect(page.getByRole('heading', { name: 'Import proposals from CSV' })).toBeVisible();
   await expect(page.getByText('Using Airtable? Download your view as CSV and upload it here.')).toBeVisible();
   await page.getByLabel('Source name', { exact: true }).fill(source);
-  const buffer = await fs.readFile(new URL('./fixtures/airtable-pitches.csv', import.meta.url));
+  const buffer = await fs.readFile(path.join(__dirname, 'fixtures', 'airtable-pitches.csv'));
   await page.getByLabel('Proposal CSV', { exact: true }).setInputFiles({ name: 'airtable-pitches.csv', mimeType: 'text/csv', buffer });
   const columns = page.getByRole('region', { name: 'Match proposal columns' });
   await expect(columns).toBeVisible();
