@@ -315,7 +315,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 - Never block paste — especially not on the OTP code field.
 - Tooltips on disabled controls don't open via keyboard or touch; use visible text or `aria-disabled="true"`.
 - Keep submit buttons enabled until the request starts; validate on submit with `aria-invalid="true"` and move focus to the error.
-- Hit areas: Meet the WCAG 2.2 24×24 CSS pixel minimum or its stated spacing exception. Use 44×44px on touch and for shared buttons. Adjacent touch targets keep at least `--space-xs` (8px) between them and never overlap. Keep compact visual controls inside comfortable targets.
+- Hit areas: Meet the WCAG 2.2 24×24 CSS pixel minimum or its stated spacing exception. Use 44×44px on touch and for shared buttons. The public footer's link lists are the exception: each link keeps the 24px minimum on every pointer so a ten-page footer fits on a phone screen (`.footer-link`). Adjacent touch targets keep at least `--space-xs` (8px) between them and never overlap. Keep compact visual controls inside comfortable targets.
 - `pointer-events: none` on decorative elements (glows, texture overlays).
 - Wrap hover styles in `@media (hover: hover)`; wrap motion in `@media (prefers-reduced-motion: no-preference)`.
 - `role="status"` for routine updates, `role="alert"` for urgent errors only.

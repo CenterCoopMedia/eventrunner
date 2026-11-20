@@ -85,8 +85,8 @@ function FooterGroup({ name, links, linkClass }) {
 export default function FooterLinkGroups({ label, groups, linkClass }) {
   if (groups.length === 0) return null;
   return (
-    <nav aria-label={label} className="mt-md">
-      <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-4">
+    <nav aria-label={label} className="mt-sm">
+      <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-4 lg:gap-md">
         {groups.map(([name, links]) => (
           <FooterGroup key={name || 'ungrouped'} name={name} links={links} linkClass={linkClass} />
         ))}

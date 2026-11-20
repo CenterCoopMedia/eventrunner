@@ -488,6 +488,35 @@
     grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
     column-gap: var(--space-md);
   }
+  /* Two columns on a phone, whatever the face's width, so a ten-page list
+     is five short rows rather than one column taller than the screen. */
+  @media (max-width: 639px) {
+    .footer-links {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  /* A footer link's target: 24 px at least (WCAG 2.2 target size, AA), made
+     by padding inside the link, so the row pitch stays near the line height
+     and a ten-page footer fits on a phone (#1168). On touch, a margin keeps
+     8 px between stacked targets; the column gutter keeps them apart
+     sideways (interface guidelines, Hit areas). */
+  .footer-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--space-lg);
+    min-inline-size: var(--space-lg);
+    max-inline-size: 100%;
+    padding-block: var(--space-3xs);
+    text-align: start;
+    /* A long page name wraps inside its column instead of running into the
+       next one (wrap-anywhere: the row's minimum drops too). */
+    overflow-wrap: anywhere;
+  }
+  @media (pointer: coarse) {
+    .footer-link {
+      margin-block: var(--space-2xs);
+    }
+  }
 
   /* Editorial devices. Each class is the rendered form of one tier-3
      component contract, so a preset retunes a device by remapping its
