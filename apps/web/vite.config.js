@@ -122,6 +122,7 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       'shared/routing',
       'shared/page',
       'shared/pageMetadata',
+      'shared/homepageMetadata',
       'shared/profile',
       'shared/badges',
       'shared/speaker',

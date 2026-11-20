@@ -17,7 +17,7 @@
 import { useLocation } from 'react-router';
 import { languageFromSearch } from 'shared/languageUrls';
 import { isPublicPage } from 'shared/page';
-import { homepageMetadata } from 'shared/pageMetadata';
+import { homepageMetadata } from 'shared/homepageMetadata';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';

@@ -30,7 +30,7 @@ const { parseEventPublicBase } = require('shared/config/publicBase');
 const { joinEventPath } = require('shared/config/publicPath');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
 const { publicRouteUrls, publishedSpanishSections } = require('shared/contentLanguages');
-const { homepageMetadata } = require('shared/pageMetadata');
+const { homepageMetadata } = require('shared/homepageMetadata');
 const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
 
 /**

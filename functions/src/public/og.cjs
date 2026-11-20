@@ -288,7 +288,8 @@ const {
   systemPageIdForPath,
 } = require('shared/routing');
 const { pageHeading, isPublicPage } = require('shared/page');
-const { metaExcerpt: excerpt, eventMetaDescription, homepageMetadata } = require('shared/pageMetadata');
+const { metaExcerpt: excerpt, eventMetaDescription } = require('shared/pageMetadata');
+const { homepageMetadata } = require('shared/homepageMetadata');
 const {
   contentLanguages, resolveContentVariant, selectContentLanguage, publicRouteUrls, publishedSpanishSections,
 } = require('shared/contentLanguages');
