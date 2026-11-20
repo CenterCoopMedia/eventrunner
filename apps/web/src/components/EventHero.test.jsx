@@ -56,3 +56,29 @@ describe('EventHero artwork', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 });
+
+describe('EventHero logo, issue 1167', () => {
+  const LOGO = 'https://firebasestorage.googleapis.com/v0/b/x/o/branding%2Fa1%2Flogo.png?alt=media';
+  const heading = () => screen.getByRole('heading', { level: 1, name: 'Summit' });
+
+  it('draws no logo by default', () => {
+    const { container } = render(<EventHero name="Summit" nameAs="h1" logo={LOGO} />);
+    expect(container.querySelector('.event-hero__logo')).toBeNull();
+  });
+
+  it('puts the logo above a visible event name', () => {
+    const { container } = render(<EventHero name="Summit" nameAs="h1" logo={LOGO} logoPlacement="above" />);
+    expect(container.querySelector('.event-hero__logo')).toHaveAttribute('src', LOGO);
+    expect(heading()).not.toHaveClass('sr-only');
+  });
+
+  it('keeps the event name as the h1 when the logo replaces it, until the logo fails', () => {
+    const { container } = render(<EventHero name="Summit" nameAs="h1" logo={LOGO} logoPlacement="instead" />);
+    const logo = container.querySelector('.event-hero__logo');
+    expect(logo).toHaveAttribute('alt', '');
+    expect(heading()).toHaveClass('sr-only');
+    fireEvent.error(logo);
+    expect(container.querySelector('.event-hero__logo')).toBeNull();
+    expect(heading()).not.toHaveClass('sr-only');
+  });
+});

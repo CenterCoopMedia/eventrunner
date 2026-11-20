@@ -10,7 +10,7 @@ await import(/* @vite-ignore */ `/@fs${globalThis.HEADER_SOURCE}/index.css${befo
 const { default: Header } = await import(/* @vite-ignore */ `/@fs${globalThis.HEADER_SOURCE}/components/Header.jsx${before}`);
 const variant = params.get('variant');
 const shape = params.get('logo');
-const identity = params.get('identity') ?? 'name';
+const identity = params.get('identity') ?? 'icon';
 const phone = globalThis.matchMedia('(max-width: 639px)').matches;
 const svg = shape === 'wide'
   ? '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="48"><rect width="240" height="48" fill="rgb(21,94,117)"/><text x="12" y="33" font-size="28" fill="white">News gathering</text></svg>'

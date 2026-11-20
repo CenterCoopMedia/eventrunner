@@ -13,6 +13,8 @@ import EventCountdown, { countdownDraws } from '../components/EventCountdown.jsx
 import InfoCards, { groupIntoCards } from '../components/InfoCards.jsx';
 import EventHero from '../components/EventHero.jsx';
 import { demoHero } from '../lib/demoHero.js';
+import { uploadedBrandingSrc } from '../lib/mediaSource.js';
+import { THEME_HERO_LOGOS } from 'shared/theme';
 import { buildNameplate } from '../components/editorial/Nameplate.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import {
@@ -308,6 +310,8 @@ export default function Home() {
           place={plate.edition}
           tagline={tagline}
           image={demoHero(theme) ?? lead}
+          logo={uploadedBrandingSrc(theme?.logos?.primary)}
+          logoPlacement={THEME_HERO_LOGOS.includes(theme?.heroLogo) ? theme.heroLogo : 'off'}
         >
           {subtitle?.value ? <p lang={subtitle.publicLanguage} className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{subtitle.value}</p> : null}
           {registrationAction || heroCtas.length || pitchOpen ? (

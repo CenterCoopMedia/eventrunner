@@ -148,6 +148,13 @@ const HEADER_LOGO_OPTIONS = [
   { value: 'both', label: 'Logo and name' },
 ];
 
+/** Where the home hero can show the logo (#1167). */
+const HERO_LOGO_OPTIONS = [
+  { value: 'off', label: 'No logo' },
+  { value: 'above', label: 'Logo above the event name' },
+  { value: 'instead', label: 'Logo instead of the event name' },
+];
+
 /** An uploaded primary logo: the only kind the header draws. */
 function hasUploadedLogo(path) {
   return typeof path === 'string' && path.trim().split('/').length > 2;
@@ -240,6 +247,7 @@ function toForm(theme) {
     headerLogo: ['name', 'logo', 'both'].includes(theme?.headerLogo) ? theme.headerLogo : '',
     footerLogo: typeof theme?.footerLogo === 'boolean' ? theme.footerLogo : '',
     logoAlt: typeof theme?.logoAlt === 'string' ? theme.logoAlt : '',
+    heroLogo: ['off', 'above', 'instead'].includes(theme?.heroLogo) ? theme.heroLogo : '',
     // Header style has no field in this editor, but config/theme is replaced
     // whole on publish. Carry the stored value so an unrelated phone-layout
     // change cannot reset the public header or make the draft preview lie.
@@ -300,6 +308,7 @@ export function toThemeDoc(form) {
   if (form.headerLogo) doc.headerLogo = form.headerLogo;
   if (typeof form.footerLogo === 'boolean') doc.footerLogo = form.footerLogo;
   if (form.logoAlt.trim()) doc.logoAlt = form.logoAlt.trim();
+  if (form.heroLogo) doc.heroLogo = form.heroLogo;
   if (form.navPlacement) doc.navPlacement = form.navPlacement;
   // Written every time, the brand default included. EventConfigProvider
   // overlays the live document on the built snapshot shallowly, so a saved
@@ -427,7 +436,7 @@ const STORED_PALETTE_LABEL = 'Stored palette';
 /** Route a rejected field back to its task, including nested overrides. */
 function brandingTaskForField(field) {
   if (field === 'theme.brandColor' || field?.startsWith('theme.logos')
-    || ['theme.headerLogo', 'theme.footerLogo', 'theme.logoAlt'].includes(field)) return 'identity';
+    || ['theme.headerLogo', 'theme.footerLogo', 'theme.logoAlt', 'theme.heroLogo'].includes(field)) return 'identity';
   if (/^theme\.tokens\.(light|dark)\.(surfaceAlt|accent)$/.test(field)) return 'identity';
   if (field === 'theme.adminScheme') return 'workspace';
   if (['theme.preset', 'theme.mode', 'theme.header', 'theme.navPlacement', 'theme.optionPicks.nameplate',
@@ -708,6 +717,14 @@ export default function AdminBranding() {
                   onChange={(value) => setForm((c) => ({ ...c, headerLogo: value }))}
                   hint="The logo is the primary logo. Without one, the header shows the name."
                   error={fieldErrors.get('theme.headerLogo')}
+                />
+                <SelectField
+                  label="Homepage hero shows"
+                  value={form.heroLogo || 'off'}
+                  options={HERO_LOGO_OPTIONS}
+                  onChange={(value) => setForm((c) => ({ ...c, heroLogo: value }))}
+                  hint="The primary logo, in the hero at the top of the home page. Screen readers and search engines still get the event name."
+                  error={fieldErrors.get('theme.heroLogo')}
                 />
                 <TextField
                   label="Logo description"

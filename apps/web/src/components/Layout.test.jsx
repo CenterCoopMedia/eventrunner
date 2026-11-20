@@ -324,12 +324,14 @@ describe('Layout header logo, issue 1167', () => {
     expect(src).not.toBe(PRIMARY);
   });
 
-  it('shows only the name for "Name only", even with an uploaded logo', () => {
-    const { container } = renderShell({ primary: PRIMARY }, { themeDoc: { headerLogo: 'name' } });
+  it('shows only the name for "Name only", even with an uploaded logo and an icon', () => {
+    const { container } = renderShell({ primary: PRIMARY, mark: 'branding/mark.svg' }, { themeDoc: { headerLogo: 'name' } });
     expect(headerLogo(container)).toBeNull();
     const title = container.querySelector('.site-header-title');
     expect(title).toHaveTextContent(FIXTURE_EVENT.name);
     expect(title.className).not.toContain('sr-only');
+    // The icon may stay beside it, but never in its place on a phone.
+    expect(title.className).not.toContain('site-header-title--with-mark');
   });
 
   it('keeps the event name as the home link name for "Logo only"', () => {

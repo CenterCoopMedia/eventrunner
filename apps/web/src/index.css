@@ -2535,6 +2535,18 @@
     padding-inline: var(--hero-copy-pad-inline-start) var(--space-lg);
     border-inline-start: var(--hero-copy-border-inline-start);
   }
+  /* The organizer's logo in the hero (#1167): a fixed height so the copy
+     below it never moves when the image arrives; the width follows the
+     image, capped at the copy column. */
+  .event-hero__logo {
+    display: block;
+    block-size: var(--space-3xl);
+    inline-size: auto;
+    max-inline-size: 100%;
+    object-fit: contain;
+    object-position: left center;
+    margin-block-end: var(--space-sm);
+  }
   .event-hero__title {
     font-size: min(var(--hero-title-size), var(--hero-title-fit));
     line-height: .98;
@@ -2727,6 +2739,7 @@
        so a word such as "community," fits its line once the inset and a
        style's accent bar have taken their share. */
     .event-hero__title { font-size: min(clamp(2.35rem, 9vw, 3.35rem), var(--hero-title-fit-narrow)); }
+    .event-hero__logo { block-size: var(--space-2xl); }
     .event-hero__figure { display: block; position: relative; inline-size: 100%; }
     .event-hero__media { position: relative; block-size: 14rem; }
     .event-hero__art { inline-size: 100%; block-size: 100%; z-index: 0; }

@@ -29,7 +29,7 @@ function Dateline({ dates, place, className = '' }) {
  *   dates?: string | null,
  *   place?: string | null,       // the venue's city and region, or its name
  *   mark?: import('react').ReactNode,
- *   identity?: 'name' | 'logo' | 'both', // what `mark` is: an icon beside the name, the logo instead of it, or the logo with it
+ *   identity?: 'icon' | 'name' | 'logo' | 'both', // what `mark` is: an icon (the name yields to it on phones), an icon beside a name that always shows, the logo instead of the name, or the logo with it
  *   to?: string,                 // where the identity links
  *   mobileControl?: import('react').ReactNode, // small-screen navigation disclosure
  *   actions?: import('react').ReactNode, // account controls when navigation is beside the page
@@ -42,7 +42,7 @@ export default function Header({
   dates = null,
   place = null,
   mark = null,
-  identity = 'name',
+  identity = 'icon',
   to = '/',
   children = null,
   mobileControl = null,
@@ -58,9 +58,11 @@ export default function Header({
   // logo shown with the name keeps it visible at every width (#1167).
   const logoOnly = Boolean(mark) && identity === 'logo';
   const logoAndName = Boolean(mark) && identity === 'both';
+  // A chosen "Name only" keeps the name in view beside an icon.
+  const nameShown = logoAndName || identity === 'name';
   const titleClass = logoOnly
     ? ' sr-only'
-    : mark && !logoAndName ? ' site-header-title--with-mark' : '';
+    : mark && !nameShown ? ' site-header-title--with-mark' : '';
   const title = (
     <span className={`site-header-title block min-w-0 truncate${titleClass}`}>
       {name}
@@ -98,7 +100,7 @@ export default function Header({
       <div className="site-header-treatment site-header-minimal flex flex-wrap items-center gap-x-md gap-y-2xs border-b-hairline border-b-rule-hairline py-sm">
         <p className="site-header-identity font-heading text-body text-text-primary">
           {identityLink(
-            mark && !logoAndName ? (
+            mark && !nameShown ? (
               <>
                 {mark}
                 <span className="sr-only">{name}</span>

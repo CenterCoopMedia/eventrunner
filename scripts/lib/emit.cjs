@@ -138,6 +138,12 @@ function emitEventConfig({ event, features, theme, launch = null }) {
     // resolves that to the base header.
     header: theme.header,
     logos: theme.logos,
+    // Where the logo shows and how it is described (#1167). The shell and
+    // the home hero draw from this snapshot before config/theme arrives.
+    headerLogo: theme.headerLogo,
+    footerLogo: theme.footerLogo,
+    heroLogo: theme.heroLogo,
+    logoAlt: theme.logoAlt,
   };
   // Keep configured overrides available to runtime resolution without raw
   // hex literals in generated source (the same rule as handwritten JS).

@@ -56,7 +56,7 @@
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
 import { Outlet, matchPath, useLocation } from 'react-router';
-import { resolveFooterLogo, resolveHeader, resolveHeaderLogo } from 'shared/theme';
+import { THEME_HEADER_LOGOS, resolveFooterLogo, resolveHeader, resolveHeaderLogo } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config/socialAccounts';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useDeviceBookmarks } from '../hooks/useDeviceBookmarks.js';
@@ -67,7 +67,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
-import { brandingSrc } from '../lib/mediaSource.js';
+import { brandingSrc, uploadedBrandingSrc } from '../lib/mediaSource.js';
 import useAccountViews from '../hooks/useAccountViews.js';
 import BackToTop from './BackToTop.jsx';
 import FooterLinkGroups, { FOOTER_SECTION_ID, footerLinkGroups } from './FooterLinkGroups.jsx';
@@ -343,16 +343,15 @@ export default function Layout() {
   // An uploaded primary logo (a `branding/{assetId}/{name}` path, never a
   // flat seeded placeholder) leads the header; the square icon is the
   // fallback, so a client who uploads only their main logo still sees it.
-  const primary = typeof theme?.logos?.primary === 'string' ? theme.logos.primary.trim() : '';
-  const uploadedPrimary = primary.split('/').length > 2 ? brandingSrc(primary) : null;
+  const uploadedPrimary = uploadedBrandingSrc(theme?.logos?.primary);
   const markSrc = brandingSrc(theme?.logos?.mark);
   // The Branding tab's footer slot, falling back to the uploaded primary
   // logo as that tab promises. A flat seeded placeholder is not a client
   // logo, so like the header the footer shows only uploaded assets.
   // The organizer can turn the footer logo off (#1167).
-  const footerSlot = typeof theme?.logos?.footer === 'string' ? theme.logos.footer.trim() : '';
-  const footerLogo = !resolveFooterLogo(theme) ? null
-    : footerSlot.split('/').length > 2 ? brandingSrc(footerSlot) : uploadedPrimary;
+  const footerLogo = resolveFooterLogo(theme)
+    ? uploadedBrandingSrc(theme?.logos?.footer) ?? uploadedPrimary
+    : null;
   // What the header shows (#1167): the name, the primary logo instead of
   // it, or both. Without a primary logo that loads, the name is shown.
   const headerLogo = resolveHeaderLogo(theme, Boolean(uploadedPrimary));
@@ -605,7 +604,9 @@ export default function Layout() {
             name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}
             place={plate.edition}
-            identity={headerShowsLogo ? headerLogo : 'name'}
+            // A chosen mode whose logo is missing or failed keeps the name
+            // in view; an unchosen one keeps the icon rule it always had.
+            identity={headerShowsLogo ? headerLogo : THEME_HEADER_LOGOS.includes(theme?.headerLogo) ? 'name' : 'icon'}
             mark={
               headerShowsLogo ? (
                 // A wide logo keeps its own proportions at the mark's height.

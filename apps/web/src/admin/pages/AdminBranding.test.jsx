@@ -817,17 +817,20 @@ describe('publishing the theme', () => {
     expect(theme).not.toHaveProperty('headerLogo');
     expect(theme).not.toHaveProperty('footerLogo');
     expect(theme).not.toHaveProperty('logoAlt');
+    expect(theme).not.toHaveProperty('heroLogo');
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
     fireEvent.change(screen.getByLabelText('Header shows'), { target: { value: 'logo' } });
     fireEvent.click(screen.getByLabelText('Show the logo in the footer'));
     fireEvent.change(screen.getByLabelText('Logo description'), { target: { value: ' Summit logo ' } });
+    fireEvent.change(screen.getByLabelText('Homepage hero shows'), { target: { value: 'instead' } });
     fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     ({ theme } = JSON.parse(fetch.mock.calls[1][1].body));
     expect(theme.headerLogo).toBe('logo');
     expect(theme.footerLogo).toBe(false);
     expect(theme.logoAlt).toBe('Summit logo');
+    expect(theme.heroLogo).toBe('instead');
   });
 
   it('says brand outright when a stored house scheme is switched back', async () => {

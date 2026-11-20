@@ -15,6 +15,7 @@ export {
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,
   THEME_HEADER_LOGOS,
+  THEME_HERO_LOGOS,
   THEME_LOGO_ALT_MAX,
   resolveHeaderLogo,
   resolveFooterLogo,

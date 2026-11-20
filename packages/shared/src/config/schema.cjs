@@ -36,6 +36,7 @@ const {
   THEME_FONT_SET_IDS,
   THEME_HEADERS,
   THEME_HEADER_LOGOS,
+  THEME_HERO_LOGOS,
   THEME_LOGO_ALT_MAX,
   THEME_LOGO_SLOTS,
   THEME_MODE_POLICIES,
@@ -941,6 +942,8 @@ function validateTheme(theme) {
     ['header', THEME_HEADERS],
     // What the header shows: the name, the primary logo, or both (#1167).
     ['headerLogo', THEME_HEADER_LOGOS],
+    // Where the home hero shows the logo (#1167).
+    ['heroLogo', THEME_HERO_LOGOS],
     // The admin's colours: the brand colour, or one house scheme by id.
     // Optional: a document that says nothing follows the brand colour.
     ['adminScheme', ADMIN_SCHEME_IDS],

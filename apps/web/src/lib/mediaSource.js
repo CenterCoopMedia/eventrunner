@@ -338,3 +338,16 @@ export function brandingSrc(value) {
     ? assetUrl(path)
     : `${import.meta.env.BASE_URL}${path}`;
 }
+
+/**
+ * The `src` for a branding slot only when it holds an UPLOADED asset
+ * (`branding/{assetId}/{name}`). A flat seeded placeholder is not the
+ * client's logo, so the header, footer and home hero never draw one.
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function uploadedBrandingSrc(value) {
+  const path = storagePath(typeof value === 'string' ? value.trim() : value);
+  return path && path.split('/').length > 2 ? assetUrl(path) : null;
+}
