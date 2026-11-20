@@ -505,8 +505,12 @@
     align-items: center;
     min-block-size: var(--space-lg);
     min-inline-size: var(--space-lg);
+    max-inline-size: 100%;
     padding-block: var(--space-3xs);
     text-align: start;
+    /* A long page name wraps inside its column instead of running into the
+       next one (wrap-anywhere: the row's minimum drops too). */
+    overflow-wrap: anywhere;
   }
   @media (pointer: coarse) {
     .footer-link {
