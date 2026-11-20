@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router';
 import { isStarterContent } from 'shared/seed';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import MapBlock from '../../components/blocks/MapBlock.jsx';
 import { leadsToNoPublicPage, switchedOffSectionFor } from '../../lib/linkTargets.js';
 import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
@@ -35,6 +36,7 @@ import {
   blockTypeFor,
 } from '../blockTypes.js';
 import { contentFieldHelp } from '../contentFieldHelp.js';
+import { mapEmbedInput } from '../mapEmbedInput.js';
 import {
   blankContent,
   contentBlockTitle,
@@ -61,6 +63,7 @@ import {
   SelectField,
   ServerErrorSummary,
   TextField,
+  TextAreaField,
   linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
@@ -185,6 +188,22 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
           );
         }
         if (field.type === 'url') {
+          if (blockTypeId === 'map') {
+            return (
+              <div key={field.id} className="sm:col-span-2">
+                <TextAreaField
+                  label={label}
+                  hint={hint}
+                  help={hint}
+                  value={value}
+                  required
+                  onChange={(next) => onChange(field.id, mapEmbedInput(next) || next)}
+                  error={error}
+                  rows={2}
+                />
+              </div>
+            );
+          }
           // Only the image block's `url` names a Storage object path (spec
           // §5.2) — route it through the media library picker, exactly as
           // AdminBranding's logo slots do. cta and link_group's `url` are
@@ -219,6 +238,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
             key={field.id}
             label={label}
             value={value}
+            required={blockTypeId === 'map' && field.required}
             onChange={(next) => onChange(field.id, next)}
             error={error}
           />
@@ -616,6 +636,9 @@ export default function AdminContentBlockEditor({ mode }) {
         features={features}
         pageRows={pagesLoading ? null : pageRows}
       />
+      {content.blockType === 'map' ? (
+        <MapBlock block={content.values} preview />
+      ) : null}
       <ContentTranslations kind="block" record={{ ...content.values, blockType: content.blockType, translations: content.translations }}
         onChange={(translations) => setContent((current) => ({ ...current, translations }))}
         labels={Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)]))}

@@ -6,6 +6,7 @@
 import TextBlock from './TextBlock.jsx';
 import RichTextBlock from './RichTextBlock.jsx';
 import ImageBlock from './ImageBlock.jsx';
+import MapBlock from './MapBlock.jsx';
 import CtaBlock from './CtaBlock.jsx';
 import StatBlock from './StatBlock.jsx';
 import FactBlock from './FactBlock.jsx';
@@ -20,6 +21,7 @@ export const BLOCK_RENDERERS = Object.freeze({
   text: TextBlock,
   richtext: RichTextBlock,
   image: ImageBlock,
+  map: MapBlock,
   cta: CtaBlock,
   stat: StatBlock,
   fact: FactBlock,

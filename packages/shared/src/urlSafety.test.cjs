@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isSafeUrl, safeUrlHref, looksLikeUrl, scrubLinkLabel } = require('./urlSafety.cjs');
+const { isSafeUrl, safeUrlHref, googleMapsEmbedUrl, looksLikeUrl, scrubLinkLabel } = require('./urlSafety.cjs');
 
 test('isSafeUrl: http/https allowlist', () => {
   assert.equal(isSafeUrl('https://docs.example.org/deck'), true);
@@ -53,6 +53,29 @@ test('safeUrlHref returns the canonical href, so the checked string is the store
   // value a caller might store by mistake.
   for (const bad of ['https:video.example.org', '//evil.example.org', 'javascript:alert(1)', '', null]) {
     assert.equal(safeUrlHref(bad), '', `accepted ${JSON.stringify(bad)}`);
+  }
+});
+
+test('googleMapsEmbedUrl accepts the exact HTTPS embed endpoint with a query', () => {
+  const src = 'https://www.google.com/maps/embed?pb=!1m2&hl=en';
+  assert.equal(googleMapsEmbedUrl(` ${src} `), src);
+  for (const invalid of [
+    'https://example.org/maps/embed?pb=fixture',
+    'https://www.google.com.example.org/maps/embed?pb=fixture',
+    'https://www.google.com@elsewhere.example/maps/embed?pb=fixture',
+    'https://user@www.google.com/maps/embed?pb=fixture',
+    'https://www.google.com:443/maps/embed?pb=fixture',
+    'http://www.google.com/maps/embed?pb=fixture',
+    'https://www.google.com/maps/search?pb=fixture',
+    'https://www.google.com/maps/../maps/embed?pb=fixture',
+    'https://www.google.com/maps/embed/',
+    'https://www.google.com/maps/embed?',
+    'https://www.google.com/maps/embed?pb=fixture#section',
+    'javascript:alert(1)',
+    'data:text/html,fixture',
+    null,
+  ]) {
+    assert.equal(googleMapsEmbedUrl(invalid), '', String(invalid));
   }
 });
 

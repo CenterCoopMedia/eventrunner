@@ -7,7 +7,7 @@ const { isStarterContent, publicContentDoc } = require('./seed.cjs');
 const ENGLISH_ONLY = Object.freeze({ default: 'en', available: Object.freeze(['en']) });
 // Identifiers, URLs, prices, figures, attributions and proper names are shared.
 const BLOCK_FIELDS = Object.freeze({
-  text: ['value'], richtext: ['value'], image: ['alt', 'caption'], cta: ['label'],
+  text: ['value'], richtext: ['value'], image: ['alt', 'caption'], map: ['label'], cta: ['label'],
   stat: ['label', 'takeaway', 'description', 'alt'], fact: ['label', 'note'],
   quote: ['text'], list_item: ['text'], faq_item: ['question', 'answer'],
   link_group: ['label'], sponsor_package: ['benefits'],

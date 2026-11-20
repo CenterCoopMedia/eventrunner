@@ -11,6 +11,11 @@ const FIELD_HINTS = Object.freeze({
     focalX: 'Choose the part of the picture to keep across a crop: 0 is the left edge and 100 is the right.',
     focalY: 'Choose the part of the picture to keep down a crop: 0 is the top edge and 100 is the bottom.',
   },
+  map: {
+    embedUrl: 'In Google Maps, choose Share, then Embed a map. Paste the copied HTML or its embed link.',
+    label: 'Describe what the map shows, such as “Map of the convention center”.',
+    address: 'Show a street address below the map so attendees can find the venue.',
+  },
   cta: {
     label: 'Write the short action phrase shown on the button or link.',
     url: 'Enter a full web address that starts with https://, or a page on this site such as /travel.',

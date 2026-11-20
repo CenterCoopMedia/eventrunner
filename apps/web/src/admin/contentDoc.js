@@ -8,6 +8,7 @@
 // required-field contract at the write boundary.
 import { blockTypeFor } from './blockTypes.js';
 import { hasRichTextContent } from 'shared/richText';
+import { googleMapsEmbedUrl } from 'shared/urlSafety';
 
 /**
  * Mirrors functions/src/cms/content.cjs's DELETE_FIELD_SENTINEL exactly (a
@@ -168,6 +169,7 @@ const EDITORIAL_FIELD_LABELS = Object.freeze({
     focalX: 'Horizontal focus',
     focalY: 'Vertical focus',
   },
+  map: { embedUrl: 'Google Maps embed', label: 'Map label', address: 'Address' },
   cta: { label: 'Button text', url: 'Destination', external: 'Open in a new tab' },
   stat: {
     value: 'Figure',
@@ -246,6 +248,8 @@ export function validateRequiredContent(content) {
     if (isEmpty) {
       const name = editorialFieldLabel(content.blockType, field.id);
       errors.push({ field: field.id, message: `${name}: is required.` });
+    } else if (content.blockType === 'map' && field.id === 'embedUrl' && googleMapsEmbedUrl(raw) !== raw) {
+      errors.push({ field: field.id, message: 'Paste the embed code or link from Google Maps.' });
     }
   }
   // The page draws a sponsor package's limit only when it is a whole number

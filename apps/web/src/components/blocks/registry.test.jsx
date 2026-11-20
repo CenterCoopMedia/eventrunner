@@ -14,6 +14,12 @@ const SAMPLE_BLOCKS = {
   text: { blockType: 'text', value: 'Sample text' },
   richtext: { blockType: 'richtext', value: '<p>Sample <strong>rich</strong> text</p>' },
   image: { blockType: 'image', url: 'https://example.org/i.png', alt: 'Sample image', caption: 'Caption' },
+  map: {
+    blockType: 'map',
+    embedUrl: 'https://www.google.com/maps/embed?pb=fixture',
+    label: 'Map of Test Hall',
+    address: '1 Test Way',
+  },
   cta: { blockType: 'cta', label: 'Register now', url: 'https://example.org/register', external: true },
   stat: { blockType: 'stat', value: '450', label: 'Attendees expected' },
   fact: { blockType: 'fact', label: 'Where', value: 'Test Hall', note: '1 Test Way' },
@@ -51,6 +57,30 @@ describe('block renderer registry', () => {
     expect(rendererFor('toString')).toBe(UnknownBlock);
     expect(rendererFor(undefined)).toBe(UnknownBlock);
     expect(rendererFor('text')).not.toBe(UnknownBlock);
+  });
+
+  it('renders the titled sandboxed map and an address search link', () => {
+    const { map } = SAMPLE_BLOCKS;
+    render(<BlockRenderer block={map} />);
+    const frame = screen.getByTitle(map.label);
+    expect(frame).toHaveAttribute('src', map.embedUrl);
+    expect(frame).toHaveAttribute('loading', 'lazy');
+    expect(frame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin');
+    expect(screen.getByText(map.address)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open in Google Maps' })).toHaveAttribute(
+      'href', 'https://www.google.com/maps/search/?api=1&query=1+Test+Way',
+    );
+  });
+
+  it('renders nothing for an invalid stored map source or missing label', () => {
+    const { map } = SAMPLE_BLOCKS;
+    const { container, rerender } = render(
+      <BlockRenderer block={{ ...map, embedUrl: 'https://www.google.com/maps/search?q=fixture' }} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    rerender(<BlockRenderer block={{ ...map, label: '' }} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('renders a labeled box for unknown blocks in dev', () => {

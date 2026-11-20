@@ -14,6 +14,7 @@
 // history page, in a signed-in browser, reads the publish back as a
 // version with its time, its account, and the one field it changed.
 import { test, expect } from '@playwright/test';
+import hostingConfig from '../firebase.json';
 import seed from '../scripts/lib/seed.cjs';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
 import { editorialId } from '../apps/web/src/admin/editorialId.js';
@@ -270,6 +271,62 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
       await visitor.close();
     }
   });
+});
+
+test('publishes a Google Maps embed from the editor to the Travel page', async ({ page, browser }) => {
+  const label = `Map of Test Hall ${Date.now()}`;
+  const address = '1 Test Way';
+  const src = 'https://www.google.com/maps/embed?pb=fixture&hl=en';
+  const section = 'travel_map';
+  const field = editorialId(label);
+  const docId = `${section}__${field}`;
+  const idToken = await adminIdToken();
+  const visitor = await browser.newContext();
+  const stubMap = (route) => route.fulfill({ contentType: 'text/html', body: '<p>Map fixture</p>' });
+  try {
+    await page.route('https://www.google.com/maps/embed?*', stubMap);
+    await visitor.route('https://www.google.com/maps/embed?*', stubMap);
+    // The e2e server is Vite. Apply the real Hosting policy to the public document.
+    const policy = hostingConfig.hosting.headers.find(({ source }) => source === '**')
+      .headers.find(({ key }) => key === 'Content-Security-Policy').value;
+    await visitor.route('**/travel', async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({
+        response,
+        headers: { ...response.headers(), 'content-security-policy': policy },
+      });
+    });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto(`/admin/content/travel/${section}/_new`);
+    await page.getByRole('combobox', { name: 'Block type' }).selectOption('map');
+
+    const embedField = page.getByRole('textbox', { name: 'Google Maps embed' });
+    await embedField.fill(`<iframe width="600" src="${src.replace('&', '&amp;')}" height="450"></iframe>`);
+    await expect(embedField).toHaveValue(src);
+    await page.getByRole('textbox', { name: 'Map label' }).fill(label);
+    await page.getByRole('textbox', { name: 'Address (optional)' }).fill(address);
+    await expect(page.getByRole('region', { name: 'Map preview' }).getByTitle(label)).toHaveAttribute('src', src);
+
+    const published = page.waitForResponse((res) =>
+      res.url().endsWith('/cmsPublish') && res.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    expect((await published).ok()).toBe(true);
+    const live = (await adminDb().doc(`cmsContent/${docId}`).get()).data();
+    expect(live).toMatchObject({ blockType: 'map', embedUrl: src, label, address });
+
+    const travel = await visitor.newPage();
+    await travel.goto('/travel');
+    const frame = travel.getByTitle(label);
+    await expect(frame).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
+    await expect(frame).toHaveAttribute('src', live.embedUrl);
+    await frame.scrollIntoViewIfNeeded();
+    await expect(travel.frameLocator(`iframe[title="${label}"]`).getByText('Map fixture')).toBeVisible();
+    await expect(travel.getByText(address, { exact: true })).toBeVisible();
+  } finally {
+    await visitor.close();
+    await callFunction('cmsDeleteContent', { section, field }, idToken);
+  }
 });
 
 // The organizations editor (issue #192) and the sponsor page (issue #193),
