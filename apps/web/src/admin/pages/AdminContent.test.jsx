@@ -149,6 +149,7 @@ async function renderAt(path) {
     () => {
       expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
       expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading content…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
       expect(screen.queryByText('Loading section content…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme

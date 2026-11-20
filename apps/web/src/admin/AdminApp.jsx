@@ -26,7 +26,6 @@ import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
 import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
-import AdminMedia from './pages/AdminMedia.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
@@ -65,7 +64,9 @@ const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'), 
 // Lazy, as the other large pages: with its sync and account actions the page
 // put the admin entry chunk over the lazy-chunk budget.
 const AdminTicketing = lazy(() => import('./pages/AdminTicketing.jsx'), 'AdminTicketing');
+const AdminContentPages = lazy(() => import('./pages/AdminContentPages.jsx'), 'AdminContentPages');
 const AdminContentSection = lazy(() => import('./pages/AdminContentSection.jsx'), 'AdminContentSection');
+const AdminMedia = lazy(() => import('./pages/AdminMedia.jsx'), 'AdminMedia');
 // The block editor carries a form for every block type, and each new type
 // (the fact and the quote, design wave 2) added its fields to the entry
 // chunk. It opens from one link in a section list, so it loads the same way.
@@ -332,7 +333,7 @@ export default function AdminApp({ routeAttempt }) {
           <Route path="badges" element={<DeferredAdminPage label="badges"><AdminBadgeSettings /></DeferredAdminPage>} />
           <Route path="registration-form" element={<DeferredAdminPage label="registration form"><AdminRegistrationForm /></DeferredAdminPage>} />
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
-          <Route path="media" element={<StaticAdminPage><AdminMedia /></StaticAdminPage>} />
+          <Route path="media" element={<DeferredAdminPage label="the media library"><AdminMedia /></DeferredAdminPage>} />
           <Route
             path="materials"
             element={<DeferredAdminPage label="materials"><AdminMaterialsTab /></DeferredAdminPage>}
