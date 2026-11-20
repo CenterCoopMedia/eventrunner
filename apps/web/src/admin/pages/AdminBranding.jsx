@@ -44,7 +44,7 @@
 // Storage bucket, and each slot is an ImagePicker over the `branding/`
 // namespace. Whatever is in `logos` is carried through every save verbatim.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import {
   THEME_HEADERS,
   getPreset,
@@ -348,6 +348,8 @@ const BRANDING_TASKS = [
   { id: 'advanced', label: 'Advanced', description: 'Type, shape and colour overrides' },
 ];
 
+const STORED_PALETTE_LABEL = 'Stored palette';
+
 /** Route a rejected field back to its task, including nested overrides. */
 function brandingTaskForField(field) {
   if (field === 'theme.brandColor' || field?.startsWith('theme.logos')) return 'identity';
@@ -374,6 +376,7 @@ export default function AdminBranding() {
   const [moreLogosOpen, setMoreLogosOpen] = useState(false);
   const [overrideMode, setOverrideMode] = useState('light');
   const errorRef = useRef(null);
+  const siteStylePicker = useRef(null);
   const adoptedRef = useRef(sources.theme === 'live');
 
   // Seeding reads unset colors back from the resolved custom properties, so
@@ -433,6 +436,7 @@ export default function AdminBranding() {
   // The words for the picked style. The rendering values and the copy are
   // two generated outputs of one source, so a style always has both.
   const copy = presetCopy(form.preset);
+  const activeStyle = presetCopy(theme?.preset)?.label ?? STORED_PALETTE_LABEL;
   // The mode the admin mark's legibility is judged in: whichever mode the
   // preview is showing, so the warning and the picture agree.
   const [previewMode, setPreviewMode] = useState('light');
@@ -496,13 +500,25 @@ export default function AdminBranding() {
     setStatus('Reverted to the saved theme.');
   }
 
+  function openSiteStyle() {
+    flushSync(() => setActiveTask('page-style'));
+    siteStylePicker.current?.querySelector('select')?.focus();
+  }
+
   return (
     <form className="flex flex-col gap-md" onSubmit={submit} inert={leaveGuard.pending ? '' : undefined}>
       <AdminPageHeader
         title="Branding"
         state={<RecordState state={isDirty ? state('dirty') : state('live')} />}
         identifiers="config/theme"
-        description="Shape the site’s identity and page style, then review the real page preview. Your changes stay in this draft until you publish."
+        help="Your changes stay in this draft until you publish."
+        description={(
+          <span className="flex flex-wrap items-center gap-x-sm">
+            <span>Active site style <strong>{activeStyle}</strong></span>
+            <button type="button" className={linkButtonClass} aria-controls="admin-theme-page-style"
+              onClick={openSiteStyle}>Change site style</button>
+          </span>
+        )}
         actions={
           <>
             <button type="submit" className={primaryButtonClass} disabled={saving}>
@@ -693,7 +709,7 @@ export default function AdminBranding() {
               title="Site style"
               description="Six complete styles. Each one arrives set up and ready — you can publish it as it stands. Picking a style replaces every value you have not set yourself."
             >
-              <div className="flex flex-col gap-sm">
+              <div ref={siteStylePicker} className="flex flex-col gap-sm">
                 <SelectField
                   label="Site style"
                   value={form.preset}
@@ -1125,6 +1141,7 @@ export default function AdminBranding() {
           ) : null}
           <ThemeProof
             themeDoc={candidate}
+            styleName={copy?.label ?? STORED_PALETTE_LABEL}
             isDirty={isDirty}
             mode={previewMode}
             onModeChange={setPreviewMode}
