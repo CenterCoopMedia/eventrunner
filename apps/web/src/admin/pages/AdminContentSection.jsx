@@ -5,7 +5,7 @@
 // type, and disabled once the section is at its cap, same guardrail
 // AdminPageEditor's block picker applies to defaultBlocks.
 import { sectionBlockTypes } from 'shared/page';
-import { useEffect, useId, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router';
 import { isStarterContent } from 'shared/seed';
@@ -22,7 +22,6 @@ import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import HomeHeroImageEditor from '../components/HomeHeroImageEditor.jsx';
-import FooterPagesEditor from '../components/FooterPagesEditor.jsx';
 import {
   DestructiveConfirm,
   Notice,
@@ -47,6 +46,8 @@ import AdminPageHeader, {
   StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
+
+const FooterPagesEditor = lazy(() => import('../components/FooterPagesEditor.jsx'));
 
 export default function AdminContentSection() {
   const { pageId, sectionId } = useParams();
@@ -303,12 +304,14 @@ export default function AdminContentSection() {
       ) : null}
 
       {homeFooterSection ? (
-        <FooterPagesEditor
-          pageRows={pageRows}
-          ready={pagesReady}
-          disabled={savingOrder || busy !== null}
-          onEditStateChange={setInlineEdit}
-        />
+        <Suspense fallback={<AdminLoadingState label="Loading footer pages…" />}>
+          <FooterPagesEditor
+            pageRows={pageRows}
+            ready={pagesReady}
+            disabled={savingOrder || busy !== null}
+            onEditStateChange={setInlineEdit}
+          />
+        </Suspense>
       ) : null}
 
       {displayed.length === 0 ? (

@@ -510,7 +510,7 @@ describe('Layout navigation (built from page documents)', () => {
     expect(summary).toHaveFocus();
   });
 
-  it('closes More after route selection, while the footer and side nav keep every page', () => {
+  it('closes More after route selection, while the footer and side nav keep every page', async () => {
     const top = renderShell({}, { pageDocs: MANY_PAGES });
     const mainNav = top.getByRole('navigation', { name: 'Main' });
     const details = mainNav.querySelector('details.site-nav-more');
@@ -521,7 +521,7 @@ describe('Layout navigation (built from page documents)', () => {
     expect(route).toHaveAttribute('aria-current', 'page');
     expect(within(details).getByText('More')).toHaveClass('touch-target', 'border-b-rule-strong', 'font-semibold');
     expect(
-      within(top.getByRole('navigation', { name: 'Site pages' }))
+      within(await top.findByRole('navigation', { name: 'Site pages' }))
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(MANY_PAGES.map((item) => item.label));
@@ -840,9 +840,10 @@ describe('Layout footer', () => {
       href: a.getAttribute('href'),
     }));
 
-  it('lists the same pages the navigation lists, in the same order', () => {
+  it('lists the same pages the navigation lists, in the same order', async () => {
     const { container } = renderShell({});
-    expect(within(footer(container).querySelector(PAGE_NAV)).getByText('Site pages')).toBeInTheDocument();
+    const group = await within(footer(container)).findByRole('navigation', { name: 'Site pages' });
+    expect(within(group).getByText('Site pages')).toBeInTheDocument();
     expect(footerLinks(container)).toEqual([
       { label: 'Home', href: '/' },
       { label: 'Schedule', href: '/schedule' },
@@ -851,22 +852,25 @@ describe('Layout footer', () => {
     ]);
   });
 
-  it('shows the configured group heading and ordered public pages only in the footer', () => {
+  it('shows the configured group heading and ordered public pages only in the footer', async () => {
     const { container } = renderShell({}, {
       event: { ...FIXTURE_EVENT, footerPageGroup: { heading: 'Plan your visit', pageIds: ['faq', 'schedule', 'travel', 'missing'] } },
       featureFlags: {},
     });
-    const group = within(footer(container)).getByRole('navigation', { name: 'Plan your visit' });
+    const group = await within(footer(container)).findByRole('navigation', { name: 'Plan your visit' });
     expect(within(group).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(['/faq', '/travel']);
     expect(within(container.querySelector('header')).getByRole('link', { name: 'Home' })).toBeInTheDocument();
   });
 
-  it('accepts an empty footer page selection', () => {
+  it('accepts an empty footer page selection', async () => {
+    const standard = renderShell({});
+    await within(footer(standard.container)).findByRole('navigation', { name: 'Site pages' });
+    standard.unmount();
     const { container } = renderShell({}, { event: { ...FIXTURE_EVENT, footerPageGroup: { pageIds: [] } } });
     expect(within(footer(container)).queryByRole('navigation', { name: 'Site pages' })).toBeNull();
   });
 
-  it('applies the navigation’s own gates rather than a second set', () => {
+  it('applies the navigation’s own gates rather than a second set', async () => {
     const { container } = renderShell(
       {},
       {
@@ -877,6 +881,7 @@ describe('Layout footer', () => {
         ],
       },
     );
+    await within(footer(container)).findByRole('navigation', { name: 'Site pages' });
     const labels = footerLinks(container).map((link) => link.label);
     // Hidden by the editor, and a system page whose feature is switched off.
     expect(labels).not.toContain('Draft page');
@@ -1178,7 +1183,7 @@ describe('Layout footer', () => {
     ]);
   });
 
-  it('gives every footer link a keyboard path and the footer target size', () => {
+  it('gives every footer link a keyboard path and the footer target size', async () => {
     const { container } = renderShell(
       {},
       {
@@ -1189,6 +1194,7 @@ describe('Layout footer', () => {
         },
       },
     );
+    await within(footer(container)).findByRole('navigation', { name: 'Site pages' });
     for (const link of footer(container).querySelectorAll('a')) {
       expect(link).toHaveAttribute('href');
       expect(link.hasAttribute('tabindex')).toBe(false);
@@ -1333,9 +1339,10 @@ describe('Layout on the stage', () => {
     }
   });
 
-  it('runs the footer page list in columns that wrap', () => {
+  it('runs the footer page list in columns that wrap', async () => {
     const { container } = renderShell({});
-    const list = container.querySelector('nav[aria-label="Site pages"] ul');
+    const group = await within(container).findByRole('navigation', { name: 'Site pages' });
+    const list = within(group).getByRole('list');
     expect(list.classList.contains('footer-links')).toBe(true);
     expect(indexCss).toMatch(/\.footer-links \{[^}]*repeat\(auto-fill, minmax\(/);
   });

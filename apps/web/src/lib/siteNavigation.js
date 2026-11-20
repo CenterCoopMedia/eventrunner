@@ -127,13 +127,10 @@ export function navItemFor(page, features, pages) {
  * @param {object|null|undefined} features config/features
  * @returns {Array<{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }>}
  */
-export function buildNavItems(pages, features, orderedPageIds) {
-  const orderById = Array.isArray(orderedPageIds)
-    ? new Map(orderedPageIds.map((id, index) => [id, index])) : null;
+export function buildNavItems(pages, features) {
   const seen = new Set();
   return (pages ?? [])
-    .filter((page) => !orderById || orderById.has(page?.id))
-    .map((page) => ({ order: orderById ? orderById.get(page.id) : page?.order, item: navItemFor(page, features, pages) }))
+    .map((page) => ({ order: page?.order, item: navItemFor(page, features, pages) }))
     .filter((entry) => entry.item !== null)
     .sort(
       (a, b) =>

@@ -122,6 +122,7 @@ export function optionalOnDemand(importer, label) {
 // Only multi-role accounts need this menu; keep it out of public first paint.
 const AccountMenu = optionalOnDemand(() => import('./AccountMenu.jsx'), 'account menu');
 const LanguageChoice = optionalOnDemand(() => import('./LanguageChoice.jsx'), 'language controls');
+const FooterPageLinks = optionalOnDemand(() => import('./FooterPageLinks.jsx'), 'footer page links');
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 // Import account code only when this signed-in reader has browser saves.
@@ -430,11 +431,6 @@ export default function Layout() {
   // config or content snapshot, and the list only changes when the pages or
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
-  const footerPageGroup = eventConfig?.footerPageGroup;
-  const footerPageIds = footerPageGroup?.pageIds;
-  const footerPages = useMemo(() => buildNavItems(pages, features, footerPageIds), [pages, features, footerPageIds]);
-  const footerPageHeading = (typeof footerPageGroup?.heading === 'string' && footerPageGroup.heading.trim())
-    || text('Site pages', 'Páginas del sitio');
   // The home page's footer section, drawn in the footer on every page
   // (FooterLinkGroups.jsx). Its label names the landmark.
   const homePage = getPage('home') ?? getPage('/');
@@ -697,20 +693,9 @@ export default function Layout() {
               {eventConfig?.name}
             </p>
             <div className="grid gap-sm lg:grid-cols-2 lg:gap-lg">
-            {footerPages.length === 0 ? null : (
-              <nav aria-label={footerPageHeading} className="mt-sm">
-                <p className="break-words font-semibold text-text-primary">{footerPageHeading}</p>
-                <ul className="footer-links">
-                  {footerPages.map((item) => (
-                    <li key={item.to}>
-                      <Link to={item.to} className={FOOTER_LINK_CLASS} lang={item.language}>
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            )}
+            <Suspense fallback={null}>
+              <FooterPageLinks pages={pages} defaultItems={navItems} linkClass={FOOTER_LINK_CLASS} />
+            </Suspense>
             <FooterLinkGroups
               label={footerSection?.label || 'Footer links'}
               groups={footerGroups}

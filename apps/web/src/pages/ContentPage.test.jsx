@@ -171,7 +171,7 @@ describe('ContentPage (catch-all route)', () => {
     const nav = screen.getByRole('navigation', { name: 'Main' });
     expect(within(nav).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '/faq');
     expect(within(nav).queryByRole('link', { name: 'Frequently asked questions' })).not.toBeInTheDocument();
-    const footer = screen.getByRole('navigation', { name: 'Site pages' });
+    const footer = await screen.findByRole('navigation', { name: 'Site pages' });
     expect(within(footer).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '/faq');
   });
 

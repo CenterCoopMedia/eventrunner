@@ -23,7 +23,7 @@ export default function FooterPagesEditor({ pageRows, ready, disabled, onEditSta
   const group = draft ?? current ?? { heading: '', pageIds: null };
   const picks = pageRows
     .map(({ id, live }) => ({ id, order: live?.order ?? 0, item: navItemFor(live, features) }))
-    .filter(({ item }) => item)
+    .filter(({ item }) => item && !item.custom)
     .sort((a, b) => a.order - b.order || a.item.label.localeCompare(b.item.label));
   const selected = Array.isArray(group.pageIds) ? group.pageIds : null;
   const names = new Map(picks.map(({ id, item }) => [id, item.label]));
