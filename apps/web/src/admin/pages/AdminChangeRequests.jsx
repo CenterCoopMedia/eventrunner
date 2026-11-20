@@ -64,6 +64,7 @@ import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
 import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 import AdminScreenshotField from '../components/AdminScreenshotField.jsx';
 import RequestScreenshots from '../components/RequestScreenshots.jsx';
+import { useRequestAnchor } from '../useRequestAnchor.js';
 
 /** The server's limits (functions/src/admin/changeRequests.cjs). */
 const MAX_MESSAGE_LENGTH = 2000;
@@ -234,10 +235,12 @@ export default function AdminChangeRequests() {
   const { features } = useEventConfig();
   const enabled = features?.changeRequests === true;
   const [searchParams, setSearchParams] = useSearchParams();
-  const filter = readFilter(searchParams.get('status'));
+  const requestId = searchParams.get('request');
+  const filter = readFilter(searchParams.get('status') ?? (requestId ? 'all' : null));
   const filterEntry = FILTERS.find((entry) => entry.value === filter);
 
   const [rows, setRows] = useState(null);
+  useRequestAnchor(requestId, rows);
   const [listError, setListError] = useState(null);
   // The action in flight, keyed to the control that was pressed:
   // { id, control: 'next' | 'decline' | 'remove', row }. The listener can
@@ -298,6 +301,7 @@ export default function AdminChangeRequests() {
 
   const setFilter = useCallback((value) => {
     const next = new URLSearchParams(searchParams);
+    next.delete('request');
     if (value === DEFAULT_FILTER) next.delete('status');
     else next.set('status', value);
     setSearchParams(next, { replace: true });
@@ -430,7 +434,7 @@ export default function AdminChangeRequests() {
                 const busy = pending?.id === row.id ? pending : null;
                 const locked = Boolean(pending);
                 return (
-                  <li key={row.id} className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0">
+                  <li key={row.id} id={`request-${row.id}`} tabIndex={-1} className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0">
                     <div className="flex flex-wrap items-start justify-between gap-sm px-md py-sm">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">

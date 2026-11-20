@@ -14,6 +14,8 @@
 
 const { createWebhookSink } = require('./sinks/webhook.cjs');
 const { createEmailSink } = require('./sinks/email.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
+const { buildSubmissionAlert } = require('shared/operatorAlert');
 
 const DEDUPE_WINDOW_MS = 5 * 60 * 1000;
 const SINK_NAMES = new Set(['webhook', 'email', 'none']);
@@ -124,7 +126,30 @@ function createOperatorNotifier({
   return { name, notify };
 }
 
+function createSubmissionNotifier({ getConfig, sendEmail, env = process.env, log = console, ...deps }) {
+  const notifier = createOperatorNotifier({ getConfig, sendEmail, env, log, ...deps });
+  return async ({ kind, id, page, screenshotCount }) => {
+    if (notifier.name === 'none') return;
+    try {
+      const config = await getConfig();
+      const target = kind === 'feedback' ? '/admin/feedback' : '/admin/change-requests';
+      const address = eventPageUrl(config, target, env);
+      const alert = buildSubmissionAlert({
+        kind, id, page, screenshotCount,
+        site: config?.tierA?.projectId || config?.tierA?.slug,
+        link: address ? `${address}?request=${encodeURIComponent(id)}` : null,
+        allowLoopback: env.FUNCTIONS_EMULATOR === 'true',
+      });
+      if (alert) await notifier.notify(alert);
+      else log.warn('The submission alert is missing a valid site address or record ID.');
+    } catch {
+      log.warn('The submission alert could not be delivered.');
+    }
+  };
+}
+
 module.exports = {
   createOperatorNotifier,
+  createSubmissionNotifier,
   internals: { resetDedupeForTest, DEDUPE_WINDOW_MS, isDuplicate },
 };

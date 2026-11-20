@@ -62,7 +62,8 @@ export default function ReportProblem() {
         url: `${window.location.origin}${window.location.pathname}`,
         version: import.meta.env.VITE_BUILD_ID || '',
         consoleLogs: recentMessages(),
-        ...(screenshots.files.length ? { ...await encodeScreenshots(screenshots.files), submissionKey } : {}),
+        submissionKey,
+        ...(screenshots.files.length ? await encodeScreenshots(screenshots.files) : {}),
       });
       setSent(true);
     } catch (err) {

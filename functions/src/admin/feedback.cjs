@@ -207,7 +207,7 @@ function looksLikeBot({ honeypot, startedAt, now }) {
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
 function createSubmitFeedbackHandler({
-  db, sendEmail, getConfig, now = Date.now, log = console,
+  db, sendEmail, getConfig, notifySubmission, now = Date.now, log = console,
   render = (screenshots) => renderScreenshots(screenshots, require('sharp'), 4_000_000),
 }) {
   return async function submitFeedback(req, res) {
@@ -307,6 +307,9 @@ function createSubmitFeedbackHandler({
       return sendError(res, 409, 'conflict', 'submissionKey: already used. Open the form again.');
     }
     if (result.outcome === 'invalid') return badRequest(res, result.message);
+    if (result.outcome === 'stored') {
+      await notifySubmission?.({ kind: 'feedback', id: ref.id, screenshotCount: screenshots.length });
+    }
 
     // Confirmation email is best-effort and onceKey-gated on the doc id: a
     // client retry after a dropped response must not send a second mail for
@@ -388,10 +391,14 @@ function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const { defineSecret } = require('firebase-functions/params');
   const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const { notifierSecretNames } = require('../telemetry/systemErrors.cjs').internals;
 
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
   const providerName = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
-  const secrets = (SEND_SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
+  const secrets = [...new Set([
+    ...(SEND_SECRETS_BY_PROVIDER[providerName] || []),
+    ...notifierSecretNames(process.env),
+  ])].map(defineSecret);
 
   const withCors = (handler) => async (req, res) => {
     const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
@@ -416,10 +423,12 @@ function buildHandlers() {
       const { getEventConfig } = require('../core/config.cjs');
       const { getEmailProvider } = require('../email/providers/index.cjs');
       const { createEmailCore } = require('../email/send.cjs');
+      const { createSubmissionNotifier } = require('../notify/operator.cjs');
       const db = getDb();
       const getConfig = () => getEventConfig({ db });
       const emailCore = createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
-      await createSubmitFeedbackHandler({ db, sendEmail: emailCore.send, getConfig })(req, res);
+      const notifySubmission = createSubmissionNotifier({ getConfig, sendEmail: emailCore.send });
+      await createSubmitFeedbackHandler({ db, sendEmail: emailCore.send, getConfig, notifySubmission })(req, res);
     })),
     updateFeedbackStatus: onRequest({ region }, withCors(async (req, res) => {
       await createUpdateFeedbackStatusHandler(buildAdminDeps())(req, res);

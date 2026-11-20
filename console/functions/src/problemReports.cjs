@@ -4,9 +4,8 @@
  * "Report a problem" relay. The console and each client site's admin panel
  * post here; the report goes on to the operator's triage service, which
  * sends it to the operator in Telegram with File, File + fix and Ignore.
- * Reports with screenshots also keep a private Console receipt for 30 days.
- * It includes the reporter's verified address so operators can follow up
- * when the triage relay is unavailable.
+ * The Console keeps a private receipt for 30 days. It includes the verified
+ * reporter address so operators can follow up when the relay is unavailable.
  *
  * The caller must be signed in, with a verified email, to the console or to
  * a client site this console built (or one named in CONSOLE_REPORT_PROJECTS
@@ -243,21 +242,21 @@ function reportProblemHandler(deps) {
         now: deps.now,
         message: 'You have sent several reports in the last hour. Try again later.',
       });
-      const requestId = screenshots.length && body.submissionKey
+      const requestId = body.submissionKey
         ? crypto.createHash('sha256').update(JSON.stringify([
           reporter.project, reporter.uid, body.submissionKey, report.category, report.description, report.url,
           ...screenshots.map(({ digest }) => digest),
         ])).digest('hex').slice(0, 32)
         : crypto.randomBytes(16).toString('hex');
-      if (screenshots.length) {
-        const created = await storeProblemReportReceipt({ db: deps.db, now }, requestId, report, reporter, () => render(screenshots));
-        if (!created) {
-          log.info('reportProblem: replay matched an existing Console receipt', requestId);
-          res.status(200).json({ id: requestId });
-          return;
-        }
+      const receiptId = screenshots.length ? requestId : `er_${requestId}`;
+      const created = await storeProblemReportReceipt({ db: deps.db, now }, requestId, report, reporter,
+        () => screenshots.length ? render(screenshots) : []);
+      if (!created) {
+        log.info('reportProblem: replay matched an existing Console receipt', requestId);
+        res.status(200).json({ id: receiptId });
+        return;
       }
-      const id = await forwardReport(deps, {
+      await forwardReport(deps, {
         request_id: requestId,
         category: report.category,
         description: report.description,
@@ -269,27 +268,20 @@ function reportProblemHandler(deps) {
         version: report.version,
         consoleLogs: report.consoleLogs,
       }).catch((err) => {
-        if (screenshots.length) {
-          log.error('reportProblem: forwarding failed for saved Console receipt', requestId, err.message);
-          return requestId;
-        }
-        throw Object.assign(new ConsoleError(502, 'unavailable', 'The report could not be sent. Try again in a minute.'), { cause: err });
+        log.error('reportProblem: forwarding failed for saved Console receipt', requestId, err.message);
       });
-      if (screenshots.length) {
-        try {
-          await deps.notifyAttachments?.({ id: requestId, count: screenshots.length, project: reporter.project });
-        } catch {
-          log.error('reportProblem: screenshot notice failed for Console receipt', requestId);
-        }
+      try {
+        await deps.notifyReport?.({ id: requestId, screenshotCount: screenshots.length, project: reporter.project });
+      } catch {
+        log.error('reportProblem: operator alert failed for Console receipt', requestId);
       }
-      res.status(200).json({ id: screenshots.length ? requestId : id });
+      res.status(200).json({ id: receiptId });
     } catch (err) {
       if (err instanceof ScreenshotError) {
         sendError(res, 400, 'bad-request', err.message, { field: 'screenshots' });
         return;
       }
       if (err instanceof ConsoleError) {
-        if (err.cause) log.error('reportProblem: forward failed', err.cause.message);
         if (err.retryAfterSeconds) res.set('Retry-After', String(err.retryAfterSeconds));
         sendError(res, err.status, err.code, err.message, typeof err.field === 'string' ? { field: err.field } : {});
         return;

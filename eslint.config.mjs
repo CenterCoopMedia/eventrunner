@@ -171,6 +171,7 @@ export default [
       "functions/src/schedule/pdf.cjs",
       "functions/src/pdf/kit.cjs",
       "console/functions/src/emailLayout.cjs",
+      "packages/shared/src/operatorAlertLayout.cjs",
     ],
     rules: { "no-restricted-syntax": "off" },
   },

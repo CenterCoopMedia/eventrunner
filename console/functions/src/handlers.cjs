@@ -36,7 +36,7 @@ const { acceptInvite, inviteMember } = require('./invites.cjs');
 const { changeMemberRole, removeMember } = require('./members.cjs');
 const { getApplication, listApplications } = require('./applications.cjs');
 const { saveApplicationStep } = require('./applicationSave.cjs');
-const { withdrawApplication, notifyProblemReportAttachments } = require('./applicationStatus.cjs');
+const { withdrawApplication, notifyProblemReport } = require('./applicationStatus.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { consentEventMount, manageEventMount } = require('./clientHostEnrollment.cjs');
 const { createRouteMapStore } = require('./clientHostMapStore.cjs');
@@ -129,7 +129,7 @@ const SCHEDULED = Object.freeze({
 // panel, so it has its own CORS and sign-in check (problemReports.cjs).
 const REPORT_FUNCTION = 'reportProblem';
 
-const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice', 'sendAgreementCopy', 'sendReportAttachmentNotice']);
+const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice', 'sendAgreementCopy', 'sendSubmissionAlert']);
 
 let services = null;
 function adminServices() {
@@ -285,7 +285,7 @@ function buildHandlers({ startBuild } = {}) {
       consoleProject: process.env.GCLOUD_PROJECT,
       extraProjects: parseAllowedOrigins(process.env.CONSOLE_REPORT_PROJECTS),
       extraOrigins,
-      notifyAttachments: (notice) => notifyProblemReportAttachments({ db, mailer: lazyMailer(), log: console, publicUrl: publicUrl() }, notice),
+      notifyReport: (notice) => notifyProblemReport({ db, mailer: lazyMailer(), log: console, publicUrl: publicUrl() }, notice),
       intake: { url: process.env.CONSOLE_REPORT_INTAKE_URL || '', secret, accessId, accessSecret },
     })(req, res);
   });

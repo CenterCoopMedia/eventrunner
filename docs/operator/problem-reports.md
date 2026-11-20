@@ -16,9 +16,14 @@ removed.
    built (a request that is building, ready or launched) or one listed in
    `CONSOLE_REPORT_PROJECTS`. The email must be verified. Each person gets ten
    reports an hour.
-3. The function forwards the report to the operator's triage service at
-   `CONSOLE_REPORT_INTAKE_URL`. Nothing is stored in the console.
-4. The triage service sends the operator a Telegram card with **File**,
+3. The function saves a private receipt in Console and emails the current
+   Console operators. The alert carries the project, report ID, screenshot
+   count, and a link to the signed-in Console receipt. The receipt includes
+   contact information and expires after 30 days.
+4. The function forwards the report to the operator's triage service at
+   `CONSOLE_REPORT_INTAKE_URL`. Screenshots stay in Console. Operators can
+   read the receipt in Console → Review → Problem reports during a relay outage.
+5. The triage service sends the operator a Telegram card with **File**,
    **File + fix** and **Ignore**. File opens a GitHub issue in this repository
    without the reporter's email or browser messages. File + fix also starts a
    fix session that opens a pull request for review. Nothing merges or deploys

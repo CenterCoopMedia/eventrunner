@@ -445,7 +445,7 @@ async function storeRequest({ db, id, actor, message, page, nowMs, screenshots, 
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
 function createSubmitChangeRequestHandler({
-  db, auth, getConfig, sendEmail, now = Date.now, log = console,
+  db, auth, getConfig, sendEmail, notifySubmission, now = Date.now, log = console,
   render = (screenshots) => renderScreenshots(screenshots, require('sharp'), 12_000_000),
 }) {
   return async function submitChangeRequest(req, res) {
@@ -508,11 +508,14 @@ function createSubmitChangeRequestHandler({
     // The request is durable before the acknowledgement goes. A replay
     // finds it stored and sends nothing; a failed send only marks the
     // record for staff to retry (deliverNotice never throws).
-    if (result.outcome === 'stored' && result.acknowledgement) {
-      await deliverNotice({
-        db, sendEmail, getConfig, now, log, id, slot: 'received', record: result.acknowledgement,
-        to: email, recipientUid: actor.uid,
-      });
+    if (result.outcome === 'stored') {
+      await notifySubmission?.({ kind: 'change-request', id, page: submission.page, screenshotCount: req.body?.screenshots?.length ?? 0 });
+      if (result.acknowledgement) {
+        await deliverNotice({
+          db, sendEmail, getConfig, now, log, id, slot: 'received', record: result.acknowledgement,
+          to: email, recipientUid: actor.uid,
+        });
+      }
     }
     res.status(201).json({ id, ok: true });
   };
@@ -795,14 +798,20 @@ function buildHandlers() {
 
   const { defineSecret } = require('firebase-functions/params');
   const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const { notifierSecretNames } = require('../telemetry/systemErrors.cjs').internals;
   const providerName = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
   // Only the endpoints that send mail bind the provider's send secrets.
   const secrets = (SEND_SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
+  const submitSecrets = [...new Set([
+    ...(SEND_SECRETS_BY_PROVIDER[providerName] || []),
+    ...notifierSecretNames(process.env),
+  ])].map(defineSecret);
 
   const buildDeps = () => {
     const { getDb } = require('../core/firestore.cjs');
     const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
+    const { createSubmissionNotifier } = require('../notify/operator.cjs');
     const db = getDb();
     const getConfig = () => getEventConfig({ db });
     const sendEmail = (message) => {
@@ -810,7 +819,7 @@ function buildHandlers() {
       const { getEmailProvider } = require('../email/providers/index.cjs');
       return createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig }).send(message);
     };
-    return { db, auth: getAuth(), getConfig, sendEmail };
+    return { db, auth: getAuth(), getConfig, sendEmail, notifySubmission: createSubmissionNotifier({ getConfig, sendEmail }) };
   };
 
   const expose = (create, options = {}) =>
@@ -824,7 +833,7 @@ function buildHandlers() {
   } = require('./changeRequestNotices.cjs');
 
   return {
-    submitChangeRequest: expose(createSubmitChangeRequestHandler, { secrets, memory: '512MiB', cpu: 1, concurrency: 2 }),
+    submitChangeRequest: expose(createSubmitChangeRequestHandler, { secrets: submitSecrets, memory: '512MiB', cpu: 1, concurrency: 2 }),
     updateChangeRequestStatus: expose(createUpdateChangeRequestStatusHandler, { secrets }),
     saveChangeRequestOutcome: expose(createSaveChangeRequestOutcomeHandler),
     deleteChangeRequest: expose(createDeleteChangeRequestHandler),

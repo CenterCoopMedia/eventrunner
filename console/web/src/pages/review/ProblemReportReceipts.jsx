@@ -24,8 +24,8 @@ export default function ProblemReportReceipts() {
 
   return (
     <section className="panel" aria-labelledby="reports-title">
-      <p><Link to={id ? PATH : '/review'}>{id ? 'All problem reports with screenshots' : 'Console review'}</Link></p>
-      <h1 id="reports-title">{id ? 'Problem report' : 'Problem reports with screenshots'}</h1>
+      <p><Link to={id ? PATH : '/review'}>{id ? 'All problem reports' : 'Console review'}</Link></p>
+      <h1 id="reports-title">{id ? 'Problem report' : 'Problem reports'}</h1>
       {!data && !error ? <p role="status">Loading reports…</p> : null}
       {error ? (
         <div>
@@ -39,13 +39,15 @@ export default function ProblemReportReceipts() {
           {data.receipt.reporterEmail ? <p className="report-description">Reporter {data.receipt.reporterEmail}</p> : null}
           <p className="report-description">{data.receipt.description}</p>
           <p className="report-description">Page <a href={data.receipt.url}>{data.receipt.url}</a></p>
-          <ScreenshotViewer
-            key={id}
-            count={data.receipt.screenshotCount}
-            readScreenshot={(index) => callApi('readProblemReportScreenshot', { id, index }, { freshToken: true })}
-            className="report-screenshots"
-            buttonClass="button quiet"
-          />
+          {data.receipt.screenshotCount > 0 ? (
+            <ScreenshotViewer
+              key={id}
+              count={data.receipt.screenshotCount}
+              readScreenshot={(index) => callApi('readProblemReportScreenshot', { id, index }, { freshToken: true })}
+              className="report-screenshots"
+              buttonClass="button quiet"
+            />
+          ) : null}
         </div>
       ) : null}
       {data?.receipts?.length ? (
@@ -53,13 +55,14 @@ export default function ProblemReportReceipts() {
           {data.receipts.map((receipt) => (
             <li key={receipt.id}>
               <Link to={`${PATH}?id=${encodeURIComponent(receipt.id)}`}>
-                {receipt.project} · {new Date(receipt.createdAt).toLocaleString()} · {receipt.screenshotCount} {receipt.screenshotCount === 1 ? 'screenshot' : 'screenshots'}
+                {receipt.project} · {new Date(receipt.createdAt).toLocaleString()}
+                {receipt.screenshotCount ? ` · ${receipt.screenshotCount} ${receipt.screenshotCount === 1 ? 'screenshot' : 'screenshots'}` : ''}
               </Link>
             </li>
           ))}
         </ul>
       ) : null}
-      {data?.receipts?.length === 0 ? <p>There are no recent reports with screenshots.</p> : null}
+      {data?.receipts?.length === 0 ? <p>There are no recent reports.</p> : null}
     </section>
   );
 }

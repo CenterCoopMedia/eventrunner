@@ -5,6 +5,7 @@ const { test } = require('node:test');
 const { makeFakeDb, makeReq, makeRes } = require('./fakes.cjs');
 const { cleanPageUrl, readReport, redact, reportOriginAllowed, reportProblemHandler } = require('./problemReports.cjs');
 const { getProblemReportReceipts, readProblemReportScreenshot } = require('./problemReportReceipts.cjs');
+const { notifyProblemReport } = require('./applicationStatus.cjs');
 
 const jwt = (aud) => `h.${Buffer.from(JSON.stringify({ aud })).toString('base64url')}.s`;
 const user = (overrides = {}) => ({ uid: 'u1', email: 'Pat@Example.org', email_verified: true, ...overrides });
@@ -94,17 +95,45 @@ test('no token, a bad token or an unverified email is refused before anything is
   }
 });
 
-test('a short description names its field; a refused forward is a plain 502', async () => {
-  let s = setup();
-  let res = makeRes();
+test('a short description names its field and creates no report', async () => {
+  const s = setup();
+  const res = makeRes();
   await reportProblemHandler(s.deps)(makeReq({ token: jwt('er-console'), body: { ...BODY, description: 'short' } }), res);
   assert.equal(res.statusCode, 400);
   assert.equal(res.body.error.field, 'description');
-  s = setup({ fetchStatus: 403 });
-  res = makeRes();
-  await reportProblemHandler(s.deps)(makeReq({ token: jwt('er-console'), body: BODY }), res);
-  assert.equal(res.statusCode, 502);
-  assert.equal(res.body.error.message, 'The report could not be sent. Try again in a minute.');
+  assert.equal(s.sent.length, 0);
+});
+
+test('a plain report saves and alerts once even if the triage relay is down', async () => {
+  const { deps, sent } = setup({ fetchStatus: 403 });
+  const notices = [];
+  deps.notifyReport = async (notice) => { notices.push(notice); throw new Error('mail unavailable'); };
+  const body = { ...BODY, submissionKey: 'a'.repeat(32) };
+  const first = makeRes();
+  const repeat = makeRes();
+  await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body }), first);
+  await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body }), repeat);
+  assert.equal(first.statusCode, 200);
+  assert.deepEqual(repeat.body, first.body);
+  assert.equal(sent.length, 1);
+  const id = sent[0].body.request_id;
+  assert.deepEqual(notices, [{ id, screenshotCount: 0, project: 'er-console' }]);
+  assert.equal(deps.db.read(`problem_report_receipts/${id}`).description, BODY.description);
+});
+
+test('a Console alert reaches the current operator list with a private receipt link', async () => {
+  const db = makeFakeDb({ 'console_config/operators': { emails: [' Ops@Example.org ', 'ops@example.org'] } });
+  const sent = [];
+  const mailer = { sendSubmissionAlert: async (mail) => sent.push(mail) };
+  const id = 'receipt-1234';
+  await notifyProblemReport({
+    db, mailer, log: { error() {} }, publicUrl: 'https://console.example.test', now: () => 0,
+  }, { id, screenshotCount: 2, project: 'event-demo' });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'ops@example.org');
+  assert.equal(sent[0].message.kind, 'problem-report');
+  assert.deepEqual(sent[0].message.fields, { site: 'event-demo', record: id, screenshots: 2 });
+  assert.equal(sent[0].message.url, 'https://console.example.test/review/problem-reports?id=receipt-1234');
 });
 
 test('one person gets ten reports an hour', async () => {
@@ -126,7 +155,7 @@ test('screenshots stay in the Console receipt, out of the relay, and require ope
   const notices = [];
   const replays = [];
   deps.log.info = (...entry) => replays.push(entry);
-  deps.notifyAttachments = async (notice) => notices.push(notice);
+  deps.notifyReport = async (notice) => notices.push(notice);
   const body = { ...BODY, submissionKey: 'f'.repeat(32), screenshots: [image.toString('base64')] };
   const res = makeRes();
   await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body }), res);
@@ -137,7 +166,7 @@ test('screenshots stay in the Console receipt, out of the relay, and require ope
   assert.deepEqual(retry.body, { id });
   assert.deepEqual(replays, [['reportProblem: replay matched an existing Console receipt', id]]);
   assert.equal(sent.length, 1);
-  assert.deepEqual(notices, [{ id, count: 1, project: 'er-console' }]);
+  assert.deepEqual(notices, [{ id, screenshotCount: 1, project: 'er-console' }]);
   assert.equal(sent[0].body.request_id, id);
   assert.ok(!('screenshots' in sent[0].body));
   assert.ok(!JSON.stringify(sent[0].body).includes('problem-reports'));

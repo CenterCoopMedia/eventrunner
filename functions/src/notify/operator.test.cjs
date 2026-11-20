@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createOperatorNotifier, internals } = require('./operator.cjs');
+const { createOperatorNotifier, createSubmissionNotifier, internals } = require('./operator.cjs');
 
 // --- Fakes -----------------------------------------------------------------
 
@@ -50,6 +50,27 @@ function fakeSendEmail(result = { providerMessageId: 'pm-1', status: 'sent', ret
   impl.calls = calls;
   return impl;
 }
+
+test('a submission uses the existing email sink and links to the mounted staff record once', async () => {
+  const sendEmail = fakeSendEmail();
+  const notify = createSubmissionNotifier({
+    env: EMAIL_ENV,
+    sendEmail,
+    getConfig: fakeGetConfig({
+      ...CONFIG,
+      tierA: { projectId: 'proj-1', publicUrl: 'https://conference.example.org/summit' },
+    }),
+  });
+  const alert = { kind: 'change-request', id: 'alert-record-123', page: '/travel', screenshotCount: 1 };
+  await notify(alert);
+  await notify(alert);
+  assert.equal(sendEmail.calls.length, 1);
+  const [sent] = sendEmail.calls;
+  assert.equal(sent.to, CONFIG.providers.notifier.operatorEmail);
+  assert.match(sent.text, /site: proj-1\nrecord: alert-record-123\npage: \/travel\nscreenshots: 1/);
+  assert.match(sent.text, /https:\/\/conference\.example\.org\/summit\/admin\/change-requests\?request=alert-record-123/);
+  assert.match(sent.html, /Event Runner operator alert/);
+});
 
 /** log.warn capture. */
 function fakeLog() {
