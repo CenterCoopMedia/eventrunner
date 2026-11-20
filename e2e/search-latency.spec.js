@@ -366,6 +366,9 @@ const inSync = async (page) => {
   return value ? line.includes(`“${value}”`) : !line.includes('“');
 };
 const search = (label, step) => ({ label, ...step, done: inSync });
+// A zero-result action is measured only once the empty state is on screen.
+const zeroMatch = (label, text, line) => ({ label, ...type(text),
+  done: async (page) => (await inSync(page)) && line.test(await statusText(page)) });
 
 // The URL commits at once; the page renders it later. An action settles only
 // when the rendered field, count line, facets and sort all show the URL, so
@@ -393,7 +396,11 @@ function scheduleActions(viewport) {
     search('type "data"', type('data')),
     search('delete two characters', erase(2)),
     search('clear search', clearSearch),
-    search('type zero-match "zzqx"', type('zzqx')),
+    // Typed at reading speed, this text can lose keys and still match.
+    search('type "zzqx" (lost-input check)', type('zzqx')),
+    search('clear "zzqx" search', clearSearch),
+    // One key cannot be lost, so the empty result is always measured.
+    zeroMatch('type zero-match "~"', '~', /^0 sessions match “~”/),
     search('clear zero-match search', clearSearch),
     ...openFilters,
     { label: 'check workshop facet', run: (page) => facet(page).press('Space'),
@@ -416,7 +423,7 @@ function attendeeActions() {
     search('clear search', clearSearch),
     search('type accented "josé"', type('josé')),
     search('clear accented search', clearSearch),
-    search('type zero-match "zzqx"', type('zzqx')),
+    zeroMatch('type zero-match "zzqx"', 'zzqx', /^0 attendees match “zzqx”/),
     search('clear zero-match search', clearSearch),
     { label: 'check top organization', run: (page) => facet(page).press('Space'), done: async (page) => facet(page).isChecked() },
     { label: 'uncheck top organization', run: (page) => facet(page).press('Space'), done: async (page) => !(await facet(page).isChecked()) },
