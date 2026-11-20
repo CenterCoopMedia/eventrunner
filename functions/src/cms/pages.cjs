@@ -350,6 +350,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
     // save -> publish -> delete launder one into deletability (stranding its
     // dedicated React route, §5.2). Checked against BOTH revisions, same as
     // the delete guard.
+    const creating = req.body?.create === true;
     if (page.systemPage === false) {
       let revisions;
       try {
@@ -366,6 +367,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
         return forbidden(res, 'systemPage: a system page cannot be changed into a regular page.');
       }
       if (revisions.some((revision) => isNavigationLink(revision) !== navigationLink)) {
+        if (creating) return sendError(res, 409, 'already-exists', `id: '${page.id}' already belongs to a page or navigation link`);
         return forbidden(res, 'A page and a navigation link must use separate records.');
       }
     }
@@ -432,7 +434,6 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
     // `create: true` is a new page. The store then refuses an existing draft
     // and an existing live doc, so two creators cannot overwrite one id.
     // An edit omits the flag and keeps the upsert path.
-    const creating = req.body?.create === true;
     try {
       // The store strips reserved publish-model keys (visible/status/
       // revision/...) from `fields` itself; visible rides separately.

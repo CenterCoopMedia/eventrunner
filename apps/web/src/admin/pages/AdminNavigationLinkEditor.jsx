@@ -6,6 +6,7 @@ import { SYSTEM_PAGE_ROUTES, isCanonicalPagePath } from 'shared/routing';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { assignPageIds, toPagePayload } from '../pageDoc.js';
+import { nextStoredOrder } from '../reorder.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { useDeletedRecord } from '../deletionUndo.jsx';
@@ -27,6 +28,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
   const saved = useRef(false);
+  const rejectedIds = useRef(new Set());
   const leave = useUnsavedNavigation(!saved.current && JSON.stringify(draft) !== JSON.stringify(initial), { blocked: busy !== null });
   const paths = new Map();
   for (const { current } of rows) {
@@ -45,16 +47,21 @@ function NavigationLinkForm({ initial, rows, creating }) {
     }
     setError('');
     setBusy('save');
+    const page = creating
+      ? assignPageIds({ ...draft, url, order: nextStoredOrder(rows) }, { pageIds: [...rows.map((row) => row.id), ...rejectedIds.current] })
+      : { ...draft, url };
     try {
-      const page = creating
-        ? assignPageIds({ ...draft, url }, { pageIds: rows.map((row) => row.id) })
-        : { ...draft, url };
       await call('cmsSavePage', { page: toPagePayload(page), ...(creating ? { create: true } : {}) });
       saved.current = true;
       showToast('Navigation link saved as a draft.');
       navigate(PAGES_PATH);
     } catch (failure) {
-      setError(contentError(failure, { fallback: 'The navigation link could not be saved.' }).message);
+      if (creating && failure?.status === 409) {
+        rejectedIds.current.add(page.id);
+        setError('That link ID was already taken. Save again to use a new one.');
+      } else {
+        setError(contentError(failure, { fallback: 'The navigation link could not be saved.' }).message);
+      }
     } finally {
       setBusy(null);
     }
@@ -134,7 +141,7 @@ export default function AdminNavigationLinkEditor() {
     return <AdminEmptyState title="Navigation link unavailable" action={<Link to={PAGES_PATH}>Back to Pages</Link>} />;
   }
   const initial = creating
-    ? { id: '', label: '', url: '', order: Math.max(0, ...rows.map((row) => row.current.order || 0)) + 1, visible: true, systemPage: false }
+    ? { id: '', label: '', url: '', order: 0, visible: true, systemPage: false }
     : existing;
   return <NavigationLinkForm key={linkId} initial={initial} rows={rows} creating={creating} />;
 }

@@ -622,6 +622,7 @@ async function runInit({
   const seedablePages = pageDocs.filter(
     (page) => !pathCollisions.has(page.id) && !sectionCollisions.has(page.id),
   );
+  const pagesWithSections = seedablePages.filter((page) => Array.isArray(page.sections));
 
   // Content is derived from the EFFECTIVE config, not from what was
   // proposed: on a --force re-run the merge rules keep the stored auth
@@ -636,7 +637,7 @@ async function runInit({
   // was skipped is precisely that somebody else owns those section ids,
   // which is where those blocks would land: editable content on a page
   // nobody seeded. A page left out of the seed is left out of it whole.
-  const generated = buildSeedContent({ pages: seedablePages, docs: effective, tierA, seededAt });
+  const generated = buildSeedContent({ pages: pagesWithSections, docs: effective, tierA, seededAt });
   // A template page keeps the template's own blocks, but a block init
   // derives from configuration (the title, the dates) is built again from
   // the new event's configuration, never carried from the old one.
@@ -646,7 +647,7 @@ async function runInit({
       template: { ...template, pages: template.pages.filter((p) => seedablePages.some((s) => s.id === p.id)) },
       configDerived: buildSeedContent({ pages: defaultPages(), docs: effective, tierA, seededAt })
         .filter((doc) => isConfigDerived(doc)
-          && seedablePages.some((page) => page.sections.some((sec) => sec.id === doc.section))),
+          && pagesWithSections.some((page) => page.sections.some((sec) => sec.id === doc.section))),
       seededAt,
     })
     : generated;

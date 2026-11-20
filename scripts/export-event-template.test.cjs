@@ -189,10 +189,18 @@ test('a template carries navigation links and their order alongside pages', asyn
     { id: 'help', label: 'Get help', url: '/faq', order: 25, visible: true, systemPage: false },
   ];
   for (const link of links) await db.collection('cmsPages').doc(link.id).set(link);
-  const { template, value, output } = await exportFrom(db);
+  const { template, out, value, output } = await exportFrom(db);
   assert.equal(value, 0, output);
   assert.deepEqual(template.pages.filter((entry) => entry.url), links);
-  assert.equal(parseTemplateFile(JSON.stringify(template)).ok, true);
+  const target = makeFakeDb();
+  const applied = await applyTo(target, { template: out });
+  assert.equal(applied.value, 0, applied.output);
+  for (const { id, url, order } of links) {
+    const link = target.read('cmsPages', id);
+    assert.equal(link.url, url);
+    assert.equal(link.order, order);
+  }
+  assert.equal(target.read('config', 'template').status, 'applied');
 });
 
 test('a bilingual export reports omitted text and distinguishes copied section translations', async () => {

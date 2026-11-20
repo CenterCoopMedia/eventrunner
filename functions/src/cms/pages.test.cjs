@@ -68,6 +68,10 @@ test('navigation link drafts accept internal paths and HTTPS while keeping page 
   await createSavePageHandler(existing)(adminReq({ page: navigationLink }), rejected);
   assert.equal(rejected.statusCode, 403);
   assert.equal(existing.store.writes.length, 0);
+  const collision = fakeRes();
+  await createSavePageHandler(existing)(adminReq({ page: navigationLink, create: true }), collision);
+  assert.equal(collision.statusCode, 409);
+  assert.equal(existing.store.writes.length, 0);
 });
 
 /** In-memory Firestore fake (get/set/where/batch) seeded as 'collection/id'. */
