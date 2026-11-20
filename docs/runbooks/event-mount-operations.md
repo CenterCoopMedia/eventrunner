@@ -22,7 +22,7 @@ Rehearsal receipts below use these names. Site A is `rehearsal-nov4` (`/conferen
 ## 1. Verify host authority and each Owner's consent
 
 1. Name the owners: host authority (CCM release coordinator), DNS/router/TLS (Cloudflare zone administrator), Hosting origins and deploys (Firebase and release operators), provider settings (each project's Auth, App Check, mail and ticket operators), route projection (Console and provisioning operators). Record the authority receipt reference, for example `er1063/host-authority`. **Proven** (runs 1 and 2).
-2. Confirm each event's Console application, organization, completed build, project, site and GitHub environment. The build record needs `resources` with `projectId`, `site`, `environment`, `domain` and `region`. Builds made before November 5, 2026 lack it: backfill with a field-mask update and an update-time precondition, then read back all five fields. **Proven** (run 1, change 1).
+2. Confirm each event's Console application, organization, completed build, project, site and GitHub environment. The build record needs `resources` with `projectId`, `site`, `environment`, `domain` and `region`. An older build can lack it (site A's build, last written November 5, 2026, did): backfill with a field-mask update and an update-time precondition, then read back all five fields. **Proven** (run 1, change 1).
 3. Each event organization Owner approves the exact public base in their own Console session: `POST /api/consentEventMount` with `{"appId":"<application id>","orgId":"<organization id>","publicBase":"https://<host>/<mount>/","confirm":true}`. The Owner must still be an Owner when the operator enrolls; enrollment checks that again. **Proven** (runs 1 and 2). In both runs the agent account was added as a second Owner of the test organization by a recorded deviation (an invite record with the product's exact fields, then a normal acceptance), because the real Owner was not available. A customer run needs the real Owner's session.
 
 ## 2. Prepare the host: router, TLS, ingress rules and the route projection
@@ -82,29 +82,32 @@ List every public, admin, speaker, unsubscribe, welcome, reminder, ticket and pa
 
 1. Disable that event's old-host redirect first.
 2. `{"action":"remove","appId":"<application id>","confirm":true}`, then check the route-map receipt and the sibling with `edge only-<sibling>`.
-3. Run the same `sync_event_mount` command. It restores the standalone URL variables and runs a full Deploy (functions, metadata, publisher configuration, Hosting). After an abort before the first address sync, the sync has nothing to apply and runs no Deploy; if you also revert `EVENT_ALLOWED_ORIGINS` or other provider settings, run a standalone Deploy (`gh workflow run deploy.yml --ref main -f client=<environment>`) so the running functions drop the host origin.
+3. Run the same `sync_event_mount` command. When the event's applied address was the mount, it restores the standalone URL variables and runs a full Deploy (functions, metadata, publisher configuration, Hosting). It runs a Deploy only when it writes a URL variable or the applied address changes: after an abort before the first address sync it deploys nothing.
 4. Check: the standalone address loads and its functions work, the mount returns 404, and the sibling's route, Hosting version and data are unchanged.
 
 **Proven** (run 1, changes 22, 38 and 41; run 2: A removed with B still mounted, `edge only-b` passed, B pages loaded and called only B's project, then B removed and `edge empty` passed).
 
-The rollback sync writes only the URL variables. It keeps `EVENT_ALLOWED_ORIGINS` as stored, so set the origins back to the standalone pair before the rollback sync if the host is going away; the rollback Deploy then also deploys the final origins. A failure after the Hosting release (post-release smoke failed, no applied receipt, sibling unaffected) is **proven** (run 1, change 39). The provisioner retries a failed Deploy 3 times, so that path takes about 40 minutes before rollback can start.
+The rollback sync writes only the URL variables and keeps `EVENT_ALLOWED_ORIGINS` as stored, so the host origin stays allowed. If the host is going away, revert the settings and run a standalone Deploy as in section 10, steps 3 and 4. A failure after the Hosting release (post-release smoke failed, no applied receipt, sibling unaffected) is **proven** (run 1, change 39). The provisioner retries a failed Deploy 3 times, so that path takes about 40 minutes before rollback can start.
 
 ## 9. Retire and restore an event
 
-Archive with `decommission-client.yml -f mode=archive`: the mount returns 404 and leaves the index and robots, the sibling keeps serving. Restore with `mode=restore` inside the recovery window: the saved route and Hosting version return. **Proven with a fix** (run 1, change 37): restore enrolled the event in auto-deploy without checking its earlier state ([#1093](https://github.com/CenterCoopMedia/eventrunner/issues/1093)); delete `AUTO_DEPLOY_ENVIRONMENTS` if it was absent before.
+Archive with `gh workflow run decommission-client.yml --ref main -f application_id=<app> -f mode=archive`: the mount returns 404 and leaves the index and robots, the sibling keeps serving. Restore with `mode=restore` inside the recovery window: the saved route and Hosting version return. **Proven** (run 1, change 37).
+
+Automatic deploys after a restore: **unproven**. In run 1 the restore added the event to `AUTO_DEPLOY_ENVIRONMENTS` although it was not enrolled before the archive ([#1093](https://github.com/CenterCoopMedia/eventrunner/issues/1093)). The fix ([#1096](https://github.com/CenterCoopMedia/eventrunner/pull/1096)) merged after run 1: the archive records whether the event was enrolled, and the restore re-enrolls it only then. No rehearsal has run a restore with the fix. After a restore, read `AUTO_DEPLOY_ENVIRONMENTS` and check that the event is listed only if it was listed before the archive. Do not delete or overwrite the variable by hand: it holds every enrolled event.
 
 ## 10. Clean up a rehearsal
 
 Reverse in dependency order and read back each step:
 
-1. Disable the old-host redirects, and `remove` each route.
-2. Set each event's deploy variables back to their baseline (`EVENT_ALLOWED_ORIGINS`, and the publisher flag and account if the rehearsal enabled them). `deploy-client.yml` writes these into the running functions, so they must be in place before the event's last Deploy.
-3. Run `sync_event_mount` for each event. Its Deploy restores the standalone address and applies the baseline settings. If the settings changed after that Deploy, run a standalone Deploy. Verify the running functions' `EVENT_PUBLIC_URL` and `EVENT_ALLOWED_ORIGINS` and a CORS preflight from the removed host (no `Access-Control-Allow-Origin`).
-4. Only then remove what the running functions no longer use: the publisher job, its image repository and grants, and the publisher service account.
-5. Fixture content and accounts, Auth authorized domains, redirect and configuration rules, old hosts back to DNS-only.
-6. Route projection: if the rehearsal created the bucket and no other host is enrolled, delete the Console variable, run **Deploy console**, then remove the bucket's grants, its object and the bucket. If the bucket was reused (step 2.1), keep the variable and the bucket, and delete only this rehearsal host's map object after its routes are removed.
-7. Custom Domain, then Worker, then cache and WAF rules, then temporary tokens and the temporary Owner membership.
+1. Disable the old-host redirects, and `remove` each route. **Proven** (run 1, changes 38, 40 and 41; run 2, change 19).
+2. Run `sync_event_mount` for each event and wait for it to finish. Read back that the route is `removed` with `appliedPublicBase` at the standalone address. **Proven** (run 1, change 44; run 2, change 20). The sync can run no Deploy (section 8, step 3), so it does not deliver the next step's settings.
+3. Set each event's deploy variables back to their baseline: `EVENT_ALLOWED_ORIGINS`, and `EVENT_SITE_PUBLISHER_ENABLED` and `EVENT_PUBLISHER_SERVICE_ACCOUNT` if the rehearsal changed them. **Proven** (run 1, change 46).
+4. Run a standalone Deploy for each event after step 3: `gh workflow run deploy.yml --ref main -f client=<environment>`. `deploy-client.yml` writes these settings into the running functions only during a Deploy. Read back: the Deploy succeeded; its **Update the site-publisher Cloud Run job** job was skipped when the publisher is off; a CORS preflight from the removed host gets no `Access-Control-Allow-Origin` and the standalone origin gets its own. **Proven** (run 1, changes 46 and 50). Reading the publisher setting directly from the running functions' environment is **unproven**.
+5. Only after step 4's readback, remove what the running functions no longer use: the publisher job, its image repository and grants, and the publisher service account. **Proven** (run 1, change 51).
+6. Fixture content and accounts, Auth authorized domains, redirect and configuration rules, old hosts back to DNS-only.
+7. Route projection: if the rehearsal created the bucket and no other host is enrolled, delete the Console variable, run **Deploy console**, then remove the bucket's grants, its object and the bucket. **Proven** (runs 1 and 2). If the bucket was reused (step 2.1), keep the variable and the bucket, and delete only this rehearsal host's map object after its routes are removed. **Unproven**: both runs created their own bucket.
+8. Custom Domain, then Worker, then cache and WAF rules, then temporary tokens and the temporary Owner membership.
 
-**Proven** (run 2 in this order; run 1 restored the origins and publisher flag after the rollback syncs and needed a second standalone Deploy of each event).
+Steps 6 to 8: **proven** (runs 1 and 2). Run 2 had no publisher and set the origins back before its syncs, whose Deploys applied them (changes 19 and 20); steps 3 and 4 above follow run 1, which works whether or not the sync deploys.
 
 Delete synthetic sign-in accounts one at a time, or run the account cleanup yourself after a batch delete: a batch delete through the Auth admin API does not fire `onUserDeleted`, so the `users` document and the per-account records stay (run 2).
