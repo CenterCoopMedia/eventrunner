@@ -63,6 +63,7 @@ export default function AdminContentPages() {
   const resultId = `${searchId}-results`;
   const filtered = filterContentPages(rows, query);
   const hasQuery = query.trim().length > 0;
+  const hasFooter = rows.some((row) => row.id === 'home' && row.current?.sections?.some(({ id }) => id === 'footer'));
 
   function clearSearch() {
     setQuery('');
@@ -74,7 +75,10 @@ export default function AdminContentPages() {
       <AdminPageHeader help="Choose a page to edit the text, images and other content in its sections."
         title="Content"
         identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
-        actions={<Link to="/admin/pages" className={linkButtonClass}>Manage page structure</Link>}
+        actions={<>
+          {hasFooter ? <Link to={contentSectionPath('home', 'footer')} className={secondaryButtonClass}>Edit footer links</Link> : null}
+          <Link to="/admin/pages" className={linkButtonClass}>Manage page structure</Link>
+        </>}
       />
 
       {error ? (

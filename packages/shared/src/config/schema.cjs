@@ -185,6 +185,26 @@ function validateMilestones(milestones, errors) {
   });
 }
 
+function validateFooterPageGroup(value, errors) {
+  if (value == null) return;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    errors.push('footerPageGroup: must be an object or null');
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (key !== 'heading' && key !== 'pageIds') errors.push(`footerPageGroup.${key}: unknown field`);
+  }
+  if (value.heading != null && typeof value.heading !== 'string') {
+    errors.push('footerPageGroup.heading: must be text or null');
+  }
+  const ids = value.pageIds;
+  if (ids != null && (!Array.isArray(ids)
+    || ids.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/u.test(id))
+    || new Set(ids).size !== ids.length)) {
+    errors.push('footerPageGroup.pageIds: must list distinct page IDs or be null');
+  }
+}
+
 /**
  * Validate a config/event document (spec §2.2).
  *
@@ -209,6 +229,7 @@ function validateEventConfig(event) {
   if (event.historicalDemo !== undefined && typeof event.historicalDemo !== 'boolean') {
     errors.push('historicalDemo: must be a boolean or absent');
   }
+  validateFooterPageGroup(event.footerPageGroup, errors);
 
   if (!Array.isArray(event.days)) {
     errors.push('days: must be an array');

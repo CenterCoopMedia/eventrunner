@@ -33,6 +33,16 @@ test('validateEventConfig accepts a valid config', () => {
   assert.deepEqual(result, { ok: true, errors: [] });
 });
 
+test('validates the footer page group and permits automatic or empty selections', () => {
+  for (const pageIds of [null, [], ['home', 'help']]) {
+    assert.equal(validateEventConfig({ ...VALID_EVENT, footerPageGroup: { pageIds, heading: 'Explore' } }).ok, true);
+  }
+  const invalid = validateEventConfig({ ...VALID_EVENT, footerPageGroup: { pageIds: ['home', 'home'], heading: {} } });
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.errors.some((error) => error.startsWith('footerPageGroup.pageIds:')));
+  assert.ok(invalid.errors.some((error) => error.startsWith('footerPageGroup.heading:')));
+});
+
 test('validateEventConfig rejects per-field problems with named errors', () => {
   const result = validateEventConfig({
     name: '',

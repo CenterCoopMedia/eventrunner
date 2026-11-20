@@ -74,7 +74,7 @@ function isNonEmptyString(v) {
  * @param {object|null|undefined} features config/features
  * @returns {{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }|null}
  */
-function navItemFor(page, features, pages) {
+export function navItemFor(page, features, pages) {
   if (!page || typeof page !== 'object') return null;
   if (isNavigationLink(page)) {
     const to = navigationLinkUrl(page.url);

@@ -234,13 +234,14 @@ describe('Layout nav', () => {
     );
   }
 
-  it('hides nav items whose feature is disabled at runtime', () => {
+  it('hides nav items whose feature is disabled at runtime', async () => {
     // Every page link is rendered TWICE — once in the navigation and once in
     // the footer list, which reuses the same builder and therefore the same
     // gate (M7 issue 3) — so these count links rather than expecting one.
     const links = (name) => screen.queryAllByRole('link', { name });
 
     renderShell();
+    await screen.findByRole('navigation', { name: 'Site pages' });
     // Snapshot features enable all three sections.
     expect(links('Speakers')).toHaveLength(2);
 
