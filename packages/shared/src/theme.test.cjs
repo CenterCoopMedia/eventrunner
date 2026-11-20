@@ -792,9 +792,9 @@ test('a resolver asked for a style before the remaps load throws, naming the mod
   // paint sees before the lazy chunk lands. The public path asks it for no
   // style (the generated stylesheet already carries the look), and a
   // document that names no preset resolves to nothing without the remaps.
-  const key = require.resolve('./theme.cjs');
-  const cached = require.cache[key];
-  delete require.cache[key];
+  const keys = [require.resolve('./theme.cjs'), require.resolve('./presetRemapState.cjs')];
+  const cached = keys.map((key) => require.cache[key]);
+  for (const key of keys) delete require.cache[key];
   try {
     const fresh = require('./theme.cjs');
     assert.equal(fresh.presetRemapsLoaded(), false);
@@ -806,6 +806,6 @@ test('a resolver asked for a style before the remaps load throws, naming the mod
     assert.throws(() => fresh.resolveComponentFonts({ preset: 'zine' }), /shared\/presetRemaps/);
     assert.throws(() => fresh.resolveFontRoles({ preset: 'zine' }), /shared\/presetRemaps/);
   } finally {
-    require.cache[key] = cached;
+    keys.forEach((key, index) => { require.cache[key] = cached[index]; });
   }
 });

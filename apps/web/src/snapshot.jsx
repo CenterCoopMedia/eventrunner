@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 import { Router, createPath } from 'react-router';
 import AppRoot from './AppRoot.jsx';
 import { theme } from '@generated/eventConfig.js';
-import { resolveRootAttributes } from './lib/themeCss.js';
+import { resolveRootAttributes } from './lib/themeAttributes.js';
 import { readDemoDisplay } from './components/DemoBanner.jsx';
 import { ViewportProvider, WIDE_VIEWPORT } from './lib/viewport.js';
 

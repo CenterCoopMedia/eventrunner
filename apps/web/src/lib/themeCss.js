@@ -324,18 +324,3 @@ function printBlock(lines) {
   const body = lines.map((line) => `  ${line}`).join('\n');
   return `@media print {\n  ${selectors} {\n${body}\n  }\n}`;
 }
-
-/**
- * The root-element attributes a document resolves to (brief §3.4, §3.8).
- * EventConfigProvider writes these; the mode attribute is modeRuntime's,
- * because it also follows a media query.
- *
- * @param {object} themeDoc
- * @returns {{ theme: string|null, motifSet: string }}
- */
-export function resolveRootAttributes(themeDoc) {
-  return {
-    theme: themePresetId(themeDoc),
-    motifSet: resolveMotifSet(themeDoc),
-  };
-}

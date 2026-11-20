@@ -21,7 +21,8 @@ import {
 import { COLOR_PROPS, FONT_SETS, RADIUS_SCALES } from './themeCss.js';
 
 // The preview uses the same CSS and attributes as the live site.
-export { buildRuntimeThemeCss, resolveRootAttributes } from './themeCss.js';
+export { buildRuntimeThemeCss } from './themeCss.js';
+export { resolveRootAttributes } from './themeAttributes.js';
 
 const HEX_DIGITS = '0123456789abcdef';
 

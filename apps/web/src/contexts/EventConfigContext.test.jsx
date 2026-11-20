@@ -2,7 +2,7 @@
 // snapshot-first rendering, config doc overlays via fake onSnapshot
 // callbacks, the runtime theme style element, and feature-driven nav.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 // Capture each config doc subscription so tests can fire fake snapshots.
@@ -82,7 +82,7 @@ describe('EventConfigProvider', () => {
     expect(runtimeStyle().textContent).toBe('');
   });
 
-  it('updates the runtime style element when config/theme changes', () => {
+  it('updates the runtime style element when config/theme changes', async () => {
     render(
       <EventConfigProvider>
         <Probe />
@@ -95,9 +95,9 @@ describe('EventConfigProvider', () => {
         radius: 'round',
       });
     });
-    expect(runtimeStyle().textContent).toContain(
+    await waitFor(() => expect(runtimeStyle().textContent).toContain(
       '--brand-primary-rgb: 51 102 153;',
-    );
+    ));
     expect(runtimeStyle().textContent).toContain('--radius-base: 16px;');
     expect(screen.getByTestId('source')).toHaveTextContent('live');
 
@@ -105,9 +105,9 @@ describe('EventConfigProvider', () => {
     act(() => {
       subscriptions.get('theme')({ colors: { primary: hex('112233') } });
     });
-    expect(runtimeStyle().textContent).toContain(
+    await waitFor(() => expect(runtimeStyle().textContent).toContain(
       '--brand-primary-rgb: 17 34 51;',
-    );
+    ));
     expect(runtimeStyle().textContent).not.toContain('51 102 153');
     expect(runtimeStyle().textContent).not.toContain('--radius-base');
   });
@@ -156,7 +156,7 @@ describe('EventConfigProvider', () => {
     expect(screen.getByTestId('schedule-feature')).toHaveTextContent('true');
   });
 
-  it('mirrors config/theme.texture onto documentElement.dataset.texture', () => {
+  it('mirrors config/theme.texture onto documentElement.dataset.texture', async () => {
     render(
       <EventConfigProvider>
         <Probe />
@@ -174,10 +174,10 @@ describe('EventConfigProvider', () => {
     act(() => {
       subscriptions.get('theme')({ texture: other });
     });
-    expect(document.documentElement.dataset.texture).toBe(other);
+    await waitFor(() => expect(document.documentElement.dataset.texture).toBe(other));
   });
 
-  it('writes the preset\'s texture when the document names no texture of its own', () => {
+  it('writes the preset\'s texture when the document names no texture of its own', async () => {
     // A preset states its own texture (brief §4); config/theme.texture only
     // overrides it. Every preset is flat by default now (owner review,
     // 2026-08-27), so a document that names one and omits the field must
@@ -190,13 +190,13 @@ describe('EventConfigProvider', () => {
     act(() => {
       subscriptions.get('theme')({ preset: 'field-guide' });
     });
-    expect(document.documentElement.dataset.texture).toBe('flat');
+    await waitFor(() => expect(document.documentElement.dataset.texture).toBe('flat'));
 
     // And the override still wins over the preset it overrides.
     act(() => {
       subscriptions.get('theme')({ preset: 'field-guide', texture: 'paper' });
     });
-    expect(document.documentElement.dataset.texture).toBe('paper');
+    await waitFor(() => expect(document.documentElement.dataset.texture).toBe('paper'));
   });
 });
 

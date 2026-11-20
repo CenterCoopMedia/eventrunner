@@ -25,15 +25,15 @@ import {
 } from '@generated/eventConfig.js';
 import { subscribeConfigDoc } from '../lib/configSource.js';
 import { IS_DEMO } from '../lib/demoMode.js';
-import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeCss.js';
+import { resolveRootAttributes } from '../lib/themeAttributes.js';
 import { loadPresetRemaps, presetRemapsLoaded } from '../lib/presetRemaps.js';
 import { startModeSync } from '../lib/modeRuntime.js';
 import { getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
-import { resolveShape, themePresetId } from 'shared/theme';
+import { resolveShape, themePresetId } from 'shared/themeAppearance';
 import { publicSubscriptionsForRoute } from '../lib/publicSubscriptions.js';
 
-/** Pauses before a failed remaps load is tried again, in milliseconds. */
-const REMAPS_RETRY_DELAYS = Object.freeze([2_000, 4_000, 8_000]);
+/** Pauses before a failed runtime theme load is tried again, in milliseconds. */
+const THEME_RETRY_DELAYS = Object.freeze([2_000, 4_000, 8_000]);
 
 const EventConfigContext = createContext(null);
 
@@ -235,23 +235,17 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
   const [appliedThemeDoc, setAppliedThemeDoc] = useState(snapshotTheme);
   // A failed chunk load is tried again, a bounded number of times; each
   // tick re-runs the overlay effect below.
-  const [remapsRetry, setRemapsRetry] = useState(0);
-  const remapsAttempts = useRef(0);
+  const [themeLoadRetry, setThemeLoadRetry] = useState(0);
+  const themeLoadAttempts = useRef(0);
 
   // Runtime theme override (spec §7.2). The element exists from mount so the
   // ownership contract holds even before config/theme arrives; its content is
   // only the properties the runtime doc validly overrides — everything else
   // keeps the build-time value from generated/theme.css.
   //
-  // THE OVERLAY WAITS FOR THE PRESET REMAPS. Resolving a style needs what it
-  // and its picked options move, and that data is a lazy chunk (lib/
-  // presetRemaps.js) rather than part of the bundle every visitor downloads
-  // for a first paint the generated stylesheet already covers. The overlay is
-  // written whole once the chunk is here, never half-resolved before it. A
-  // document that names no style needs no remaps and is written at once. A
-  // load that fails leaves the look last written in place and is tried
-  // again after a pause (REMAPS_RETRY_DELAYS); a document that changes in
-  // the meantime asks afresh.
+  // The build stylesheet covers the first paint. A live or demo override
+  // loads the runtime CSS builder and, for a named style, the preset remaps.
+  // Install the finished CSS before changing the root attributes or mode.
   useEffect(() => {
     const styleEl = ensureRuntimeStyleElement();
     if (!runtimeThemeDoc) {
@@ -261,27 +255,31 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
     }
     let cancelled = false;
     let timer = null;
-    const write = () => {
+    const remaps = themePresetId(runtimeThemeDoc) && !presetRemapsLoaded()
+      ? loadPresetRemaps()
+      : null;
+    const runtimeModule = import('../lib/themeCss.js').then((runtime) => {
+      if (!runtime) throw new Error('The runtime theme stylesheet module did not load.');
+      return runtime;
+    });
+    Promise.all([runtimeModule, remaps]).then(([runtime]) => {
       if (cancelled) return;
-      styleEl.textContent = buildRuntimeThemeCss(runtimeThemeDoc);
-      remapsAttempts.current = 0;
+      styleEl.textContent = runtime.buildRuntimeThemeCss(runtimeThemeDoc);
+      themeLoadAttempts.current = 0;
       setAppliedThemeDoc(runtimeThemeDoc);
-    };
-    if (!themePresetId(runtimeThemeDoc) || presetRemapsLoaded()) {
-      write();
-    } else {
-      loadPresetRemaps().then(write, () => {
-        if (cancelled || remapsAttempts.current >= REMAPS_RETRY_DELAYS.length) return;
-        const delay = REMAPS_RETRY_DELAYS[remapsAttempts.current];
-        remapsAttempts.current += 1;
-        timer = setTimeout(() => setRemapsRetry((tick) => tick + 1), delay);
-      });
-    }
+    }, () => {
+      if (cancelled || themeLoadAttempts.current >= THEME_RETRY_DELAYS.length) return;
+      const delay = THEME_RETRY_DELAYS[themeLoadAttempts.current];
+      themeLoadAttempts.current += 1;
+      timer = setTimeout(() => setThemeLoadRetry((tick) => tick + 1), delay);
+    }).catch(() => {
+      if (!cancelled) console.error('Could not build the runtime theme stylesheet.');
+    });
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [runtimeThemeDoc, remapsRetry]);
+  }, [runtimeThemeDoc, themeLoadRetry]);
 
   // Event-neutral shell title: snapshot name first, runtime name when it
   // lands. A route that names itself (useDocumentTitle) composes in front

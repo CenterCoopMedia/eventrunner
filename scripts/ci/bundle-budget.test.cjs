@@ -180,6 +180,14 @@ test('only the home first-paint blocks can be statically imported', () => {
   }
 });
 
+test('first paint leaves runtime theme rendering and venue floor plans unloaded', () => {
+  const { files, packages } = eagerSourceGraph(path.join(WEB_SRC, 'main.jsx'));
+  assert.equal(files.has(path.join(WEB_SRC, 'lib', 'themeAttributes.js')), true);
+  assert.equal(files.has(path.join(WEB_SRC, 'lib', 'themeCss.js')), false);
+  assert.equal(packages.has('shared/theme'), false);
+  assert.equal(packages.has('shared/venue'), false);
+});
+
 test('the demo settings panel and style descriptions load only after the disclosure opens', () => {
   const { files } = eagerSourceGraph(path.join(WEB_SRC, 'main.jsx'));
   assert.equal(files.has(path.join(WEB_SRC, 'components', 'DemoBanner.jsx')), true);

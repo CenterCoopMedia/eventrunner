@@ -28,7 +28,11 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import postcss from 'postcss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import publicTailwind from '../../../tailwind.config.js';
+import adminTailwind from '../../../tailwind.admin.config.js';
+import specimenTailwind from '../../../tailwind.specimen.config.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..', '..', '..', '..');
@@ -37,10 +41,10 @@ const { buildCommand, DEFAULT_BASE, DEMO_FIREBASE_ENV } = require(path.join(REPO
 const { measureBundle } = require(path.join(REPO_ROOT, 'scripts', 'ci', 'bundle-budget.cjs'));
 
 /**
- * The same demo-mode vite build scripts/build-demo.cjs runs, written to a
- * scratch directory so it never touches apps/web/dist or docs/demo.
+ * Stylesheets from the same Vite build scripts/build-demo.cjs runs, written
+ * to a scratch directory so it never touches apps/web/dist or docs/demo.
  */
-function buildDemoStylesheet(outDir) {
+function buildDemoStylesheets(outDir) {
   const env = { ...process.env, ...DEMO_FIREBASE_ENV, VITE_DEMO_MODE: '1' };
   for (const key of Object.keys(env)) {
     if (key === 'NODE_ENV' || key === 'GENERATED_DIR' || key.startsWith('VITEST')) delete env[key];
@@ -54,8 +58,7 @@ function buildDemoStylesheet(outDir) {
   return fs
     .readdirSync(assets)
     .filter((file) => file.endsWith('.css'))
-    .map((file) => fs.readFileSync(path.join(assets, file), 'utf8'))
-    .join('\n');
+    .map((file) => ({ file: `assets/${file}`, css: fs.readFileSync(path.join(assets, file), 'utf8') }));
 }
 
 /**
@@ -193,9 +196,19 @@ const DEVICE_CLASSES = [
 describe('the built stylesheet', () => {
   let scratch;
   let bundled = '';
+  let startup = '';
+  let sheets;
   beforeAll(() => {
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'purge-demo-build-'));
-    bundled = buildDemoStylesheet(scratch);
+    sheets = buildDemoStylesheets(scratch);
+    bundled = sheets.map(({ css }) => css).join('\n');
+    const { initialCss } = measureBundle(scratch);
+    const initialFiles = new Set(initialCss.files.map(({ file }) => file));
+    startup = sheets.filter(({ file }) => initialFiles.has(file)).map(({ css }) => css).join('\n');
+    for (const sheet of sheets) {
+      sheet.initial = initialFiles.has(sheet.file);
+      sheet.tree = postcss.parse(sheet.css);
+    }
   }, 180_000);
   afterAll(() => {
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
@@ -209,12 +222,13 @@ describe('the built stylesheet', () => {
   });
 
   it('keeps block and admin styles out of the first-paint CSS', () => {
-    const { initialCss } = measureBundle(scratch);
-    expect(initialCss.files.length).toBeGreaterThan(0);
-    const startup = initialCss.files.map(({ file }) =>
-      fs.readFileSync(path.join(scratch, file), 'utf8'),
-    ).join('\n');
-    for (const selector of ['.pull-quote__mark', '.long-read-opening', '.venue-map__frame', '.admin-rich-text', '.admin-proof-row']) {
+    expect(startup.length).toBeGreaterThan(0);
+    for (const selector of [
+      '.pull-quote__mark', '.long-read-opening', '.venue-map__frame', '.ruled-table__sort',
+      '.dropzone__sent', '.repeater__row', '.specimen-motif-row', '.admin-rich-text',
+      '.admin-proof-row', '.bg-admin-ground-proof', '.progress-bar', '.standfirst',
+      '.byline', '.public-dialog', '.site-account-sheet',
+    ]) {
       expect(bundled).toContain(selector);
       expect(startup).not.toContain(selector);
     }
@@ -223,12 +237,40 @@ describe('the built stylesheet', () => {
   it('never leaves a masked device without its mask', () => {
     // The failure mode this file exists for: a `.motif--*` or
     // `.wayfinding-icon--*` rule purged while the base class — which paints
-    // the ink — survives.
+    // the ink — survives. A specimen override can mention the same class
+    // before its standalone rule, so match the selectors on the mask rule.
+    const maskedSelectors = new Set();
+    for (const { tree } of sheets) {
+      tree.walkDecls('mask-image', (declaration) => {
+        const rule = declaration.parent;
+        if (rule.type === 'rule' && declaration.value !== 'none') {
+          rule.selectors.forEach((selector) => maskedSelectors.add(selector));
+        }
+      });
+    }
     for (const selector of DEVICE_CLASSES.filter(
       (name) => name.startsWith('.motif--') || name.startsWith('.wayfinding-icon--'),
     )) {
-      const rule = bundled.slice(bundled.indexOf(selector));
-      expect(rule.slice(0, 400), `${selector} still carries a mask`).toContain('mask-image');
+      expect(maskedSelectors, `${selector} still carries a mask`).toContain(selector);
+    }
+  });
+
+  it('keeps shared responsive utilities after base utilities in deferred styles', () => {
+    for (const [scope, base, variant] of [
+      [':where(html:has(.admin-room))', 'grid-cols-2', 'sm\\:grid-cols-4'],
+      [':where(html:has(.specimen-book))', 'flex-col', 'lg\\:flex-row'],
+    ]) {
+      const order = [];
+      for (const { file, initial, tree } of sheets) {
+        if (initial) continue;
+        tree.walkRules((rule) => {
+          const { selectors } = rule;
+          if (selectors.includes(`.${base}`)) order.push(`${file} has an unscoped ${base}`);
+          if (selectors.includes(`${scope} .${base}`)) order.push(base);
+          if (selectors.includes(`${scope} .${variant}`) && rule.parent.name === 'media') order.push(variant);
+        });
+      }
+      expect(order, scope).toEqual([base, variant]);
     }
   });
 
@@ -237,10 +279,9 @@ describe('the built stylesheet', () => {
     // list it checks. Put the test files back in `content` and every name
     // here keeps its own rule alive, and both assertions pass for a class
     // no component renders. So the exclusion is asserted, not assumed.
-    const config = fs.readFileSync(path.join(REPO_ROOT, 'apps', 'web', 'tailwind.config.js'), 'utf8');
-    const globs = config.match(/content:\s*\[([^\]]*)\]/);
-    expect(globs, 'tailwind.config.js states its content globs').not.toBeNull();
-    expect(globs[1], 'the test files are excluded from what Tailwind scans')
-      .toContain("'!./src/**/*.test.{js,jsx}'");
+    for (const config of [publicTailwind, adminTailwind, specimenTailwind]) {
+      expect(config.content, 'the test files are excluded from what Tailwind scans')
+        .toContain('!./src/**/*.test.{js,jsx}');
+    }
   });
 });

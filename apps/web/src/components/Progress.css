@@ -1,0 +1,28 @@
+/* PROGRESS (record §3.2): a native <progress> with the fraction stated
+   beside it. The native paint is turned off and the bar is drawn from the
+   tokens: a track inside a hairline on the alternate ground, and a flat
+   fill in the accent. Never a ring, and nothing moves. */
+.progress-bar {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  inline-size: 100%;
+  block-size: var(--progress-block-size);
+  overflow: hidden;
+  border: var(--progress-rule-width) solid rgb(var(--progress-rule-rgb));
+  border-radius: var(--progress-radius);
+  background-color: var(--progress-track);
+  color: var(--progress-fill);
+}
+.progress-bar::-webkit-progress-bar {
+  background-color: var(--progress-track);
+}
+.progress-bar::-webkit-progress-value {
+  background-color: var(--progress-fill);
+}
+.progress-bar::-moz-progress-bar {
+  background-color: var(--progress-fill);
+}
+.progress-label {
+  font-family: var(--progress-label-font);
+}

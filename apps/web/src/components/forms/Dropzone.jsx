@@ -29,6 +29,7 @@
 import { useId, useRef, useState } from 'react';
 import Progress from '../Progress.jsx';
 import { quietActionClass } from '../controlClasses.js';
+import './Dropzone.css';
 
 /** The word for each state a sent file can be in. */
 const SENT_STATE_WORD = Object.freeze({

@@ -1,0 +1,12 @@
+/* THE BYLINE AND THE DATELINE (record §3.1): who, in what role, and when,
+   in the data face. A dateline carries the event's clock. */
+.byline {
+  font-family: var(--byline-font);
+  font-size: var(--byline-size);
+  line-height: var(--text-caption-leading);
+  font-weight: var(--byline-weight);
+  color: var(--byline-ink);
+  text-transform: var(--byline-transform);
+  letter-spacing: var(--byline-tracking);
+  font-variant-numeric: tabular-nums;
+}

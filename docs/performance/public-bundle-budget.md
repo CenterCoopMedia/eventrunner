@@ -32,7 +32,7 @@ The committed limits are:
 - 180,000 raw bytes and 50,000 gzip bytes for each deferred chunk.
 - 560,000 raw bytes and 165,000 gzip bytes for the named `firebase-sdk` chunk. This exception covers the static dependencies of the deferred Firebase runtime. Storage, Firestore Lite and dynamic App Check remain outside that group and retain the ordinary deferred ceiling.
 
-For each initial JS limit, start with the larger measurement from the normal and demo production builds. Add 2% and round up to a multiple of 100 bytes. The [bundle report](public-bundle-report.md) records the measurements for #1122.
+Follow the approval and measurement rule in `scripts/ci/bundle-budget.json` when proposing a higher initial limit. The [bundle report](public-bundle-report.md) records the measurements for #1122.
 
 ### 2026-11-19: held-up figure, initial and CSS limits raised (#1090)
 

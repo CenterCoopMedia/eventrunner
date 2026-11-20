@@ -52,6 +52,7 @@ import LoadingStatus from './LoadingStatus.jsx';
 import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
 import { encodeScreenshots, PUBLIC_SCREENSHOT_MIB, ScreenshotReadError } from '@screenshot-ui/browser.mjs';
 import PublicScreenshotField from './forms/PublicScreenshotField.jsx';
+import './PublicDialog.css';
 
 /**
  * The dialog's frame: the strong rule on the page ground, at the reading

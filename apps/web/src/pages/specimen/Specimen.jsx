@@ -21,6 +21,7 @@ import { SPECIMEN_TITLE } from './specimenRoute.js';
 import useNoIndex from './useNoIndex.js';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { eventConfig } from '@generated/eventConfig.js';
+import './Specimen.css';
 
 export default function Specimen() {
   useDocumentTitle(SPECIMEN_TITLE);

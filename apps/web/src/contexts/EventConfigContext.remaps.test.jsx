@@ -7,7 +7,7 @@
 // test controls when the chunk "arrives"; the resolver behind it is real,
 // registered for every test by src/test/setup.js.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 
 const { subscriptions, loader } = vi.hoisted(() => ({
   subscriptions: new Map(),
@@ -90,14 +90,14 @@ describe('EventConfigProvider and the preset remaps', () => {
     await act(async () => {
       loader.resolve();
     });
-    expect(runtimeStyle().textContent).toContain('--callout-angle: -2.5deg;');
+    await waitFor(() => expect(runtimeStyle().textContent).toContain('--callout-angle: -2.5deg;'));
     expect(runtimeStyle().textContent).toContain('--density:');
-    // A second theme write finds the remaps loaded and writes at once.
+    // A second theme write uses the remaps already loaded.
     act(() => {
       subscriptions.get('theme')({ preset: 'civic' });
     });
     expect(loader.calls).toBe(1);
-    expect(runtimeStyle().textContent).not.toContain('--callout-angle: -2.5deg;');
+    await waitFor(() => expect(runtimeStyle().textContent).not.toContain('--callout-angle: -2.5deg;'));
   });
 
   it('keeps the root attributes at the style last written whole until the remaps land', async () => {
@@ -123,7 +123,7 @@ describe('EventConfigProvider and the preset remaps', () => {
     await act(async () => {
       loader.resolve();
     });
-    expect(root.dataset.theme).toBe(OTHER_PRESET);
+    await waitFor(() => expect(root.dataset.theme).toBe(OTHER_PRESET));
     expect(root.dataset.motifSet).toBe(resolveMotifSet({ preset: OTHER_PRESET }));
     expect(runtimeStyle().textContent).not.toBe('');
   });
@@ -147,10 +147,10 @@ describe('EventConfigProvider and the preset remaps', () => {
     await act(async () => {
       loader.resolve();
     });
-    expect(root.dataset.mode).toBe(next);
+    await waitFor(() => expect(root.dataset.mode).toBe(next));
   });
 
-  it('writes a document that names no style at once, because it needs no remaps', () => {
+  it('writes a document that names no style without loading preset remaps', async () => {
     render(
       <EventConfigProvider>
         <p>The page</p>
@@ -160,10 +160,11 @@ describe('EventConfigProvider and the preset remaps', () => {
       subscriptions.get('theme')({ radius: 'round' });
     });
     expect(loader.calls).toBe(0);
-    expect(runtimeStyle().textContent).toContain('--radius-base: 16px;');
+    await waitFor(() => expect(runtimeStyle().textContent).toContain('--radius-base: 16px;'));
   });
 
   it('tries the load again after a failure, and applies the style when it lands', async () => {
+    await import('../lib/themeCss.js');
     vi.useFakeTimers();
     render(
       <EventConfigProvider>

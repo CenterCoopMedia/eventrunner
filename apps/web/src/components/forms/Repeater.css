@@ -1,0 +1,6 @@
+/* THE REPEATER (record §3.3): a short list of rows a person adds and
+   removes, ruled between rows. */
+.repeater__row {
+  padding-block: var(--repeater-row-pad-block);
+  border-block-start: var(--repeater-rule-width) solid rgb(var(--repeater-rule-rgb));
+}

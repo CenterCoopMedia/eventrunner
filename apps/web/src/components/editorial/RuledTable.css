@@ -1,0 +1,57 @@
+/* THE RULED TABLE (record §3.1): a real <table>, ruled between rows,
+   inside a region that scrolls sideways at narrow widths so the page
+   never does. The head does not stick: the region is the scroll
+   container, and a head pinned inside a container that scrolls only
+   sideways pins to nothing the reader scrolls (adversarial review of the
+   wave). The three widths are what the Table rules option moves:
+   hairline rows, a ruled head, or the full grid. Figures sit in tabular
+   numerals so a column of them lines up. */
+.ruled-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+.ruled-table caption {
+  text-align: start;
+  caption-side: top;
+}
+.ruled-table th,
+.ruled-table td {
+  padding-block: var(--table-cell-pad-block);
+  padding-inline: var(--table-cell-pad-inline);
+  text-align: start;
+  vertical-align: top;
+  border-block-start: var(--table-rule-width) solid rgb(var(--table-rule-rgb));
+  border-inline-start: var(--table-column-rule-width) solid rgb(var(--table-rule-rgb));
+}
+.ruled-table th:first-child,
+.ruled-table td:first-child {
+  padding-inline-start: 0;
+  border-inline-start: 0;
+}
+.ruled-table thead th {
+  border-block-start: 0;
+  border-block-end: var(--table-head-rule-width) solid rgb(var(--table-head-rule-rgb));
+  background-color: var(--table-head-ground);
+  font-family: var(--table-head-font);
+  text-transform: var(--table-head-transform);
+  letter-spacing: var(--table-head-tracking);
+}
+.ruled-table tbody tr:first-child > * {
+  border-block-start: 0;
+}
+.ruled-table [data-numeric] {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+/* The sort control is the head's own word, so it takes no box of its
+   own: the whole word is the target, at the row's height. */
+.ruled-table__sort {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: inherit;
+}

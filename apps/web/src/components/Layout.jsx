@@ -56,7 +56,14 @@
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
 import { Outlet, matchPath, useLocation } from 'react-router';
-import { THEME_HEADER_LOGOS, resolveFooterLogo, resolveHeader, resolveHeaderLogo } from 'shared/theme';
+import {
+  DEFAULT_NAV_PLACEMENT,
+  THEME_HEADER_LOGOS,
+  resolveFooterLogo,
+  resolveHeader,
+  resolveHeaderLogo,
+  resolveNavPlacement,
+} from 'shared/themeAppearance';
 import { listSocialAccounts } from 'shared/config/socialAccounts';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useDeviceBookmarks } from '../hooks/useDeviceBookmarks.js';
@@ -64,7 +71,6 @@ import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { PublicLink as Link, PublicNavLink as NavLink } from './PublicLink.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc, uploadedBrandingSrc } from '../lib/mediaSource.js';

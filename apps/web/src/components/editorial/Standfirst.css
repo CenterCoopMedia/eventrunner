@@ -1,0 +1,13 @@
+/* THE STANDFIRST (record §3.1): the one sentence under a heading that says
+   what the page is. Below the heading, never above it. */
+.standfirst {
+  font-family: var(--standfirst-font);
+  font-size: var(--standfirst-size);
+  line-height: var(--standfirst-leading);
+  font-style: var(--standfirst-style);
+  font-weight: var(--standfirst-weight);
+  color: var(--standfirst-ink);
+  padding-block-end: var(--standfirst-pad-block-end);
+  border-block-end: var(--standfirst-rule-width) solid rgb(var(--standfirst-rule-rgb));
+  text-wrap: pretty;
+}

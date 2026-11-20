@@ -27,6 +27,7 @@
 // The rules read the `table` contract, which is what the Table rules option
 // in each style remaps: hairline rows, a ruled head, or the full grid.
 import HorizontalScrollRegion from '../HorizontalScrollRegion.jsx';
+import './RuledTable.css';
 
 /** The direction words, as aria-sort states and as the hidden sentence. */
 const SORT_WORD = Object.freeze({

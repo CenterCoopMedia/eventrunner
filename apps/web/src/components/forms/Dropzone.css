@@ -1,0 +1,34 @@
+/* THE DROPZONE (record §3.3): a ruled region around a real file input.
+   The rule is the control boundary, dashed at rest and solid while a file
+   is held over it, and the region shows the one focus ring when the input
+   inside it has focus, because the input itself is off screen. */
+.dropzone {
+  position: relative;
+  padding: var(--dropzone-pad);
+  border: var(--dropzone-rule-width) var(--dropzone-rule-style) rgb(var(--dropzone-rule-rgb));
+  border-radius: var(--dropzone-radius);
+  background-color: var(--dropzone-ground);
+}
+/* Held over: solid AND at the drag width, so a style whose rest rule is
+   already solid (Atlas) or already strong (Zine, which doubles the drag
+   width) still shows the state by more than its colour. */
+.dropzone[data-dragging='true'] {
+  border-style: solid;
+  border-width: var(--dropzone-drag-rule-width);
+  border-color: rgb(var(--color-accent-rgb));
+}
+/* The alarm rule (state grammar, error): the strong width in the danger
+   ink, the same rule a checkbox in error draws, so a refusal is never the
+   red sentence under the region alone. */
+.dropzone[data-invalid='true'] {
+  border-style: solid;
+  border-width: var(--rule-strong-width);
+  border-color: rgb(var(--semantic-danger-rgb));
+}
+.dropzone:focus-within {
+  outline: var(--focus-ring-width) solid rgb(var(--color-accent-rgb));
+  outline-offset: var(--focus-ring-offset);
+}
+.dropzone__sent {
+  border-block-start: var(--dropzone-rule-width) solid rgb(var(--rule-hairline-rgb));
+}

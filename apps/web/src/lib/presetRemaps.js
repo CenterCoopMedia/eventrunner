@@ -19,7 +19,7 @@
 // caller waits on the same load; a failed load is forgotten, so the next
 // caller tries again rather than inheriting the failure for the life of the
 // page.
-import { presetRemapsLoaded, registerPresetRemaps } from 'shared/theme';
+import { presetRemapsLoaded, registerPresetRemaps } from 'shared/presetRemapState';
 
 let loading = null;
 

@@ -1,8 +1,8 @@
 {
-  "initialHeadroomRule": "For each initial JS metric, add 2% to the larger of the normal and demo production build measurements and round up to a multiple of 100 bytes. Record fresh measurements and a reason before raising a limit.",
+  "initialHeadroomRule": "Raise an initial limit only with the coordinator's approval recorded in the PR body, fresh public and demo measurements, and a reason. For an approved initial JS increase, add 2% to the larger measurement and round up to a multiple of 100 bytes.",
   "initial": {
-    "raw": 439300,
-    "gzip": 138800
+    "raw": 430900,
+    "gzip": 135800
   },
   "initialCss": {
     "raw": 195000,
