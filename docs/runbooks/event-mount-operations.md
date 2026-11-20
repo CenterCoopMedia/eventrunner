@@ -17,12 +17,13 @@ Rehearsal receipts below use these names. Site A is `rehearsal-nov4` (`/conferen
 - Roll back the route and the matching build and URL settings together. Keep the event's fixed Hosting origin (`https://<project>.web.app`) as the router's upstream and as the recovery address.
 - Keep secrets in process memory or the credential store. Never print a token, a signed link or a sign-in code.
 - One event's change must leave every sibling event on the host unchanged. Check the sibling after each step.
+- `scripts/dev/client-host-rehearsal.cjs` (`edge`, `cors`, `browser`, `unsubscribe`) is rehearsal-only: it hard-codes the test host and the two fixture projects. For any other host, run the same checks by hand against that host and the event's own project: the public receipt at `https://<host>/.well-known/eventrunner-route-map`, `curl -X OPTIONS` preflights to `https://us-central1-<project>.cloudfunctions.net/sendOtpCode` with each origin, and the mounted pages in a browser.
 
 ## 1. Verify host authority and each Owner's consent
 
 1. Name the owners: host authority (CCM release coordinator), DNS/router/TLS (Cloudflare zone administrator), Hosting origins and deploys (Firebase and release operators), provider settings (each project's Auth, App Check, mail and ticket operators), route projection (Console and provisioning operators). Record the authority receipt reference, for example `er1063/host-authority`. **Proven** (runs 1 and 2).
 2. Confirm each event's Console application, organization, completed build, project, site and GitHub environment. The build record needs `resources` with `projectId`, `site`, `environment`, `domain` and `region`. Builds made before November 5, 2026 lack it: backfill with a field-mask update and an update-time precondition, then read back all five fields. **Proven** (run 1, change 1).
-3. Each event organization Owner approves the exact public base in their own Console session: `POST /api/consentEventMount` with `{"appId","orgId","publicBase","confirm":true}`. The Owner must still be an Owner when the operator enrolls; enrollment checks that again. **Proven** (runs 1 and 2). In both runs the agent account was added as a second Owner of the test organization by a recorded deviation (an invite record with the product's exact fields, then a normal acceptance), because the real Owner was not available. A customer run needs the real Owner's session.
+3. Each event organization Owner approves the exact public base in their own Console session: `POST /api/consentEventMount` with `{"appId":"<application id>","orgId":"<organization id>","publicBase":"https://<host>/<mount>/","confirm":true}`. The Owner must still be an Owner when the operator enrolls; enrollment checks that again. **Proven** (runs 1 and 2). In both runs the agent account was added as a second Owner of the test organization by a recorded deviation (an invite record with the product's exact fields, then a normal acceptance), because the real Owner was not available. A customer run needs the real Owner's session.
 
 ## 2. Prepare the host: router, TLS, ingress rules and the route projection
 
@@ -41,9 +42,9 @@ Rehearsal receipts below use these names. Site A is `rehearsal-nov4` (`/conferen
 
 ## 4. Enroll and publish the route
 
-1. As Console operator: `POST /api/manageEventMount` with `{"action":"enroll","appId","publicBase","confirmAuthority":true,"authorityReference"}` for the first event on a host, and without the authority fields for later events. Read back with `{"action":"get"}`: project, mount and fixed origin. Run `edge empty <version>` with the map version the action returned. **Proven** (runs 1 and 2).
+1. As Console operator: `POST /api/manageEventMount` with `{"action":"enroll","appId":"<application id>","publicBase":"https://<host>/<mount>/","confirmAuthority":true,"authorityReference":"<authority receipt>"}` for the first event on a host, and without the two authority fields for later events. Read back with `{"action":"get","appId":"<application id>"}`: project, mount and fixed origin. Run `edge empty <version>` with the map version the action returned. **Proven** (runs 1 and 2).
 2. A malformed base (query, empty leading or inner segment) must fail with 400 `invalid-mount` and no change. **Proven** (run 1, change 29).
-3. Publish: `{"action":"publish","appId","publicBase","publicTitle","confirm":true}`. Run `edge staged-<event> <version>`: the mount routes, the old address still works, and the staged event is not listed or in a sitemap. **Proven** (runs 1 and 2).
+3. Publish: `{"action":"publish","appId":"<application id>","publicBase":"https://<host>/<mount>/","publicTitle":"<public title>","confirm":true}`. Run `edge staged-<event> <version>`: the mount routes, the old address still works, and the staged event is not listed or in a sitemap. **Proven** (runs 1 and 2).
 
 ## 5. Inventory public and emailed URLs
 
@@ -80,8 +81,8 @@ List every public, admin, speaker, unsubscribe, welcome, reminder, ticket and pa
 ## 8. Roll back one address
 
 1. Disable that event's old-host redirect first.
-2. `{"action":"remove","appId","confirm":true}`, then check the route-map receipt and the sibling with `edge only-<sibling>`.
-3. Run the same `sync_event_mount` command. It restores the standalone URL variables and runs a full Deploy (functions, metadata, publisher configuration, Hosting). An abort before any URL variable changed needs no redeploy.
+2. `{"action":"remove","appId":"<application id>","confirm":true}`, then check the route-map receipt and the sibling with `edge only-<sibling>`.
+3. Run the same `sync_event_mount` command. It restores the standalone URL variables and runs a full Deploy (functions, metadata, publisher configuration, Hosting). After an abort before the first address sync, the sync has nothing to apply and runs no Deploy; if you also revert `EVENT_ALLOWED_ORIGINS` or other provider settings, run a standalone Deploy (`gh workflow run deploy.yml --ref main -f client=<environment>`) so the running functions drop the host origin.
 4. Check: the standalone address loads and its functions work, the mount returns 404, and the sibling's route, Hosting version and data are unchanged.
 
 **Proven** (run 1, changes 22, 38 and 41; run 2: A removed with B still mounted, `edge only-b` passed, B pages loaded and called only B's project, then B removed and `edge empty` passed).
