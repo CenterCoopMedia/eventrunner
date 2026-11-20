@@ -22,7 +22,6 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
 import AdminLayout, { AdminRecoveryReadyContext } from './AdminLayout.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
-import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
 import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
 import AdminContentPages from './pages/AdminContentPages.jsx';
@@ -40,6 +39,7 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // sessions list, so its figures and panels stay out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'), 'AdminSessionPitches');
+const AdminPagesList = lazy(() => import('./pages/AdminPagesList.jsx'), 'AdminPagesList');
 const AdminPageEditor = lazy(() => import('./pages/AdminPageEditor.jsx'), 'AdminPageEditor');
 const AdminNavigationLinkEditor = lazy(() => import('./pages/AdminNavigationLinkEditor.jsx'), 'AdminNavigationLinkEditor');
 const AdminWebAddress = lazy(() => import('./pages/AdminWebAddress.jsx'), 'AdminWebAddress');
@@ -223,7 +223,7 @@ export default function AdminApp({ routeAttempt }) {
           <Route path="pitches/settings" element={<DeferredAdminPage label="pitch call settings"><AdminPitchSettings /></DeferredAdminPage>} />
           <Route path="pitches/import" element={<DeferredAdminPage label="pitch import"><AdminPitchImport /></DeferredAdminPage>} />
           <Route path="pitches/:pitchId" element={<DeferredAdminPage label="session pitch"><AdminSessionPitch /></DeferredAdminPage>} />
-          <Route path="pages" element={<StaticAdminPage><AdminPagesList /></StaticAdminPage>} />
+          <Route path="pages" element={<DeferredAdminPage label="pages"><AdminPagesList /></DeferredAdminPage>} />
           <Route path="pages/new" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="create" /></DeferredAdminPage>} />
           <Route path="pages/links/:linkId" element={<DeferredAdminPage label="navigation link editor"><AdminNavigationLinkEditor /></DeferredAdminPage>} />
           <Route path="pages/:pageId" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="edit" /></DeferredAdminPage>} />

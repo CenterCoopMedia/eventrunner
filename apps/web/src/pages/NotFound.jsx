@@ -100,7 +100,7 @@ export default function NotFound() {
   const reducedMotion = useSyncExternalStore(subscribeMotion, getReducedMotion, getServerReducedMotion);
   const nav = buildNavItems(pages, features);
   const destinations = [SYSTEM_PAGES.schedule.to, SYSTEM_PAGES.speakers.to]
-    .map((to) => nav.find((item) => item.to === to))
+    .map((to) => nav.find((item) => !item.custom && item.to === to))
     .filter(Boolean);
 
   return (

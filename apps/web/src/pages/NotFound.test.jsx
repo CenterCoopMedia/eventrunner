@@ -51,7 +51,11 @@ describe('the missing-ticket recovery page', () => {
     expect(screen.getByText('Not an admission ticket')).toBeTruthy();
   });
   it('does not advertise hidden pages or disabled features', () => {
-    state.pages = [{ ...schedule, visible: false }, speakers];
+    state.pages = [
+      { ...schedule, visible: false },
+      speakers,
+      { id: 'agenda', label: 'Agenda', url: '/schedule', order: 0, visible: true, systemPage: false },
+    ];
     state.features.speakers = false;
     view();
     expect(screen.queryByRole('navigation', { name: 'Find your next stop' })).toBeNull();
