@@ -38,7 +38,9 @@ function baseWorld(overrides = {}) {
 }
 
 test('one transaction unlinks sessions, drafts, the account, and both documents', async () => {
-  const db = makeSpeakersDb(baseWorld());
+  const db = makeSpeakersDb(baseWorld({
+    'speaker_invites/pending': { speakerId: 's1', status: 'pending' },
+  }));
   const result = await applyDeleteSpeaker({ db, speakerId: 's1', actor: ACTOR, now: NOW });
 
   assert.equal(result.ok, true);
@@ -55,6 +57,7 @@ test('one transaction unlinks sessions, drafts, the account, and both documents'
   assert.equal(db.read('speakers_public', 's1'), undefined);
   assert.equal(db.read('speakers', 's1'), undefined);
   assert.equal(db.read('speaker_logistics', 's1'), undefined);
+  assert.equal(db.read('speaker_invites', 'pending'), undefined);
 });
 
 test('deleting a speaker leaves zero dangling references anywhere', async () => {
@@ -92,15 +95,15 @@ test('a uid naming an account that no longer exists does not fail the delete', a
   assert.equal(db.read('speaker_logistics', 's1'), undefined);
 });
 
-test('above the transaction limit it refuses, names the count, and changes NOTHING', async () => {
+test('sessions and invites share the transaction limit, and a refusal changes nothing', async () => {
   const seed = {
     'speakers/s1': { firstName: 'A', lastName: 'B', status: 'approved', uid: 'u1' },
     'speaker_logistics/s1': { travel: 'Private itinerary' },
     'speakers_public/s1': { speakerId: 's1' },
     'users/u1': { uid: 'u1', speakerId: 's1' },
+    'speaker_invites/accepted': { speakerId: 's1', status: 'accepted' },
   };
-  const overLimit = internals.MAX_UNLINKED_SESSIONS + 1;
-  for (let i = 0; i < overLimit; i += 1) {
+  for (let i = 0; i < internals.MAX_RELATED_WRITES; i += 1) {
     seed[`cmsSchedule/sess-${i}`] = { speakerIds: ['s1'] };
   }
   const db = makeSpeakersDb(seed);
@@ -109,7 +112,7 @@ test('above the transaction limit it refuses, names the count, and changes NOTHI
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
   assert.equal(result.code, 'too-many-references');
-  assert.match(result.message, new RegExp(`${overLimit} session documents`));
+  assert.match(result.message, new RegExp(`${internals.MAX_RELATED_WRITES + 1} linked session and invitation records`));
   assert.match(result.message, /"soft": true/);
   assert.deepEqual(db.writes, [], 'a refused unlink must be a no-op, not a half-applied one');
   assert.notEqual(db.read('speakers', 's1'), undefined);

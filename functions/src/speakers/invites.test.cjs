@@ -18,6 +18,7 @@ const {
   internals,
 } = require('./invites.cjs');
 const { SPEAKER_INVITES, hashInviteToken, INVITE_TTL_MS } = require('./inviteTokens.cjs');
+const { applyDeleteSpeaker } = require('./lifecycle.cjs');
 const { makeSpeakersDb: makeBareSpeakersDb } = require('./speakersFake.cjs');
 
 // requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
@@ -313,6 +314,25 @@ test('acceptance links both halves, transitions to accepted, and burns the token
   assert.equal(db.read(SPEAKER_INVITES, hashInviteToken(minted.token)).acceptedByUid, 'u1');
 });
 
+test('hard delete removes the accepted and superseded invites for just that speaker', async () => {
+  const db = makeSpeakersDb(world({
+    'speaker_invites/other': { speakerId: 'someone-else', status: 'accepted' },
+  }));
+  const send = { db, speakerId: 'rae', inviteType: 'speaker', actor: ACTOR, now: NOW };
+  const first = await applyMintInvite({ ...send, mode: 'send' });
+  const second = await applyMintInvite({ ...send, mode: 'resend' });
+  const accepted = await acceptWith({ db, token: second.token, uid: 'u1', email: 'rae@example.org', now: NOW });
+  assert.equal(accepted.ok, true);
+  assert.equal(db.read('speakers', 'rae').inviteToken, null);
+  assert.equal(db.read(SPEAKER_INVITES, first.tokenHash).status, 'superseded');
+  assert.equal(db.read(SPEAKER_INVITES, second.tokenHash).acceptedEmail, 'rae@example.org');
+
+  const deleted = await applyDeleteSpeaker({ db, speakerId: 'rae', actor: ACTOR, now: NOW });
+  assert.equal(deleted.ok, true);
+  assert.deepEqual(db.ids(SPEAKER_INVITES), ['other']);
+  assert.equal(db.read('users', 'u1').speakerId, null);
+});
+
 test('the token is single-use: a second acceptance by a different account is refused', async () => {
   const db = makeSpeakersDb(world({ 'users/u2': { uid: 'u2', speakerId: null } }));
   const minted = await applyMintInvite({ db, speakerId: 'rae', inviteType: 'speaker', mode: 'send', actor: ACTOR, now: NOW });
@@ -583,6 +603,23 @@ test('sendSpeakerInvite mails a tokenized invite that carries the accept URL and
   assert.notEqual(onlyInvite(db).data.sentAt, null);
   // Audited.
   assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('a delivery receipt cannot recreate an invitation deleted while mail was in flight', async () => {
+  const db = makeSpeakersDb(world());
+  const { deps: d } = deps(db, {
+    sendResult: async () => {
+      assert.equal(onlyInvite(db).data.status, 'pending');
+      const deleted = await applyDeleteSpeaker({ db, speakerId: 'rae', actor: ACTOR, now: NOW });
+      assert.equal(deleted.ok, true);
+      return { status: 'sent', providerMessageId: 'm1' };
+    },
+  });
+  const res = fakeRes();
+  await createSendSpeakerInviteHandler(d)(adminReq({ speakerId: 'rae' }), res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.ids(SPEAKER_INVITES), []);
 });
 
 test('a provider failure leaves the invitation recorded, undelivered, and says so', async () => {

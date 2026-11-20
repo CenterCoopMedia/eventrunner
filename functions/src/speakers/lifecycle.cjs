@@ -18,7 +18,8 @@
  *      un-saveable until an admin hand-edited it,
  *   3. clears `users/{uid}.speakerId` when `speakers.uid` is set,
  *   4. deletes `speakers_public/{id}`,
- *   5. deletes `speakers/{id}`.
+ *   5. deletes `speakers/{id}`, logistics, the slug reservation, and the
+ *      speaker's invitation records.
  *
  * Above the transaction's write limit the operation REFUSES, naming the
  * count, and directs the admin to the soft delete
@@ -40,6 +41,7 @@
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId } = require('../cms/store.cjs');
+const { SPEAKER_INVITES, invalidateInviteInTx } = require('./inviteTokens.cjs');
 
 const SPEAKERS = 'speakers';
 const SPEAKERS_PUBLIC = 'speakers_public';
@@ -49,14 +51,12 @@ const SESSION_DRAFTS = 'cmsSchedule_drafts';
 const USERS = 'users';
 
 /**
- * Firestore's per-transaction write ceiling. The unlink spends up to six
- * writes on the speaker itself (user link, projection, record, logistics,
- * slug reservation, outstanding invitation), so the session budget is what
- * is left.
+ * Firestore's per-transaction write ceiling. Reserve five writes for the
+ * user link, projection, speaker record, logistics, and slug reservation.
+ * Sessions and invitation records share the remaining budget.
  */
 const MAX_TRANSACTION_WRITES = 500;
-const FIXED_WRITES = 6;
-const MAX_UNLINKED_SESSIONS = MAX_TRANSACTION_WRITES - FIXED_WRITES;
+const MAX_RELATED_WRITES = MAX_TRANSACTION_WRITES - 5;
 
 /**
  * Read the account a speaker is linked to, INSIDE `tx`, so a caller can
@@ -148,7 +148,6 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
         // speaker must not leave a `pending` row in the admin invite list,
         // and the same one-commit rule applies to the token as to the pair.
         const linked = await readLinkedUser({ tx, db, speaker });
-        const { invalidateInviteInTx } = require('./inviteTokens.cjs');
         const invalidation = invalidateInviteInTx({
           tx, db, speaker, at, status: 'superseded', actorEmail: actor.email,
         });
@@ -171,21 +170,25 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
       // Every read before every write — Firestore transactions require it,
       // and the user read must be part of this transaction so the pair is
       // cleared against the state the delete actually saw.
-      const [sessions, drafts, userSnap] = await Promise.all([
+      // Acceptance clears speakers.inviteToken. Query by speaker id to
+      // delete the invite history for this speaker, reading only references.
+      const [sessions, drafts, userSnap, invites] = await Promise.all([
         readReferencingSessions({ tx, db, collection: SESSIONS, speakerId }),
         readReferencingSessions({ tx, db, collection: SESSION_DRAFTS, speakerId }),
         userRef ? tx.get(userRef) : Promise.resolve(null),
+        tx.get(db.collection(SPEAKER_INVITES).where('speakerId', '==', speakerId)
+          .select().limit(MAX_RELATED_WRITES + 1)),
       ]);
 
-      const referenceCount = sessions.length + drafts.length;
-      if (referenceCount > MAX_UNLINKED_SESSIONS) {
+      const relatedCount = sessions.length + drafts.length + invites.size;
+      if (relatedCount > MAX_RELATED_WRITES) {
         const err = new Error('TOO_MANY_REFERENCES');
         err.conflict = {
           status: 409,
           code: 'too-many-references',
           message:
-            `This speaker is referenced by ${referenceCount} session documents, more than the ` +
-            `${MAX_UNLINKED_SESSIONS} a single transaction can unlink. Nothing was changed. ` +
+            `This speaker has at least ${relatedCount} linked session and invitation records combined. ` +
+            `A single transaction can handle at most ${MAX_RELATED_WRITES}. Nothing was changed. ` +
             'Retry with { "soft": true } to mark the speaker removed, which hides them everywhere ' +
             'without touching sessions.',
         };
@@ -214,13 +217,8 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
       if (typeof speaker.slug === 'string' && speaker.slug) {
         tx.delete(db.collection(SPEAKER_SLUGS).doc(speaker.slug));
       }
-      // Same for the outstanding invitation, if any: the speaker record it
-      // names is gone, so the row is not history any admin can act on —
-      // deleting it keeps `speaker_invites` free of invitations pointing at
-      // documents that no longer exist (issue #21).
-      if (typeof speaker.inviteToken === 'string' && speaker.inviteToken) {
-        const { SPEAKER_INVITES } = require('./inviteTokens.cjs');
-        tx.delete(db.collection(SPEAKER_INVITES).doc(speaker.inviteToken));
+      for (const invite of invites.docs) {
+        tx.delete(invite.ref);
       }
 
       return {
@@ -423,7 +421,7 @@ module.exports = {
     SESSION_DRAFTS,
     USERS,
     MAX_TRANSACTION_WRITES,
-    MAX_UNLINKED_SESSIONS,
+    MAX_RELATED_WRITES,
     readReferencingSessions,
   },
 };
