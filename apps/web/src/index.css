@@ -1776,40 +1776,6 @@
   }
 }
 
-@layer utilities {
-  /* 44px minimum touch targets (interface guidelines: Accessibility). */
-  .touch-target {
-    @apply min-h-11 min-w-11;
-  }
-
-  /* A WORD THAT CANNOT FIT BREAKS (interface guidelines, Responsive: no
-     page scrolls sideways at 320px).
-
-     Tailwind's `break-words` is `overflow-wrap: break-word`, and inside a
-     flex row that is not enough: it draws the break, but it leaves the
-     row's minimum at the width of the whole word, so the row refuses to
-     shrink below it and overflows its box anyway. `anywhere` lowers that
-     minimum as well, which is what lets the row fit. Either way only a
-     word that cannot fit is broken, so nothing changes at a width where
-     the word fits. Tailwind 3 has no utility for it.
-
-     Measured: the demo event's name holds "Harborlight", 241px at the
-     44px nameplate size, and the wordmark's mark and gutter put its
-     minimum at 289px — wider than the 272px stage at 320px, and wider
-     than the 224px box the specimen book frames the device in. */
-  .wrap-anywhere {
-    overflow-wrap: anywhere;
-  }
-
-  /* The data and mono roles carry changing values — figures, timestamps,
-     schedule columns — so they set tabular figures wherever they are used
-     (design brief §3.2; interface guidelines, Typography). */
-  .font-data,
-  .font-mono {
-    font-variant-numeric: tabular-nums;
-  }
-}
-
 /* The two sequences the .motion-enter and .motion-exit classes run (see the
    motion block in @layer components above). They are declared here, outside
    every layer, because a layer is subject to Tailwind's own tree-shaking and

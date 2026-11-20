@@ -1,3 +1,9 @@
-import config, { ADMIN_CONTENT, ADMIN_SPECIMEN_CONTENT, EXCLUDE_TEST_CONTENT } from './tailwind.config.js';
+import config, { WEB_CONTENT } from './tailwind.config.js';
 
-export default { ...config, content: [ADMIN_CONTENT, ADMIN_SPECIMEN_CONTENT, EXCLUDE_TEST_CONTENT] };
+export default {
+  ...config,
+  // Include shared components for Tailwind's original base and variant order.
+  // Scope to the document so controls in admin portals get the same utilities.
+  important: ':where(html:has(.admin-room))',
+  content: WEB_CONTENT,
+};

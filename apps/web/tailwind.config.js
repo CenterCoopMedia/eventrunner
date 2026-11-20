@@ -22,9 +22,9 @@ const fontStep = (step) => [
 ];
 
 export const ADMIN_CONTENT = './src/admin/**/*.{js,jsx}';
-export const ADMIN_SPECIMEN_CONTENT = './src/pages/specimen/AdminSpecimen.jsx';
+export const ADMIN_SPECIMEN_CONTENT = './src/pages/specimen/{AdminSpecimen,AdminExamples}.jsx';
 export const SPECIMEN_CONTENT = './src/pages/specimen/**/*.{js,jsx}';
-export const EXCLUDE_TEST_CONTENT = '!./src/**/*.test.{js,jsx}';
+export const WEB_CONTENT = ['./index.html', './src/**/*.{js,jsx}', '!./src/**/*.test.{js,jsx}'];
 
 export default {
   // A TAP IS NOT A HOVER. `hoverOnlyWhenSupported` puts every `hover:`
@@ -50,10 +50,7 @@ export default {
   //
   // Excluding the tests makes the build reflect the app alone, which is
   // what the test was written to measure.
-  content: [
-    './index.html', './src/**/*.{js,jsx}', `!${ADMIN_CONTENT}`,
-    `!${SPECIMEN_CONTENT}`, EXCLUDE_TEST_CONTENT,
-  ],
+  content: [...WEB_CONTENT, `!${ADMIN_CONTENT}`, `!${SPECIMEN_CONTENT}`],
   theme: {
     extend: {
       colors: {
@@ -264,5 +261,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [({ addUtilities, theme }) => {
+    addUtilities({
+      // A 44px minimum touch target and a break for words wider than their container.
+      '.touch-target': { minHeight: theme('spacing.11'), minWidth: theme('spacing.11') },
+      '.wrap-anywhere': { overflowWrap: 'anywhere' },
+      '.font-data, .font-mono': { fontVariantNumeric: 'tabular-nums' },
+    });
+  }],
 };

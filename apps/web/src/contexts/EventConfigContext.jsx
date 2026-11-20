@@ -258,17 +258,22 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
     const remaps = themePresetId(runtimeThemeDoc) && !presetRemapsLoaded()
       ? loadPresetRemaps()
       : null;
-    Promise.all([import('../lib/themeCss.js'), remaps]).then(([runtime]) => {
-      if (cancelled) return;
+    const runtimeModule = import('../lib/themeCss.js').then((runtime) => {
       if (!runtime) throw new Error('The runtime theme stylesheet module did not load.');
+      return runtime;
+    });
+    Promise.all([runtimeModule, remaps]).then(([runtime]) => {
+      if (cancelled) return;
       styleEl.textContent = runtime.buildRuntimeThemeCss(runtimeThemeDoc);
       themeLoadAttempts.current = 0;
       setAppliedThemeDoc(runtimeThemeDoc);
-    }).catch(() => {
+    }, () => {
       if (cancelled || themeLoadAttempts.current >= THEME_RETRY_DELAYS.length) return;
       const delay = THEME_RETRY_DELAYS[themeLoadAttempts.current];
       themeLoadAttempts.current += 1;
       timer = setTimeout(() => setThemeLoadRetry((tick) => tick + 1), delay);
+    }).catch(() => {
+      if (!cancelled) console.error('Could not build the runtime theme stylesheet.');
     });
     return () => {
       cancelled = true;

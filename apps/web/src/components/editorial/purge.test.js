@@ -41,10 +41,10 @@ const { buildCommand, DEFAULT_BASE, DEMO_FIREBASE_ENV } = require(path.join(REPO
 const { measureBundle } = require(path.join(REPO_ROOT, 'scripts', 'ci', 'bundle-budget.cjs'));
 
 /**
- * The same demo-mode vite build scripts/build-demo.cjs runs, written to a
- * scratch directory so it never touches apps/web/dist or docs/demo.
+ * Stylesheets from the same Vite build scripts/build-demo.cjs runs, written
+ * to a scratch directory so it never touches apps/web/dist or docs/demo.
  */
-function buildDemoStylesheet(outDir) {
+function buildDemoStylesheets(outDir) {
   const env = { ...process.env, ...DEMO_FIREBASE_ENV, VITE_DEMO_MODE: '1' };
   for (const key of Object.keys(env)) {
     if (key === 'NODE_ENV' || key === 'GENERATED_DIR' || key.startsWith('VITEST')) delete env[key];
@@ -58,8 +58,7 @@ function buildDemoStylesheet(outDir) {
   return fs
     .readdirSync(assets)
     .filter((file) => file.endsWith('.css'))
-    .map((file) => fs.readFileSync(path.join(assets, file), 'utf8'))
-    .join('\n');
+    .map((file) => ({ file: `assets/${file}`, css: fs.readFileSync(path.join(assets, file), 'utf8') }));
 }
 
 /**
@@ -197,9 +196,19 @@ const DEVICE_CLASSES = [
 describe('the built stylesheet', () => {
   let scratch;
   let bundled = '';
+  let startup = '';
+  let sheets;
   beforeAll(() => {
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'purge-demo-build-'));
-    bundled = buildDemoStylesheet(scratch);
+    sheets = buildDemoStylesheets(scratch);
+    bundled = sheets.map(({ css }) => css).join('\n');
+    const { initialCss } = measureBundle(scratch);
+    const initialFiles = new Set(initialCss.files.map(({ file }) => file));
+    startup = sheets.filter(({ file }) => initialFiles.has(file)).map(({ css }) => css).join('\n');
+    for (const sheet of sheets) {
+      sheet.initial = initialFiles.has(sheet.file);
+      sheet.tree = postcss.parse(sheet.css);
+    }
   }, 180_000);
   afterAll(() => {
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
@@ -213,11 +222,7 @@ describe('the built stylesheet', () => {
   });
 
   it('keeps block and admin styles out of the first-paint CSS', () => {
-    const { initialCss } = measureBundle(scratch);
-    expect(initialCss.files.length).toBeGreaterThan(0);
-    const startup = initialCss.files.map(({ file }) =>
-      fs.readFileSync(path.join(scratch, file), 'utf8'),
-    ).join('\n');
+    expect(startup.length).toBeGreaterThan(0);
     for (const selector of [
       '.pull-quote__mark', '.long-read-opening', '.venue-map__frame', '.ruled-table__sort',
       '.dropzone__sent', '.repeater__row', '.specimen-motif-row', '.admin-rich-text',
@@ -235,16 +240,37 @@ describe('the built stylesheet', () => {
     // the ink — survives. A specimen override can mention the same class
     // before its standalone rule, so match the selectors on the mask rule.
     const maskedSelectors = new Set();
-    postcss.parse(bundled).walkDecls('mask-image', (declaration) => {
-      const rule = declaration.parent;
-      if (rule.type === 'rule' && declaration.value !== 'none') {
-        rule.selectors.forEach((selector) => maskedSelectors.add(selector));
-      }
-    });
+    for (const { tree } of sheets) {
+      tree.walkDecls('mask-image', (declaration) => {
+        const rule = declaration.parent;
+        if (rule.type === 'rule' && declaration.value !== 'none') {
+          rule.selectors.forEach((selector) => maskedSelectors.add(selector));
+        }
+      });
+    }
     for (const selector of DEVICE_CLASSES.filter(
       (name) => name.startsWith('.motif--') || name.startsWith('.wayfinding-icon--'),
     )) {
       expect(maskedSelectors, `${selector} still carries a mask`).toContain(selector);
+    }
+  });
+
+  it('keeps shared responsive utilities after base utilities in deferred styles', () => {
+    for (const [scope, base, variant] of [
+      [':where(html:has(.admin-room))', 'grid-cols-2', 'sm\\:grid-cols-4'],
+      [':where(html:has(.specimen-book))', 'flex-col', 'lg\\:flex-row'],
+    ]) {
+      const order = [];
+      for (const { file, initial, tree } of sheets) {
+        if (initial) continue;
+        tree.walkRules((rule) => {
+          const { selectors } = rule;
+          if (selectors.includes(`.${base}`)) order.push(`${file} has an unscoped ${base}`);
+          if (selectors.includes(`${scope} .${base}`)) order.push(base);
+          if (selectors.includes(`${scope} .${variant}`) && rule.parent.name === 'media') order.push(variant);
+        });
+      }
+      expect(order, scope).toEqual([base, variant]);
     }
   });
 
