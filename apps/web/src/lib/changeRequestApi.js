@@ -10,6 +10,7 @@
 // lib/feedbackApi.js.
 import { resolveFunctionsOrigin } from './errorReporting.js';
 import { IS_DEMO } from './demoMode.js';
+import { requestWithDeadline } from './requestDeadline.js';
 
 // Use named build-time replacements. The deployed chunk can compile a bare
 // import.meta.env to an empty object even when these settings are defined.
@@ -25,12 +26,13 @@ const DEPLOYMENT_ENV = {
  * @param {string} name the endpoint
  * @param {object} payload
  * @param {{ user: object|null, env?: object, fetchImpl?: typeof fetch,
- *           words: { signedOut: string, noBrowser: string, noServer: string, unconfirmed: string } }} deps
+ *           words: { signedOut: string, noBrowser: string, noServer: string, unconfirmed: string },
+ *           signal?: AbortSignal, stopped?: () => boolean }} deps
  *   `words` name each refusal and an unconfirmed or failed request
  * @returns {Promise<{ ok: true, body: object|null } | { ok: false, error: string }>}
  */
 async function post(name, payload, deps) {
-  const { user, env = DEPLOYMENT_ENV, fetchImpl = typeof fetch === 'function' ? fetch : null, words } = deps;
+  const { user, env = DEPLOYMENT_ENV, fetchImpl = typeof fetch === 'function' ? fetch : null, words, signal, stopped } = deps;
   // The static demo has no endpoint. The flag is off in its snapshot, so the
   // footer control never shows there, but the seam must not depend on that.
   if (IS_DEMO) {
@@ -45,6 +47,7 @@ async function post(name, payload, deps) {
   } catch {
     return { ok: false, error: 'Your session has expired. Sign in again.' };
   }
+  if (stopped?.()) return { ok: false, error: words.unconfirmed };
   if (!fetchImpl) {
     return { ok: false, error: words.noBrowser };
   }
@@ -62,6 +65,7 @@ async function post(name, payload, deps) {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
+      ...(signal ? { signal } : {}),
     });
   } catch {
     return { ok: false, error: 'We could not reach the server. Check your connection and try again.' };
@@ -90,15 +94,16 @@ async function post(name, payload, deps) {
  * @returns {Promise<{ ok: true, id?: string } | { ok: false, error: string }>}
  */
 export async function submitChangeRequest(payload, deps = {}) {
-  const result = await post('submitChangeRequest', payload, {
-    ...deps,
-    words: {
-      signedOut: 'Sign in to send a change request.',
-      noBrowser: 'This browser cannot send a change request right now.',
-      noServer: 'Your request could not be sent. Try again later.',
-      unconfirmed: 'Your change request could not be confirmed. Try again.',
-    },
-  });
+  const words = {
+    signedOut: 'Sign in to send a change request.',
+    noBrowser: 'This browser cannot send a change request right now.',
+    noServer: 'Your request could not be sent. Try again later.',
+    unconfirmed: 'Your change request could not be confirmed. Try again.',
+  };
+  const result = await requestWithDeadline(
+    (signal, stopped) => post('submitChangeRequest', payload, { ...deps, words, signal, stopped }),
+    { ok: false, error: words.unconfirmed },
+  );
   if (!result.ok) return result;
   return { ok: true, id: typeof result.body?.id === 'string' ? result.body.id : undefined };
 }

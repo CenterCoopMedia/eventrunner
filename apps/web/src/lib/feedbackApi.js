@@ -6,9 +6,7 @@
 // lib/errorReporting.js's reportClientError.
 import { resolveFunctionsOrigin } from './errorReporting.js';
 import { IS_DEMO } from './demoMode.js';
-
-/** Bound the entire request, including reading the response body. */
-export const FEEDBACK_REQUEST_TIMEOUT_MS = 20_000;
+import { requestWithDeadline } from './requestDeadline.js';
 
 const UNCONFIRMED_RECEIPT =
   'We could not confirm your feedback was received. Check your connection and try again. Your message is still here.';
@@ -47,29 +45,14 @@ export async function submitFeedback(payload, deps = {}) {
   }
 
   const unconfirmed = { ok: false, error: UNCONFIRMED_RECEIPT };
-  if (signal?.aborted) return unconfirmed;
 
-  const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  let timeout;
-  let stop;
-  const deadline = new Promise((resolve) => {
-    stop = () => {
-      // Resolve independently of abort: a transport or response reader may
-      // ignore AbortSignal. A late result cannot replace this settled one.
-      resolve(unconfirmed);
-      controller?.abort();
-    };
-    timeout = setTimeout(stop, FEEDBACK_REQUEST_TIMEOUT_MS);
-  });
-  signal?.addEventListener('abort', stop, { once: true });
-
-  async function request() {
+  async function request(requestSignal) {
     try {
       const response = await fetchImpl(`${origin}/submitFeedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        ...(controller || signal ? { signal: controller?.signal ?? signal } : {}),
+        ...(requestSignal ? { signal: requestSignal } : {}),
       });
       let body = null;
       try {
@@ -89,10 +72,5 @@ export async function submitFeedback(payload, deps = {}) {
     }
   }
 
-  try {
-    return await Promise.race([request(), deadline]);
-  } finally {
-    clearTimeout(timeout);
-    signal?.removeEventListener('abort', stop);
-  }
+  return requestWithDeadline(request, unconfirmed, signal);
 }
