@@ -509,7 +509,7 @@ describe('content browsing', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Intro', exact: true }));
     expect(await screen.findByRole('link', { name: 'Scholarships open in spring.' })).toBeInTheDocument();
-    expect(screen.getByText('Paragraphs')).toBeInTheDocument();
+    expect(screen.getByText('Text', { exact: true })).toBeInTheDocument();
     // The title band names the section and its identifiers (the editor a
     // public "Edit section" link opens, issue #198).
     expect(screen.getByRole('heading', { level: 1, name: 'Intro' })).toBeInTheDocument();
@@ -776,7 +776,7 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/_new');
 
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
-    await chooseBlockType('Paragraphs');
+    await chooseBlockType('Text');
     await replaceRichText(await findRichText(), '<p>Hello</p>', 'Hello');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
@@ -809,7 +809,8 @@ describe('creating and editing a block', () => {
 
     const picker = await screen.findByRole('group', { name: 'Block type' });
     await waitFor(() => {
-      expect(within(picker).getAllByRole('radio').map((radio) => radio.value)).toEqual(BLOCK_TYPE_IDS);
+      // Short text is not offered for a new block where Text is (#1184).
+      expect(within(picker).getAllByRole('radio').map((radio) => radio.value)).toEqual(BLOCK_TYPE_IDS.filter((id) => id !== 'text'));
     });
     for (const radio of within(picker).getAllByRole('radio')) {
       expect(radio).toBeEnabled();
@@ -819,7 +820,7 @@ describe('creating and editing a block', () => {
     expect(await within(picker).findByText('The program is out')).toBeInTheDocument();
 
     // Switching the block type swaps the value fields the registry declares.
-    fireEvent.click(within(picker).getByRole('radio', { name: 'Paragraphs' }));
+    fireEvent.click(within(picker).getByRole('radio', { name: 'Text' }));
     expect(await findRichText()).toBeInTheDocument();
     fireEvent.click(within(picker).getByRole('radio', { name: 'Number' }));
     expect(screen.getByLabelText(/^Caption/)).toBeInTheDocument();
@@ -920,6 +921,30 @@ describe('creating and editing a block', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  // Issue #1184: Short text could not take a link. Switching an existing
+  // Short text block to Text keeps its words, escaped, as one paragraph.
+  it('keeps the words when a Short text block becomes Text', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [{
+      id: 'intro__note', section: 'intro', field: 'note', blockType: 'text',
+      value: 'Fees & deadlines <2027>', order: 3, visible: true, status: 'clean', revision: 1,
+    }];
+    fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__note', status: 'dirty' }));
+
+    await renderAt('/admin/content/scholarships/intro/note');
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
+    const picker = screen.getByRole('group', { name: 'Block type' });
+    expect(within(picker).getByRole('radio', { name: 'Short text' })).toBeChecked();
+    fireEvent.click(within(picker).getByRole('radio', { name: 'Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields).toMatchObject({
+      blockType: 'richtext',
+      value: '<p>Fees &amp; deadlines &lt;2027&gt;</p>',
+    });
+  });
+
   it('clears the old block type’s stale fields when switching types', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [CTA_BLOCK_DRAFT];
@@ -998,7 +1023,7 @@ describe('server errors and publish skips', () => {
     // Fill the required value field so this reaches the network call at
     // all — an empty one is caught by client-side validation first, which
     // has its own test.
-    await chooseBlockType('Paragraphs');
+    await chooseBlockType('Text');
     await replaceRichText(await findRichText(), '<p>Hi</p>', 'Hi');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 

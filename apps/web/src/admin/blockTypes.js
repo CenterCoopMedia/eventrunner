@@ -17,7 +17,7 @@ export const BLOCK_TYPES = Object.freeze({
   },
   richtext: {
     id: 'richtext',
-    label: 'Paragraphs',
+    label: 'Text',
     description: 'Formatted body copy rendered by the rich-text renderer.',
     fields: [{ id: 'value', type: 'richtext', required: true }],
   },

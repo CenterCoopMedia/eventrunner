@@ -275,6 +275,14 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
   );
 }
 
+/** Plain text as one escaped paragraph of rich text. */
+function plainTextAsParagraph(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return '';
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<p>${escaped}</p>`;
+}
+
 export default function AdminContentBlockEditor({ mode }) {
   const { pageId, sectionId, field: fieldParam } = useParams();
   const newBlockHref = useHref('../_new', { relative: 'path' });
@@ -365,7 +373,11 @@ export default function AdminContentBlockEditor({ mode }) {
     // listed types on older sites, else the type of its starter block.
     const own = [...(section?.allowedBlocks ?? []), ...(section?.defaultBlocks ?? []).map((entry) => entry.blockType)];
     const mapUrl = canAddMap ? mapEmbedInput(searchParams.get('mapEmbed') ?? '') : '';
-    const fallback = mapUrl ? 'map' : (own.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0]);
+    const first = own.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0];
+    // New blocks are Text where the section takes it (issue #1184).
+    const fallback = mapUrl
+      ? 'map'
+      : (first === 'text' && (allowed.length === 0 || allowed.includes('richtext')) ? 'richtext' : first);
     const baseline = createFormBaseline({ fieldId, content, fallbackType: fallback });
     loadedKeyRef.current = 'create-defaults';
     setSavedEdit(baseline.snapshot);
@@ -471,12 +483,27 @@ export default function AdminContentBlockEditor({ mode }) {
   const currentFieldId = isExisting ? fieldParam ?? fieldId : fieldId;
 
   function changeBlockType(nextType) {
-    setContent((current) => ({
-      ...blankContent(nextType),
-      order: current.order,
-      visible: current.visible,
-      ...(Object.hasOwn(current, 'translations') ? { translations: {} } : {}),
-    }));
+    setContent((current) => {
+      // Short text to Text (issue #1184) keeps the words, and the Spanish
+      // ones, as one paragraph, the way the public page drew them.
+      if (current.blockType === 'text' && nextType === 'richtext') {
+        const spanish = current.translations?.es?.value;
+        return {
+          ...current,
+          blockType: 'richtext',
+          values: { ...current.values, value: plainTextAsParagraph(current.values?.value) },
+          ...(typeof spanish === 'string' && spanish
+            ? { translations: { ...current.translations, es: { ...current.translations.es, value: plainTextAsParagraph(spanish) } } }
+            : {}),
+        };
+      }
+      return {
+        ...blankContent(nextType),
+        order: current.order,
+        visible: current.visible,
+        ...(Object.hasOwn(current, 'translations') ? { translations: {} } : {}),
+      };
+    });
   }
 
   function changeValue(name, value) {
