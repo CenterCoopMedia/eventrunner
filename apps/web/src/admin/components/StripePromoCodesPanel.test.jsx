@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import StripePromoCodesPanel from './StripePromoCodesPanel.jsx';
+import { saveTextFile } from '../downloadFile.js';
+
+vi.mock('../downloadFile.js', () => ({ saveTextFile: vi.fn() }));
 
 const CATALOG = {
   currency: 'usd',
@@ -16,10 +19,11 @@ const EARLY = {
 };
 const PRESS = { ...EARLY, code: 'PRESS', kind: 'amount', value: 500, ticketTypeIds: ['student'], maxUses: null, endsAt: null, active: false, used: 0 };
 
-function setup(codes = [EARLY, PRESS]) {
+function setup(codes = [EARLY, PRESS], redemptions) {
   let stored = codes;
   const call = vi.fn(async (_name, body) => {
     if (body.action === 'promoCodes') return { codes: stored };
+    if (body.action === 'promoRedemptions' && redemptions) return redemptions(body);
     if (body.action === 'savePromoCode') {
       const saved = { ...body.promo, code: body.promo.code.toUpperCase(), used: 0 };
       stored = [...stored.filter((code) => code.code !== saved.code), saved];
@@ -36,6 +40,30 @@ function setup(codes = [EARLY, PRESS]) {
 }
 
 describe('promo codes panel', () => {
+  it('shows buyer and redeemed ticket types, and exports the entire code report after paging', async () => {
+    vi.mocked(saveTextFile).mockClear();
+    const { call } = setup([EARLY], ({ cursor }) => cursor ? {
+      redemptions: [{ orderId: 'order-2', purchaserEmail: 'two@example.org', count: 1, types: [{ id: 'student', name: 'Student', quantity: 1 }] }],
+      nextCursor: null,
+    } : {
+      redemptions: [{ orderId: 'order-1', purchaserEmail: 'one@example.org', count: 2, types: [{ id: 'general', name: '=Historical "pass"', quantity: 2 }] }],
+      nextCursor: 'order-1',
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'View redemptions for EARLY' }));
+    await screen.findByText('2 redeemed tickets loaded so far.');
+    expect(screen.getByText('one@example.org')).toBeInTheDocument();
+    expect(screen.getByText('2 × =Historical "pass"')).toBeInTheDocument();
+    expect(saveTextFile).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Download redemptions CSV' }));
+    await screen.findByText('3 redeemed tickets.');
+    expect(screen.getByText('1 × Student')).toBeInTheDocument();
+    expect(call).toHaveBeenLastCalledWith('ticketingCommerceAdmin', { action: 'promoRedemptions', code: 'EARLY', cursor: 'order-1' });
+    expect(saveTextFile).toHaveBeenCalledExactlyOnceWith('promo-early-redemptions.csv',
+      '"Code","Order","Buyer email","Ticket type ID","Ticket type","Redeemed tickets"\r\n'
+      + '"EARLY","order-1","one@example.org","general","\'=Historical ""pass""","2"\r\n'
+      + '"EARLY","order-2","two@example.org","student","Student","1"\r\n');
+  });
+
   it('lists each code with its discount, its tickets, its uses and its end on the event clock', async () => {
     setup();
     const early = await screen.findByRole('listitem', { name: 'EARLY' });

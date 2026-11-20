@@ -8,6 +8,7 @@ import { formatTicketMoney, formatTicketTime } from '../../lib/ticketingDetails.
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { DestructiveConfirm, Notice, Panel, secondaryButtonClass } from './formControls.jsx';
 import StripePromoCodeEditor, { EMPTY_PROMO } from './StripePromoCodeEditor.jsx';
+import StripePromoRedemptions from './StripePromoRedemptions.jsx';
 
 function discountText(code, currency) {
   return code.kind === 'percent'
@@ -107,6 +108,7 @@ export default function StripePromoCodesPanel({ call, catalog, timezone }) {
                     />
                   ) : null}
                 </div>
+                <StripePromoRedemptions call={call} code={code.code} />
               </li>
             ))}
           </ul>

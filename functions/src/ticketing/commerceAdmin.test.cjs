@@ -64,6 +64,37 @@ test('commerce roles are live, verified, and financial/catalog operations requir
   assert.equal((await call(admin(db), { action: 'orders' }, 'operator')).statusCode, 403);
 });
 
+test('a promo redemption report counts completed tickets by historical type and buyer across pages', async () => {
+  const discounted = { ...order, promo: { code: 'EARLY', discountedSeats: 2 },
+    lines: [
+      { name: 'Original pass', ticketTypeId: 'general', quantity: 2, unitAmount: 4000, listUnitAmount: 5000 },
+      { name: 'Other pass', ticketTypeId: 'other', quantity: 1, unitAmount: 5000 },
+    ],
+  };
+  const holds = Object.fromEntries(Array.from({ length: 49 }, (_, index) => [
+    `ticket_orders/held-${String(index).padStart(2, '0')}`, { ...discounted, inventoryState: 'held', paymentStatus: 'pending' },
+  ]));
+  const db = dbFor({ ...holds,
+    'ticket_orders/elsewhere': { ...discounted, stripeAccountId: 'acct_other' },
+    'ticket_orders/order-1': { ...discounted, checkoutUrl: 'private-attempt-fixture' },
+    'ticket_orders/order-2': { ...discounted, purchaserEmail: 'second@example.org', refundStatus: 'full', status: 'refunded' },
+    'ticket_orders/order-3': { ...discounted, promo: { code: 'PRESS', discountedSeats: 2 } },
+  });
+  const handler = admin(db);
+  const body = { action: 'promoRedemptions', code: 'early' };
+  assert.equal((await call(handler, body, 'stranger')).statusCode, 403);
+  const first = await call(handler, body);
+  assert.equal(first.statusCode, 200);
+  assert.deepEqual(first.body, { redemptions: [], nextCursor: 'held-48' });
+  const second = await call(handler, { ...body, cursor: first.body.nextCursor });
+  const type = { id: 'general', name: 'Original pass', quantity: 2 };
+  assert.equal(second.headers['Cache-Control'], 'private, no-store');
+  assert.deepEqual(second.body, { redemptions: [
+    { orderId: 'order-1', purchaserEmail: 'buyer@example.org', count: 2, types: [type] },
+    { orderId: 'order-2', purchaserEmail: 'second@example.org', count: 2, types: [type] },
+  ], nextCursor: null });
+});
+
 test('order reads redact attempt/session credentials and isolate account/event/mode', async () => {
   const db = dbFor({ 'ticket_orders/order-1': { ...order, checkoutUrl: 'private-checkout', clientSecret: 'private-value', requestId: 'private-id' } });
   const own = await call(admin(db), { action: 'order', orderId: 'order-1' });
