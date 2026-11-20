@@ -86,6 +86,8 @@ function typeSearchText(block) {
       return stripHtml(block.value);
     case 'image':
       return joined(block.alt, block.caption);
+    case 'map':
+      return joined(block.label, block.address);
     case 'cta':
       return joined(block.label);
     case 'stat':

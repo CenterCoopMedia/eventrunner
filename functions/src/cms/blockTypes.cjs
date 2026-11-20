@@ -1,6 +1,7 @@
 'use strict';
 
 const { hasRichTextContent } = require('shared/richText');
+const { googleMapsEmbedUrl } = require('shared/urlSafety');
 
 /**
  * Code-resident CMS registries (spec §5.2, §8.4).
@@ -65,6 +66,16 @@ const BLOCK_TYPES = Object.freeze({
       field('caption', 'string', false),
       field('focalX', 'number', false),
       field('focalY', 'number', false),
+    ],
+  }),
+  map: blockType({
+    id: 'map',
+    label: 'Map',
+    description: 'An interactive Google map with an optional street address.',
+    fields: [
+      field('embedUrl', 'url', true),
+      field('label', 'string', true),
+      field('address', 'string', false),
     ],
   }),
   cta: blockType({
@@ -228,6 +239,20 @@ function requiredBlockErrors(fields) {
     return ['blockType: must name a known block type.'];
   }
   if (blockType === 'stat') return statContractErrors(fields);
+  if (blockType === 'map') {
+    const errors = [];
+    const { embedUrl, label, address } = fields;
+    if (!embedUrl || googleMapsEmbedUrl(embedUrl) !== embedUrl) {
+      errors.push('embedUrl: paste an embed link from Google Maps.');
+    }
+    if (typeof label !== 'string' || !label.trim()) {
+      errors.push('label: describe what the map shows.');
+    }
+    if (address !== undefined && typeof address !== 'string') {
+      errors.push('address: enter the address as text or leave it empty.');
+    }
+    return errors;
+  }
   return BLOCK_TYPES[blockType].fields
     .filter((entry) => entry.required && entry.type !== 'boolean')
     .filter((entry) => {

@@ -10,7 +10,7 @@ test('all Hosting entry points prohibit framing, including direct SPA access', (
   const global = rules.find((rule) => rule.source === '**');
   assert.ok(global, 'Protect every entry point, including /admin, nested routes and /index.html');
   const headers = Object.fromEntries(global.headers.map(({ key, value }) => [key.toLowerCase(), value]));
-  assert.equal(headers['content-security-policy'], "frame-ancestors 'none'");
+  assert.match(headers['content-security-policy'], /(?:^|;)\s*frame-ancestors 'none'\s*(?:;|$)/);
   assert.equal(headers['x-frame-options'], 'DENY');
   for (const rule of rules) {
     for (const { key, value } of rule.headers) {
@@ -20,6 +20,20 @@ test('all Hosting entry points prohibit framing, including direct SPA access', (
       if (key.toLowerCase() === 'x-frame-options') assert.equal(value, 'DENY');
     }
   }
+});
+
+test('Hosting permits the Google Maps embed and the sign-in and App Check frames', () => {
+  const global = config.hosting.headers.find((rule) => rule.source === '**');
+  const policy = global.headers.find(({ key }) => key === 'Content-Security-Policy').value;
+  const frameSources = policy.split(';').map((directive) => directive.trim())
+    .find((directive) => directive.startsWith('frame-src ')).split(/\s+/).slice(1);
+  assert.deepEqual(new Set(frameSources), new Set([
+    "'self'",
+    'https://*.firebaseapp.com/__/auth/iframe',
+    'https://www.google.com/recaptcha/',
+    'https://recaptcha.google.com/recaptcha/',
+    'https://www.google.com/maps/embed',
+  ]));
 });
 
 test('admin rewrites retain noindex alongside the global framing policy', () => {

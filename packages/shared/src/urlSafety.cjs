@@ -74,6 +74,14 @@ function isSafeUrl(url) {
   return safeUrlHref(url) !== '';
 }
 
+/** The canonical URL copied from Google Maps' "Embed a map" dialog. */
+function googleMapsEmbedUrl(value) {
+  if (typeof value !== 'string') return '';
+  const url = value.trim();
+  if (!/^https:\/\/www\.google\.com\/maps\/embed\?[^#\s<>"\\]+$/.test(url)) return '';
+  return safeUrlHref(url);
+}
+
 /**
  * True when a string is URL-shaped. Used as an embargo scrub on the
  * `filename` field of link-type session materials — that field reaches the
@@ -125,4 +133,4 @@ function scrubLinkLabel(label) {
   return trimmed;
 }
 
-module.exports = { isSafeUrl, safeUrlHref, looksLikeUrl, scrubLinkLabel };
+module.exports = { isSafeUrl, safeUrlHref, googleMapsEmbedUrl, looksLikeUrl, scrubLinkLabel };

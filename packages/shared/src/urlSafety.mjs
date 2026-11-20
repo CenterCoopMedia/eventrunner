@@ -1,1 +1,1 @@
-export { isSafeUrl, safeUrlHref, looksLikeUrl, scrubLinkLabel } from './urlSafety.cjs';
+export { isSafeUrl, safeUrlHref, googleMapsEmbedUrl, looksLikeUrl, scrubLinkLabel } from './urlSafety.cjs';

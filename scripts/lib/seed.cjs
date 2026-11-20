@@ -646,6 +646,8 @@ function placeholderBlock(blockType, description) {
       return { value: `<p>${text}</p>` };
     case 'image':
       return { url: 'branding/og-default.svg', alt: text, caption: '' };
+    case 'map':
+      return { embedUrl: 'https://www.google.com/maps/embed?pb=[Replace]', label: text };
     case 'cta':
       return { label: '[Replace] Button label', url: 'https://example.org', external: true };
     case 'stat':

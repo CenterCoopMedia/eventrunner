@@ -6,22 +6,31 @@ const assert = require('node:assert/strict');
 const {
   BLOCK_TYPES,
   isKnownBlockType,
+  requiredBlockErrors,
   statContractErrors,
   PUBLISHABLE_COLLECTIONS,
   draftCollectionFor,
   internals,
 } = require('./blockTypes.cjs');
 
-// The eight v1 types, plus the two the design vocabulary expansion added
-// (wave 2): `fact`, the non-numeric fact of #234, and `quote`, the pull
-// quote's block; and `sponsor_package` (#193), the sponsors page's package.
-const V1_TYPE_IDS = [
+const TYPE_IDS = [
   'text', 'richtext', 'image', 'cta', 'stat', 'fact', 'quote', 'list_item', 'faq_item', 'link_group',
-  'sponsor_package',
+  'sponsor_package', 'map',
 ];
 
-test('registry ships exactly the v1 block types', () => {
-  assert.deepEqual(Object.keys(BLOCK_TYPES).sort(), [...V1_TYPE_IDS].sort());
+test('registry ships exactly the supported block types', () => {
+  assert.deepEqual(Object.keys(BLOCK_TYPES).sort(), [...TYPE_IDS].sort());
+});
+
+test('a map stores an embed URL and a text label, with an optional text address', () => {
+  const embedUrl = 'https://www.google.com/maps/embed?pb=!1m2';
+  const map = { blockType: 'map', embedUrl, label: 'Map of the convention center' };
+  assert.deepEqual(requiredBlockErrors(map), []);
+  assert.deepEqual(requiredBlockErrors({ ...map, address: '100 Main Street' }), []);
+  assert.match(requiredBlockErrors({ ...map, embedUrl: `<iframe src="${embedUrl}"></iframe>` })[0], /^embedUrl:/);
+  assert.match(requiredBlockErrors({ ...map, label: '  ' })[0], /^label:/);
+  assert.match(requiredBlockErrors({ ...map, label: 123 })[0], /^label:/);
+  assert.match(requiredBlockErrors({ ...map, address: ['100 Main Street'] })[0], /^address:/);
 });
 
 // #234: a fact is a term and a description, never a stat block. The whole
@@ -90,7 +99,7 @@ test('registry is deeply frozen — validators can rely on it never mutating', (
 });
 
 test('isKnownBlockType: known ids only, never prototype names or non-strings', () => {
-  for (const id of V1_TYPE_IDS) assert.equal(isKnownBlockType(id), true);
+  for (const id of TYPE_IDS) assert.equal(isKnownBlockType(id), true);
   assert.equal(isKnownBlockType('hero'), false);
   assert.equal(isKnownBlockType('toString'), false);
   assert.equal(isKnownBlockType('constructor'), false);

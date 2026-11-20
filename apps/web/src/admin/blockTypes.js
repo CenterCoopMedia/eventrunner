@@ -36,6 +36,16 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'focalY', type: 'number', required: false },
     ],
   },
+  map: {
+    id: 'map',
+    label: 'Map',
+    description: 'An interactive Google map with an optional street address.',
+    fields: [
+      { id: 'embedUrl', type: 'url', required: true },
+      { id: 'label', type: 'string', required: true },
+      { id: 'address', type: 'string', required: false },
+    ],
+  },
   cta: {
     id: 'cta',
     label: 'Call to action',
