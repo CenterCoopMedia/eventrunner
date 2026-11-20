@@ -25,7 +25,6 @@ import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
 import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
-import AdminContentSection from './pages/AdminContentSection.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
@@ -66,6 +65,7 @@ const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'), 
 // Lazy, as the other large pages: with its sync and account actions the page
 // put the admin entry chunk over the lazy-chunk budget.
 const AdminTicketing = lazy(() => import('./pages/AdminTicketing.jsx'), 'AdminTicketing');
+const AdminContentSection = lazy(() => import('./pages/AdminContentSection.jsx'), 'AdminContentSection');
 // The block editor carries a form for every block type, and each new type
 // (the fact and the quote, design wave 2) added its fields to the entry
 // chunk. It opens from one link in a section list, so it loads the same way.
@@ -303,7 +303,7 @@ export default function AdminApp({ routeAttempt }) {
           />
           <Route path="content" element={<DeferredAdminPage label="content"><AdminContentPages /></DeferredAdminPage>} />
           <Route path="content/:pageId" element={<StaticAdminPage><AdminContentSections /></StaticAdminPage>} />
-          <Route path="content/:pageId/:sectionId" element={<StaticAdminPage><AdminContentSection /></StaticAdminPage>} />
+          <Route path="content/:pageId/:sectionId" element={<DeferredAdminPage label="section content"><AdminContentSection /></DeferredAdminPage>} />
           {/* '_new', not 'new': a cmsContent field id may legitimately BE
               'new' (SECTION_FIELD_RE only requires an alnum first
               character), which would collide with a static 'new' segment —
