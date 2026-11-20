@@ -9,7 +9,8 @@
  * Supports exactly what the cms modules use — doc get/set/update/delete,
  * create (fails ALREADY_EXISTS like the Admin SDK), `==` and `<` queries with
  * orderBy/limit/startAfter, `count()` aggregates on a query or a whole
- * collection (admin/eventStats.cjs), getAll, batches with per-update
+ * collection (admin/eventStats.cjs), top-level field projections for
+ * queries and getAll, batches with per-update
  * { lastUpdateTime } preconditions (snapshots expose a monotonically
  * bumped `updateTime`; a stale precondition fails the whole batch with
  * FAILED_PRECONDITION, applying nothing, like real Firestore) — plus
@@ -116,14 +117,19 @@ function makeFakeDb(seed = {}) {
     writes.push({ type: op.type, path: key });
   }
 
-  function snapshot(col, id) {
+  function snapshot(col, id, fields) {
     const data = colMap(col).get(id);
     const exists = data !== undefined;
     return {
       id,
       exists,
       updateTime: exists ? updateTimes.get(`${col}/${id}`) : undefined,
-      data: () => (exists ? clone(data) : undefined),
+      data: () => {
+        if (!exists) return undefined;
+        if (!fields) return clone(data);
+        return Object.fromEntries(fields.filter((field) => Object.hasOwn(data, field))
+          .map((field) => [field, clone(data[field])]));
+      },
       ref: docRef(col, id),
     };
   }
@@ -151,7 +157,7 @@ function makeFakeDb(seed = {}) {
     };
   }
 
-  function query(col, filters, order, limitN, startAfterValue) {
+  function query(col, filters, order, limitN, startAfterValue, fields) {
     const built = {
       // Marks this object as a Query for `tx.get()`, which accepts either a
       // DocumentReference or a Query in the Admin SDK (the ticketing
@@ -165,16 +171,19 @@ function makeFakeDb(seed = {}) {
         if (op === 'in' && (!Array.isArray(value) || value.length < 1 || value.length > 30)) {
           throw new Error(`fake 'in' wants 1 to 30 values, got ${Array.isArray(value) ? value.length : typeof value}`);
         }
-        return query(col, [...filters, { field, op, value }], order, limitN, startAfterValue);
+        return query(col, [...filters, { field, op, value }], order, limitN, startAfterValue, fields);
       },
       orderBy(field, direction = 'asc') {
-        return query(col, filters, { field, direction }, limitN, startAfterValue);
+        return query(col, filters, { field, direction }, limitN, startAfterValue, fields);
       },
       limit(n) {
-        return query(col, filters, order, n, startAfterValue);
+        return query(col, filters, order, n, startAfterValue, fields);
       },
       startAfter(value) {
-        return query(col, filters, order, limitN, value);
+        return query(col, filters, order, limitN, value, fields);
+      },
+      select(...fieldNames) {
+        return query(col, filters, order, limitN, startAfterValue, fieldNames);
       },
       async get() {
         let rows = [...colMap(col).entries()]
@@ -203,7 +212,7 @@ function makeFakeDb(seed = {}) {
           }
         }
         if (typeof limitN === 'number') rows = rows.slice(0, limitN);
-        const docs = rows.map(({ id }) => snapshot(col, id));
+        const docs = rows.map(({ id }) => snapshot(col, id, fields));
         return { docs, size: docs.length, empty: docs.length === 0 };
       },
       // The Admin SDK's aggregate: `query.count().get()` answers a snapshot
@@ -220,6 +229,12 @@ function makeFakeDb(seed = {}) {
       },
     };
     return built;
+  }
+
+  function readAll(refs, read) {
+    const fields = refs.at(-1)?.fieldMask;
+    if (fields) refs.pop();
+    return refs.map((ref) => read(ref._col, ref.id, fields));
   }
 
   const db = {
@@ -262,7 +277,7 @@ function makeFakeDb(seed = {}) {
       };
     },
     async getAll(...refs) {
-      return refs.map((ref) => snapshot(ref._col, ref.id));
+      return readAll(refs, snapshot);
     },
     /**
      * Optimistic transaction with a real READ SET, because that is the
@@ -290,9 +305,9 @@ function makeFakeDb(seed = {}) {
         const readVersions = new Map();
         const queryReads = [];
         const ops = [];
-        const trackRead = (col, id) => {
+        const trackRead = (col, id, fields) => {
           readVersions.set(`${col}/${id}`, updateTimes.get(`${col}/${id}`));
-          return snapshot(col, id);
+          return snapshot(col, id, fields);
         };
         const tx = {
           async get(target) {
@@ -311,7 +326,7 @@ function makeFakeDb(seed = {}) {
             return trackRead(target._col, target.id);
           },
           async getAll(...refs) {
-            return refs.map((ref) => trackRead(ref._col, ref.id));
+            return readAll(refs, trackRead);
           },
           create(ref, data) {
             ops.push({ type: 'create', col: ref._col, id: ref.id, data: clone(data) });
