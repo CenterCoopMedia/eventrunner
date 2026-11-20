@@ -1,5 +1,185 @@
 /* Admin-only workspace. Color and type come from the existing tenant-aware
  admin token contract. No public stylesheet or theme override is changed. */
+/* The desk (docs/plans/2026-09-10-admin-editorial-desk.md, which amends
+   the composing room in docs/plans/2026-08-27-admin-identity-story.md).
+   The admin is the seventh surface and it is not a preset: it reads the
+   admin-* tokens only, obeys data-mode, and ignores data-theme. These
+   rules carry what a utility class cannot: the two focus rings, the
+   stone's gutters, the title band's bleed, and moment 1's publish
+   resolve. */
+
+/* The room's own skip link. Same behaviour as .skip-link, in admin ink on
+   an admin ground: the shell must not paint a client's brand colour. */
+.skip-link--admin {
+  @apply focus:border-admin-hairline focus:border-admin-rule-control focus:bg-admin-ground-raised
+    focus:font-admin-ui focus:text-admin-ink;
+}
+
+/* A folio in the room: a small uppercase label at a group boundary. Never
+   a chip, never a pill, and never directly above a heading. On the rail it
+   takes the rail's full ink, not the muted ink the links at rest take: a
+   group heading has to outrank the items under it. */
+.admin-folio {
+  @apply text-admin-xs font-semibold uppercase tracking-admin-folio text-admin-ink-secondary;
+}
+.admin-rail .admin-folio {
+  @apply text-admin-rail-ink;
+}
+.admin-mobile-docket > summary {
+  list-style: none;
+}
+.admin-mobile-docket > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Part f: ONE ring on the light surfaces — the action blue, 3px, offset so
+   it never collides with a rule — clearing the canvas, the panel and the
+   input ground in both modes. It replaces the public ring inside the room
+   rather than removing it. */
+.admin-room :focus-visible {
+  outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
+  outline-offset: var(--admin-focus-offset);
+}
+/* The shared photo control keeps the public ring on its visible label.
+   Inside the desk, that label uses the admin ring, and the radios use
+   the admin rule and action instead of the public theme accent. */
+.admin-room .speaker-photo-field--admin .file-input-label:has(+ input:focus-visible) {
+  outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
+  outline-offset: var(--admin-focus-offset);
+}
+.admin-room .speaker-photo-field--admin .control-choice {
+  border-color: rgb(var(--admin-rule-control-rgb));
+  background-color: rgb(var(--admin-ground-input-rgb));
+}
+.admin-room .speaker-photo-field--admin .control-choice:checked {
+  border-color: rgb(var(--admin-action-rgb));
+  background-color: rgb(var(--admin-action-rgb));
+}
+/* And one on the rail, where the action blue would sink into the ground. */
+.admin-rail :focus-visible {
+  outline-color: rgb(var(--admin-focus-ring-rail-rgb));
+}
+
+/* The stone: the work surface beside the rail. Its gutters are custom
+   properties so the title band below can run to the stone's edges. */
+:where(.admin-stone) {
+  --admin-stone-pad-inline: var(--space-md);
+  --admin-stone-pad-block: var(--space-md);
+  padding: var(--admin-stone-pad-block) var(--admin-stone-pad-inline) var(--space-xl);
+}
+.admin-branding-controls { container-type: inline-size; }
+.admin-branding-grid { grid-template-columns: minmax(0, 1fr); }
+.admin-branding-color-row > :last-child { flex-basis: 14rem; }
+@container (min-width: 36rem) {
+  .admin-branding-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .admin-stone {
+    --admin-stone-pad-inline: var(--space-lg);
+    --admin-stone-pad-block: var(--space-md);
+  }
+}
+
+/* Title and table heads reserve their measured height for native focus
+   scrolling. Public pages and the static phone title band keep their
+   existing scrolling. */
+.admin-table-scroll {
+  scroll-padding-top: calc(var(--admin-table-head-height, 0px) + var(--space-xs));
+}
+
+/* The title band scrolls on phones and when it needs over half the
+   viewport. A smaller band holds the top edge from 640px up. */
+.admin-job-line {
+  position: static;
+  z-index: 8;
+  margin: calc(-1 * var(--admin-stone-pad-block)) calc(-1 * var(--admin-stone-pad-inline)) 0;
+  padding: var(--space-sm) var(--admin-stone-pad-inline);
+}
+@media (min-width: 640px) {
+  html:has(.admin-room) {
+    scroll-padding-top: var(--admin-header-scroll-padding, 0px);
+  }
+  .admin-room [id] {
+    scroll-margin-top: 0;
+  }
+  .admin-job-line:not([data-scrolls]) {
+    position: sticky;
+    top: 0;
+  }
+}
+@media (max-width: 639px) {
+  .admin-job-line .admin-job-line__actions > * { padding-inline: var(--space-xs); }
+}
+/* The editor tour (issue #198) is the one panel the shell sets inside the
+   stone above a page: the desk's panel ground and rule, named once here
+   for the tour and for the line that stands in when its chunk fails. The
+   page's title band pulls itself up by the stone's top padding, so the
+   tour keeps twice that under it: the band lands one padding below the
+   tour rather than over its foot. */
+.admin-tour {
+  @apply rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md;
+  margin-bottom: calc(2 * var(--admin-stone-pad-block));
+}
+
+/* Moment 1: a record with unpublished changes sits on the proof ground.
+   The tint is a LAYER, so a successful publish resolves it to the base
+   ground on `opacity` alone, over --motion-base (160ms). The word is
+   always present beside it; the tint is the second signal, never the
+   first. */
+.admin-proof-row {
+  position: relative;
+}
+.admin-proof-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: rgb(var(--admin-ground-proof-rgb));
+}
+.admin-proof-row > * {
+  position: relative;
+}
+/* Published in this session: the same row, its proof tint resolved away. */
+.admin-proof-row--resolved::before {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .admin-proof-row::before {
+    transition: opacity var(--motion-base) var(--motion-ease);
+  }
+}
+
+/* A quiet in-row control may drop to the 24×24px minimum on a pointer
+   surface and holds 44×44px on touch. A button or a field holds the
+   control height on every pointer (min-h-admin-control), so this is only
+   the floor under the links and the small controls between them. */
+.admin-target {
+  @apply min-h-6 min-w-6;
+}
+@media (pointer: coarse) {
+  .admin-target {
+    @apply min-h-11 min-w-11;
+  }
+}
+
+/* The data face carries everything the machine owns, and every value it
+   carries can change, so it sets tabular figures (admin story part 6g). */
+.font-admin-data {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+  .admin-status-badge {
+    outline: 1px solid CanvasText;
+    outline-offset: 1px;
+  }
+
+  .admin-room .control-choice:disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+}
+
 .admin-overview { padding-bottom: var(--space-lg); }
 .admin-section-intro { margin-bottom: var(--space-sm); }
 .admin-section-intro h2 { font-family: var(--admin-font-ui); font-size: var(--admin-text-lg); font-weight: 700; }

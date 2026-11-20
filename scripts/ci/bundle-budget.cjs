@@ -168,6 +168,12 @@ function main(argv = process.argv.slice(2)) {
     `${measurement.initial.raw} raw bytes, ${measurement.initial.gzip} gzip bytes`,
   );
   console.log(`bundle budget: initial CSS ${measurement.initialCss.raw} raw bytes, ${measurement.initialCss.gzip} gzip bytes`);
+  const largestInitialAssets = [...measurement.initial.files, ...measurement.initialCss.files]
+    .sort((left, right) => right.gzip - left.gzip)
+    .slice(0, 15);
+  for (const asset of largestInitialAssets) {
+    console.log(`bundle budget: initial asset ${asset.file} ${asset.raw} raw bytes, ${asset.gzip} gzip bytes`);
+  }
   for (const chunk of measurement.lazyChunks.filter((entry) => /^assets\/firebase-sdk-[^/]+\.js$/.test(entry.file))) {
     console.log(`bundle budget: Firebase SDK ${chunk.raw} raw bytes, ${chunk.gzip} gzip bytes`);
   }

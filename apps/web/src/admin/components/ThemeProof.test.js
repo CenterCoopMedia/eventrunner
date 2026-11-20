@@ -4,16 +4,49 @@
 // they are worth testing away from the frame itself: mounting the whole
 // public app inside the admin, twice, to assert one route string is a slow
 // way to learn nothing extra. AdminBranding.test.jsx covers the rendering.
+import { waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { PREVIEW_STYLE_ID } from '../themePreview.js';
 import {
   PROOF_PAGES,
   STRESS_DAY,
   denseSchedule,
   firstPreviewSession,
   proofPath,
+  syncProofStyles,
 } from './ThemeProof.jsx';
 
 const page = (id) => PROOF_PAGES.find((entry) => entry.id === id);
+
+it('keeps late styles before the proof override and releases the copies on cleanup', async () => {
+  const app = document.implementation.createHTMLDocument();
+  const proof = document.implementation.createHTMLDocument();
+  const base = app.createElement('style');
+  base.textContent = '.callout { display: block; }';
+  app.head.appendChild(base);
+  const override = proof.createElement('style');
+  override.id = PREVIEW_STYLE_ID;
+  proof.head.appendChild(override);
+
+  const stop = syncProofStyles(app.head, proof.head);
+  try {
+    expect(proof.head.querySelector('style')?.textContent).toBe(base.textContent);
+    const deferred = app.createElement('link');
+    deferred.rel = 'stylesheet';
+    deferred.href = '/assets/QuoteBlock.css';
+    app.head.appendChild(deferred);
+    await waitFor(() => {
+      expect(override.previousElementSibling?.getAttribute('href')).toBe('/assets/QuoteBlock.css');
+    });
+    expect(proof.head.querySelectorAll('link')).toHaveLength(1);
+    expect(proof.head.querySelector('link')?.previousElementSibling?.textContent).toBe(base.textContent);
+  } finally {
+    stop();
+  }
+  expect(proof.head.querySelectorAll('style, link')).toHaveLength(1);
+  expect(proof.head.querySelector('style')).toBe(override);
+  expect(app.head.querySelectorAll('link')).toHaveLength(1);
+});
 
 describe('the stress fixture', () => {
   it('packs a day even when the deployment has no sessions at all', () => {

@@ -18,7 +18,7 @@
 //
 // It is an inline link in running content, not one of the four control
 // shapes in controlClasses.js, so it draws the prose-link treatment the
-// .rich-text anchor rule already sets in index.css: accent ink, an
+// .rich-text anchor rule sets: accent ink, an
 // underline at 40%, accent-strong on hover.
 import { PublicLink as Link } from '../PublicLink.jsx';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';

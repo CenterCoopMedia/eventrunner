@@ -278,7 +278,7 @@ describe('SystemPage renderSection', () => {
   // One pull quote per page at most (expansion record §3.1), and the page is
   // what enforces it: the first quote in READING order takes the device,
   // whatever the operator's section order says.
-  it('sets the first quote in reading order as the page’s pull quote and the rest plain', () => {
+  it('sets the first quote in reading order as the page’s pull quote and the rest plain', async () => {
     page = {
       id: 'schedule',
       sections: [section('main-one', 'main'), section('above-one', 'above')],
@@ -288,6 +288,7 @@ describe('SystemPage renderSection', () => {
       'above-one': [quoteBlock('above-one', 'The first quote a reader meets.')],
     };
     const { container } = renderPage();
+    await screen.findByText('The first quote a reader meets.');
     const pulled = container.querySelectorAll('figure.pull-quote');
     expect(pulled).toHaveLength(1);
     expect(pulled[0].textContent).toContain('The first quote a reader meets.');
@@ -380,7 +381,7 @@ describe('SystemPage section edit links', () => {
 // that is not public, opens a dead end. The shell leaves it out, and a
 // section left with nothing draws no heading.
 describe('SystemPage links that lead nowhere', () => {
-  it('leaves out a link to a section that is off or to a hidden page, and keeps the rest', () => {
+  it('leaves out a link to a section that is off or to a hidden page, and keeps the rest', async () => {
     features = { schedule: false, speakers: true };
     pages = [{ id: 'travel', path: '/travel', visible: true }, { id: 'guidelines', path: '/guidelines', visible: false }];
     page = { id: 'schedule', sections: [section('links'), section('dead')] };
@@ -393,8 +394,8 @@ describe('SystemPage links that lead nowhere', () => {
     };
     try {
       renderPage();
+      expect(await screen.findByRole('link', { name: 'Plan your trip' })).toHaveAttribute('href', '/travel');
       expect(screen.queryByRole('link', { name: 'Browse the schedule' })).toBeNull();
-      expect(screen.getByRole('link', { name: 'Plan your trip' })).toHaveAttribute('href', '/travel');
       expect(screen.queryByRole('link', { name: 'Speaker guidelines' })).toBeNull();
       expect(screen.queryByRole('heading', { name: 'dead label' })).toBeNull();
     } finally {

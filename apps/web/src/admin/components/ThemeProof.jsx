@@ -231,15 +231,46 @@ export function denseSchedule(sessions, dayId) {
 
 const PREVIEW_DOCUMENT = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>';
 
-/** Copy the app's built or development styles into one isolated proof document. */
-function copyPreviewStyles(targetDocument) {
-  targetDocument.head.querySelectorAll('[data-theme-proof-base]').forEach((node) => node.remove());
-  for (const source of document.head.querySelectorAll('link[rel="stylesheet"], style')) {
-    if (source.id === PREVIEW_STYLE_ID) continue;
-    const clone = source.cloneNode(true);
-    clone.dataset.themeProofBase = '';
-    targetDocument.head.appendChild(clone);
+/** Keep styles from the app and its deferred chunks in the proof document. */
+export function syncProofStyles(sourceHead, proofHead) {
+  const copies = new Map();
+  function refresh() {
+    const styles = [...sourceHead.querySelectorAll('link[rel="stylesheet"], style')]
+      .filter((node) => node.id !== PREVIEW_STYLE_ID);
+    for (const [source, copy] of copies) {
+      if (styles.includes(source)) continue;
+      copy.remove();
+      copies.delete(source);
+    }
+    // Keep the app's cascade order and the proof's own overrides at the end.
+    let before = proofHead.querySelector(`#${PREVIEW_STYLE_ID}`);
+    for (const source of styles.reverse()) {
+      let copy = copies.get(source);
+      if (!copy || !source.isEqualNode(copy)) {
+        copy?.remove();
+        copy = source.cloneNode(true);
+        copies.set(source, copy);
+      }
+      if (copy.parentNode !== proofHead || copy.nextSibling !== before) {
+        proofHead.insertBefore(copy, before);
+      }
+      before = copy;
+    }
   }
+
+  refresh();
+  const observer = new MutationObserver(refresh);
+  observer.observe(sourceHead, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['href', 'rel', 'media', 'id', 'disabled'],
+  });
+  return () => {
+    observer.disconnect();
+    for (const copy of copies.values()) copy.remove();
+  };
 }
 
 /** One rendered frame, at one width, in one mode. */
@@ -252,7 +283,6 @@ function PreviewFrame({ path, scopeId, onReady, width, height, scale, identifica
     const iframe = iframeRef.current;
     const targetDocument = iframe?.contentDocument;
     if (!targetDocument?.head || !targetDocument.body || !iframe.contentWindow) return;
-    copyPreviewStyles(targetDocument);
     targetDocument.body.className = 'theme-preview-document';
     const next = {
       root: targetDocument.documentElement,
@@ -275,6 +305,11 @@ function PreviewFrame({ path, scopeId, onReady, width, height, scale, identifica
       onReady(null);
     };
   }, [onReady, prepare]);
+
+  const proofHead = host?.body.ownerDocument.head;
+  useLayoutEffect(() => {
+    if (proofHead) return syncProofStyles(document.head, proofHead);
+  }, [proofHead]);
 
   const page = host
     ? createPortal(

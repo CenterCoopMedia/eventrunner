@@ -151,7 +151,7 @@ describe('ContentPage (catch-all route)', () => {
       await screen.findByRole('heading', { level: 1, name: pageHeading(faqPage) }),
     ).toBeInTheDocument();
     // The FAQ item renders as a disclosure with its question.
-    expect(screen.getByText(siteContent.faq_items__what_is_this.question)).toBeInTheDocument();
+    expect(await screen.findByText(siteContent.faq_items__what_is_this.question, { selector: 'summary' })).toBeInTheDocument();
   });
 
   it('heads the page with its full title while the navigation keeps the short label', async () => {
@@ -532,6 +532,7 @@ describe('ContentPage — search and section index on long pages', () => {
       quote('tq_first', 'The first quote a reader meets.'),
     ]);
     expect(await screen.findByRole('heading', { level: 1, name: 'Two quotes fixture' })).toBeInTheDocument();
+    await screen.findByText('The first quote a reader meets.');
     const pulled = document.querySelectorAll('figure.pull-quote');
     expect(pulled).toHaveLength(1);
     expect(pulled[0].textContent).toContain('The first quote a reader meets.');
@@ -660,7 +661,7 @@ describe('ContentPage — search and section index on long pages', () => {
     const filter = screen.getByRole('searchbox', { name: 'Filter by keyword' });
     fireEvent.change(filter, { target: { value: siteContent.faq_items__what_is_this.question } });
     expect(
-      screen.getByText(siteContent.faq_items__what_is_this.question),
+      await screen.findByText(siteContent.faq_items__what_is_this.question, { selector: 'summary' }),
     ).toBeInTheDocument();
   });
 
@@ -1270,8 +1271,8 @@ describe('ContentPage — links to a section that is off', () => {
   it('draws no link to a section that is off, and no heading over a section left empty', async () => {
     renderWithFeatures({ schedule: false, speakers: true });
     expect(await screen.findByText('Thanks for coming.')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Meet the speakers' })).toHaveAttribute('href', '/speakers');
     expect(screen.queryByRole('link', { name: 'Browse the schedule' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Meet the speakers' })).toHaveAttribute('href', '/speakers');
     expect(screen.queryByRole('link', { name: 'See the program' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Feedback' })).toBeNull();
   });
@@ -1328,12 +1329,12 @@ describe('ContentPage — links to a page that is hidden', () => {
     });
     expect(await screen.findByText('Thanks for coming.')).toBeInTheDocument();
     const main = within(screen.getByRole('main'));
+    expect(await main.findByRole('link', { name: 'Plan your trip' })).toHaveAttribute('href', '/travel');
     expect(main.queryByRole('link', { name: 'Speaker guidelines' })).toBeNull();
     expect(main.queryByRole('link', { name: 'Old page' })).toBeNull();
     expect(main.queryByRole('link', { name: 'Read the guidelines' })).toBeNull();
     expect(main.queryByRole('heading', { name: 'Feedback' })).toBeNull();
     // A page that is on the site, an app route, and a file all stay.
-    expect(main.getByRole('link', { name: 'Plan your trip' })).toHaveAttribute('href', '/travel');
     expect(main.getByRole('link', { name: 'Buy a ticket' })).toHaveAttribute('href', '/tickets');
     expect(main.getByRole('link', { name: 'Speaker kit' })).toHaveAttribute('href', '/files/kit.pdf');
   });

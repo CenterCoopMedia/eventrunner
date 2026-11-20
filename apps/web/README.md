@@ -14,6 +14,14 @@ spec: [docs/adr/0001-event-platform-v1.md](../../docs/adr/0001-event-platform-v1
   [docs/interface-guidelines.md](../../docs/interface-guidelines.md) — the
   foundational interface, accessibility, and writing rules for this repo.
 
+## CMS block renderers
+
+Name new renderer modules `<Type>Block.jsx` and register them with
+`lazy(() => import(...))` in `src/components/blocks/registry.jsx`. Import
+block-specific CSS from the renderer. Only the Home hero, information
+cards, and opening copy renderers and the unknown-block fallback are
+eager. Keep admin styles with their route or component.
+
 ## How the app reads its config (spec §2.4)
 
 First paint never waits on a network round trip. It renders straight from

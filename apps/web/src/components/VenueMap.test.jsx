@@ -18,7 +18,7 @@ vi.mock('../lib/mediaSource.js', () => ({ assetUrl }));
 import VenueMap, { useVenueMapImage } from './VenueMap.jsx';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const indexCss = fs.readFileSync(path.resolve(here, '..', 'index.css'), 'utf8');
+const venueMapCss = fs.readFileSync(path.join(here, 'VenueMap.css'), 'utf8');
 
 const MAP = {
   image: 'cms-images/abc/plan.png',
@@ -105,12 +105,12 @@ describe('VenueMap', () => {
       expect(element.className).not.toMatch(/aspect-/);
       expect(element.style.aspectRatio).toBe('');
     }
-    const rule = indexCss.match(/\.venue-map__image \{[^}]*\}/)[0];
+    const rule = venueMapCss.match(/\.venue-map__image \{[^}]*\}/)[0];
     expect(rule).not.toMatch(/aspect-ratio/);
     expect(rule).not.toMatch(/object-fit/);
     // The frame shrinks to the picture instead of stretching past it, which
     // is what makes "60% across the frame" mean "60% across the plan".
-    expect(indexCss).toMatch(/\.venue-map__frame \{[^}]*inline-size: fit-content;/);
+    expect(venueMapCss).toMatch(/\.venue-map__frame \{[^}]*inline-size: fit-content;/);
   });
 
   it('renders the picture with no markers when nothing has been placed', () => {

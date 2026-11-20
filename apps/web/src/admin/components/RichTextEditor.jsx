@@ -13,6 +13,7 @@ import Blockquote from 'quill/formats/blockquote.js';
 import CodeBlock, { Code } from 'quill/formats/code.js';
 import { hasRichTextContent, isSafeRichTextHref } from 'shared/richText';
 import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
+import './RichTextEditor.css';
 import {
   FieldError,
   fieldHintClass,

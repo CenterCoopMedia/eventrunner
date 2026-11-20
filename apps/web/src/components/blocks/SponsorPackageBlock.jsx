@@ -9,16 +9,7 @@
 // on top, the way every list in the system is ruled.
 import { DefinitionPair } from '../editorial/DefinitionList.jsx';
 import PublicRichText from '../PublicRichText.jsx';
-
-/** A string field with something in it, or null. */
-function text(value) {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-/** Whether a package block has a name to head it. */
-export function sponsorPackageDraws(block) {
-  return Boolean(text(block?.name));
-}
+import { sponsorPackageDraws, text } from './sponsorPackageData.js';
 
 /** "Open to" words for a limit, or null when the package states none. */
 export function sponsorLimitLabel(limit) {

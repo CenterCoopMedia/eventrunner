@@ -1,8 +1,7 @@
-import { googleMapsEmbedUrl, safeUrlHref } from 'shared/urlSafety';
-import { isStarterContent } from 'shared/seed';
-import { venueAddress } from 'shared/venue';
+import { safeUrlHref } from 'shared/urlSafety';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { usePublicLanguage } from '../../contexts/PublicLanguageContext.jsx';
+import { mapBlockFields, mapVenueFields } from './mapBlockFields.js';
 
 function googleMapsSearch(query) {
   const url = new URL('https://www.google.com/maps/search/');
@@ -43,24 +42,22 @@ function MapFrame({ src, label, address, href, publicLanguage, preview }) {
 function EventVenueMap({ block, label, address, preview }) {
   const { eventConfig } = useEventConfig();
   const venue = eventConfig?.venue;
-  const name = typeof venue?.name === 'string' ? venue.name.trim() : '';
-  const street = typeof venue?.addressLine1 === 'string' ? venue.addressLine1.trim() : '';
-  if (!name || !street) {
+  const venueFields = mapVenueFields(venue);
+  if (!venueFields) {
     return preview ? (
       <p className="mt-md text-admin-sm text-admin-state-caution">
         Add the venue name and street address in Event settings to preview this map.
       </p>
     ) : null;
   }
-  const savedAddress = venueAddress(venue);
-  const query = `${name}, ${savedAddress}`;
+  const query = `${venueFields.name}, ${venueFields.address}`;
   const src = new URL('https://www.google.com/maps');
   src.search = new URLSearchParams({ q: query, output: 'embed' });
   return (
     <MapFrame
       src={src.href}
       label={label}
-      address={address || savedAddress}
+      address={address || venueFields.address}
       href={safeUrlHref(venue.mapUrl) || googleMapsSearch(query)}
       publicLanguage={block.publicLanguage}
       preview={preview}
@@ -69,14 +66,12 @@ function EventVenueMap({ block, label, address, preview }) {
 }
 
 export default function MapBlock({ block, preview = false }) {
-  const label = typeof block?.label === 'string' ? block.label.trim() : '';
-  const address = typeof block?.address === 'string' ? block.address.trim() : '';
-  if (!label || isStarterContent({ label, address })) return null;
+  const fields = mapBlockFields(block);
+  if (!fields) return null;
+  const { label, address, src } = fields;
   if (block.useEventVenue === true) {
     return <EventVenueMap block={block} label={label} address={address} preview={preview} />;
   }
-  const src = googleMapsEmbedUrl(block.embedUrl);
-  if (!src || src !== block.embedUrl || isStarterContent({ embedUrl: src })) return null;
   return (
     <MapFrame
       src={src}

@@ -10,9 +10,7 @@ import BlockRenderer from './registry.jsx';
 import StatBlock from './StatBlock.jsx';
 import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
-import FaqItemBlock from './FaqItemBlock.jsx';
-import LinkGroupBlock from './LinkGroupBlock.jsx';
-import SponsorPackageBlock, { sponsorPackageDraws } from './SponsorPackageBlock.jsx';
+import { sponsorPackageDraws } from './sponsorPackageData.js';
 import Folio from '../editorial/Folio.jsx';
 
 const blockKey = (block, index) =>
@@ -39,7 +37,7 @@ function LinkGroups({ blocks }) {
           ) : null}
           <ul className="mt-xs space-y-3xs">
             {links.map((block, i) => (
-              <LinkGroupBlock key={blockKey(block, i)} block={block} />
+              <BlockRenderer key={blockKey(block, i)} block={block} />
             ))}
           </ul>
         </div>
@@ -77,7 +75,7 @@ const RUN_RENDERERS = {
   faq_item: (run) => (
     <div className="space-y-sm">
       {run.map((block, i) => (
-        <FaqItemBlock key={blockKey(block, i)} block={block} />
+        <BlockRenderer key={blockKey(block, i)} block={block} />
       ))}
     </div>
   ),
@@ -89,7 +87,7 @@ const RUN_RENDERERS = {
     <ul className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
       {run.filter(sponsorPackageDraws).map((block, i) => (
         <li key={blockKey(block, i)} className="border-t-hairline border-t-rule-hairline pt-sm">
-          <SponsorPackageBlock block={block} />
+          <BlockRenderer block={block} />
         </li>
       ))}
     </ul>

@@ -101,7 +101,7 @@ it.each([
     ]);
   });
   expect(await screen.findByRole('link', { name: 'Visitar' })).toHaveAttribute('href', expected);
-  expect(screen.getByRole('link', { name: 'Find the room' })).toHaveAttribute('href', expected);
-  expect(screen.getByRole('link', { name: 'Read more' })).toHaveAttribute('href', expected);
+  expect(await screen.findByRole('link', { name: 'Find the room' })).toHaveAttribute('href', expected);
+  expect(await screen.findByRole('link', { name: 'Read more' })).toHaveAttribute('href', expected);
   expect(screen.getByTestId('source-label')).toHaveTextContent('Visit');
 });

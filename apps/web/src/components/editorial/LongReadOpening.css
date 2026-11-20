@@ -1,0 +1,27 @@
+/* THE LONG READ OPENING (record §3.1, brief §2.1): the first paragraph of
+   the first block on a Long read page takes the style's opening — a drop
+   cap, a standfirst-sized line, or nothing. The contract defaults draw
+   nothing; the Long read opening option remaps them. One cap per page, on
+   that first paragraph and nowhere else. */
+.long-read-opening .rich-text:first-child > p:first-child {
+  font-size: var(--long-read-opening-size);
+  line-height: var(--long-read-opening-leading);
+}
+.long-read-opening .rich-text:first-child > p:first-child::first-letter {
+  float: var(--drop-cap-float);
+  font-size: var(--drop-cap-size);
+  padding-inline-end: var(--drop-cap-pad-inline-end);
+}
+/* The cap's face, leading, weight, ink and lift apply only while the
+   letter floats: a first letter that is not a cap keeps its paragraph's
+   own. A browser that cannot read a style query draws the floated letter
+   at its size in the paragraph's face, which is still a cap. */
+@container style(--drop-cap-float: left) {
+  .long-read-opening .rich-text:first-child > p:first-child::first-letter {
+    font-family: var(--drop-cap-font);
+    line-height: var(--drop-cap-leading);
+    font-weight: var(--drop-cap-weight);
+    color: var(--drop-cap-ink);
+    margin-block-start: var(--drop-cap-margin-block-start);
+  }
+}

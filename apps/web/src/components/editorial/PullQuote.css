@@ -1,0 +1,46 @@
+/* THE PULL QUOTE (record §3.1): a quoted sentence with its attribution,
+   one per page at most. The sentence is the callout device — see
+   .callout above, and components/editorial/PullQuote.jsx — so the frame
+   is all that is drawn here: a rule above and below at the weight the
+   style sets, an optional rule at the inline start, and an optional large
+   opening mark. Every rule reads the rule tokens and never the accent, so
+   the frame is a typographic rule and not the rejected coloured edge. */
+.pull-quote {
+  padding-block: var(--pull-quote-pad-block);
+  padding-inline-start: var(--pull-quote-pad-inline);
+  border-block-start: var(--pull-quote-rule-block-width) solid rgb(var(--pull-quote-rule-rgb));
+  border-block-end: var(--pull-quote-rule-block-width) solid rgb(var(--pull-quote-rule-rgb));
+  border-inline-start: var(--pull-quote-rule-inline-width) solid rgb(var(--pull-quote-rule-rgb));
+  text-align: var(--pull-quote-align);
+}
+/* The marks are drawn, never typed into the copy, so a screen reader
+   reads the sentence and not a stray quotation mark. Two devices, one of
+   which every style keeps on: the large opening mark above the sentence,
+   and the inline pair around it. A style that draws the large mark turns
+   the pair off (design/tokens/presets), so a quote never carries both. */
+.pull-quote__mark {
+  display: var(--pull-quote-mark-display);
+  font-family: var(--pull-quote-mark-font);
+  font-size: var(--text-h1);
+  line-height: 0.6;
+  color: rgb(var(--callout-rgb));
+}
+.pull-quote__quote {
+  display: var(--pull-quote-quotes-display);
+}
+/* A centred quote centres its sentence too. The callout is an inline
+   block with a measure of its own, so the block's text-align places it. */
+.pull-quote .callout {
+  text-wrap: pretty;
+}
+.pull-quote__attribution {
+  font-family: var(--pull-quote-attribution-font);
+  text-transform: var(--pull-quote-attribution-transform);
+}
+/* A page's second quote (record §3.1: one pull quote per page at most,
+   which the page enforces). The same words in the body register, inside
+   a hairline at the inline start; no callout, no large mark. */
+.quote-plain {
+  padding-inline-start: var(--space-md);
+  border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}

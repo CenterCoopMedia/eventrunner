@@ -8,7 +8,7 @@ import PullQuote from './PullQuote.jsx';
 import { renderInEveryStyle } from '../../test/everyStyle.jsx';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const indexCss = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
+const pullQuoteCss = fs.readFileSync(path.join(here, 'PullQuote.css'), 'utf8');
 
 const LINE = 'Bring one task your team could share and one it must keep.';
 
@@ -49,7 +49,7 @@ describe('PullQuote', () => {
     expect(quotes.map((mark) => mark.textContent.trim())).toEqual(['“', '”']);
     for (const mark of quotes) expect(mark).toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelector('.callout').textContent.trim()).toBe(`“${LINE}”`);
-    expect(indexCss).toMatch(/\.pull-quote__quote \{[^}]*display: var\(--pull-quote-quotes-display\);/u);
+    expect(pullQuoteCss).toMatch(/\.pull-quote__quote \{[^}]*display: var\(--pull-quote-quotes-display\);/u);
   });
 
   it('draws no caption when there is no attribution, and nothing for an empty quote', () => {
