@@ -2,7 +2,7 @@ import { timelineHref, timelineImagePath } from '../../lib/timelineEntry.js';
 import ExternalLink from '../ExternalLink.jsx';
 import { PublicLink } from '../PublicLink.jsx';
 import AssetImage from '../media/AssetImage.jsx';
-import Timeline from './Timeline.jsx';
+import Timeline from '../editorial/Timeline.jsx';
 
 function renderTitle(entry) {
   const href = timelineHref(entry.url);

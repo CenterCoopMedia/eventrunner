@@ -14,7 +14,7 @@
 import { useContent } from '../contexts/ContentContext.jsx';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
-import PublishedTimeline from './editorial/PublishedTimeline.jsx';
+import PublishedTimeline from './timeline/PublishedTimeline.jsx';
 
 /**
  * @param {{

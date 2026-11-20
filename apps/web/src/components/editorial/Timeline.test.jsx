@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Timeline from './Timeline.jsx';
-import TimelineDetails from './TimelineDetails.jsx';
+import TimelineDetails from '../timeline/TimelineDetails.jsx';
 import { renderInEveryStyle } from '../../test/everyStyle.jsx';
 
 const EDITIONS = [

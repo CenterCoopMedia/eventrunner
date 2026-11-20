@@ -1,1 +1,1 @@
-export { default } from '../editorial/PublishedTimeline.jsx';
+export { default } from '../timeline/PublishedTimeline.jsx';

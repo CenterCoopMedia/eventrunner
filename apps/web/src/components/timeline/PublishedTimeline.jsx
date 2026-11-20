@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { useContent } from '../../contexts/ContentContext.jsx';
-import Timeline from './Timeline.jsx';
+import Timeline from '../editorial/Timeline.jsx';
 
 const TimelineDetails = lazy(() => import('./TimelineDetails.jsx'));
 
