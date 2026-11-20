@@ -21,7 +21,10 @@ export function useScreenshotFiles(mib) {
   }
 
   function onPaste(event) {
-    const images = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'));
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+    if (clipboard.getData('text/plain') && event.target.matches('textarea, input:not([type="file"])')) return;
+    const images = Array.from(clipboard.files).filter((file) => file.type.startsWith('image/'));
     if (images.length === 0) return;
     event.preventDefault();
     add(images);

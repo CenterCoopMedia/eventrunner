@@ -252,6 +252,7 @@ function reportProblemHandler(deps) {
       if (screenshots.length) {
         const created = await storeProblemReportReceipt({ db: deps.db, now }, requestId, report, reporter, () => render(screenshots));
         if (!created) {
+          log.info('reportProblem: replay matched an existing Console receipt', requestId);
           res.status(200).json({ id: requestId });
           return;
         }

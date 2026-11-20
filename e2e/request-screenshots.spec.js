@@ -17,6 +17,14 @@ test('a signed-out visitor attaches screenshots and only staff can open the sani
     await page.getByRole('button', { name: 'Share feedback' }).click();
     const form = page.getByRole('dialog', { name: 'Share feedback' });
     const message = form.getByRole('textbox', { name: 'Message' });
+    const keepTextPaste = await message.evaluate((element, data) => {
+      const clipboardData = new globalThis.DataTransfer();
+      clipboardData.setData('text/plain', 'A text selection from a spreadsheet');
+      clipboardData.items.add(new File([new Uint8Array(data)], 'table.png', { type: 'image/png' }));
+      return element.dispatchEvent(new globalThis.ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+    }, [...png]);
+    expect(keepTextPaste).toBe(true);
+    await expect(form.getByRole('list', { name: 'Selected screenshots' })).toHaveCount(0);
     await message.fill('The map label is hard to read.');
     await form.getByLabel('Screenshots (optional)').setInputFiles({ name: 'map.png', mimeType: 'image/png', buffer: png });
     await message.evaluate((element, data) => {

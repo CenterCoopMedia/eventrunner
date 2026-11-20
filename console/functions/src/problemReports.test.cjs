@@ -124,6 +124,8 @@ test('screenshots stay in the Console receipt, out of the relay, and require ope
   const { deps, sent } = setup({ fetchStatus: 502, seed: { 'console_config/operators': { emails: [operator.email] } } });
   const image = await require('sharp')({ create: { width: 12, height: 12, channels: 3, background: 'white' } }).png().toBuffer();
   const notices = [];
+  const replays = [];
+  deps.log.info = (...entry) => replays.push(entry);
   deps.notifyAttachments = async (notice) => notices.push(notice);
   const body = { ...BODY, submissionKey: 'f'.repeat(32), screenshots: [image.toString('base64')] };
   const res = makeRes();
@@ -133,6 +135,7 @@ test('screenshots stay in the Console receipt, out of the relay, and require ope
   const retry = makeRes();
   await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body }), retry);
   assert.deepEqual(retry.body, { id });
+  assert.deepEqual(replays, [['reportProblem: replay matched an existing Console receipt', id]]);
   assert.equal(sent.length, 1);
   assert.deepEqual(notices, [{ id, count: 1, project: 'er-console' }]);
   assert.equal(sent[0].body.request_id, id);
