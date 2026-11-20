@@ -375,7 +375,7 @@ function ControlGroup({ label, options, value, onChange }) {
   );
 }
 
-export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
+export default function ThemeProof({ themeDoc, styleName, isDirty, mode, onModeChange }) {
   const [frameRoot, setFrameRoot] = useState(null);
   const [compareRoot, setCompareRoot] = useState(null);
   const columnRef = useRef(null);
@@ -604,7 +604,10 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   return (
     <div ref={columnRef} className="flex min-w-0 flex-col gap-xs">
       <div className="flex flex-wrap items-end gap-xs border-admin-rule-hairline border-b-admin-hairline pb-2xs">
-        <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Page preview</h2>
+        <div>
+          <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Page preview</h2>
+          <p className="text-admin-sm text-admin-ink-secondary">{styleName}</p>
+        </div>
         <div className="min-w-[12rem] flex-1">
           <SelectField
             label="Page"

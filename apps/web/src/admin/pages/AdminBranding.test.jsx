@@ -538,11 +538,16 @@ describe('the staff workflow', () => {
     expect(panelTitles()).toEqual(['Logo and icon', 'Homepage hero image', 'Main brand colour', 'Page preview']);
 
     fireEvent.change(screen.getByLabelText('Primary logo'), { target: { value: 'branding/draft.svg' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Page style', exact: true }));
+    expect(screen.getByText('Active site style').parentElement).toHaveTextContent('Broadsheet');
+    fireEvent.click(screen.getByRole('button', { name: 'Change site style', exact: true }));
     expect(panelTitles()).toEqual(['Site style', 'Header and schedule', 'Light or dark', 'Page preview']);
     expect(screen.getByLabelText('Primary logo')).not.toBeVisible();
     expect(screen.getByLabelText('Site style')).toBeVisible();
+    expect(screen.getByLabelText('Site style')).toHaveFocus();
     expect(previewIframe()).toBe(proof);
+    fireEvent.change(screen.getByLabelText('Site style'), { target: { value: 'zine' } });
+    expect(screen.getByRole('heading', { name: 'Page preview' }).parentElement).toHaveTextContent('Zine');
+    expect(screen.getByText('Active site style').parentElement).toHaveTextContent('Broadsheet');
 
     fireEvent.click(screen.getByRole('button', { name: 'Workspace', exact: true }));
     expect(panelTitles()).toEqual(['Admin colours', 'Page preview']);
