@@ -23,6 +23,7 @@ const {
   planNewRetryFunctions,
   createDeployRunner,
 } = require('./deploy-functions.cjs');
+const { retireAirtableFunctions } = require('./retire-airtable-functions.cjs');
 
 const PROJECT = 'demo-project';
 const REGION = 'us-central1';
@@ -30,9 +31,13 @@ const EVENT_TYPE = 'google.cloud.firestore.document.v1.written';
 const eventTrigger = (retry) => ({ eventType: EVENT_TYPE, retry });
 const quiet = { log() {}, error() {} };
 const FULL_DEPLOY = ['firebase', 'deploy', '--project', PROJECT, '--non-interactive', '--only', 'functions'];
+const RETIREMENT = ['firebase', 'retire-airtable-functions', PROJECT];
 
 const deployed = (id, region = REGION) => ({ id, region, platform: 'gcfv2', codebase: 'default' });
 const deployedRetry = (id, retry = true) => ({ ...deployed(id), eventTrigger: eventTrigger(retry) });
+const deployedAirtable = (id, region = REGION, trigger = { httpsTrigger: {} }) => ({
+  ...deployed(id, region), project: PROJECT, ...trigger,
+});
 const local = (id, retry, regions = [REGION]) => ({
   id, retry, regions, platform: 'gcfv2', eventTrigger: retry ? eventTrigger(true) : null,
 });
@@ -129,6 +134,72 @@ function assertNoBareForce(calls) {
     for (const selector of only.split(',')) assert.match(selector, /^functions:[A-Za-z0-9_-]+$/);
   }
 }
+
+test('the deploy retires only exact Airtable exports that left local code', async () => {
+  const removed = [
+    deployedAirtable('updateAirtablePitchSource', 'us-east1'),
+    deployedAirtable('scheduledAirtablePitchRefresh', REGION, { scheduleTrigger: {} }),
+  ];
+  const stillDeclared = [deployedAirtable('refreshAirtablePitches'), deployed('refreshAirtablePitches-other')];
+  const localFunctions = stillDeclared.map(({ id }) => local(id));
+  const retired = await runDeploy({ bootstrap: false, localFunctions,
+    inventoryReads: [[...removed, ...stillDeclared], stillDeclared, stillDeclared] });
+  assert.equal(retired.code, 0);
+  assert.deepEqual(retired.calls.map(({ args }) => args), [
+    [...RETIREMENT, 'us-east1/updateAirtablePitchSource', 'us-central1/scheduledAirtablePitchRefresh'], FULL_DEPLOY,
+  ]);
+
+  const repeated = await runDeploy({ bootstrap: false, localFunctions, completeInventory: stillDeclared });
+  assert.equal(repeated.code, 0);
+  assert.deepEqual(repeated.calls.map(({ args }) => args), [FULL_DEPLOY]);
+});
+
+test('a failed or unverified Airtable retirement stops before the full deploy', async () => {
+  const endpoint = deployedAirtable('refreshAirtablePitches');
+  const scenarios = [
+    { completeInventory: [endpoint], status: () => 1, attempts: 1 },
+    { inventoryReads: [[endpoint], [endpoint]], attempts: 1 },
+    { completeInventory: [{ ...endpoint, codebase: 'other' }], attempts: 0 },
+  ];
+  for (const { attempts, ...options } of scenarios) {
+    const result = await runDeploy({ bootstrap: false, ...options });
+    assert.equal(result.code, 1);
+    assert.deepEqual(result.calls.map(({ args }) => args), attempts ? [[...RETIREMENT, `${REGION}/${endpoint.id}`]] : []);
+  }
+});
+
+test('the retirement child accepts exact names and tolerates already-deleted resources', async (t) => {
+  const previous = process.env.EVENT_FIREBASE_PROJECT_ID;
+  process.env.EVENT_FIREBASE_PROJECT_ID = PROJECT;
+  t.after(() => {
+    if (previous === undefined) delete process.env.EVENT_FIREBASE_PROJECT_ID;
+    else process.env.EVENT_FIREBASE_PROJECT_ID = previous;
+  });
+  const calls = [];
+  const notFound = Object.assign(new Error('absent'), { status: 404 });
+  const dependencies = {
+    authenticate: async () => calls.push('auth'),
+    deleteSchedule: async ({ id }) => { calls.push(`schedule:${id}`); throw notFound; },
+    deleteFunction: async ({ id }) => {
+      calls.push(`function:${id}`);
+      if (id === 'refreshAirtablePitches') throw notFound;
+      return { name: 'operation-id' };
+    },
+    pollDeletion: async ({ name }) => calls.push(`poll:${name}`),
+  };
+  await assert.rejects(retireAirtableFunctions(PROJECT, [
+    `${REGION}/refreshAirtablePitches`, `${REGION}/refreshAirtablePitches-other`,
+  ], dependencies), /Unexpected Airtable function retirement target/);
+  assert.deepEqual(calls, []);
+
+  await retireAirtableFunctions(PROJECT, [
+    `${REGION}/scheduledAirtablePitchRefresh`, `${REGION}/refreshAirtablePitches`,
+  ], dependencies);
+  assert.deepEqual(calls, [
+    'auth', 'schedule:scheduledAirtablePitchRefresh', 'function:scheduledAirtablePitchRefresh',
+    'poll:operation-id', 'function:refreshAirtablePitches',
+  ]);
+});
 
 test('ordinary deploys with no new retry functions use one plain full deploy', async () => {
   const { calls, code } = await runDeploy({

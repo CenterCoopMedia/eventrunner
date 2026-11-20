@@ -45,6 +45,7 @@ const {
   endpointMatchesFilter,
   parseFunctionSelector,
 } = require('firebase-tools/lib/deploy/functions/functionsDeployHelper.js');
+const { COMMAND: RETIRE_AIRTABLE_FUNCTIONS, retirementTargets } = require('./retire-airtable-functions.cjs');
 
 const PROJECT_DIR = path.resolve(__dirname, '..');
 // The v1 write quota uses a 100-second window; v2 uses a 60-second window.
@@ -505,6 +506,24 @@ async function deployAttempt({
       plan = planNewRetryFunctions(inventory, localFunctions, readConfig());
     } catch (error) {
       log.error(reportFailure('deploy-functions: refusing a forced deploy of retry policies', {}, error));
+      return { code: 1 };
+    }
+    try {
+      const targets = retirementTargets(projectId, inventory, localFunctions);
+      if (targets.length) {
+        const result = await run(['firebase', RETIRE_AIRTABLE_FUNCTIONS, projectId, ...targets], { stdio: 'inherit' });
+        if (failed(result)) {
+          log.error('deploy-functions: Airtable function retirement failed');
+          return { code: deployFailure(result) };
+        }
+        const remaining = retirementTargets(projectId, await verifyCompleteInventory(projectId), localFunctions);
+        if (remaining.length) {
+          log.error(`deploy-functions: Airtable function retirement incomplete: ${remaining.join(', ')}`);
+          return { code: 1 };
+        }
+      }
+    } catch (error) {
+      log.error(diagnosticFailure('deploy-functions: could not verify Airtable function retirement', 'airtable-function-retirement', error));
       return { code: 1 };
     }
     const retryResult = await deployRetryPolicies({
