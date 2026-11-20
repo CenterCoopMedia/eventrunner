@@ -2,17 +2,17 @@ import { contentLanguages, resolveContentVariant } from './contentLanguages.mjs'
 import { withContentLanguage } from './languageUrls.mjs';
 import { metaExcerpt, eventMetaDescription } from './pageMetadata.mjs';
 import { isStarterText } from './seed.mjs';
+import { homepageEventTitle, homepageTitlePart, publishedHeroText } from './homepageTitle.mjs';
 
 /** Crawler documents from published home hero text and the event defaults. */
 export function homepageMetadata(event, blocks = []) {
-  const hero = (field) => blocks.find((block) => block?.section === 'hero' && block.field === field
-    && block.visible === true && block.blockType === 'text' && !isStarterText(block.value));
+  const hero = (field) => blocks.find((block) => publishedHeroText(block, field));
   const title = hero('title');
   const subtitle = hero('subtitle');
   const config = contentLanguages(event);
-  const eventTitle = typeof event?.name === 'string' && event.name.trim() ? event.name.trim() : 'Event site';
+  const eventTitle = homepageEventTitle(event);
   const tags = (name, description) => {
-    const titlePart = name && name !== eventTitle ? name : null;
+    const titlePart = homepageTitlePart(name, eventTitle);
     return { title: titlePart ? `${titlePart} · ${eventTitle}` : eventTitle, titlePart, description };
   };
   const text = {

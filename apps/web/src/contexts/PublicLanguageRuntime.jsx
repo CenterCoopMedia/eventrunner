@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { createPath, useLocation, useNavigate } from 'react-router';
 import { contentLanguages, resolveContentVariant } from 'shared/contentLanguages';
+import { homepageMetadata } from 'shared/homepageMetadata';
 import { languageFromSearch, withContentLanguage } from 'shared/languageUrls';
 import { isPublicPage } from 'shared/page';
 import { isDrawable, useContent } from './ContentContext.jsx';
@@ -49,7 +50,8 @@ export default function PublicLanguageRuntime({ onChange }) {
   const multilingual = available.includes('es');
   const configReady = IS_DEMO || sources?.event === 'live';
   const recordsReady = IS_DEMO || (sources?.features === 'live' && content.languageRecordsReady);
-  const explicit = languageFromSearch(location.search, available);
+  const requested = languageFromSearch(location.search);
+  const explicit = available.includes(requested) ? requested : null;
   const savedLanguage = available.includes(saved) ? saved : null;
   const language = explicit ?? savedLanguage ?? defaultLanguage;
 
@@ -99,6 +101,12 @@ export default function PublicLanguageRuntime({ onChange }) {
   const urlLanguage = explicit ?? (multilingual ? savedLanguage : null);
   const localizedContent = useMemo(() => language === 'es' ? projectContent(content, eventConfig) : content,
     [content, language, eventConfig]);
+  const homeTitlePart = useMemo(() => {
+    if (location.pathname !== '/' || (requested === 'es' && !explicit && !configReady)) return undefined;
+    const { getBlock } = content;
+    const { text } = homepageMetadata(eventConfig, [getBlock('hero', 'title'), getBlock('hero', 'subtitle')]);
+    return (text[language] ?? text.en).titlePart;
+  }, [location.pathname, requested, explicit, configReady, content, eventConfig, language]);
   const value = useMemo(() => isAdmin ? englishLanguage : {
     language,
     available: multilingual && (Boolean(explicit || savedLanguage) || (configReady && content.readSource === 'draft'))
@@ -106,6 +114,7 @@ export default function PublicLanguageRuntime({ onChange }) {
     urlLanguage,
     sourceContent: content,
     localizedContent,
+    homeTitlePart,
     localize: (href) => isAdminRoute(href) ? href : withContentLanguage(href, urlLanguage),
     text: language === 'es' ? spanishText : englishLanguage.text,
     select: (next) => {
@@ -114,7 +123,7 @@ export default function PublicLanguageRuntime({ onChange }) {
         state: { ...location.state, languageSwitch: true },
       });
     },
-  }, [isAdmin, language, multilingual, explicit, savedLanguage, configReady, content, available, urlLanguage, localizedContent, navigate, location]);
+  }, [isAdmin, language, multilingual, explicit, savedLanguage, configReady, content, available, urlLanguage, localizedContent, homeTitlePart, navigate, location]);
 
   useLayoutEffect(() => onChange(value), [onChange, value]);
   return null;

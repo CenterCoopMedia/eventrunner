@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router';
-import { homepageMetadata } from 'shared/homepageMetadata';
+import { homepageEventTitle, homepageTitlePart, publishedHeroText } from 'shared/homepageTitle';
 import { languageFromSearch } from 'shared/languageUrls';
 import { isPublicPage } from 'shared/page';
 import { useContent } from '../contexts/ContentContext.jsx';
@@ -9,14 +9,16 @@ import { useDerivedDocumentTitle } from '../lib/useDocumentTitle.js';
 import RouteTitle from './RouteTitle.jsx';
 
 function HomeTitle({ search }) {
-  const { getBlock, pages } = useContent();
+  const content = useContent();
+  const { getBlock, pages } = content;
   const { eventConfig, features } = useEventConfig();
-  const { language } = usePublicLanguage();
+  const { sourceContent, homeTitlePart } = usePublicLanguage();
   let part = null;
   if (isPublicPage(pages?.find(({ id }) => id === 'home'), features)) {
-    const { text } = homepageMetadata(eventConfig, [getBlock('hero', 'title'), getBlock('hero', 'subtitle')]);
-    const locale = languageFromSearch(search) ?? language;
-    part = (text[locale] ?? text.en).titlePart;
+    const requested = languageFromSearch(search) ?? eventConfig.contentLanguages?.default;
+    if (sourceContent === content && homeTitlePart !== undefined) part = homeTitlePart;
+    else if (requested === 'es') part = undefined;
+    else part = homepageTitlePart(publishedHeroText(getBlock('hero', 'title'), 'title'), homepageEventTitle(eventConfig));
   }
   useDerivedDocumentTitle(part);
   return null;

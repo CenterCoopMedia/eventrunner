@@ -225,8 +225,11 @@ describe('app shell', () => {
 
   it('keeps the Spanish homepage title after the app loads', async () => {
     const title = 'Cumbre de noticias locales';
+    const expected = `${title} · ${eventConfig.name}`;
     const event = { ...eventConfig, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+    document.title = expected;
     renderAt('/?lang=es');
+    expect(document.title).toBe(expected);
     act(() => {
       configSubscriptions.get('event')(event);
       contentSubscriptions.get('cmsContent').onNext([
@@ -234,7 +237,8 @@ describe('app shell', () => {
         { ...siteContent.hero__subtitle, id: 'hero__subtitle', translations: { es: { value: 'Conoce a las redacciones.' } } },
       ]);
     });
-    await waitFor(() => expect(document.title).toBe(`${title} · ${event.name}`));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument());
+    expect(document.title).toBe(expected);
   });
 
   it('renders the schedule from the snapshot with sessions grouped by day', async () => {

@@ -74,7 +74,7 @@ function setClaimedPart(value) {
 
 function setDerivedPart(value) {
   const before = getRouteTitlePart();
-  derivedPart = normalize(value);
+  derivedPart = value === undefined ? undefined : normalize(value);
   publish(before);
   return derivedPart;
 }
@@ -155,7 +155,8 @@ export function routeTitlePartFor({ pathname, pages, features, pitchTitle = 'Pit
  * component that sits inside the content provider and watches the location
  * (apps/web/src/components/RouteTitle.jsx).
  *
- * @param {string|null} part
+ * Undefined keeps the served title while localized text loads.
+ * @param {string|null|undefined} part
  */
 export function useDerivedDocumentTitle(part) {
   useEffect(() => {

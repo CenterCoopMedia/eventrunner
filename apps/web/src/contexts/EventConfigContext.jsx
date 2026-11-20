@@ -291,6 +291,7 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
   // finished booting.
   useEffect(() => {
     const apply = (part) => {
+      if (part === undefined) return;
       document.title = part
         ? `${part} · ${value.eventConfig.name}`
         : value.eventConfig.name;
