@@ -20,7 +20,7 @@
 // sit in a hairline-ruled block tinted by --color-surface-alt, the same
 // device SignInPanel and the speaker-invite page use — never a shadowed,
 // rounded card.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useHref, useSearchParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -39,9 +39,9 @@ const Panel = ({ children }) => (
   </div>
 );
 
-function PreparingAccount({ retryPath }) {
+function PreparingAccount({ retryPath, routeAttempt }) {
   const retryHref = useHref(retryPath);
-  const { stage } = useLoadingStage();
+  const { stage } = useLoadingStage({ routeAttempt });
   const prolonged = stage === 'prolonged';
   const label = prolonged
     ? 'Setting up your account. Check your connection and reload this page, or contact the organizers if this continues.'
@@ -56,7 +56,7 @@ function PreparingAccount({ retryPath }) {
   );
 }
 
-export default function TicketClaim() {
+export default function TicketClaim({ routeAttempt }) {
   const { user, loading: authLoading } = useAuth();
   const { profile, status } = useProfile();
   const [searchParams] = useSearchParams();
@@ -71,13 +71,17 @@ export default function TicketClaim() {
   // Also reject a prior account's profile during the subscription transition.
   const preparing = !authLoading && !needsSignIn && (status !== 'ready' || profile?.id !== user.uid);
   const waiting = authLoading || preparing;
+  useLayoutEffect(() => {
+    if (routeAttempt && !waiting) routeAttempt.settled = true;
+  }, [routeAttempt, waiting]);
+
   let feedback;
   if (authLoading) {
-    feedback = <LoadingState label="Checking your sign-in…" rows={0} />;
+    feedback = <LoadingState label="Checking your sign-in…" rows={0} routeAttempt={routeAttempt} />;
   } else if (preparing) {
     const retryParams = new URLSearchParams(searchParams);
     if (orderNumber || retryParams.has('order')) retryParams.set('order', orderNumber);
-    feedback = <PreparingAccount key={identity} retryPath={`/ticket/claim?${retryParams.toString()}`} />;
+    feedback = <PreparingAccount key={identity} retryPath={`/ticket/claim?${retryParams.toString()}`} routeAttempt={routeAttempt} />;
   }
 
   return (
