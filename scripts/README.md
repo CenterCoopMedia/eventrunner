@@ -59,11 +59,11 @@ API with `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, not Firebase creden
 
 ```sh
 node scripts/client-host-worker-version.cjs capture <worker>
-node scripts/client-host-worker-version.cjs restore <worker> <recorded version id> <host> <mount>...
+node scripts/client-host-worker-version.cjs restore <worker> <recorded version id> https://<host>/<mount>/...
 ```
 
 `capture` prints the one version serving the Worker. `restore` deploys that recorded version at
-100%, reads back the active deployment and requests each mount. The order of use is in
+100%, reads back the active deployment and requests each mounted base until it answers 200. The order of use is in
 [docs/runbooks/event-mount-operations.md](../docs/runbooks/event-mount-operations.md).
 
 ### `prepare-functions.cjs`

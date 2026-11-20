@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+const { parseEventPublicBase } = require('shared/config/publicBase');
+
 // Capture and restore the client-host router Worker version through the Cloudflare API.
 // `wrangler rollback` and `wrangler versions deploy` first read every version in the current
 // deployment and do not retry Cloudflare code 100146, which a just-uploaded version can return (#1125).
@@ -9,7 +11,7 @@
 const API = 'https://api.cloudflare.com/client/v4';
 const VERSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const WORKER_NAME = /^[a-z0-9][a-z0-9_-]*$/;
-const READBACK_ATTEMPTS = 5;
+const ATTEMPTS = 5;
 
 class VersionFailure extends Error {}
 
@@ -57,11 +59,37 @@ async function captureVersion(fetchImpl, env, worker) {
   return { worker, versionId, deploymentId: deployment.id };
 }
 
-async function restoreVersion(fetchImpl, env, worker, versionId, host, mounts, sleep) {
+function mountedBase(value) {
+  let parsed;
+  try {
+    parsed = parseEventPublicBase(value);
+  } catch {
+    parsed = {};
+  }
+  check(parsed.mount, `Supply each mounted public base as https://<host>/<mount>/, not ${JSON.stringify(value)}`);
+  return parsed.publicBase;
+}
+
+async function probeBase(fetchImpl, url, sleep) {
+  // The new deployment can take a few seconds to reach the location that answers the probe.
+  let status = 'no response';
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+    if (attempt > 1) await sleep(1000);
+    try {
+      status = (await fetchImpl(url, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(8000) })).status;
+    } catch {
+      status = 'request failed';
+    }
+    if (status === 200) return { url, status };
+  }
+  throw new VersionFailure(`${url}: expected HTTP 200, last received ${status}`);
+}
+
+async function restoreVersion(fetchImpl, env, worker, versionId, publicBases, sleep) {
   check(WORKER_NAME.test(worker || ''), 'Supply the Worker name');
   check(VERSION_ID.test(versionId || ''), 'Supply the version id recorded by capture before the change');
-  check(/^[a-z0-9.-]+$/.test(host || '') && mounts.length > 0
-    && mounts.every((mount) => /^(\/[a-z0-9][a-z0-9-]*)+$/.test(mount)), 'Supply the client host and each mounted path');
+  check(publicBases.length > 0, 'Supply each mounted public base');
+  const urls = publicBases.map(mountedBase);
   const created = await cloudflare(fetchImpl, env, `/workers/scripts/${worker}/deployments`, {
     method: 'POST',
     body: JSON.stringify({
@@ -74,33 +102,23 @@ async function restoreVersion(fetchImpl, env, worker, versionId, host, mounts, s
   for (let attempt = 1; ; attempt += 1) {
     active = await activeDeployment(fetchImpl, env, worker);
     if (active.id === created.id && soleVersion(active) === versionId) break;
-    check(attempt < READBACK_ATTEMPTS, `Readback: the active deployment is ${active.id} serving `
+    check(attempt < ATTEMPTS, `Readback: the active deployment is ${active.id} serving `
       + `${JSON.stringify(active.versions)}, not ${versionId} at 100%`);
     await sleep(1000);
   }
-  const hosts = [];
-  for (const mount of mounts) {
-    const url = `https://${host}${mount}/`;
-    let status;
-    try {
-      status = (await fetchImpl(url, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(8000) })).status;
-    } catch {
-      throw new VersionFailure(`${url}: request failed`);
-    }
-    check(status === 200, `${url}: expected HTTP 200, received ${status}`);
-    hosts.push({ url, status });
-  }
-  return { worker, versionId, deploymentId: active.id, hosts };
+  const mounts = [];
+  for (const url of urls) mounts.push(await probeBase(fetchImpl, url, sleep));
+  return { worker, versionId, deploymentId: active.id, mounts };
 }
 
 async function cli([command, ...args], env = process.env) {
   if (command === 'capture' && args.length === 1) return captureVersion(fetch, env, ...args);
-  if (command === 'restore' && args.length >= 4) {
-    const [worker, versionId, host, ...mounts] = args;
+  if (command === 'restore' && args.length >= 3) {
+    const [worker, versionId, ...publicBases] = args;
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    return restoreVersion(fetch, env, worker, versionId, host, mounts, sleep);
+    return restoreVersion(fetch, env, worker, versionId, publicBases, sleep);
   }
-  throw new VersionFailure('Usage: capture <worker> | restore <worker> <version-id> <host> <mount>...'
+  throw new VersionFailure('Usage: capture <worker> | restore <worker> <version-id> <public base>...'
     + ' (docs/runbooks/event-mount-operations.md)');
 }
 
