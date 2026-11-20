@@ -20,30 +20,41 @@ export function ConnectionNotice({ message }) {
 }
 
 /** Disconnect asks once, in place. Cancel returns the focus to Disconnect. */
-function Disconnect({ name, warning, onDisconnect, disabled }) {
+function Disconnect({ name, warning, requireConfirmation, onDisconnect, disabled }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
   const button = useRef(null);
+  const blocked = busy || disabled || (requireConfirmation && confirmation !== 'DISCONNECT');
   if (!asking) {
     return <IconControl icon="disconnect" label="Disconnect" className="danger" ref={button} disabled={disabled} onClick={() => setAsking(true)} />;
   }
   return (
     <div className="confirm" role="group" aria-label={`Disconnect your ${name} account`}>
       <span>Disconnect your {name} account?{warning ? ` ${warning}` : ''}</span>
+      {requireConfirmation ? <label>
+        Type DISCONNECT to confirm
+        <input type="text" value={confirmation} autoComplete="off" spellCheck={false} autoFocus disabled={busy || disabled} onChange={(event) => setConfirmation(event.target.value)} />
+      </label> : null}
       <button
         type="button"
         className="button danger"
-        disabled={busy || disabled}
+        disabled={blocked}
         aria-busy={busy || undefined}
         onClick={async () => {
-          if (busy || disabled) return;
+          if (blocked) return;
           setBusy(true);
-          try { if (await onDisconnect()) setAsking(false); } finally { setBusy(false); }
+          try {
+            if (await onDisconnect(requireConfirmation ? confirmation : undefined)) {
+              setAsking(false);
+              setConfirmation('');
+            }
+          } finally { setBusy(false); }
         }}
       >
         {busy ? 'Disconnecting…' : 'Disconnect'}
       </button>
-      <button type="button" className="button" disabled={busy || disabled} autoFocus onClick={() => { setAsking(false); setTimeout(() => button.current?.focus(), 0); }}>
+      <button type="button" className="button" disabled={busy || disabled} autoFocus={!requireConfirmation} onClick={() => { setAsking(false); setConfirmation(''); setTimeout(() => button.current?.focus(), 0); }}>
         Cancel
       </button>
     </div>
@@ -164,9 +175,10 @@ export default function ConnectionPanel({
   // A reconnect after the answers froze keeps the chosen event; it asks only when the new account lost it.
   const showPicker = canConnect && (connections.canChange || !account.event);
   const mayDisconnect = connections.canDisconnect || account.canEnd;
+  const requireConfirmation = connections.built && provider === 'stripe';
   let warning = '';
   if (connections.canChange) warning = 'If your ticket choice uses this account, you will need to connect one again or choose another way to run tickets before we can build your site.';
-  if (connections.built) warning = `Your site stays online, but it stops selling paid tickets. Orders and attendees already in your site stay there, and you refund orders from your ${copy.name} account. To connect an account again, ask ${hostName()}.`;
+  if (requireConfirmation) warning = `Open and scheduled paid ticket sales stop when you disconnect Stripe. Reconnecting is not guaranteed. Ask ${hostName()} about recovery before you disconnect. Check whether any buyers are still paying in Stripe.`;
 
   async function connect() {
     if (leaving || disconnecting) return;
@@ -189,13 +201,13 @@ export default function ConnectionPanel({
     }
   }
 
-  async function disconnect() {
+  async function disconnect(confirmation) {
     if (leaving || disconnecting) return false;
     setError('');
     setNotice('');
     setDisconnecting(true);
     try {
-      const reply = await callApi('disconnectAccount', { orgId, appId, provider });
+      const reply = await callApi('disconnectAccount', { orgId, appId, provider, ...(confirmation === undefined ? {} : { confirmation }) });
       if (preserveResult) onResult?.();
       onConnections(reply);
       const message = disconnectedWords(copy.name, reply, connections.built);
@@ -240,7 +252,7 @@ export default function ConnectionPanel({
           {canConnect || mayDisconnect ? (
             <div className="step-actions">
               {canConnect ? <button type="button" className="button" disabled={leaving || disconnecting} aria-busy={leaving || undefined} onClick={connect}>{leaving ? 'Opening account provider…' : connectLabel || 'Connect again'}</button> : null}
-              {mayDisconnect ? <Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} disabled={leaving} /> : null}
+              {mayDisconnect ? <Disconnect name={copy.name} warning={warning} requireConfirmation={requireConfirmation} onDisconnect={disconnect} disabled={leaving} /> : null}
             </div>
           ) : null}
         </>
@@ -249,7 +261,7 @@ export default function ConnectionPanel({
           {account.unfinished && mayDisconnect ? (
             <>
               <p>An earlier change to this account did not finish, so we may still have access to it. Disconnect to end that access.</p>
-              <div className="step-actions"><Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} disabled={leaving} /></div>
+              <div className="step-actions"><Disconnect name={copy.name} warning={warning} requireConfirmation={requireConfirmation} onDisconnect={disconnect} disabled={leaving} /></div>
             </>
           ) : null}
           {connections.built ? (

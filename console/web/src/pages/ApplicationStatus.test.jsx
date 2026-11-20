@@ -339,12 +339,29 @@ describe('ApplicationStatus', () => {
       expect(callsTo('disconnectAccount')).toEqual([{ orgId: 'o1', appId: 'a1', provider: 'stripe' }]);
     });
 
-    it('an Owner can disconnect Stripe from a built site, and hears what that does', async () => {
+    it('an Owner sees the Stripe sales impact and must type DISCONNECT on a built site', async () => {
       const built = connections({ canChange: false, canDisconnect: false, built: true, stripe: { available: true, connected: true, canEnd: true, displayName: 'NC Local', connectedAt: '2026-11-02T00:00:00.000Z' } });
-      serveStatus({ status: 'ready', canEdit: false, canWithdraw: false, connections: built });
+      const linked = application({ status: 'ready', canEdit: false, canWithdraw: false, connections: built });
+      serveApi({
+        getApplication: () => ({ application: linked }),
+        disconnectAccount: () => ({ connections: { ...built, stripe: notConnected }, errors: {}, revoked: true, shared: false }),
+      });
       page();
       fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
-      expect(screen.getByRole('group', { name: 'Disconnect your Stripe account' })).toHaveTextContent('Your site stays online, but it stops selling paid tickets.');
+      const confirmation = screen.getByRole('group', { name: 'Disconnect your Stripe account' });
+      expect(confirmation).toHaveTextContent('Open and scheduled paid ticket sales stop');
+      expect(confirmation).toHaveTextContent('Reconnecting is not guaranteed.');
+      const input = screen.getByRole('textbox', { name: 'Type DISCONNECT to confirm' });
+      const button = screen.getByRole('button', { name: 'Disconnect' });
+      expect(input).toHaveFocus();
+      expect(button).toBeDisabled();
+      fireEvent.change(input, { target: { value: 'disconnect' } });
+      expect(button).toBeDisabled();
+      expect(callsTo('disconnectAccount')).toEqual([]);
+      fireEvent.change(input, { target: { value: 'DISCONNECT' } });
+      fireEvent.click(button);
+      expect(await screen.findByText(/Your site no longer sells paid tickets/)).toBeInTheDocument();
+      expect(callsTo('disconnectAccount')).toEqual([{ orgId: 'o1', appId: 'a1', provider: 'stripe', confirmation: 'DISCONNECT' }]);
     });
 
     it('a built site names who removes an Eventbrite account', async () => {

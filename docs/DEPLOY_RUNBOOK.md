@@ -1656,10 +1656,21 @@ Nothing needs to be open during a build. Operators get an email when a build fai
 | Retry a failed build | **Retry the build** on the review page |
 | Redeploy one live site | `gh workflow run deploy.yml --ref main -f client=<name>` |
 | End a built site's Eventbrite connection, when its Owner asks | Eventbrite has no way to end one from our side. Add a new version of `TICKETING_API_TOKEN` holding `disconnected` in the client project's Secret Manager, disable the older versions, then redeploy the site. Say that the client's Eventbrite account may still list the app. Not yet run on a live site |
-| Connect Stripe again on a built site, when its Owner asks | An Owner can disconnect Stripe from the console's status page, but not connect it again. Have the Owner make a restricted key, follow the key rotation in [Stripe ticketing](operator/stripe-ticketing.md), delete `ticket_catalog/connection` in the client project so paid tickets reopen, and redeploy. The console keeps saying no account is connected and shows no Disconnect button, so tell the Owner that sales are back on and that ending this key means deleting it in Stripe ([#676](https://github.com/CenterCoopMedia/eventrunner/issues/676)). Not yet run on a live site |
+| Recover paid sales after a built site's Stripe disconnect | Follow [Stripe disconnect and recovery](#1251-stripe-disconnect-and-recovery) with the Owner's authorization |
 | Check a live site answers | `curl -sI https://<name>.eventrunner.org/` and `curl -sI https://<name>.eventrunner.org/admin` |
 
 Stopping a build also leaves any `Deploy <name>` run it started going, so cancel that too. A retry won't redeploy a code fix on its own, because an earlier successful deploy of the same kind still counts. Run the deploy yourself and wait for it, then retry. For a failure before the full deploy, use `gh workflow run deploy.yml --ref main -f client=<name> -f provision=true -f bootstrap=true`. For a failure after it, use the plain redeploy in the table.
+
+### 12.5.1 Stripe disconnect and recovery
+
+On a built site's console status page, the Owner types `DISCONNECT` to end Stripe access. Scheduled and open paid sales stop. A buyer already in Stripe Checkout may still pay while the site's order remains pending. For a planned disconnect, pause new sales in the site's Ticketing workspace and settle outstanding Checkout Sessions first.
+
+Recovery requires the Owner's approval and an operator. The console has no self-serve reconnect for built sites. If the Owner cannot provide a compatible key, leave sales paused.
+
+1. In Stripe, check outstanding Checkout Sessions and reconcile any payments against their site orders before issuing replacements or refunds.
+2. Have the Owner create a restricted key for the same Stripe account and mode. Follow the [key rotation and verification steps](operator/stripe-ticketing.md#7-pause-rotate-credentials-and-recover-safely) to update `TICKETING_API_TOKEN`, redeploy the Stripe consumers, and verify the replacement access.
+3. In the client project, remove the `ticket_catalog/connection` marker for the ended connection. In the site's Ticketing workspace, verify the catalog, current orders, and sale window. Resume new sales if the Owner authorizes it and confirm the public catalog reflects the expected availability.
+4. Tell the Owner that the console will still show Stripe as disconnected. To retire the replacement key later, revoke it in Stripe. Track self-serve recovery under [#676](https://github.com/CenterCoopMedia/eventrunner/issues/676).
 
 ### 12.6 Deleting a console-built site
 
