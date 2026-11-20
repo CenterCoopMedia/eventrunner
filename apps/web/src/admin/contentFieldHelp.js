@@ -19,6 +19,11 @@ const FIELD_HINTS = Object.freeze({
     label: 'Describe what the map shows, such as “Map of the convention center”.',
     address: 'Show a street address below the map. A map that uses the event venue shows its saved address when this is blank.',
   },
+  gallery: {
+    images: 'Choose pictures from the media library. Each one needs alt text. Drag a picture or use the arrows to change the order.',
+    layout: 'Grid shows every picture at once. Carousel shows several in a row that readers scroll. Slideshow shows one picture at a time.',
+    label: 'Name the gallery for screen readers, such as “Photos from last year”. Leave it empty to use “Photo gallery”.',
+  },
   cta: {
     label: 'Write the short action phrase shown on the button or link.',
     url: 'Enter a full web address that starts with https://, or a page on this site such as /travel.',

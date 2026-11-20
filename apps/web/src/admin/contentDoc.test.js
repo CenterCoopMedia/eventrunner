@@ -8,8 +8,11 @@
 import { describe, expect, it } from 'vitest';
 import * as contentCjs from '../../../../functions/src/cms/content.cjs';
 import * as firestoreFakeCjs from '../../../../functions/src/cms/firestoreFake.cjs';
+import * as contentBlockTypesCjs from '../../../../functions/src/cms/blockTypes.cjs';
 import {
   DELETE_FIELD_SENTINEL,
+  GALLERY_MAX_ALT_LENGTH,
+  GALLERY_MAX_IMAGES,
   blankContent,
   contentBlockTitle,
   contentIdSource,
@@ -328,5 +331,65 @@ describe('a cleared number field', () => {
     expect(fields.alignment).toBe(DELETE_FIELD_SENTINEL);
     const { internals } = contentCjs.default ?? contentCjs;
     expect('focalX' in internals.omitDeletedFields(fields)).toBe(false);
+  });
+});
+
+// #1176: a gallery's pictures are a list. The form keeps each picture's path
+// and alt text, sends exactly those two keys, and names a picture with no
+// alt text before the save.
+describe('gallery content', () => {
+  const stored = {
+    section: 'details',
+    field: 'photos',
+    blockType: 'gallery',
+    layout: 'carousel',
+    images: [
+      { url: 'cms-images/a1/hall.webp', alt: 'The main hall' },
+      { url: 'cms-images/a2/panel.webp', alt: '  A panel  ', caption: 'not stored' },
+    ],
+  };
+
+  it('round-trips the pictures and layout, trimming alt text and dropping other keys', () => {
+    const editable = toEditableContent(stored);
+    expect(editable.values.images).toEqual([
+      { url: 'cms-images/a1/hall.webp', alt: 'The main hall' },
+      { url: 'cms-images/a2/panel.webp', alt: '  A panel  ' },
+    ]);
+    expect(toContentFields(editable)).toEqual({
+      blockType: 'gallery',
+      layout: 'carousel',
+      label: '',
+      images: [
+        { url: 'cms-images/a1/hall.webp', alt: 'The main hall' },
+        { url: 'cms-images/a2/panel.webp', alt: 'A panel' },
+      ],
+    });
+  });
+
+  it('starts with no pictures and requires one, a layout, and alt text on each', () => {
+    expect(blankContent('gallery').values.images).toEqual([]);
+    expect(validateRequiredContent(blankContent('gallery')).map((error) => error.field)).toEqual(['images', 'layout']);
+    const missingAlt = toEditableContent({ ...stored, images: [stored.images[0], { url: 'cms-images/a3/x.webp', alt: ' ' }] });
+    expect(validateRequiredContent(missingAlt)).toEqual([
+      { field: 'images.2.alt', message: 'Picture 2: needs alt text.' },
+    ]);
+  });
+
+  it('refuses before the save what the server refuses: a long alt text and more than the cap', () => {
+    const { GALLERY_MAX_IMAGES: serverMax } = (contentBlockTypesCjs.default ?? contentBlockTypesCjs).internals;
+    expect(GALLERY_MAX_IMAGES).toBe(serverMax);
+    const server = contentBlockTypesCjs.default ?? contentBlockTypesCjs;
+    const longAlt = { url: 'cms-images/a1/hall.webp', alt: 'x'.repeat(GALLERY_MAX_ALT_LENGTH + 1) };
+    expect(server.galleryErrors({ blockType: 'gallery', layout: 'grid', images: [longAlt] })).toHaveLength(1);
+    expect(validateRequiredContent(toEditableContent({ ...stored, images: [longAlt] }))).toEqual([
+      { field: 'images.1.alt', message: 'Picture 1: keep alt text under 500 characters.' },
+    ]);
+    const atMax = { ...longAlt, alt: 'x'.repeat(GALLERY_MAX_ALT_LENGTH) };
+    expect(server.galleryErrors({ blockType: 'gallery', layout: 'grid', images: [atMax] })).toEqual([]);
+    expect(validateRequiredContent(toEditableContent({ ...stored, images: [atMax] }))).toEqual([]);
+    const twice = toEditableContent({ ...stored, images: [stored.images[0], stored.images[0]] });
+    expect(validateRequiredContent(twice)).toEqual([{ field: 'images.2.url', message: 'Picture 2: is already in the gallery. Remove it.' }]);
+    const tooMany = toEditableContent({ ...stored, images: Array.from({ length: GALLERY_MAX_IMAGES + 1 }, (_, i) => ({ url: `cms-images/a${i}/x.webp`, alt: 'A' })) });
+    expect(validateRequiredContent(tooMany)).toEqual([{ field: 'images', message: 'Pictures: a gallery holds at most 24.' }]);
   });
 });

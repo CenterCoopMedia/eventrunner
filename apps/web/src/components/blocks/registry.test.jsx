@@ -40,6 +40,7 @@ const SAMPLE_BLOCKS = {
   list_item: { blockType: 'list_item', text: 'Sample list entry' },
   faq_item: { blockType: 'faq_item', question: 'Sample question?', answer: '<p>Sample answer.</p>' },
   link_group: { blockType: 'link_group', group: 'About', label: 'Contact the organizers', url: 'mailto:hi@example.org' },
+  gallery: { blockType: 'gallery', layout: 'grid', images: [{ url: 'cms-images/a1/crowd.webp', alt: 'The main hall' }] },
   sponsor_package: { blockType: 'sponsor_package', name: 'Coffee break', price: 'Illustrative', limit: 2, benefits: '<p>Signs</p>' },
 };
 

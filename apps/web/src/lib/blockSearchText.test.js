@@ -132,6 +132,12 @@ describe('blockSearchText', () => {
     ).toBe('Decide who checks sources. A speaker');
   });
 
+  it('reads the name and every picture’s alt text from a gallery block', () => {
+    const gallery = { blockType: 'gallery', label: 'Last year', images: [{ url: 'cms-images/a/x.webp', alt: 'The main hall' }, { url: 'cms-images/b/y.webp', alt: 'A panel' }, null] };
+    expect(blockSearchText(gallery)).toBe('Last year The main hall A panel');
+    expect(blockSearchText({ blockType: 'gallery', images: 'not a list' })).toBe('');
+  });
+
   it('reads alt and caption from an image block', () => {
     expect(
       blockSearchText({ blockType: 'image', alt: 'Venue entrance', caption: 'Main doors' }),

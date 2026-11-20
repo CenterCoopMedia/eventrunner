@@ -56,6 +56,7 @@ export default function MediaLibrary({
   folder = 'cms-images',
   onSelect = null,
   selectedPath = null,
+  selectedPaths = null,
   emptyHint = null,
 }) {
   const library = useMediaLibrary({ folder });
@@ -134,7 +135,10 @@ export default function MediaLibrary({
 
       <ul className="grid grid-cols-2 gap-sm sm:grid-cols-3 lg:grid-cols-4">
         {visible.map((asset) => {
-          const isSelected = selectedPath && asset.path === selectedPath;
+          // selectedPaths: a chooser that keeps several pictures (a gallery).
+          const isSelected = selectedPaths
+            ? selectedPaths.includes(asset.path)
+            : selectedPath && asset.path === selectedPath;
           return (
             <li key={asset.id} className={tileClass(isSelected)}>
               <button

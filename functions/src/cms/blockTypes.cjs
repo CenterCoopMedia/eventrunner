@@ -2,6 +2,7 @@
 
 const { hasRichTextContent } = require('shared/richText');
 const { googleMapsEmbedUrl } = require('shared/urlSafety');
+const { isMediaLibraryPath, storageObjectPath } = require('shared/venue');
 
 /**
  * Code-resident CMS registries (spec §5.2, §8.4).
@@ -14,7 +15,7 @@ const { googleMapsEmbedUrl } = require('shared/urlSafety');
  * server-side story; the matching renderer lands in apps/web.
  *
  * Field `type` vocabulary is closed: 'string' | 'richtext' | 'url' |
- * 'number' | 'boolean'. Content validators key off it, so a new field
+ * 'number' | 'boolean' | 'images'. Content validators key off it, so a new field
  * type is a registry change plus a validator change, never a data-only
  * addition.
  *
@@ -25,9 +26,9 @@ const { googleMapsEmbedUrl } = require('shared/urlSafety');
  * thrown error, not a silent write to a brand-new collection.
  */
 
-const FIELD_TYPES = Object.freeze(['string', 'richtext', 'url', 'number', 'boolean']);
+const FIELD_TYPES = Object.freeze(['string', 'richtext', 'url', 'number', 'boolean', 'images']);
 
-/** @param {string} id @param {'string'|'richtext'|'url'|'number'|'boolean'} type @param {boolean} required @param {string[]} [choices] */
+/** @param {string} id @param {'string'|'richtext'|'url'|'number'|'boolean'|'images'} type @param {boolean} required @param {string[]} [choices] */
 function field(id, type, required, choices) {
   return Object.freeze(choices ? { id, type, required, choices: Object.freeze(choices) } : { id, type, required });
 }
@@ -163,6 +164,18 @@ const BLOCK_TYPES = Object.freeze({
       field('order', 'number', false),
     ],
   }),
+  gallery: blockType({
+    id: 'gallery',
+    label: 'Gallery',
+    description:
+      'Several pictures from the media library, shown as a grid, a carousel or a slideshow. ' +
+      'Every picture needs alt text. label names the gallery for screen readers.',
+    fields: [
+      field('images', 'images', true),
+      field('layout', 'string', true),
+      field('label', 'string', false),
+    ],
+  }),
   sponsor_package: blockType({
     id: 'sponsor_package',
     label: 'Sponsor package',
@@ -203,6 +216,62 @@ const STAT_CONTRACT = Object.freeze({
   source: 'name where the number came from and the date you read it',
   alt: 'describe the finding for a screen reader',
 });
+
+/** The gallery layouts a reader can be shown. Stored as one of these ids. */
+const GALLERY_LAYOUTS = Object.freeze(['grid', 'carousel', 'slideshow']);
+const GALLERY_MAX_IMAGES = 24;
+/** Mirrors functions/src/media/upload.cjs MAX_ALT_LENGTH. */
+const GALLERY_MAX_ALT_LENGTH = 500;
+const GALLERY_IMAGE_KEYS = Object.freeze(['url', 'alt']);
+
+/**
+ * The gallery contract: a layout from the fixed set, and 1 to 24 different
+ * pictures, each a media library path with its own alt text and nothing
+ * else. A picture appears once, so the editor can key each row by its path. The
+ * renderer draws only this shape, so a stored gallery cannot carry a link,
+ * a script or a layout the page does not have.
+ *
+ * Pure, and a no-op for every other block type.
+ *
+ * @param {object} fields the block's fields as they will be stored
+ * @returns {string[]}
+ */
+function galleryErrors(fields) {
+  if (!fields || fields.blockType !== 'gallery') return [];
+  const errors = [];
+  if (fields.layout !== undefined && !GALLERY_LAYOUTS.includes(fields.layout)) {
+    errors.push(`layout: must be one of ${GALLERY_LAYOUTS.join(', ')}.`);
+  }
+  const { images } = fields;
+  if (images === undefined) return errors;
+  if (!Array.isArray(images)) return [...errors, 'images: must be a list of pictures.'];
+  if (images.length > GALLERY_MAX_IMAGES) {
+    errors.push(`images: a gallery holds at most ${GALLERY_MAX_IMAGES} pictures.`);
+  }
+  const seen = new Set();
+  images.forEach((image, index) => {
+    const at = `images.${index + 1}`;
+    if (!image || typeof image !== 'object' || Array.isArray(image)) {
+      errors.push(`${at}: must be a picture.`);
+      return;
+    }
+    const extra = Object.keys(image).filter((key) => !GALLERY_IMAGE_KEYS.includes(key));
+    if (extra.length) errors.push(`${at}: unknown ${extra.join(', ')}.`);
+    const path = storageObjectPath(image.url);
+    if (!path || path !== image.url || !isMediaLibraryPath(path) || path.split('/').length < 3) {
+      errors.push(`${at}.url: choose the picture from the media library.`);
+    } else if (seen.has(path)) {
+      errors.push(`${at}.url: this picture is already in the gallery.`);
+    }
+    if (path) seen.add(path);
+    if (typeof image.alt !== 'string' || !image.alt.trim()) {
+      errors.push(`${at}.alt: every picture needs alt text.`);
+    } else if (image.alt.length > GALLERY_MAX_ALT_LENGTH) {
+      errors.push(`${at}.alt: keep alt text under ${GALLERY_MAX_ALT_LENGTH} characters.`);
+    }
+  });
+  return errors;
+}
 
 /**
  * Every missing part of the stat contract, each naming its field.
@@ -270,12 +339,13 @@ function requiredBlockErrors(fields) {
     .filter((entry) => entry.required && entry.type !== 'boolean')
     .filter((entry) => {
       if (entry.type === 'richtext') return !hasRichTextContent(fields[entry.id]);
+      if (entry.type === 'images') return !Array.isArray(fields[entry.id]) || fields[entry.id].length === 0;
       return fields[entry.id] === undefined
         || fields[entry.id] === null
         || String(fields[entry.id]).trim().length === 0;
     })
     .map((entry) => `${entry.id}: is required for block type "${blockType}".`);
-  return [...missingErrors, ...choiceErrors];
+  return [...missingErrors, ...choiceErrors, ...galleryErrors(fields)];
 }
 
 /**
@@ -319,7 +389,9 @@ module.exports = {
   isKnownBlockType,
   requiredBlockErrors,
   statContractErrors,
+  galleryErrors,
+  GALLERY_LAYOUTS,
   PUBLISHABLE_COLLECTIONS,
   draftCollectionFor,
-  internals: { FIELD_TYPES, STAT_CONTRACT },
+  internals: { FIELD_TYPES, STAT_CONTRACT, GALLERY_MAX_IMAGES },
 };

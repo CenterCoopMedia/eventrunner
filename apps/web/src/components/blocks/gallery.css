@@ -1,0 +1,84 @@
+/* Gallery block (#1176). Each picture sits in a fixed aspect box, so the
+   page does not shift while it loads. Nothing here moves on its own. */
+
+.gallery__image {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-base);
+  outline: 1px solid rgb(var(--color-text-primary-rgb) / 0.08);
+  outline-offset: -1px;
+  background: rgb(var(--color-surface-alt-rgb));
+}
+
+.gallery__cell,
+.gallery__slide {
+  aspect-ratio: 4 / 3;
+}
+
+.gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 40rem) {
+  .gallery__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.gallery__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-block-end: var(--space-xs);
+}
+
+.gallery__position {
+  margin: 0;
+  margin-inline-start: auto;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.gallery__scroller {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.gallery__slide {
+  flex: 0 0 80%;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 40rem) {
+  .gallery--carousel .gallery__slide {
+    flex-basis: calc((100% - var(--space-sm)) / 2);
+  }
+}
+
+@media (min-width: 64rem) {
+  .gallery--carousel .gallery__slide {
+    flex-basis: calc((100% - 2 * var(--space-sm)) / 3);
+  }
+}
+
+/* One picture at a time, shown whole on a quiet ground. */
+.gallery--slideshow .gallery__slide {
+  flex-basis: 100%;
+  aspect-ratio: 3 / 2;
+}
+
+.gallery__image--slideshow {
+  object-fit: contain;
+}
