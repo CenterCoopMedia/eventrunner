@@ -5,11 +5,14 @@ import { sanitizeHtml } from '../lib/sanitizeHtml.js';
 
 export default function PublicRichText({ value, ...props }) {
   const { localize, rootHref, navigate } = usePublicLanguage();
-  const html = sanitizeHtml(value, rootHref && ((href) => {
-    if (!internalRoutePath(href)) return null;
-    const to = localize(href);
-    return { to, href: joinEventPath(rootHref, to) };
-  }));
+  const html = sanitizeHtml(value, {
+    omitEmbedSourceHeadings: true,
+    routeLink: rootHref && ((href) => {
+      if (!internalRoutePath(href)) return null;
+      const to = localize(href);
+      return { to, href: joinEventPath(rootHref, to) };
+    }),
+  });
   if (!html) return null;
 
   function followRoute(event) {
