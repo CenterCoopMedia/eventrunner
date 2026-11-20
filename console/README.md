@@ -153,7 +153,7 @@ A status email that fails is logged and does not undo the change. The status pag
 | `saveAgreement` | Operators | Saves the title and text as a new version, and writes an audit record. The same text saves nothing. |
 | `startConnection` | Owners | Returns the provider's page to send the browser to. Thirty a day for one account. |
 | `completeConnection` | The person who started it | Takes `state` and `code` from the return page, and finishes the connection. |
-| `disconnectAccount` | Owners | Deletes the stored token and ends the connection at the provider, unless another request uses the account. Returns `revoked` and `shared`. |
+| `disconnectAccount` | Owners | Ends account access and returns `revoked` and `shared`. For a built site's Stripe connection, send `confirmation: "DISCONNECT"` to revoke access at Stripe. A missing or different phrase returns `400 confirmation-required`. |
 | `listEventbriteEvents` | Owners | The client's upcoming Eventbrite events, for the picker. |
 | `chooseEventbriteEvent` | Owners | Saves one event from that list. It checks the id against the list, so nothing typed can get in. |
 
