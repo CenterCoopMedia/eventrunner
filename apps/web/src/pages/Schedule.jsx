@@ -8,7 +8,7 @@
 // sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
-import { memo, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { pageHeading } from 'shared/page';
@@ -164,8 +164,8 @@ export default function Schedule() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigationType = useNavigationType();
-  const pendingView = useRef(null);
-  const viewRevision = useRef(0);
+  const pendingParams = useRef(null);
+  const [viewPending, startViewUpdate] = useTransition();
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -305,14 +305,13 @@ export default function Schedule() {
   const activeDayId = view.day ?? days[0]?.id ?? null;
 
   useLayoutEffect(() => {
-    const update = location.state?.scheduleUpdate;
-    // The router commits replacements in a transition. An earlier commit
-    // must not reset the field or the parameters for the next control.
-    if (navigationType !== 'POP' && update?.owner === filtersId &&
-        pendingView.current && update.revision !== pendingView.current.revision) return;
-    pendingView.current = null;
+    // Back can interrupt a pending update and return to the location
+    // React already rendered. Synchronize when the transition settles,
+    // even in that case.
+    if (viewPending) return;
+    pendingParams.current = null;
     setInputQuery(query);
-  }, [location, navigationType, query, filtersId]);
+  }, [location, query, viewPending]);
 
   useLayoutEffect(() => {
     const interrupted = interruptedResolve.current;
@@ -355,21 +354,17 @@ export default function Schedule() {
    * keystroke.
    */
   function updateView(patch, { replace = false } = {}) {
-    const previous = pendingView.current?.params ?? searchParams;
+    const previous = pendingParams.current ?? searchParams;
     const params = writeScheduleView(
       { ...readScheduleView(previous, knownView), ...patch },
       { firstDayId: days[0]?.id ?? null },
       previous,
     );
-    const revision = ++viewRevision.current;
-    pendingView.current = { params, revision };
-    setSearchParams(params, {
+    pendingParams.current = params;
+    startViewUpdate(() => setSearchParams(params, {
       replace,
-      state: {
-        scheduleUpdate: { owner: filtersId, revision },
-        scheduleResolve: ['formats', 'tracks', 'sort'].some((key) => Object.hasOwn(patch, key)),
-      },
-    });
+      state: { scheduleResolve: ['formats', 'tracks', 'sort'].some((key) => Object.hasOwn(patch, key)) },
+    }));
   }
 
   function updateQuery(next) {

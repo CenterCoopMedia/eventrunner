@@ -823,6 +823,18 @@ describe('schedule search', () => {
     expect(onScreen().getByText('[Fixture] Day-two roundtable')).toBeVisible();
   });
 
+  it('restores the previously rendered query when Back interrupts a pending entry', () => {
+    renderSchedule({ initialEntries: ['/schedule?q=morning'], historyControls: true });
+    const input = screen.getByRole('searchbox', { name: 'Search this day' });
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Day two' }));
+      type('roundtable');
+      fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    });
+    expect(screen.getByLabelText('Current URL')).toHaveTextContent('/schedule?q=morning');
+    expect(input).toHaveValue('morning');
+  });
+
   it('narrows the grid too', () => {
     const original = window.matchMedia;
     window.matchMedia = (query) => ({
