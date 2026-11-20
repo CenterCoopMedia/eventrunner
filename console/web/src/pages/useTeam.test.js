@@ -75,4 +75,28 @@ describe('useTeam', () => {
     await act(async () => refreshed);
     expect(result.current.refreshing).toBe(false);
   });
+
+  it('drops an older team that answers after a newer read failed', async () => {
+    const reads = [];
+    callApi.mockImplementation(() => new Promise((resolve, reject) => reads.push({ resolve, reject })));
+    const { result } = renderHook(() => useTeam('org1'));
+    act(() => { result.current.refresh(); });
+    await act(async () => reads[1].reject(new Error('Network down.')));
+    expect(result.current.error).toBe('Network down.');
+    await act(async () => reads[0].resolve(TEAM));
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBe('Network down.');
+  });
+
+  it('never shows the previous organization\'s team', async () => {
+    const reads = [];
+    callApi.mockImplementation((name, body) => new Promise((resolve) => reads.push({ orgId: body.orgId, resolve })));
+    const { result, rerender } = renderHook(({ orgId }) => useTeam(orgId), { initialProps: { orgId: 'orgA' } });
+    rerender({ orgId: 'orgB' });
+    const teamB = { ...TEAM, organization: { name: 'Org B' } };
+    await act(async () => reads.find((read) => read.orgId === 'orgA').resolve({ ...TEAM, organization: { name: 'Org A' } }));
+    expect(result.current.data).toBeNull();
+    await act(async () => reads.find((read) => read.orgId === 'orgB').resolve(teamB));
+    expect(result.current.data).toEqual(teamB);
+  });
 });

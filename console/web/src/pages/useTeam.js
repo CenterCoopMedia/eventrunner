@@ -12,22 +12,28 @@ export function useTeam(orgId) {
   const inFlight = useRef(false);
 
   // Reads land in the order they started: the first answer shows at once,
-  // and an older read that answers after a newer one has landed returns
-  // null, so its caller leaves the state to the newer read.
-  const reads = useRef({ started: 0, landed: 0 });
+  // and an older read that answers after a newer one has landed (with a
+  // team or a failure) returns null, so its caller leaves the state to the
+  // newer read. A new organization starts a new count, so an answer for the
+  // previous one never lands.
+  const reads = useRef({ orgId, started: 0, landed: 0 });
   const refreshes = useRef(0);
   const load = useCallback(async () => {
-    const attempt = ++reads.current.started;
+    if (reads.current.orgId !== orgId) reads.current = { orgId, started: 0, landed: 0 };
+    const count = reads.current;
+    const attempt = ++count.started;
+    const current = () => count === reads.current && attempt >= count.landed;
     try {
       const body = await callApi('getTeam', { orgId });
-      if (attempt < reads.current.landed) return null;
-      reads.current.landed = attempt;
+      if (!current()) return null;
+      count.landed = attempt;
       setData(body);
       setError('');
       setStale(false);
       return '';
     } catch (err) {
-      if (attempt < reads.current.landed) return null;
+      if (!current()) return null;
+      count.landed = attempt;
       setError(err.message);
       return err.message;
     }
