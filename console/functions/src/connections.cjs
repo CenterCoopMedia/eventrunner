@@ -460,7 +460,10 @@ async function disconnectAccount(deps, { body, user }) {
   await requireOwner(db, orgId, user, ONLY_OWNER);
   if (provider === 'stripe') {
     const { data: current } = await readApplication((r) => r.get(), db, orgId, appId);
-    if (BUILT_STATUSES.includes(current.status)) return endBuiltConnection(deps, { orgId, appId, provider, user });
+    if (BUILT_STATUSES.includes(current.status)) {
+      if (body.confirmation !== 'DISCONNECT') throw new ConsoleError(400, 'confirmation-required', 'Type DISCONNECT to end Stripe access for this site.');
+      return endBuiltConnection(deps, { orgId, appId, provider, user });
+    }
   }
   const at = new Date(now());
   const changeId = randomBytes(8).toString('hex');
