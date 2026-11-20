@@ -175,6 +175,22 @@ describe('AdminTicketing', () => {
     expect(screen.queryByText('Loading Stripe ticketing…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   });
 
+  it('warns about disconnecting Stripe when a published catalog has upcoming paid sales', async () => {
+    callMock.mockImplementation(async (name, body) => {
+      if (name === 'getTicketingStatus') return { ...STATUS, provider: 'stripe' };
+      if (body.action === 'catalog') return { mode: 'test', catalog: {
+        published: true, salesPaused: false, salesStartAt: '2099-01-01T12:00:00.000Z', currency: 'usd',
+        ticketTypes: [{ id: 'general', name: 'General', visibility: 'public', active: true, unitAmount: 5000 }],
+      } };
+      if (body.action === 'orders') return { orders: [], nextCursor: null };
+      if (body.action === 'tickets') return { tickets: [], nextCursor: null };
+      if (body.action === 'promoCodes') return { codes: [] };
+      throw new Error(`unexpected call: ${name}`);
+    });
+    render(<AdminTicketing />);
+    expect(await screen.findByText('Disconnecting Stripe in the console stops open and scheduled paid ticket sales. Reconnecting is not guaranteed.')).toBeVisible();
+  });
+
   it('retries an initial Stripe catalog failure in place and clears the stale error', async () => {
     let catalogCalls = 0;
     let resolveCatalog;

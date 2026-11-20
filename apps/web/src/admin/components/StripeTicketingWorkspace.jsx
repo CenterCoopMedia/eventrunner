@@ -57,6 +57,11 @@ export default function StripeTicketingWorkspace({ call }) {
     <Notice tone="error" message={error} />
     <button type="button" className={secondaryButtonClass} onClick={() => { setError(''); bump(); }}>Retry Stripe ticketing</button>
   </div> : <AdminLoadingState label="Loading Stripe ticketing…" />;
+  const { catalog } = data;
+  const now = Date.now();
+  const hasEnded = (sales) => sales.salesEndAt && Date.parse(sales.salesEndAt) <= now;
+  const warnAboutDisconnect = catalog?.published && !catalog.salesPaused && !hasEnded(catalog) &&
+    catalog.ticketTypes?.some((type) => type.active && type.visibility === 'public' && type.unitAmount > 0 && !hasEnded(type));
   return <div className="min-w-0 space-y-md" key={user?.uid}>
     <Panel help="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused." title="Stripe sales" description="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused.">
       <div className="flex flex-wrap items-center gap-sm">
@@ -64,6 +69,7 @@ export default function StripeTicketingWorkspace({ call }) {
         <StatusBadge tone={data.catalog?.salesPaused || !data.catalog?.published ? 'caution' : 'ok'}>{!data.catalog?.published ? 'Tickets not published' : data.catalog.salesPaused ? 'New sales paused' : 'New sales enabled'}</StatusBadge>
         {isOperator ? <button type="button" className={secondaryButtonClass} onClick={() => { setPause(!data.catalog?.salesPaused); setReason(''); setError(''); }}>{data.catalog?.salesPaused ? 'Reopen sales' : 'Pause sales'}</button> : null}
       </div>
+      {warnAboutDisconnect ? <div className="mt-sm"><Notice tone="caution" message="Disconnecting Stripe in the console stops open and scheduled paid ticket sales. Reconnecting is not guaranteed." /></div> : null}
       {data.inventory ? <dl className="mt-sm grid gap-sm sm:grid-cols-3"><div><dt className="text-admin-base font-semibold">Event capacity</dt><dd className="font-admin-data">{data.catalog?.capacity ?? 'Not configured'}</dd></div><div><dt className="text-admin-base font-semibold">Seats reserved in checkout</dt><dd className="font-admin-data">{data.inventory.held || 0}</dd></div><div><dt className="text-admin-base font-semibold">Seats issued</dt><dd className="font-admin-data">{data.inventory.sold || 0}</dd></div></dl> : null}
       {error && pause === null ? <div className="mt-sm"><Notice tone="error" message={error} /></div> : null}
     </Panel>
