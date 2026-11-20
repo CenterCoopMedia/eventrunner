@@ -15,6 +15,7 @@ import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 // signal (§8.1). An archived row is dead matter: it takes the dead tone and
 // keeps its word.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
@@ -22,6 +23,7 @@ import { toDate } from '../versionHistory.js';
 import FeedbackModal from '../../components/FeedbackModal.jsx';
 import RequestScreenshots from '../components/RequestScreenshots.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { useRequestAnchor } from '../useRequestAnchor.js';
 import {
   Notice,
   Panel,
@@ -76,11 +78,14 @@ export default function AdminFeedback() {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { features } = useEventConfig();
+  const [searchParams] = useSearchParams();
+  const requestId = searchParams.get('request');
 
   const [rows, setRows] = useState(null);
   const [sharing, setSharing] = useState(false);
   const [listError, setListError] = useState(null);
-  const [filter, setFilter] = useState('open');
+  const [filter, setFilter] = useState(() => requestId ? 'all' : 'open');
+  useRequestAnchor(requestId, rows);
   const [updating, setUpdating] = useState(null);
   const writeRef = useRef(false);
   const rowRefs = useRef(new Map());
@@ -219,6 +224,8 @@ export default function AdminFeedback() {
             {ordered.map((row) => (
               <li
                 key={row.id}
+                id={`request-${row.id}`}
+                tabIndex={-1}
                 ref={(node) => {
                   if (node) rowRefs.current.set(row.id, node);
                   else rowRefs.current.delete(row.id);

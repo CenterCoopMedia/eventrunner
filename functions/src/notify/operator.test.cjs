@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createOperatorNotifier, internals } = require('./operator.cjs');
+const { createOperatorNotifier, createSubmissionNotifier, internals } = require('./operator.cjs');
 
 // --- Fakes -----------------------------------------------------------------
 
@@ -51,11 +51,52 @@ function fakeSendEmail(result = { providerMessageId: 'pm-1', status: 'sent', ret
   return impl;
 }
 
+test('a submission uses the existing email sink and links to the mounted staff record once', async () => {
+  const sendEmail = fakeSendEmail();
+  const notify = createSubmissionNotifier({
+    env: EMAIL_ENV,
+    sendEmail,
+    getConfig: fakeGetConfig({
+      ...CONFIG,
+      tierA: { projectId: 'proj-1', publicUrl: 'https://conference.example.org/summit' },
+    }),
+  });
+  const alert = { kind: 'change-request', id: 'alert-record-123', page: '/travel', screenshotCount: 1 };
+  await notify(alert);
+  await notify(alert);
+  assert.equal(sendEmail.calls.length, 1);
+  const [sent] = sendEmail.calls;
+  assert.equal(sent.to, CONFIG.providers.notifier.operatorEmail);
+  assert.match(sent.text, /site: proj-1\nrecord: alert-record-123\npage: \/travel\nscreenshots: 1/);
+  assert.match(sent.text, /https:\/\/conference\.example\.org\/summit\/admin\/change-requests\?request=alert-record-123/);
+  assert.match(sent.html, /Event Runner operator alert/);
+});
+
 /** log.warn capture. */
 function fakeLog() {
   const warns = [];
   return { warn: (...args) => warns.push(args), warns };
 }
+
+test('a failed submission alert logs its record and sink without the provider response', async () => {
+  const log = fakeLog();
+  const notify = createSubmissionNotifier({
+    env: WEBHOOK_ENV,
+    fetchImpl: async () => ({ status: 503, text: async () => 'private provider response' }),
+    getConfig: fakeGetConfig({
+      ...CONFIG,
+      tierA: { projectId: 'proj-1', publicUrl: 'https://conference.example.org/summit' },
+    }),
+    log,
+  });
+  const alert = { kind: 'feedback', id: 'failed-alert-123', screenshotCount: 1 };
+  await notify(alert);
+  await notify(alert);
+  assert.deepEqual(log.warns, [[
+    'The submission alert could not be delivered.',
+    { kind: 'feedback', id: 'failed-alert-123', sink: 'webhook' },
+  ]]);
+});
 
 const EVENT = { kind: 'error', title: 'db down', summary: 'primary unreachable' };
 

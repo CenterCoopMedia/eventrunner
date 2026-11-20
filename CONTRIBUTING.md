@@ -225,7 +225,7 @@ Behavior PRs add a [changelog fragment](changelog.d/README.md). The release PR c
 fragments into `CHANGELOG.md` and deletes the collected files. Tags, collection steps and what
 a release includes are in [RELEASING.md](RELEASING.md).
 
-One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, `functions/src/pdf/kit.cjs`, `console/functions/src/emailLayout.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
+Use theme tokens for colors. Hex color literals (`#336699`) are allowed in `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, `functions/src/pdf/kit.cjs`, `console/functions/src/emailLayout.cjs`, `packages/shared/src/operatorAlertLayout.cjs`, and `apps/web/src/generated/theme.css`.
 
 ## Security
 

@@ -32,6 +32,7 @@ const announcementSuppression = require('./src/announcements/suppression.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
 const adminChangeRequests = require('./src/admin/changeRequests.cjs');
 const requestScreenshots = require('./src/admin/requestScreenshots.cjs');
+const submissionAlerts = require('./src/notify/submissionAlerts.cjs');
 const socialFeed = require('./src/social/feed.cjs');
 const adminAccess = require('./src/admin/access.cjs');
 const adminEventStats = require('./src/admin/eventStats.cjs');
@@ -114,6 +115,7 @@ module.exports = {
   ...adminFeedback.handlers,
   ...adminChangeRequests.handlers,
   ...requestScreenshots.handlers,
+  ...submissionAlerts.handlers,
   ...socialFeed.handlers, // Posts, moderation and private notification read state.
   ...adminAccess.handlers,
   ...adminEventStats.handlers,

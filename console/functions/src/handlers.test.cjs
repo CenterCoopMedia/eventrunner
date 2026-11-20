@@ -10,7 +10,8 @@ const { ENDPOINTS, REPORT_FUNCTION, SCHEDULED, buildHandlers } = require('./hand
 const { STRIPE_WEBHOOK_FUNCTION } = require('./stripeWebhooks.cjs');
 
 const firebaseJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'firebase.json'), 'utf8'));
-const ALL_FUNCTIONS = [...Object.keys(ENDPOINTS), REPORT_FUNCTION, STRIPE_WEBHOOK_FUNCTION, ...Object.keys(SCHEDULED)].sort();
+const REPORT_ALERT = 'onProblemReportOperatorAlert';
+const ALL_FUNCTIONS = [...Object.keys(ENDPOINTS), REPORT_FUNCTION, STRIPE_WEBHOOK_FUNCTION, REPORT_ALERT, ...Object.keys(SCHEDULED)].sort();
 const HTTP_FUNCTIONS = [...Object.keys(ENDPOINTS), REPORT_FUNCTION];
 
 test('every endpoint is an onRequest function with a Hosting rewrite at /api/<name>', () => {
@@ -37,6 +38,15 @@ test('the scheduled jobs have no Hosting rewrite', () => {
     assert.ok(!firebaseJson.hosting.rewrites.some((r) => r.function?.functionId === name), name);
     assert.equal(typeof buildHandlers()[name], 'function', name);
   }
+});
+
+test('problem report email runs on receipt creation and has no public route', () => {
+  const handlers = buildHandlers();
+  const alert = handlers[REPORT_ALERT].__endpoint;
+  assert.equal(alert.eventTrigger.eventFilterPathPatterns.document, 'problem_report_receipts/{id}');
+  assert.ok(alert.secretEnvironmentVariables.some(({ key }) => key === 'CONSOLE_POSTMARK_TOKEN'));
+  assert.ok(!handlers[REPORT_FUNCTION].__endpoint.secretEnvironmentVariables.some(({ key }) => key === 'CONSOLE_POSTMARK_TOKEN'));
+  assert.ok(!firebaseJson.hosting.rewrites.some((r) => r.function?.functionId === REPORT_ALERT));
 });
 
 test('only the functions that send email get the mail secret', () => {

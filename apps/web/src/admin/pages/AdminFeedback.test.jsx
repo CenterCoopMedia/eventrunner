@@ -5,7 +5,8 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
 // AdminFeedback — the review tab (issue #28). Mocks adminApi and
 // adminSource directly, same convention as AdminLiveUpdates.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render as renderPage, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 let rowsCallback;
 vi.mock('../adminSource.js', () => ({
@@ -23,6 +24,10 @@ vi.mock('../../contexts/ToastContext.jsx', () => ({ useToast: () => ({ showToast
 
 import AdminFeedback from './AdminFeedback.jsx';
 
+function render(element, path = '/admin/feedback') {
+  return renderPage(<MemoryRouter initialEntries={[path]}>{element}</MemoryRouter>);
+}
+
 function pushRows(rows) {
   act(() => rowsCallback(rows));
 }
@@ -33,6 +38,13 @@ beforeEach(() => {
 });
 
 describe('AdminFeedback', () => {
+  it('opens the exact archived record from an operator alert', () => {
+    render(<AdminFeedback />, '/admin/feedback?request=archived-feedback');
+    pushRows([{ id: 'archived-feedback', message: 'Archived message', status: 'archived' }]);
+    expect(screen.getByRole('listitem')).toHaveTextContent('Archived message');
+    expect(screen.getByRole('listitem')).toHaveFocus();
+  });
+
   it('encodes reserved characters in a mailto link and keeps the @', () => {
     render(<AdminFeedback />);
     pushRows([

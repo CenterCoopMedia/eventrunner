@@ -16,6 +16,7 @@ const { checkAnswers } = require('./checks.cjs');
 const { takeSlotIn } = require('./rateLimit.cjs');
 const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames } = require('./siteNames.cjs');
 const { ARCHIVED_MESSAGE, CLOSED, WITHDRAWABLE, historyEntry, readApplication } = require('./applications.cjs');
+const { buildSubmissionAlert } = require('shared/operatorAlert');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SUBMITS_PER_DAY = 5;
@@ -77,10 +78,18 @@ async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, e
   }));
 }
 
-async function notifyProblemReportAttachments({ db, mailer, log, publicUrl }, { id, count, project }) {
+async function notifyProblemReport({ db, mailer, log, publicUrl, now = Date.now }, { id, screenshotCount, project }) {
+  const alert = buildSubmissionAlert({
+    kind: 'problem-report', site: project, id, screenshotCount,
+    link: `${publicUrl}/review/problem-reports?id=${encodeURIComponent(id)}`,
+  });
+  if (!alert) {
+    log.error('The problem report alert is missing a valid Console address or receipt ID.');
+    return false;
+  }
   const recipients = await operatorEmails(db);
-  const link = `${publicUrl}/review/problem-reports?id=${encodeURIComponent(id)}`;
-  return sendAll(log, recipients.map((to) => () => mailer.sendReportAttachmentNotice({ to, id, count, project, link })));
+  const message = { ...alert, deployment: project, timestamp: new Date(now()).toISOString() };
+  return sendAll(log, recipients.map((to) => () => mailer.sendSubmissionAlert({ to, message })));
 }
 
 const INCOMPLETE = 'Some answers need attention before you continue.';
@@ -160,7 +169,7 @@ async function withdrawApplication(deps, { body, user }) {
 module.exports = {
   answersToFreeze,
   notifyOperators,
-  notifyProblemReportAttachments,
+  notifyProblemReport,
   notifyOwners,
   refuseIncomplete,
   statusLink,

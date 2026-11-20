@@ -71,7 +71,8 @@ export default function ReportProblemDialog({ onClose, returnFocusRef }) {
         site: siteName(window.location.hostname),
         version: import.meta.env.VITE_BUILD_ID || '',
         consoleLogs: recentMessages(),
-        ...(screenshots.files.length ? { ...await encodeScreenshots(screenshots.files), submissionKey } : {}),
+        submissionKey,
+        ...(screenshots.files.length ? await encodeScreenshots(screenshots.files) : {}),
       });
       setSent(true);
     } catch (err) {

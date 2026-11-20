@@ -3,9 +3,8 @@
 /**
  * The Event Runner frame for mail that Event Runner itself sends to an
  * operator, as opposed to mail an event sends in its own brand (layout.cjs).
- * It matches the console's frame (console/functions/src/emailLayout.cjs):
- * the console deploys as its own package, so the two cannot share a file.
- * Keep them in step. Every value passed in is already escaped.
+ * The site and Console use this frame for operator alerts. Every value
+ * passed in is already escaped.
  */
 
 const ACCENT = '#1a5296';
