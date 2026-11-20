@@ -534,6 +534,7 @@ jobs:
             test-results/admin-visual-evidence/public-header-*.json
             test-results/admin-visual-evidence/public-language-*.json
             test-results/admin-visual-evidence/admin-specimen--*.json
+            test-results/search-latency-evidence/*.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload Playwright report
