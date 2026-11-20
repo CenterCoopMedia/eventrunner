@@ -138,7 +138,7 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
 
 // Header logo choice (#1167): "Logo only" and "Logo and name" at phone and
 // desktop widths. The home link keeps the event name either way.
-for (const variant of ['standard', 'masthead']) {
+for (const variant of ['standard', 'masthead', 'compact']) {
   for (const identity of ['logo', 'both']) {
     test(`${variant} header with a wide logo shows ${identity === 'logo' ? 'the logo only' : 'the logo and the name'}`, async ({ page }) => {
       await page.route('**/*', (route) => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());

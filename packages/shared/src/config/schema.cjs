@@ -974,13 +974,14 @@ function validateTheme(theme) {
   }
 
   // The footer logo switch and the logo's description (#1167). A blank
-  // description is not stored: the event name stands in for it.
+  // description is stored as '' so it overrides an older snapshot's text;
+  // the event name stands in for it.
   if (theme.footerLogo != null && typeof theme.footerLogo !== 'boolean') {
     errors.push(`theme.footerLogo: must be true or false, got ${JSON.stringify(theme.footerLogo)}`);
   }
   if (theme.logoAlt != null) {
-    if (!isNonEmptyString(theme.logoAlt) || theme.logoAlt.trim() !== theme.logoAlt) {
-      errors.push('theme.logoAlt: must be a nonempty string without surrounding spaces');
+    if (typeof theme.logoAlt !== 'string' || theme.logoAlt.trim() !== theme.logoAlt) {
+      errors.push('theme.logoAlt: must be a string without surrounding spaces');
     } else if (theme.logoAlt.length > THEME_LOGO_ALT_MAX) {
       errors.push(`theme.logoAlt: must be at most ${THEME_LOGO_ALT_MAX} characters`);
     }

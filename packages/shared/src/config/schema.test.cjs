@@ -905,6 +905,8 @@ test('validateTheme accepts the header logo choice, footer switch and logo descr
     assert.equal(validateTheme({ ...base, headerLogo }).ok, true);
   }
   assert.equal(validateTheme({ ...base, footerLogo: false, logoAlt: 'Summit logo' }).ok, true);
+  // Blank is a stored answer: the event name describes the logo.
+  assert.equal(validateTheme({ ...base, logoAlt: '' }).ok, true);
   for (const heroLogo of ['off', 'above', 'instead']) {
     assert.equal(validateTheme({ ...base, heroLogo }).ok, true);
   }

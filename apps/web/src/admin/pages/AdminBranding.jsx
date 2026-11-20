@@ -307,7 +307,10 @@ export function toThemeDoc(form) {
   if (form.brandColor.trim()) doc.brandColor = form.brandColor.trim();
   if (form.headerLogo) doc.headerLogo = form.headerLogo;
   if (typeof form.footerLogo === 'boolean') doc.footerLogo = form.footerLogo;
-  if (form.logoAlt.trim()) doc.logoAlt = form.logoAlt.trim();
+  // Written even when blank: the live document overlays the built
+  // snapshot field by field, so an omitted description would bring back
+  // the snapshot's old text. Blank means "use the event name".
+  doc.logoAlt = form.logoAlt.trim();
   if (form.heroLogo) doc.heroLogo = form.heroLogo;
   if (form.navPlacement) doc.navPlacement = form.navPlacement;
   // Written every time, the brand default included. EventConfigProvider

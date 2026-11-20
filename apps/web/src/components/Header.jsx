@@ -124,11 +124,11 @@ export default function Header({
         <div className="site-header-identity-row">
           <Nameplate
             variant="compact"
-            name={title}
+            name={logoAndName ? wordmark : title}
             dates={dates}
             edition={place}
             to={to}
-            mark={mark}
+            mark={logoAndName ? null : mark}
           />
           {mobileControl}
           {actions}

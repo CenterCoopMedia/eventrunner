@@ -804,9 +804,10 @@ describe('publishing the theme', () => {
     expect(await screen.findByText(/no deploy needed/i)).toBeInTheDocument();
   });
 
-  it('posts the header logo choice, footer switch and description only once chosen, issue 1167', async () => {
+  it('posts the header logo choice and footer switch only once chosen, issue 1167', async () => {
     // Unchosen stays unwritten, so a first uploaded logo still leads the
-    // header the way it always has.
+    // header the way it always has. The description is always written, so
+    // clearing it overrides the built snapshot's text.
     await renderBranding({ ...PRESET_THEME, logos: { primary: 'branding/abc/logo.png' } });
     expect(screen.getByLabelText('Header shows')).toHaveValue('both');
     expect(screen.getByLabelText('Show the logo in the footer')).toBeChecked();
@@ -816,7 +817,7 @@ describe('publishing the theme', () => {
     let { theme } = JSON.parse(fetch.mock.calls[0][1].body);
     expect(theme).not.toHaveProperty('headerLogo');
     expect(theme).not.toHaveProperty('footerLogo');
-    expect(theme).not.toHaveProperty('logoAlt');
+    expect(theme.logoAlt).toBe('');
     expect(theme).not.toHaveProperty('heroLogo');
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
