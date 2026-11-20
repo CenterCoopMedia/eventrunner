@@ -2433,6 +2433,10 @@
     min-inline-size: 0;
     max-inline-size: 100%;
   }
+  /* Logo and name in a row, aligned at the top (#1167); phones stack them. */
+  .site-header-wordmark--both {
+    align-items: flex-start;
+  }
   .site-logo {
     block-size: 1.5rem;
     inline-size: auto;
@@ -2694,8 +2698,12 @@
        beside it, so neither is cut short (#1167). */
     .site-header-wordmark--both {
       flex-direction: column;
+      align-items: stretch;
       gap: var(--space-3xs);
     }
+    /* The logo keeps its own width; the name takes the column, so a long
+       name ends in an ellipsis before the Menu button. */
+    .site-header-wordmark--both > img { align-self: flex-start; }
     .site-masthead__bar,
     .site-header-identity-row {
       display: flex;

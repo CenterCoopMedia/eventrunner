@@ -69,7 +69,7 @@ export default function Header({
     </span>
   );
   const wordmark = (
-    <span className={`inline-flex max-w-full items-start gap-xs${logoAndName ? ' site-header-wordmark--both' : ''}`}>
+    <span className={`inline-flex max-w-full gap-xs ${logoAndName ? 'site-header-wordmark--both' : 'items-start'}`}>
       {mark}
       {title}
     </span>

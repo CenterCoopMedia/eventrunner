@@ -158,6 +158,9 @@ for (const variant of ['standard', 'masthead', 'compact']) {
             title: { top: box.top, left: box.left, width: box.width },
             titleHidden: globalThis.getComputedStyle(title).position === 'absolute',
             scrollWidth: globalThis.document.documentElement.scrollWidth,
+            titleRight: box.right,
+            menuLeft: [...header.querySelectorAll('button')].find((b) => b.textContent.includes('Menu'))
+              ?.getBoundingClientRect().left ?? null,
           };
         });
         await page.screenshot({ path: path.join(EVIDENCE, `public-header-logo--${variant}--${identity}--${width}.png`), animations: 'disabled' });
@@ -170,7 +173,11 @@ for (const variant of ['standard', 'masthead', 'compact']) {
           expect(measured.titleHidden).toBe(false);
           expect(measured.title.width).toBeGreaterThan(0);
           // Beside the logo on a desktop, under it on a phone.
-          if (width === 390) expect(measured.title.top).toBeGreaterThanOrEqual(measured.logo.bottom - 1);
+          if (width === 390) {
+            expect(measured.title.top).toBeGreaterThanOrEqual(measured.logo.bottom - 1);
+            // A long name ends before the Menu button instead of running under it.
+            if (measured.menuLeft !== null) expect(measured.titleRight).toBeLessThanOrEqual(measured.menuLeft);
+          }
           else expect(measured.title.left).toBeGreaterThanOrEqual(measured.logo.right);
         }
       }
