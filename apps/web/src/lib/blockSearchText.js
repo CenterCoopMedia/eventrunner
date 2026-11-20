@@ -78,7 +78,7 @@ function joined(...parts) {
 }
 
 /** The type-specific half of a block's searchable text. */
-function typeSearchText(block) {
+function typeSearchText(block, timeline) {
   switch (block.blockType) {
     case 'text':
       return verbatim(block.value);
@@ -115,6 +115,10 @@ function typeSearchText(block) {
     case 'sponsor_package':
       // The name and the price are plain input; the benefits are rich text.
       return joined(verbatim(block.name), verbatim(block.price), stripHtml(block.benefits));
+    case 'timeline':
+      // Timeline entries live in their own collection. Search the same
+      // visible entries that the block draws.
+      return timeline.map(({ year, title, description }) => joined(String(year), title, description)).join(' ');
     default:
       return '';
   }
@@ -124,9 +128,9 @@ function typeSearchText(block) {
  * `sectionLabel`, when given, is appended so a query for the section's own
  * name (e.g. "Venue") matches every block filed under it, not only a block
  * that happens to repeat the word. */
-export function blockSearchText(block, { sectionLabel } = {}) {
+export function blockSearchText(block, { sectionLabel, timeline = [] } = {}) {
   if (!block || typeof block !== 'object') return '';
-  return joined(typeSearchText(block), sectionLabel);
+  return joined(typeSearchText(block, timeline), sectionLabel);
 }
 
 /** Whether a block's own text (plus its section's label, via `options.

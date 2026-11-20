@@ -52,6 +52,7 @@ export default function ImagePicker({
   label,
   value,
   onChange,
+  onSelectionChange = onChange,
   folder = 'cms-images',
   hint = null,
   help,
@@ -175,7 +176,7 @@ export default function ImagePicker({
               Choose or upload…
             </button>
             {value ? (
-              <AdminIconControl label={`Remove ${label.toLowerCase()}`} icon="remove" className={secondaryButtonClass} onClick={() => onChange('')} />
+              <AdminIconControl label={`Remove ${label.toLowerCase()}`} icon="remove" className={secondaryButtonClass} onClick={() => onSelectionChange('')} />
             ) : null}
           </div>
         </div>
@@ -202,7 +203,7 @@ export default function ImagePicker({
             folder={folder}
             selectedPath={value || null}
             onSelect={(asset) => {
-              onChange(asset ? asset.path : '');
+              onSelectionChange(asset ? asset.path : '');
               if (asset) setBrowsing(false);
             }}
           />

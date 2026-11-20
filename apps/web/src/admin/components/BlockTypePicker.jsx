@@ -10,6 +10,7 @@
 // so nobody has to guess why a familiar option is missing.
 import { memo, useEffect, useId, useRef, useState } from 'react';
 import SectionBlocks from '../../components/blocks/SectionBlocks.jsx';
+import Timeline from '../../components/editorial/Timeline.jsx';
 import WayfindingIcon from '../../components/editorial/WayfindingIcon.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { applyThemePreview, releaseThemePreviewTarget } from '../themePreview.js';
@@ -31,6 +32,7 @@ export const BLOCK_TYPE_SUMMARIES = Object.freeze({
   link_group: 'One link in a named group, such as footer links.',
   gallery: 'Several pictures as a grid, a carousel or a slideshow.',
   sponsor_package: 'A sponsorship level with its price and benefits.',
+  timeline: 'Past editions in order, with optional links and images.',
 });
 
 function prefersDarkNow() {
@@ -66,21 +68,33 @@ const SAMPLE_BLOCKS = Object.freeze({
   sponsor_package: { name: 'Gold', price: '$2,500', limit: 3, benefits: '<p>Logo on every page</p>' },
 });
 
+const TIMELINE_EXAMPLE = [
+  { id: 'first-gathering', title: 'First gathering', date: '2022', dateLabel: '2022' },
+  { id: 'community-workshops', title: 'Community workshops', date: '2025', dateLabel: '2025' },
+];
+
 // Memoized: the examples never change, and the editor re-renders on every
 // keystroke in the fields below.
 const Example = memo(function Example({ typeId }) {
   const sample = SAMPLE_BLOCKS[typeId];
-  if (!sample && typeId !== 'map') return null;
+  let example;
+  if (typeId === 'map') {
+    example = (
+      <div className="flex items-center gap-xs bg-surface-alt p-md">
+        <WayfindingIcon name="venue" />
+        <span>1 Example Street</span>
+      </div>
+    );
+  } else if (typeId === 'timeline') {
+    example = <Timeline entries={TIMELINE_EXAMPLE} />;
+  } else if (sample) {
+    example = <SectionBlocks blocks={[{ id: `example-${typeId}`, section: 'example', field: typeId, blockType: typeId, ...sample }]} />;
+  } else {
+    return null;
+  }
   return (
     <div className="admin-block-picker__example" inert="" aria-hidden="true">
-      {typeId === 'map' ? (
-        <div className="flex items-center gap-xs bg-surface-alt p-md">
-          <WayfindingIcon name="venue" />
-          <span>1 Example Street</span>
-        </div>
-      ) : (
-        <SectionBlocks blocks={[{ id: `example-${typeId}`, section: 'example', field: typeId, blockType: typeId, ...sample }]} />
-      )}
+      {example}
     </div>
   );
 });

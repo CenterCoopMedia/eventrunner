@@ -140,7 +140,7 @@ export function withLiveDates(block, eventConfig, language) {
 export default function Home() {
   const { language, text } = usePublicLanguage();
   const { eventConfig, features, theme } = useEventConfig();
-  const { pages, getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
+  const { pages, getPage, getSectionBlocks, getBlock, source, contentSource, pageHasTimelineBlock } = useContent();
   const registrationAction = useRegistrationLink();
   const pitchOpen = usePitchCallOpen();
 
@@ -201,6 +201,7 @@ export default function Home() {
   // Each receives the section's edit link (issue #198) and draws it in its
   // own head, the way the default draw does. The key facts row with no card
   // has no head of its own, so its link sits after the row.
+  const hasTimelineBlock = pageHasTimelineBlock(page);
   const renderHomeSection = (section, blocks, editLink) => {
     if (section.id === 'info') {
       // Read with starter text kept, not from `blocks`: the seeded When
@@ -266,6 +267,7 @@ export default function Home() {
           blocks={blocks}
           arrangement={resolvePageLayout(page).arrangement}
           action={editLink}
+          showTimeline={!hasTimelineBlock}
         />
       );
     }

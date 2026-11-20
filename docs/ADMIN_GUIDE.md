@@ -268,7 +268,7 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 
 **It is a section like any other, so you place it.** Move it up or down the home page's section list and the wall moves with it. Set it to appear before or after the main feature and it obeys that too. The section draws nothing at all when no organization is published yet, when the *Sponsors* feature is switched off, or when you delete the section from the home page. Deleting the section is how you take the wall off the home page and keep the Sponsors page.
 
-**The home page's History section is your text, then the timeline.** Write the section's own words and pictures here, as for any other section. Under them the site draws the past editions from the Timeline list, oldest first. You edit the editions under Timeline, not here. Move the section and the list moves with it. Delete the section and the list is gone from the site too.
+**The home page's History section can show the timeline.** If Home has no Timeline block, the History section shows past editions under the section's text and pictures. Add a Timeline block to choose where the entries appear on Home. Edit the entries under **Timeline** in the admin rail.
 
 **A sponsor package is one thing a sponsor can support.** The **sponsor package** block carries a name and what the package includes, both required, and an optional price and limit. Write the price as it should read, with its currency. The limit is how many sponsors can take the package, as a whole number of 1 or more: The page shows "Open to 3 sponsors", and shows nothing for no limit. The save refuses any other number. The Sponsors page seeds one section for packages, **Sponsorship packages**, after the logo wall. It is not shown until it holds a package, so an empty section never reaches a visitor. A site whose Sponsors page was edited before this section existed keeps its own sections; add the section in Pages if you want it.
 
@@ -302,17 +302,13 @@ Every update on the site's Updates page. Each row gives the update's title, its 
 
 ## Timeline
 
-The past editions of the event: Add, edit, publish, and delete them here. The home page's History section lists them under its own text. Saving writes a draft, and publishing sends the entry to the home page.
+An entry describes one past edition of the event. Saving writes a draft. Publishing makes the entry appear in Timeline blocks and in the automatic History timeline on Home when it is present.
 
 **The list** gives each entry's title, year, and id, and its state in words, oldest first. An entry that is saved but not shown on the site also says **Hidden**. **Publish all** publishes every entry that is not live.
 
-**The fields.** **Year** is four digits, from 1900 to 2100. The site shows it beside the title and orders the list by it, oldest first; two entries in one year go in title order. **Title** is required: What that edition is remembered for, in a few words, on one line of up to 120 characters. Leave the year out of it. **Description** is optional: One or two sentences of plain text, up to 600 characters, shown as one paragraph. Clear **Show this entry when it is published** to keep a published entry off the site.
+**The fields.** **Year** is four digits, from 1900 to 2100. The site shows it beside the title and orders the list by it, oldest first; two entries in one year go in title order. **Title** is required and holds up to 120 characters on one line. **Description** is optional and holds up to 600 characters. Add a **Link** to make the title clickable. Enter a full HTTPS address or a path on the site, such as `/schedule`. An HTTPS address opens in a new tab. You can also choose an **Image** from the media library and describe it in **Alt text**. Clear **Show this entry when it is published** to keep a published entry off the site.
 
-**Every save is checked.** The editor and the server refuse a year that is not four digits in range, a missing title, and text that is too long. The refusal names the field.
-
-**There is no draft preview.** The entries appear only on the home page, and the home page can send an account with no display name to its profile, so the editor offers no preview link. Save and publish, then read the home page.
-
-**The list appears only in the History section.** If the home page has no section with the id `history`, published entries do not appear anywhere, and the Timeline list says so. Add a section with that id to the home page under Pages.
+**Place a Timeline block.** Open **Content**, choose a page and section, and add a block of type **Timeline**. Publish the block to show the published entries on that page. Each Timeline block uses the same list of entries.
 
 **Delete** removes the live entry and its draft together. Published versions stay in **Version history → Removed records** and can be restored as a draft. Unpublished edits are lost. An entry that was never published cannot be restored.
 

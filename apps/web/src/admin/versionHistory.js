@@ -142,8 +142,8 @@ const NOT_CONTENT = Object.freeze([
 /** Seed bookkeeping is removed by every normal editor save. */
 const SEED_FIELDS = Object.freeze(['seeded', 'seededAt']);
 // The timeline save seam drops stored-only legacy fields and rejects them
-// in a request. Restore only the same three fields its normal editor sends.
-const TIMELINE_FIELDS = Object.freeze(['year', 'title', 'description']);
+// in a request. Restore only the fields the entry editor sends.
+const TIMELINE_FIELDS = Object.freeze(['year', 'title', 'description', 'url', 'image', 'alt']);
 
 function withoutSeedFields(fields) {
   const out = {};

@@ -163,14 +163,6 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
   const [publicPagesConfirmed, setPublicPagesConfirmed] = useState(false);
   const sessionRef = useRef(null);
   const requestedRef = useRef(new Set());
-  const neededCollections = useMemo(
-    () => {
-      const streams = publicSubscriptionsForRoute(pathname, search, publicTools);
-      if (languageNeedsSchedule && !streams.includes('cmsSchedule')) streams.push('cmsSchedule');
-      return streams.filter((name) => RUNTIME_COLLECTIONS.includes(name));
-    },
-    [pathname, search, publicTools, languageNeedsSchedule],
-  );
 
   useEffect(() => {
     // Switching between published and draft re-subscribes from scratch;
@@ -187,27 +179,6 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       }
     };
   }, [readSource]);
-
-  useEffect(() => {
-    const session = sessionRef.current;
-    for (const name of neededCollections) requestedRef.current.add(name);
-    // A source switch rebinds every stream already needed in this session.
-    for (const name of requestedRef.current) {
-      if (session.subscriptions.has(name)) continue;
-      const key = name === 'speakers_public' ? 'speakers' : name;
-      const onNext = (docs) => {
-        if (session.active) setOverlay((prev) => ({ ...prev, [key]: docs }));
-      };
-      const onConfirmed = name === 'cmsPages' && readSource === 'published'
-        ? (confirmed) => { if (session.active) setPublicPagesConfirmed(confirmed); }
-        : undefined;
-      const unsubscribe = name === 'speakers_public'
-        ? subscribeSpeakersPublic(onNext)
-        : subscribeContentCollection(name, readSource, onNext, onConfirmed);
-      session.subscriptions.set(name, unsubscribe);
-    }
-    // Route changes only add streams. The source lifecycle owns cleanup.
-  }, [readSource, neededCollections]);
 
   const value = useMemo(() => {
     // cmsContent docs are keyed `<section>__<field>` — same shape as the
@@ -245,6 +216,9 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
     const timeline = prepareTimelineDocs(
       overlay.cmsTimeline != null ? overlay.cmsTimeline : snapshotTimelineData,
     );
+    const blocks = Object.values(siteContent);
+    const pageHasTimelineBlock = (page) => blocks.some((block) => block?.blockType === 'timeline'
+      && isDrawable(block) && page?.sections?.some((section) => section?.id === block.section));
     const live = Boolean(
       overlay.cmsContent != null ||
         overlay.cmsPages != null ||
@@ -262,8 +236,9 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
     };
 
     const getSectionBlocks = (section, options) =>
-      Object.values(siteContent)
-        .filter((block) => block.section === section && isDrawable(block, options))
+      blocks
+        .filter((block) => block.section === section && isDrawable(block, options)
+          && (block.blockType !== 'timeline' || timeline.length > 0))
         .sort(byOrder);
 
     // THE DOCUMENT BEHIND A ROUTE THAT RENDERS ITSELF. A system route is
@@ -316,6 +291,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       speakers,
       organizationsData,
       timeline,
+      pageHasTimelineBlock,
       // The snapshot renders synchronously, so consumers never wait on the
       // network; kept for interface stability with loading-aware pages.
       loading: false,
@@ -325,6 +301,39 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       getPublicPage,
     };
   }, [readSource, overlay, languageNeedsSchedule, publicPagesConfirmed]);
+
+  // Subscribe as soon as the page has a Timeline block, even while it has
+  // no entries to render. The placement comes from raw content, independently
+  // of the filtering in getSectionBlocks.
+  const pageNeedsTimeline = value.pageHasTimelineBlock(value.getPage(pathname?.replace(/\/+$/, '') || '/'));
+  const neededCollections = useMemo(() => {
+    const streams = publicSubscriptionsForRoute(pathname, search, publicTools);
+    // The session's requested set keeps each stream once.
+    if (languageNeedsSchedule) streams.push('cmsSchedule');
+    if (pageNeedsTimeline) streams.push('cmsTimeline');
+    return streams.filter((name) => RUNTIME_COLLECTIONS.includes(name));
+  }, [pathname, search, publicTools, languageNeedsSchedule, pageNeedsTimeline]);
+
+  useEffect(() => {
+    const session = sessionRef.current;
+    for (const name of neededCollections) requestedRef.current.add(name);
+    // A source switch rebinds every stream already needed in this session.
+    for (const name of requestedRef.current) {
+      if (session.subscriptions.has(name)) continue;
+      const key = name === 'speakers_public' ? 'speakers' : name;
+      const onNext = (docs) => {
+        if (session.active) setOverlay((prev) => ({ ...prev, [key]: docs }));
+      };
+      const onConfirmed = name === 'cmsPages' && readSource === 'published'
+        ? (confirmed) => { if (session.active) setPublicPagesConfirmed(confirmed); }
+        : undefined;
+      const unsubscribe = name === 'speakers_public'
+        ? subscribeSpeakersPublic(onNext)
+        : subscribeContentCollection(name, readSource, onNext, onConfirmed);
+      session.subscriptions.set(name, unsubscribe);
+    }
+    // Route changes only add streams. The source lifecycle owns cleanup.
+  }, [readSource, neededCollections]);
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }

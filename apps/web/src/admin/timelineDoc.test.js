@@ -11,7 +11,7 @@ import {
   validateTimelineForm,
 } from './timelineDoc.js';
 
-const { TIMELINE_LIMITS: SERVER_LIMITS } = timelineCjs.default ?? timelineCjs;
+const { TIMELINE_LIMITS: SERVER_LIMITS, validateTimelineFields } = timelineCjs.default ?? timelineCjs;
 
 const FORM = Object.freeze({ year: '2024', title: 'The first meeting', description: 'Teams met.', visible: true });
 
@@ -59,13 +59,16 @@ describe('mergeTimelineRevisions', () => {
 });
 
 describe('timelineFields', () => {
-  it('sends the three fields, the year as a number, the text trimmed, and a blank description as null', () => {
+  it('sends the year as a number, the text trimmed, and blank optional fields as null', () => {
     expect(timelineFields({ ...FORM, title: '  The first meeting ', description: '   ' })).toEqual({
       year: 2024,
       title: 'The first meeting',
       description: null,
+      url: null,
+      image: null,
+      alt: null,
     });
-    expect(timelineFields(FORM)).toEqual({ year: 2024, title: 'The first meeting', description: 'Teams met.' });
+    expect(timelineFields(FORM).description).toBe('Teams met.');
   });
 
   it('sends a year that is not four digits as typed, so the server names it', () => {
@@ -78,6 +81,24 @@ describe('validateTimelineForm', () => {
   it('passes a complete entry', () => {
     expect(validateTimelineForm(FORM).size).toBe(0);
     expect(validateTimelineForm({ ...FORM, description: '' }).size).toBe(0);
+  });
+
+  it('agrees with server validation for links, library images and alt text', () => {
+    const image = 'cms-images/archive/photo.png';
+    for (const fields of [
+      { url: '/archive#past', image, alt: 'The audience in the hall' },
+      { url: 'https://example.org/recap' },
+      { url: 'http://example.org/recap' },
+      { url: '//example.org/recap' },
+      { image, alt: '' },
+      { image: 'https://example.org/photo.png', alt: 'Photo' },
+      { image, alt: 'x'.repeat(241) },
+    ]) {
+      const form = { ...FORM, ...fields };
+      const server = validateTimelineFields({ ...timelineFields(FORM), ...fields });
+      expect([...validateTimelineForm(form).keys()]).toEqual(server.ok ? [] : server.errors.map((error) => error.split(':')[0]));
+      if (server.ok) expect(timelineFields(form)).toEqual(server.fields);
+    }
   });
 
   it('asks for a year as four digits, in range', () => {

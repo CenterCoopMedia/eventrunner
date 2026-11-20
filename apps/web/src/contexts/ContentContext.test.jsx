@@ -3,6 +3,7 @@
 // draft read source for admin preview, and the block/page accessors.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 // Capture each collection subscription so tests can fire fake snapshots.
 const { subscriptions, subscribeContentCollection, subscribeSpeakersPublic } = vi.hoisted(() => {
@@ -28,6 +29,7 @@ vi.mock('../lib/contentSource.js', () => ({
 }));
 
 import { ContentProvider, useContent } from './ContentContext.jsx';
+import TimelineBlock from '../components/blocks/TimelineBlock.jsx';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotPages from '@generated/pagesData.js';
 import snapshotScheduleData, { speakers as snapshotScheduleSpeakers } from '@generated/scheduleData.js';
@@ -102,6 +104,34 @@ describe('ContentProvider', () => {
     expect(schedule).toBeDefined();
     rerender(view(false));
     expect(subscriptions.get('cmsSchedule')).toBe(schedule);
+  });
+
+  it('loads entries for a placed Timeline block on a known route and hides the empty section', () => {
+    function Editions() {
+      const { getSectionBlocks } = useContent();
+      if (!getSectionBlocks('past-editions').length) return null;
+      return <section aria-label="Past editions"><TimelineBlock /></section>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/schedule']}>
+        <ContentProvider pathname="/schedule" publicTools={false}>
+          <Editions />
+        </ContentProvider>
+      </MemoryRouter>,
+    );
+    expect(subscriptions.has('cmsTimeline')).toBe(false);
+    act(() => {
+      subscriptions.get('cmsPages').onNext([{ id: 'schedule', path: '/schedule', visible: true, sections: [{ id: 'past-editions' }] }]);
+      subscriptions.get('cmsContent').onNext([{ id: 'past-editions__timeline', section: 'past-editions', blockType: 'timeline', visible: true }]);
+    });
+    const listener = subscriptions.get('cmsTimeline');
+    act(() => listener.onNext([]));
+    expect(screen.queryByRole('region', { name: 'Past editions' })).toBeNull();
+    act(() => listener.onNext([{ id: 'new-edition', year: 2025, title: 'A new edition', visible: true }]));
+    expect(screen.getByRole('heading', { name: 'A new edition' })).toBeInTheDocument();
+    act(() => listener.onNext([{ id: 'new-edition', year: 2025, title: 'A new edition', visible: false }]));
+    expect(screen.queryByRole('region', { name: 'Past editions' })).toBeNull();
+    expect(subscriptions.get('cmsTimeline')).toBe(listener);
   });
 
   it('rebinds the session streams on a source change and ignores stopped draft callbacks', () => {

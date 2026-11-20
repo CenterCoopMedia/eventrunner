@@ -143,27 +143,34 @@ describe('attendee ticket selection', () => {
     state.auth = { user: null, loading: true };
     state.form = undefined;
     ticketingRequest.mockRejectedValueOnce(new Error('Ticket information is unavailable.'));
-    const view = mount();
-    const region = screen.getByRole('region', { name: 'Ticket information' });
-    expect(await screen.findByRole('alert')).toHaveTextContent('Ticket information is unavailable.');
-    expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(screen.queryByText('Loading ticket information…')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry ticket information' }));
-    const authWait = await screen.findByText('Checking your sign-in…');
-    expect(authWait.closest('[aria-busy="true"]')).toBeNull();
-    state.auth = { user: buyer, loading: false };
-    view.rerender(ticketRoute());
-    expect(screen.getByText('Loading registration questions…')).toBeVisible();
-    const questions = screen.getByRole('status');
-    expect(questions.parentElement).toHaveAttribute('data-loading-stage', 'initial');
-    expect(questions.closest('[aria-busy="true"]')).toBeNull();
-    expect(screen.queryByText('Checking your sign-in…')).not.toBeInTheDocument();
-    act(() => state.pushForm(null));
-    expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(questions).toBeEmptyDOMElement();
-    expect(questions.closest('.loading-state')).toBeNull();
-    expect(screen.getByLabelText('Quantity — General admission')).toBeInTheDocument();
-    expect(checkoutCalls()).toHaveLength(0);
+    const startedAt = performance.now();
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(startedAt);
+    try {
+      const view = mount();
+      const region = screen.getByRole('region', { name: 'Ticket information' });
+      expect(await screen.findByRole('alert')).toHaveTextContent('Ticket information is unavailable.');
+      expect(region).toHaveAttribute('aria-busy', 'false');
+      expect(screen.queryByText('Loading ticket information…')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Retry ticket information' }));
+      const authWait = await screen.findByText('Checking your sign-in…');
+      expect(authWait.closest('[aria-busy="true"]')).toBeNull();
+      state.auth = { user: buyer, loading: false };
+      view.rerender(ticketRoute());
+      expect(screen.getByText('Loading registration questions…')).toBeVisible();
+      const questions = screen.getByRole('status');
+      expect(questions.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      expect(questions.closest('[aria-busy="true"]')).toBeNull();
+      expect(screen.queryByText('Checking your sign-in…')).not.toBeInTheDocument();
+      clock.mockReturnValue(startedAt + 299);
+      act(() => state.pushForm(null));
+      expect(region).toHaveAttribute('aria-busy', 'false');
+      expect(questions).toBeEmptyDOMElement();
+      expect(questions.closest('.loading-state')).toBeNull();
+      expect(screen.getByLabelText('Quantity — General admission')).toBeInTheDocument();
+      expect(checkoutCalls()).toHaveLength(0);
+    } finally {
+      clock.mockRestore();
+    }
   });
   it.each(['sold-out', 'rate-limited', 'account-not-ready'])('requires renewed terms acceptance when a %s refresh returns another revision', async (code) => {
     const changed = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Updated refund policy requires organizer approval.',

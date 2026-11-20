@@ -192,6 +192,12 @@ const BLOCK_TYPES = Object.freeze({
       field('order', 'number', false),
     ],
   }),
+  timeline: blockType({
+    id: 'timeline',
+    label: 'Timeline',
+    description: 'Published timeline entries in chronological order. Add and edit entries in Timeline.',
+    fields: [],
+  }),
 });
 
 /**

@@ -484,7 +484,7 @@ describe('admin route gating', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(adminCall).toHaveBeenCalledWith('cmsCreateContent', expect.objectContaining({
       collection: 'cmsTimeline',
-      fields: { year: 2023, title: 'A staff edition', description: null },
+      fields: { year: 2023, title: 'A staff edition', description: null, url: null, image: null, alt: null },
     })));
   });
 

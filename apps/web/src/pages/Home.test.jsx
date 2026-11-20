@@ -45,6 +45,7 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
     organizationsData,
     timeline,
     getPage: () => pageDoc,
+    pageHasTimelineBlock: () => false,
     getSectionBlocks: (section) => {
       if (section === 'hero') return heroBlocks;
       if (section === 'info') return infoBlocks;

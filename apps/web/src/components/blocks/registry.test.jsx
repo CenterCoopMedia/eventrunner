@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import * as blockTypesCjs from '../../../../../functions/src/cms/blockTypes.cjs';
 import BlockRenderer, { BLOCK_RENDERERS, rendererFor, UnknownBlock } from './registry.jsx';
+import ContentContext from '../../contexts/ContentContext.jsx';
 
 const venue = {
   name: 'Test Hall & Annex',
@@ -42,6 +43,7 @@ const SAMPLE_BLOCKS = {
   link_group: { blockType: 'link_group', group: 'About', label: 'Contact the organizers', url: 'mailto:hi@example.org' },
   gallery: { blockType: 'gallery', layout: 'grid', images: [{ url: 'cms-images/a1/crowd.webp', alt: 'The main hall' }] },
   sponsor_package: { blockType: 'sponsor_package', name: 'Coffee break', price: 'Illustrative', limit: 2, benefits: '<p>Signs</p>' },
+  timeline: { blockType: 'timeline' },
 };
 
 afterEach(() => {
@@ -59,7 +61,10 @@ describe('block renderer registry', () => {
     const sample = SAMPLE_BLOCKS[id];
     // A new backend block type must gain a sample here alongside its renderer.
     expect(sample, `missing sample block for '${id}'`).toBeTruthy();
-    const { container } = render(<BlockRenderer block={sample} />);
+    const content = { timeline: [{ id: 'edition', year: 2024, title: 'First edition' }] };
+    const { container } = render(
+      <ContentContext.Provider value={content}><BlockRenderer block={sample} /></ContentContext.Provider>,
+    );
     await waitFor(() => {
       expect(container.firstElementChild).toBeInTheDocument();
       expect(container.firstElementChild).not.toHaveAttribute('aria-hidden', 'true');

@@ -159,6 +159,12 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+  timeline: {
+    id: 'timeline',
+    label: 'Timeline',
+    description: 'Published timeline entries in chronological order. Add and edit entries in Timeline.',
+    fields: [],
+  },
 });
 
 /**

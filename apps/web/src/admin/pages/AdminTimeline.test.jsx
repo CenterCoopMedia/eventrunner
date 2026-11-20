@@ -20,12 +20,10 @@ vi.mock('../adminSource.js', () => ({
 vi.mock('../../lib/configSource.js', () => ({
   subscribeConfigDoc: () => () => {},
 }));
-// The public content listeners, captured: the list reads the live home page
-// to say whether it has a History section.
 const contentSubscriptions = new Map();
 vi.mock('../../lib/contentSource.js', () => ({
-  subscribeContentCollection: (name, _readSource, onNext) => {
-    contentSubscriptions.set(name, onNext);
+  subscribeContentCollection: (name, _readSource, onNext, onConfirmed) => {
+    contentSubscriptions.set(name, { onNext, onConfirmed });
     return () => contentSubscriptions.delete(name);
   },
   subscribeSpeakersPublic: () => () => {},
@@ -51,7 +49,6 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
-import snapshotPages from '@generated/pagesData.js';
 import { markTourDone } from '../tourState.js';
 
 let currentPath = '';
@@ -193,15 +190,35 @@ describe('the timeline list', () => {
   it('offers the first entry when there is none', async () => {
     await renderAt('/admin/timeline');
     expect(await screen.findByRole('heading', { name: 'No timeline entries yet' })).toBeInTheDocument();
-    expect(screen.getByText('Add your first past event.')).toBeInTheDocument();
-    // One noun for the record: "past editions" only says what the entries are.
-    const main = screen.getByRole('main');
-    expect(main.textContent.match(/edition/gi)).toEqual(['edition']);
-    expect(within(main).getByText(/^Past editions of the event,/)).toBeInTheDocument();
+    expect(screen.getByText('An entry describes one past edition. To display published entries on a page, add a Timeline block in its content editor.')).toBeInTheDocument();
     const add = screen.getAllByRole('link', { name: 'Add an entry' });
     expect(add.length).toBeGreaterThan(0);
     for (const link of add) expect(link).toHaveAttribute('href', '/admin/timeline/new/entry');
     expect(screen.getByText('0 entries')).toBeInTheDocument();
+  });
+
+  it('warns when entries have no published placement and clears the warning once placed', async () => {
+    await renderAt('/admin/timeline');
+    await screen.findByRole('heading', { level: 1, name: 'Timeline' });
+    pushTimeline(LIVE, DRAFTS);
+    const notice = () => screen.queryByText(/Published entries have no place to appear yet/);
+    expect(notice()).toBeNull();
+    const page = { id: 'archive', path: '/archive', visible: true, sections: [{ id: 'past-editions' }] };
+    const block = { id: 'past-editions__timeline', section: 'past-editions', blockType: 'timeline' };
+    const pageListener = contentSubscriptions.get('cmsPages');
+    const blockListener = contentSubscriptions.get('cmsContent');
+    act(() => {
+      pageListener.onNext([page]);
+      pageListener.onConfirmed(true);
+      blockListener.onNext([{ ...block, visible: false }]);
+    });
+    expect(within(notice()).getByRole('link', { name: 'page content' })).toHaveAttribute('href', '/admin/content');
+    act(() => blockListener.onNext([{ ...block, visible: true }]));
+    expect(notice()).toBeNull();
+    act(() => pageListener.onNext([{ ...page, visible: false }]));
+    expect(notice()).toBeInTheDocument();
+    act(() => pageListener.onNext([{ id: 'home', path: '/', visible: true, sections: [{ id: 'history' }] }]));
+    expect(notice()).toBeNull();
   });
 
   it('lists the entries oldest first, each state in words, a hidden one marked Hidden', async () => {
@@ -281,35 +298,13 @@ describe('the timeline list', () => {
     expect(screen.queryByText(lost)).toBeNull();
   });
 
-  it('says so when the live home page has no History section, and not while it has one', async () => {
-    await renderAt('/admin/timeline');
-    await screen.findByRole('heading', { level: 1, name: 'Timeline' });
-    const warning = (_content, element) =>
-      element?.tagName === 'P'
-      && element.textContent === 'Add a History section to the home page to show these entries. Edit home page';
-    // The historical snapshot has no invented past-edition history.
-    const notice = screen.getByText(warning);
-    expect(within(notice).getByRole('link', { name: 'Edit home page' })).toHaveAttribute('href', '/admin/pages/home');
-
-    const home = snapshotPages.find((page) => page.id === 'home');
-    act(() => {
-      contentSubscriptions.get('cmsPages')(
-        snapshotPages.map((page) => (page.id === 'home'
-          ? { ...home, sections: [...home.sections, { id: 'history', label: 'History' }] }
-          : page)),
-      );
-    });
-    expect(screen.queryByText(warning)).toBeNull();
-
-    act(() => contentSubscriptions.get('cmsPages')(snapshotPages));
-    expect(screen.getByText(warning)).toBeInTheDocument();
-  });
 });
 
 describe('the timeline entry editor', () => {
   it('creates a draft under a new UUID, and publishes nothing', async () => {
     holdAdminCollections = true;
     await openNewEntry();
+    expect(screen.getByText('An entry describes one past edition. Published entries appear in Timeline blocks and in the History section on Home when that section is present.')).toBeInTheDocument();
     pushTimeline(LIVE, DRAFTS);
     fetch.mockResolvedValueOnce(response({ docId: 'x', status: 'dirty' }));
     fillNewEntry();
@@ -324,7 +319,7 @@ describe('the timeline entry editor', () => {
       collection: 'cmsTimeline',
       docId: body.docId,
       visible: true,
-      fields: { year: 2023, title: 'A new edition', description: 'One day of talks.' },
+      fields: { year: 2023, title: 'A new edition', description: 'One day of talks.', url: null, image: null, alt: null },
     });
     // Stated in place, and repeated by the toast.
     expect(await screen.findAllByText('Draft saved. It is not live until you publish it.')).not.toHaveLength(0);
@@ -402,11 +397,10 @@ describe('the timeline entry editor', () => {
     expect(screen.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
   });
 
-  it('names the record an entry in every control, heading and hint', async () => {
+  it('names the record an entry in the form heading', async () => {
     await openNewEntry();
     const form = screen.getByLabelText('Year').closest('form');
     expect(within(form).getByRole('heading', { level: 2, name: 'Entry' })).toBeInTheDocument();
-    expect(form.textContent).not.toMatch(/edition/i);
   });
 
   it('keeps a pasted five-digit year in the field and refuses it before any call', async () => {
@@ -450,8 +444,24 @@ describe('the timeline entry editor', () => {
       collection: 'cmsTimeline',
       docId: 'edition-2025',
       visible: false,
-      fields: { year: 2025, title: 'Two workshop tracks, edited', description: 'Practice and planning.' },
+      fields: { year: 2025, title: 'Two workshop tracks, edited', description: 'Practice and planning.', url: null, image: null, alt: null },
     });
+  });
+
+  it('keeps alt text while editing an image path and clears it when removing the image', async () => {
+    await renderAt('/admin/timeline/edition-2025');
+    await waitFor(() => expect(adminSubscriptions.has('cmsTimeline_drafts')).toBe(true));
+    pushTimeline(LIVE, [
+      { ...DRAFTS[0], image: 'cms-images/edition/meeting.webp', alt: 'Attendees at a table' },
+      ...DRAFTS.slice(1),
+    ]);
+    const image = await screen.findByLabelText('Image');
+    fireEvent.change(image, { target: { value: 'cms-images/edition/gathering.webp' } });
+    expect(screen.getByLabelText('Alt text')).toHaveValue('Attendees at a table');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
+    expect(screen.queryByLabelText('Alt text')).toBeNull();
+    fireEvent.change(image, { target: { value: 'cms-images/edition/gathering.webp' } });
+    expect(screen.getByLabelText('Alt text')).toHaveValue('');
   });
 
   // Codex review on #288, the race #281 found in the organizations editor.
