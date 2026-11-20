@@ -11,6 +11,8 @@ import * as firestoreFakeCjs from '../../../../functions/src/cms/firestoreFake.c
 import {
   DELETE_FIELD_SENTINEL,
   blankContent,
+  contentBlockTitle,
+  contentIdSource,
   staleFieldDeletions,
   toContentFields,
   toEditableContent,
@@ -56,6 +58,21 @@ describe('valueFieldsOf', () => {
 });
 
 describe('toEditableContent / toContentFields round-trip', () => {
+  it('switches a copied embed to the event venue without retaining the old source', () => {
+    const content = toEditableContent({
+      blockType: 'map',
+      label: 'Map of Test Hall',
+      embedUrl: 'https://www.google.com/maps/embed?pb=fixture',
+    });
+    expect(content.values.useEventVenue).toBe(false);
+    content.values.useEventVenue = true;
+    expect(validateRequiredContent(content)).toEqual([]);
+    expect(toContentFields(content)).toMatchObject({
+      useEventVenue: true,
+      embedUrl: DELETE_FIELD_SENTINEL,
+      label: 'Map of Test Hall',
+    });
+  });
   it('preserves a paired variant and sends an explicit deletion when it is removed', () => {
     const translations = { es: { value: 'Bienvenidos' } };
     const editable = toEditableContent({ blockType: 'text', value: 'Welcome', translations });
@@ -135,6 +152,24 @@ describe('toEditableContent / toContentFields round-trip', () => {
       source: '',
       alt: '',
     });
+  });
+});
+
+describe('Rich text block titles', () => {
+  const copiedMap = '&lt;iframe src=&quot;https://www.google.com/maps/embed?pb=fixture&quot;&gt;&lt;/iframe&gt;';
+  it('uses the type name when the content contains only pasted markup', () => {
+    const block = { blockType: 'richtext', field: 'lt-iframe-src', value: `<p><code>${copiedMap}</code></p>` };
+    expect(contentBlockTitle(block)).toBe('Rich text');
+    expect(contentIdSource(block)).toBe('richtext');
+  });
+
+  it('uses the label or the first readable words around formatted or encoded markup', () => {
+    const block = {
+      blockType: 'richtext',
+      value: `<p>${copiedMap}</p><p><strong>Arriving</strong> after lunch &amp; checking in.</p>`,
+    };
+    expect(contentBlockTitle(block)).toBe('Arriving after lunch & checking in.');
+    expect(contentBlockTitle({ ...block, label: 'Venue directions' })).toBe('Venue directions');
   });
 });
 

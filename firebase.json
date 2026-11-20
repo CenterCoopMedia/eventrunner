@@ -58,7 +58,7 @@
       {
         "source": "**",
         "headers": [
-          { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'; frame-src 'self' https://*.firebaseapp.com/__/auth/iframe https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/ https://www.google.com/maps/embed" },
+          { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'; frame-src 'self' https://*.firebaseapp.com/__/auth/iframe https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/ https://www.google.com/maps/embed https://www.google.com/maps" },
           { "key": "X-Frame-Options", "value": "DENY" }
         ]
       },

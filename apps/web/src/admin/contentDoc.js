@@ -6,7 +6,8 @@
 // entry (blockTypes.js) declares. This module gives the editor a stable,
 // typed form shape and immediate field feedback. The server repeats the
 // required-field contract at the write boundary.
-import { blockTypeFor } from './blockTypes.js';
+import { blockTypeFor, blockTypeLabel } from './blockTypes.js';
+import { blockSearchText } from '../lib/blockSearchText.js';
 import { hasRichTextContent } from 'shared/richText';
 import { googleMapsEmbedUrl } from 'shared/urlSafety';
 
@@ -104,7 +105,9 @@ export function toContentFields(content) {
   }
   for (const field of valueFieldsOf(content.blockType)) {
     const raw = content.values?.[field.id];
-    if (field.type === 'boolean') {
+    if (field.id === 'embedUrl' && content.values?.useEventVenue) {
+      fields[field.id] = DELETE_FIELD_SENTINEL;
+    } else if (field.type === 'boolean') {
       fields[field.id] = Boolean(raw);
     } else if (field.type === 'number') {
       // A blank number is a deletion, not an omission. cmsUpdateContent
@@ -169,7 +172,7 @@ const EDITORIAL_FIELD_LABELS = Object.freeze({
     focalX: 'Horizontal focus',
     focalY: 'Vertical focus',
   },
-  map: { embedUrl: 'Google Maps embed', label: 'Map label', address: 'Address' },
+  map: { useEventVenue: 'Use the event’s venue', embedUrl: 'Google Maps embed', label: 'Map label', address: 'Address' },
   cta: { label: 'Button text', url: 'Destination', external: 'Open in a new tab' },
   stat: {
     value: 'Figure',
@@ -207,14 +210,21 @@ function titleValues(doc) {
   return doc.values && typeof doc.values === 'object' ? doc.values : doc;
 }
 
-/** Public text that can name a new block, or the block type when the text is empty. */
-export function contentIdSource(content) {
-  const values = titleValues(content);
+function contentTitleText(doc) {
+  const values = titleValues(doc);
   for (const key of TITLE_KEYS) {
-    const text = plainContentText(values[key]);
+    const raw = doc?.blockType === 'richtext' && key === 'value'
+      ? blockSearchText({ blockType: 'richtext', value: values[key] })
+      : values[key];
+    const text = plainContentText(raw);
     if (text) return text;
   }
-  return content?.blockType || 'block';
+  return '';
+}
+
+/** Public text that can name a new block, or the block type when the text is empty. */
+export function contentIdSource(content) {
+  return contentTitleText(content) || content?.blockType || 'block';
 }
 
 function humanizeId(id) {
@@ -225,11 +235,9 @@ function humanizeId(id) {
 
 /** What the organizer reads in a list or heading. Not the stored field id. */
 export function contentBlockTitle(doc) {
-  const values = titleValues(doc);
-  for (const key of TITLE_KEYS) {
-    const text = plainContentText(values[key]);
-    if (text) return text.length > 80 ? text.slice(0, 80) : text;
-  }
+  const text = contentTitleText(doc);
+  if (text) return text.slice(0, 80);
+  if (doc?.blockType === 'richtext') return blockTypeLabel(doc.blockType);
   if (doc?.field) return humanizeId(doc.field);
   return 'Content block';
 }
@@ -241,6 +249,7 @@ export function validateRequiredContent(content) {
   const errors = [];
   for (const field of valueFieldsOf(content.blockType)) {
     if (!field.required || field.type === 'boolean') continue;
+    if (field.id === 'embedUrl' && content.values?.useEventVenue) continue;
     const raw = content.values?.[field.id];
     const isEmpty = field.type === 'richtext'
       ? !hasRichTextContent(raw)

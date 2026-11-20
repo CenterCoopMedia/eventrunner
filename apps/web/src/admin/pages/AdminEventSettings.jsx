@@ -679,7 +679,7 @@ export default function AdminEventSettings() {
                   value={form.venue.country}
                   onChange={(value) => setGroup('venue', { country: value })}
                 />
-                <TextField help="Link to directions or a map for the main venue."
+                <TextField help="Link to directions or a map for the main venue. A Map block that uses the event venue uses this link."
                   label="Map URL"
                   value={form.venue.mapUrl}
                   onChange={(value) => setGroup('venue', { mapUrl: value })}

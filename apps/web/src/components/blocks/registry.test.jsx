@@ -7,6 +7,19 @@ import { render, screen } from '@testing-library/react';
 import * as blockTypesCjs from '../../../../../functions/src/cms/blockTypes.cjs';
 import BlockRenderer, { BLOCK_RENDERERS, rendererFor, UnknownBlock } from './registry.jsx';
 
+const venue = {
+  name: 'Test Hall & Annex',
+  addressLine1: '100 Main Street',
+  city: 'Somerville',
+  region: 'NJ',
+  postalCode: '08876',
+  country: 'US',
+  mapUrl: 'https://maps.app.goo.gl/test-hall',
+};
+vi.mock('../../contexts/EventConfigContext.jsx', () => ({
+  useEventConfig: () => ({ eventConfig: { venue } }),
+}));
+
 const { BLOCK_TYPES } = blockTypesCjs.default ?? blockTypesCjs;
 
 // One renderable sample block per backend block type.
@@ -83,6 +96,21 @@ describe('block renderer registry', () => {
     expect(container).toBeEmptyDOMElement();
     rerender(<BlockRenderer block={{ ...map, embedUrl: 'https://www.google.com/maps/embed?pb=[Replace]' }} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('embeds the venue name and address and links directly to the saved short URL', () => {
+    const label = 'Test event map';
+    render(<BlockRenderer block={{ blockType: 'map', useEventVenue: true, label }} />);
+    const frame = screen.getByTitle(label);
+    const src = new URL(frame.getAttribute('src'));
+    expect(src.origin).toBe('https://www.google.com');
+    expect(src.pathname).toBe('/maps');
+    expect([...src.searchParams]).toEqual([
+      ['q', 'Test Hall & Annex, 100 Main Street, Somerville, NJ 08876 US'],
+      ['output', 'embed'],
+    ]);
+    expect(screen.getByText('100 Main Street, Somerville, NJ 08876 US')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open in Google Maps' })).toHaveAttribute('href', venue.mapUrl);
   });
 
   it('renders a labeled box for unknown blocks in dev', () => {

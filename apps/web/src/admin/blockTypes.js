@@ -41,6 +41,7 @@ export const BLOCK_TYPES = Object.freeze({
     label: 'Map',
     description: 'An interactive Google map with an optional street address.',
     fields: [
+      { id: 'useEventVenue', type: 'boolean', required: false },
       { id: 'embedUrl', type: 'url', required: true },
       { id: 'label', type: 'string', required: true },
       { id: 'address', type: 'string', required: false },
