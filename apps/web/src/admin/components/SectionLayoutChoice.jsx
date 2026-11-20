@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { PullQuoteBudget } from '../../components/blocks/pullQuoteBudget.jsx';
 import SectionBlocks from '../../components/blocks/SectionBlocks.jsx';
 import SectionHead from '../../components/editorial/SectionHead.jsx';
+import LongReadOpening from '../../components/editorial/LongReadOpening.jsx';
 import { DEFAULT_SECTION_LAYOUT, SECTION_LAYOUTS } from '../../lib/pageLayout.js';
 import { ViewportProvider } from '../../lib/viewport.js';
 import { PREVIEW_DOCUMENT, syncProofStyles } from '../previewDocument.js';
@@ -120,6 +121,7 @@ function PreviewFrame({ width, label, scopeId, children }) {
  *   previewId: string,
  *   budget?: { sections: object[], getSectionBlocks: (id: string) => object[] },
  *   readingMeasure?: boolean,
+ *   longReadOpening?: boolean,
  * }} props
  *   `readingMeasure` is true where the public page holds a Reading width
  *   section to the text measure (a system page in the list arrangement,
@@ -127,8 +129,10 @@ function PreviewFrame({ width, label, scopeId, children }) {
  *   `budget` is the page's sections in reading order and their blocks, so
  *   a quote is drawn as the page's one pull quote only where the page draws
  *   it so.
+ *   `longReadOpening` is true for the section that opens a Long read page,
+ *   so the preview draws the style's drop cap or standfirst there too.
  */
-export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false }) {
+export default function SectionLayoutChoice({ value, onChange, label, blocks, blocksReady, previewId, budget = null, readingMeasure = false, longReadOpening = false }) {
   const name = useId();
   // A closed section keeps its fields mounted; its preview documents are
   // made only once the preview is first shown.
@@ -153,7 +157,9 @@ export default function SectionLayoutChoice({ value, onChange, label, blocks, bl
       <>
         <SectionHead level={2} id={`${previewId}-${frame}-head`} title={label || 'Untitled section'} />
         <div className={readingMeasure && current === DEFAULT_SECTION_LAYOUT ? 'measure mt-md' : 'mt-md'}>
-          <SectionBlocks blocks={blocks} layout={current} />
+          <LongReadOpening active={longReadOpening}>
+            <SectionBlocks blocks={blocks} layout={current} />
+          </LongReadOpening>
         </div>
       </>
     );

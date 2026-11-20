@@ -38,6 +38,8 @@ import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
+import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
+import { VENUE_MAP_SECTION_ID } from 'shared/venue';
 import { builtInSectionBlockTypes } from 'shared/page';
 import { isStarterContent } from 'shared/seed';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
@@ -198,15 +200,31 @@ function PageEditor({ mode }) {
   const reportDeleted = useDeletedRecord();
   const { rows, ready, error: listenerError, findRow } = useAdminPages({ includeNavigationLinks: mode === 'create' });
   const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
+  const { theme, eventConfig, features } = useEventConfig();
   // The count staff see is the content the section holds (both revisions of
   // one block are one block), not its seed list.
   // What the public page would draw for a section now: its current blocks
   // (the draft where there is one), in order, without hidden blocks or
   // starter text the public site leaves out.
-  const sectionPreviewBlocks = (section) => contentRows
-    .map((row) => row.current)
-    .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // A cta or link_group that leads to a section that is off, or to a page
+  // that is not public, is dropped first, as the public page does
+  // (lib/linkTargets.js), so the columns split the blocks the reader gets.
+  const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
+    contentRows
+      .map((row) => row.current)
+      .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    features,
+    ready ? rows.map((row) => row.current).filter(Boolean) : null,
+  );
+  // The section that takes the Long read opening on the public page
+  // (ContentPage): the first section with something in it, on a custom page
+  // that states the Long read template. The venue map section counts as
+  // something, as it does there.
+  const longReadSection = (current) => (current.systemPage || current.template !== 'long-read'
+    ? null
+    : (current.sections ?? []).find((section) => section.id === VENUE_MAP_SECTION_ID
+      || sectionPreviewBlocks(section).length > 0)?.id ?? null);
   const sectionBlockCount = (section) => {
     if (!contentReady) return contentError ? '' : 'Counting blocks…';
     const count = contentRows.filter((row) => row.current?.section === section.id).length;
@@ -215,7 +233,6 @@ function PageEditor({ mode }) {
   // What the site is set to, so the "follow the site" option can say what
   // following it means instead of sending the operator to another tab to
   // find out.
-  const { theme, eventConfig } = useEventConfig();
   const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
@@ -228,6 +245,7 @@ function PageEditor({ mode }) {
     sections: page.systemPage ? [...slots.above, ...slots.main, ...slots.below] : (page.sections ?? []),
     getSectionBlocks: (id) => sectionPreviewBlocks({ id }),
   };
+  const longReadSectionId = longReadSection(page);
   const [savedSnapshot, setSavedSnapshot] = useState(() => (
     mode === 'create' ? pageSnapshot(blankPage()) : null
   ));
@@ -919,6 +937,7 @@ function PageEditor({ mode }) {
                         previewId={`admin-section-preview-${sectionIndex}`}
                         budget={quoteBudget}
                         readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
+                        longReadOpening={section.id === longReadSectionId}
                       />
                     </div>
                   )}
