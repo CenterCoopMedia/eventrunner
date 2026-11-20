@@ -114,7 +114,7 @@ describe('DemoBannerContent', () => {
     await renderControls({ settingsOpen: false });
     const toggle = screen.getByRole('button', { name: 'Demo settings' });
     fireEvent.click(toggle);
-    expect(screen.getByRole('status', { name: 'Loading demo settings…' })).toBeVisible();
+    expect(screen.getByText('Loading demo settings…', { selector: '.loading-status__label' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Preview full screen' })).toBeVisible();
     fireEvent.keyDown(toggle, { key: 'Escape' });
     expect(toggle).toHaveFocus();

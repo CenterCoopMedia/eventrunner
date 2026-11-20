@@ -198,7 +198,7 @@ describe('admin route gating', () => {
     pendingProbe = {};
     try {
       view = render(<MemoryRouter initialEntries={['/admin']}><App /></MemoryRouter>);
-      const stage = (name) => screen.getByRole('status', { name }).closest('.loading-status');
+      const stage = (name) => screen.getByText(name, { selector: '.loading-status__label' }).closest('.loading-status');
       expect(stage('Loading admin…')).toHaveAttribute('data-loading-stage', 'initial');
       act(() => vi.advanceTimersByTime(800));
       await act(async () => finishEntry());
@@ -210,7 +210,7 @@ describe('admin route gating', () => {
       expect(stage('Loading overview…')).toHaveAttribute('data-loading-stage', 'slow');
       await act(async () => { overviewRenderPending = null; finishOverview(); });
       expect(screen.getByRole('heading', { name: 'Overview', exact: true })).toBeInTheDocument();
-      expect(screen.queryByRole('status', { name: 'Loading overview…' })).toBeNull();
+      expect(screen.queryByText('Loading overview…', { selector: '.loading-status__label' })).toBeNull();
     } finally {
       view?.unmount();
       adminRoute.Component = original;
@@ -344,7 +344,7 @@ describe('admin route gating', () => {
     await renderAt('/admin/pages');
 
     expect(screen.queryByRole('heading', { name: 'You don’t have admin access' })).toBeNull();
-    expect(screen.getByRole('status', { name: 'Checking your access…' })).toBeInTheDocument();
+    expect(screen.getByText('Checking your access…', { selector: '.loading-status__label' })).toBeInTheDocument();
 
     await act(async () => {
       pendingProbe.resolve({ docs: [] });
@@ -534,7 +534,7 @@ describe('admin route gating', () => {
     pendingOperatorProbe = true;
     adminProbeShouldSucceed = true;
     await renderAt('/admin/pages');
-    expect(screen.getByRole('status', { name: 'Checking your access…' })).toBeInTheDocument();
+    expect(screen.getByText('Checking your access…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
     expect(screen.queryByText('Staff')).toBeNull();
 

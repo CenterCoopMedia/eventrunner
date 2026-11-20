@@ -127,26 +127,29 @@ describe('SessionPitch before the call is known', () => {
     vi.useFakeTimers();
     try {
       renderPitch();
-      const status = screen.getByRole('status', { name: 'Checking submissions…' });
-      const result = screen.getByRole('status', { name: '' });
+      const status = screen.getByRole('status');
       const region = screen.getByRole('region', { name: 'Submission availability' });
       expect(status.closest('[aria-busy="true"]')).toBeNull();
-      expect(result.closest('[aria-busy="true"]')).toBeNull();
+      expect(status).toBeEmptyDOMElement();
+      expect(screen.getByText('Checking submissions…')).toBeVisible();
       expect(region).toHaveAttribute('aria-busy', 'true');
       expect(screen.queryByLabelText(/Session title/)).toBeNull();
       expect(screen.queryByRole('link', { name: /Open the pitch form/ })).toBeNull();
-      act(() => vi.advanceTimersByTime(10_000));
-      expect(status).toHaveTextContent('This is taking longer than usual.');
+      act(() => vi.advanceTimersByTime(1000));
+      expect(status.textContent).toBe('Checking submissions…');
+      act(() => vi.advanceTimersByTime(9000));
+      expect(status.textContent).toBe('This is taking longer than usual. We’re still waiting for a response.');
 
       act(() => listener.onError(new Error('offline')));
-      expect(status).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toBe(status);
       expect(region).toHaveAttribute('aria-busy', 'false');
-      expect(result).toHaveTextContent('Checking your connection…');
+      expect(status.textContent).toBe('Checking your connection…');
       act(() => vi.advanceTimersByTime(60_000));
       expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
 
       act(() => listener.onNext(NATIVE));
-      expect(result).toHaveTextContent('Submissions are open');
+      expect(screen.getByRole('status')).toBe(status);
+      expect(status.textContent).toBe('Submissions are open');
       expect(screen.getByLabelText(/Session title/)).toBeInTheDocument();
       expect(call).not.toHaveBeenCalled();
     } finally {
@@ -309,7 +312,7 @@ describe('the pitch stepper', () => {
     const draft = { title: 'Local news in the library', description: 'A full description.', leadName: 'Ada', submissionKey: 'stable-draft-key' };
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     const view = renderPitch('/pitch/review');
-    const status = screen.getByRole('status', { name: 'Checking your sign-in…' });
+    const status = screen.getByText('Checking your sign-in…', { selector: '.loading-status__label' });
     const region = screen.getByRole('region', { name: 'Pitch account' });
     expect(status.closest('[aria-busy="true"]')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'true');

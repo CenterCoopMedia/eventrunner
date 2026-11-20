@@ -175,7 +175,7 @@ describe('AdminChangeRequests: the list', () => {
 
   it('states loading, then an empty store, then an empty filter with one way out', () => {
     renderPage('/admin/change-requests?status=done');
-    expect(screen.getByRole('status', { name: 'Loading change requests…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading change requests…', { selector: '.loading-status__label' })).toBeInTheDocument();
 
     pushRows([]);
     expect(screen.getByRole('heading', { name: 'No change requests' })).toBeInTheDocument();

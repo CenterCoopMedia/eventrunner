@@ -11,7 +11,9 @@ afterEach(() => {
 describe('AdminLoadingState', () => {
   it('uses the shared delayed activity and stable explanation without a reload action', () => {
     const { container, unmount } = render(<AdminLoadingState label="Loading event figures…" />);
-    const status = screen.getByRole('status', { name: 'Loading event figures…' });
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    expect(screen.getByText('Loading event figures…')).toBeVisible();
     expect(container.querySelector('.loading-status__activity')).toBeNull();
     act(() => vi.advanceTimersByTime(1000));
     expect(container.querySelector('.loading-status__activity')).toHaveAttribute('aria-hidden', 'true');

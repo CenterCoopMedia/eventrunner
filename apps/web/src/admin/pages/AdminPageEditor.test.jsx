@@ -378,7 +378,7 @@ describe('page editor', () => {
     await renderAt('/admin/pages/scholarships', { waitForHeading: false });
     await waitFor(() => expect(adminSubscriptions.has('cmsPages_drafts')).toBe(true));
 
-    expect(screen.getByRole('status', { name: 'Loading page…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading page…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Navigation label')).toBeNull();
 
     act(() => adminSubscriptions.get('cmsPages_drafts')(draftDocs));
@@ -1174,7 +1174,7 @@ describe('publish results and recovery', () => {
     silentCollections = ['cmsPages_drafts'];
     await renderAt('/admin/pages');
 
-    expect(screen.getByRole('status', { name: 'Loading pages…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading pages…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByText('Draft')).toBeNull();
     expect(screen.queryByRole('button', { name: /Publish all/ })).toBeNull();
   });
@@ -1186,7 +1186,7 @@ describe('publish results and recovery', () => {
     await renderAt('/admin/pages');
 
     await waitFor(() => {
-      expect(screen.queryByRole('status', { name: 'Loading pages…' })).toBeNull();
+      expect(screen.queryByText('Loading pages…', { selector: '.loading-status__label' })).toBeNull();
       expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
     });
   });

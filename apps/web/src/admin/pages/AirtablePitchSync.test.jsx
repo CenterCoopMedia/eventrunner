@@ -73,7 +73,8 @@ describe('Airtable refresh status and action', () => {
     operator = true;
     holdStatus = true;
     open();
-    const loading = screen.getByRole('status', { name: 'Loading the refresh status…' });
+    const loading = screen.getByRole('status');
+    expect(screen.getByText('Loading the refresh status…')).toBeVisible();
     expect(loading.closest('.admin-loading-state')).toBeInTheDocument();
     expect(loading).toHaveAttribute('aria-live', 'polite');
     fireEvent.click(screen.getByText('Connection settings'));

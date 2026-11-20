@@ -16,6 +16,8 @@ export function LoadingStateView({
   onRetry,
   figure,
   still,
+  clock,
+  announce,
 }) {
   const layout = SHAPES.has(shape) ? shape : 'rows';
   const rowCount = Number.isFinite(rows) ? Math.max(0, Math.floor(rows)) : 3;
@@ -25,7 +27,7 @@ export function LoadingStateView({
       data-loading-stage={stage}
       data-loading-shape={layout}
     >
-      <LoadingStatus label={label} stage={stage} figure={figure} still={still} />
+      <LoadingStatus label={label} stage={stage} figure={figure} still={still} clock={clock} announce={announce} />
       {stage === 'prolonged' && typeof onRetry === 'function' ? (
         <div className="loading-state__actions mt-sm">
           <button type="button" className={secondaryActionClass} onClick={onRetry}>
@@ -55,10 +57,10 @@ export function LoadingStateView({
 
 /** Retry is available only when a caller supplies an explicit, safe request. */
 export default function LoadingState({ onRetry, routeAttempt, ...props }) {
-  const { stage, restart } = useLoadingStage({ routeAttempt });
+  const { stage, clock, restart } = useLoadingStage({ routeAttempt });
   const retry = typeof onRetry === 'function' ? () => {
     onRetry();
     restart();
   } : undefined;
-  return <LoadingStateView {...props} stage={stage} onRetry={retry} />;
+  return <LoadingStateView {...props} stage={stage} clock={clock} onRetry={retry} />;
 }

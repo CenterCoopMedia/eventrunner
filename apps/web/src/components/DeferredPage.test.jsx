@@ -6,17 +6,32 @@ import DeferredPage from './DeferredPage.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
 
 describe('DeferredPage', () => {
-  it('announces loading and then renders the route', async () => {
+  it('shows the operation and renders a fast route without changing the live region', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     let finish;
     const Route = lazy(
       () => new Promise((resolve) => { finish = () => resolve({ default: () => <h1>Schedule</h1> }); }),
     );
-    const { container } = render(<DeferredPage component={Route} label="schedule" shape="schedule" />);
-    expect(screen.getByRole('status')).toHaveAccessibleName('Loading schedule…');
-    expect(container.querySelector('.loading-state')).toHaveAttribute('data-loading-shape', 'schedule');
-    await act(async () => finish());
-    expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    const { container, unmount } = render(<DeferredPage component={Route} label="schedule" shape="schedule" />);
+    const status = screen.getByRole('status');
+    const mutations = new MutationObserver(() => {});
+    mutations.observe(status, { childList: true, characterData: true, subtree: true });
+    try {
+      expect(status).toBeEmptyDOMElement();
+      expect(screen.getByText('Loading schedule…').closest('[aria-hidden="true"]')).toBeInTheDocument();
+      expect(container.querySelector('.loading-state')).toHaveAttribute('data-loading-shape', 'schedule');
+      act(() => vi.advanceTimersByTime(300));
+      expect(status).toBeEmptyDOMElement();
+      expect(mutations.takeRecords()).toHaveLength(0);
+      await act(async () => finish());
+      expect(screen.getByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      mutations.disconnect();
+      unmount();
+      vi.useRealTimers();
+    }
   });
 
   it('routes a rejected import through the existing recovery boundary', async () => {
@@ -41,7 +56,8 @@ describe('DeferredPage', () => {
       expect(screen.getByRole('status').closest('.loading-status')).toHaveAttribute('data-loading-stage', 'active');
       view.rerender(<DeferredPage component={Fast} label="new page" routeKey="/new" />);
       act(() => vi.advanceTimersByTime(300));
-      expect(screen.getByRole('status')).toHaveAccessibleName('Loading new page…');
+      expect(screen.getByText('Loading new page…')).toBeVisible();
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
       expect(view.container.querySelector('.held-figure')).toBeNull();
       await act(async () => finish());
       expect(screen.getByRole('heading', { name: 'New page' })).toBeInTheDocument();

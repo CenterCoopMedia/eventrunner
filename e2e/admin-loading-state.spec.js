@@ -19,7 +19,7 @@ test('CMS loading activity is labelled, motion-aware, and removed when the reque
     await page.setViewportSize({ width: 390, height: 844 });
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/overview');
-    const loading = page.getByRole('status', { name: 'Loading the event figures…' });
+    const loading = page.locator('.admin-loading-state .loading-status__label').filter({ hasText: 'Loading the event figures…' });
     await expect(loading).toBeVisible();
     await expect(loading).toContainText('Loading the event figures…');
     const spinner = page.locator('.admin-loading-state .loading-status__activity');

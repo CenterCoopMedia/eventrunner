@@ -80,7 +80,8 @@ describe('MyChangeRequests', () => {
     listMock.mockResolvedValueOnce({ ok: true, requests: [OPEN, DONE] });
     renderPage();
     expect(screen.getByRole('heading', { level: 1, name: 'Your change requests' })).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Loading your change requests…');
+    expect(screen.getByText('Loading your change requests…')).toBeVisible();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     await flush();
 
     expect(listMock).toHaveBeenCalledWith({ user: USER });

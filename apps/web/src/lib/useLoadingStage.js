@@ -51,5 +51,5 @@ export default function useLoadingStage({ active = true, routeAttempt } = {}) {
     setWait(beginWait(active, shared && routeAttempt.clock));
   }
 
-  return { stage, restart };
+  return { stage, clock, restart };
 }

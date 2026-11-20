@@ -72,13 +72,19 @@ describe('PhotoCrop', () => {
     try {
       const { onApply, onCancel } = renderCrop();
       const frame = screen.getByRole('application', { name: 'Position the crop for your profile photo' });
-      const status = screen.getByRole('status', { name: 'Loading the image…' });
+      const status = screen.getByRole('status');
       expect(frame).toHaveStyle({ width: '224px', height: '224px' });
       expect(frame).toHaveAttribute('aria-busy', 'true');
       expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(status).toBeEmptyDOMElement();
+      expect(screen.getByText('Loading the image…')).toBeVisible();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
       expect(screen.getByRole('button', { name: 'Use this crop' })).toBeDisabled();
-      act(() => vi.advanceTimersByTime(60_000));
+      act(() => vi.advanceTimersByTime(1000));
+      expect(status.textContent).toBe('Loading the image…');
+      act(() => vi.advanceTimersByTime(9000));
+      expect(status.textContent).toBe('This is taking longer than usual. We’re still waiting for a response.');
+      act(() => vi.advanceTimersByTime(50_000));
       expect(status).toHaveTextContent('We haven’t received a result after a minute.');
       expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
       expect(URL.createObjectURL).toHaveBeenCalledOnce();

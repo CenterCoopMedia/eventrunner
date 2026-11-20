@@ -62,6 +62,31 @@ function eventAssetBase(mode) {
   return assetBase;
 }
 
+function nonBlockingEntry() {
+  return {
+    name: 'non-blocking-entry',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        // A held parser-inserted entry script keeps the document loading and
+        // Chrome can withhold its accessibility updates. Fetch the same entry
+        // from the head and import it without holding the document open.
+        return {
+          html: html.replace(/<script type="module" crossorigin src="([^"]+)"><\/script>/g,
+            '<link rel="modulepreload" crossorigin href="$1" data-app-entry>'),
+          tags: [{
+            tag: 'script',
+            attrs: { 'data-app-entry': true },
+            children: 'for (const entry of document.querySelectorAll("link[data-app-entry]")) import(entry.href);',
+            injectTo: 'body',
+          }],
+        };
+      },
+    },
+  };
+}
+
 export default defineConfig(({ isSsrBuild, mode }) => ({
   base: eventAssetBase(mode),
   plugins: [react(), {
@@ -70,7 +95,7 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       order: 'pre',
       handler: () => criticalFontTags(readFileSync(path.join(generatedDir, 'theme.css'), 'utf8')),
     },
-  }, snapshotHtml(), specimenBoundary()],
+  }, nonBlockingEntry(), snapshotHtml(), specimenBoundary()],
   // `shared` is a linked workspace package whose ESM entries re-export CJS
   // sources; linked deps skip prebundling by default, which would break the
   // dev server's CJS interop. Builds and vitest handle it either way.

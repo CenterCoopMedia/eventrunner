@@ -141,11 +141,15 @@ for (const colorScheme of ['light', 'dark']) {
       const url = `${origin}${BASE}?loading=1#schedule`;
       await page.goto(url, { waitUntil: 'commit' });
       const status = page.locator('#app-boot [role="status"]');
+      const copy = page.locator('#app-boot p');
       await expect(status).toHaveText('Opening this site…');
+      await expect(copy).toHaveText('Opening this site…');
+      // The entry is still held. A complete document can ship live updates.
+      expect(await page.evaluate(() => document.readyState)).toBe('complete');
       await expect(status).toHaveAttribute('aria-live', 'polite');
       await expect(status).toHaveAttribute('aria-atomic', 'true');
       await expect(page.locator('#app-boot svg, #app-boot img, #app-boot canvas')).toHaveCount(0);
-      const initialTop = await status.evaluate((element) => element.getBoundingClientRect().top);
+      const initialTop = await copy.evaluate((element) => element.getBoundingClientRect().top);
       const colors = await page.locator('#app-boot').evaluate((element) => {
         const style = globalThis.getComputedStyle(element);
         return { text: style.color, background: style.backgroundColor, animation: style.animationName, font: style.fontFamily };
@@ -161,7 +165,7 @@ for (const colorScheme of ['light', 'dark']) {
       await captureUnfinishedPage(page, `${colorScheme}-opening`);
       await expect(page.getByRole('button', { name: 'Reload this page' })).toBeVisible();
       await expect(status).toContainText('taking longer than usual');
-      expect(await status.evaluate((element) => element.getBoundingClientRect().top)).toBe(initialTop);
+      expect(await copy.evaluate((element) => element.getBoundingClientRect().top)).toBe(initialTop);
       await captureUnfinishedPage(page, `${colorScheme}-slow`);
       const delayed = await evidence(page, `${colorScheme}-delayed`, { colors });
       const line = delayed.changes.find(({ text }) => text);
@@ -184,7 +188,7 @@ for (const colorScheme of ['light', 'dark']) {
         expect(await page.evaluate(() => performance.getEntriesByType('navigation')[0].type)).toBe('reload');
       } else {
         release.entry();
-        await expect(page.getByRole('status', { name: 'Opening the page…' })).toBeVisible();
+        await expect(page.locator('.loading-status__label')).toHaveText('Opening the page…');
         await expect(page.locator('.loading-state')).toHaveAttribute('data-loading-stage', 'slow');
         const handoff = await evidence(page, 'handoff', { colors });
         const firstReact = handoff.changes.find(({ stage }) => stage);

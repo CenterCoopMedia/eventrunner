@@ -241,7 +241,7 @@ describe('admin Sessions workspace', () => {
     };
 
     act(() => adminSubscriptions.get('cmsSchedule')([live]));
-    expect(screen.getByRole('status', { name: 'Loading session…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading session…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Public title')).toBeNull();
 
     act(() => adminSubscriptions.get('cmsSchedule_drafts')([draft]));
@@ -681,10 +681,10 @@ describe('admin Sessions workspace', () => {
 
     it('says it is loading until the first counts arrive, and keeps the last counts when the listener fails', async () => {
       const panel = await openSessions();
-      expect(within(panel).getByRole('status', { name: 'Loading saves…' })).toBeInTheDocument();
+      expect(within(panel).getByText('Loading saves…', { selector: '.loading-status__label' })).toBeInTheDocument();
 
       act(() => bookmarkCounts.onNext(new Map([['audience', 2]])));
-      expect(within(panel).queryByRole('status', { name: 'Loading saves…' })).toBeNull();
+      expect(within(panel).queryByText('Loading saves…', { selector: '.loading-status__label' })).toBeNull();
       act(() => bookmarkCounts.onError(new Error('unavailable')));
       expect(within(panel).getByText(/We lost the connection to the saves/)).toBeInTheDocument();
       expect(within(panel).getByRole('link', { name: 'Audience research' })).toBeInTheDocument();
@@ -698,7 +698,7 @@ describe('admin Sessions workspace', () => {
       const panel = await openSessions();
       act(() => bookmarkCounts.onError(new Error('unavailable')));
       expect(within(panel).getByText('We could not load the saves. We keep trying.')).toBeInTheDocument();
-      expect(within(panel).queryByRole('status', { name: 'Loading saves…' })).toBeNull();
+      expect(within(panel).queryByText('Loading saves…', { selector: '.loading-status__label' })).toBeNull();
     });
 
     it('puts the panel between the title band and the day groups in the keyboard path', async () => {

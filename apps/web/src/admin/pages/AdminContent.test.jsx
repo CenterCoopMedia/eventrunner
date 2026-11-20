@@ -500,7 +500,7 @@ describe('content browsing', () => {
   it('does not call a draft-only page missing when its listener has not recovered', async () => {
     silentCollections = ['cmsPages_drafts'];
     await renderAt('/admin/content/scholarships');
-    expect(screen.getByRole('status', { name: 'Loading page…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading page…', { selector: '.loading-status__label' })).toBeInTheDocument();
     act(() => adminErrors.get('cmsPages_drafts')(new Error('draft listener failed')));
     expect(screen.getByRole('heading', { name: 'The page is not available yet' })).toBeInTheDocument();
     expect(screen.queryByText('No such page')).not.toBeInTheDocument();
@@ -570,7 +570,7 @@ describe('content browsing', () => {
 
     await renderAt('/admin/content/scholarships/intro/body');
 
-    expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading block…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Text' })).toBeNull();
 
     act(() => adminSubscriptions.get('cmsContent_drafts')(sources.cmsContent_drafts));
@@ -669,7 +669,7 @@ describe('creating and editing a block', () => {
     sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, status: undefined }];
     silentCollections = ['cmsContent_drafts'];
     await renderAt('/admin/content/scholarships/intro/_new');
-    expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading block…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save', exact: true })).toBeNull();
   });
 

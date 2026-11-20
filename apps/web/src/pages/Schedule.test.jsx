@@ -336,7 +336,7 @@ describe('SchedulePage', () => {
 
   it('shows the loading state while runtime content is loading', () => {
     renderSchedule({ loading: true });
-    expect(screen.getByRole('status', { name: 'Loading the schedule…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the schedule…', { selector: '.loading-status__label' })).toBeInTheDocument();
   });
 });
 

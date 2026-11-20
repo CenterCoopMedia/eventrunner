@@ -140,7 +140,7 @@ describe('the speaker dashboard shell', () => {
   it('waits for the account record before deciding that the reader is not a speaker', () => {
     profileValue = { profile: null, status: 'pending-account' };
     renderPage();
-    expect(screen.getByRole('status', { name: 'Loading your speaker dashboard…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading your speaker dashboard…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Attendee dashboard fixture' })).toBeNull();
     expect(getOwnSpeakerProfileMock).not.toHaveBeenCalled();
   });
@@ -152,7 +152,7 @@ describe('the speaker dashboard shell', () => {
 
     expect(screen.getByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument();
     expect(screen.getByText('Sign in panel fixture')).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: 'Loading your speaker dashboard…' })).toBeNull();
+    expect(screen.queryByText('Loading your speaker dashboard…', { selector: '.loading-status__label' })).toBeNull();
     expect(screen.getByRole('status', { name: 'Current route' })).toHaveTextContent(
       '/speaker/dashboard?returnNonce=fixture',
     );
@@ -195,7 +195,7 @@ describe('the speaker dashboard shell', () => {
     profileValue = { profile: { speakerId: 'sam-own' }, status: 'ready' };
     view.rerender(<PageFixture />);
 
-    expect(screen.getByRole('status', { name: 'Loading your speaker dashboard…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading your speaker dashboard…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(await screen.findByText(/Welcome back, Sam Rivers/)).toBeInTheDocument();
     resolveOld(SPEAKER);
     await waitFor(() => expect(screen.queryByText(/Welcome back, Rae Okonkwo/)).toBeNull());
@@ -216,7 +216,7 @@ describe('the speaker dashboard shell', () => {
     profileValue = { profile: { speakerId: 'b:c' }, status: 'ready' };
     view.rerender(<PageFixture />);
 
-    expect(screen.getByRole('status', { name: 'Loading your speaker dashboard…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading your speaker dashboard…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByText(/Welcome back, Rae Okonkwo/)).toBeNull();
     resolveNew({ ...SPEAKER, speakerId: 'b:c', firstName: 'Sam', lastName: 'Rivers' });
     expect(await screen.findByText(/Welcome back, Sam Rivers/)).toBeInTheDocument();

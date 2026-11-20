@@ -26,7 +26,7 @@ function accessFailure(error) {
 // keys its owner by account UID and canonical speaker ID before rendering it.
 export function useSpeakerDiscussion({ user, speakerId }) {
   const [state, setState] = useState(INITIAL);
-  const { stage: saveStage } = useLoadingStage({ active: state.phase === 'saving' });
+  const { stage: saveStage, clock: saveClock } = useLoadingStage({ active: state.phase === 'saving' });
   const latest = useRef(state);
   latest.current = state;
   const currentUser = useRef(user);
@@ -129,7 +129,7 @@ export function useSpeakerDiscussion({ user, speakerId }) {
   }
 
   return {
-    ...state, load, save, saveStage,
+    ...state, load, save, saveStage, saveClock,
     changeDraft: (draft) => setState((previous) => ({
       ...previous, draft, fieldError: '', phase: previous.phase === 'saved' ? 'ready' : previous.phase,
     })),
@@ -137,7 +137,7 @@ export function useSpeakerDiscussion({ user, speakerId }) {
 }
 
 export default function SpeakerDiscussionPoints({ discussion }) {
-  const { phase, draft, submission, revision, pending, error, fieldError, accessBlocked, load, save, saveStage, changeDraft } = discussion;
+  const { phase, draft, submission, revision, pending, error, fieldError, accessBlocked, load, save, saveStage, saveClock, changeDraft } = discussion;
   if (accessBlocked) {
     return (
       <div>
@@ -198,7 +198,7 @@ export default function SpeakerDiscussionPoints({ discussion }) {
   return (
     <>
       {phase === 'loading' ? <LoadingState label="Loading saved discussion points…" rows={0} /> : null}
-      {phase === 'saving' ? <LoadingStateView label="Saving discussion points…" rows={0} stage={saveStage} /> : null}
+      {phase === 'saving' ? <LoadingStateView label="Saving discussion points…" rows={0} stage={saveStage} clock={saveClock} /> : null}
       {form}
     </>
   );

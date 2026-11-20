@@ -16,10 +16,13 @@ function advance(milliseconds) {
 describe('LoadingState', () => {
   it('states the task immediately and delays decorative activity for one second', () => {
     const { container } = render(<LoadingState label="Loading the schedule…" />);
-    const status = screen.getByRole('status', { name: 'Loading the schedule…' });
-    expect(status).toHaveTextContent('Loading the schedule…');
+    const status = screen.getByRole('status');
+    const copy = screen.getByText('Loading the schedule…');
+    expect(copy.closest('[aria-hidden="true"]')).toBeInTheDocument();
+    expect(status).toBeEmptyDOMElement();
     expect(container.querySelector('.held-figure')).toBeNull();
     advance(999);
+    expect(status).toBeEmptyDOMElement();
     expect(container.querySelector('.held-figure')).toBeNull();
     advance(1);
     const activity = container.querySelector('.held-figure');
@@ -34,17 +37,22 @@ describe('LoadingState', () => {
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-live', 'polite');
     expect(status).toHaveAttribute('aria-atomic', 'true');
-    advance(9999);
-    expect(status).not.toHaveTextContent('longer than usual');
-    advance(1);
-    expect(screen.getByRole('status')).toBe(status);
-    expect(status).toHaveTextContent('This is taking longer than usual.');
-    expect(status).toHaveTextContent('still waiting for a response.');
-    advance(50000);
-    expect(screen.getByRole('status')).toBe(status);
-    expect(status).toHaveTextContent('We haven’t received a result after a minute.');
-    expect(status).toHaveTextContent('You can keep waiting.');
-    expect(status).not.toHaveTextContent('longer than usual');
+    const mutations = new MutationObserver(() => {});
+    mutations.observe(status, { childList: true, characterData: true, subtree: true });
+    expect(status).toBeEmptyDOMElement();
+    for (const [elapsed, message] of [
+      [1000, 'Loading the schedule…'],
+      [9000, 'This is taking longer than usual. We’re still waiting for a response.'],
+      [50000, 'We haven’t received a result after a minute. You can keep waiting.'],
+    ]) {
+      advance(elapsed - 1);
+      expect(mutations.takeRecords()).toHaveLength(0);
+      advance(1);
+      expect(screen.getByRole('status')).toBe(status);
+      expect(status.textContent).toBe(message);
+      expect(mutations.takeRecords()).toHaveLength(1);
+    }
+    mutations.disconnect();
     expect(container.querySelector('.loading-status')).toHaveAttribute('data-loading-stage', 'prolonged');
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     expect(status.textContent).not.toContain('%');
@@ -52,7 +60,7 @@ describe('LoadingState', () => {
 
   it('offers retry only when a caller explicitly supplies it, and starts a new wait', () => {
     const onRetry = vi.fn();
-    const { container } = render(<LoadingState onRetry={onRetry} />);
+    const { container } = render(<LoadingState label="Loading the schedule…" onRetry={onRetry} />);
     advance(59999);
     expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
     advance(1);
@@ -60,20 +68,21 @@ describe('LoadingState', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
     expect(container.querySelector('.held-figure')).toBeNull();
-    expect(screen.getByRole('status').textContent).toBe('Loading…');
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     advance(1000);
     expect(container.querySelector('.held-figure')).toBeInTheDocument();
+    expect(screen.getByRole('status').textContent).toBe('Loading the schedule…');
   });
 
   it('keeps waiting without suggesting an implicit reload when no retry is supplied', () => {
-    render(<LoadingState />);
+    render(<LoadingState label="Loading the schedule…" />);
     advance(60000);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('You can keep waiting.');
   });
 
   it('clears every scheduled update when content replaces the loader', () => {
-    const { rerender, container } = render(<LoadingState />);
+    const { rerender, container } = render(<LoadingState label="Loading the schedule…" />);
     expect(vi.getTimerCount()).toBe(3);
     advance(1000);
     expect(container.querySelector('.held-figure')).toBeInTheDocument();
@@ -84,7 +93,7 @@ describe('LoadingState', () => {
   });
 
   it.each(['rows', 'schedule', 'directory'])('keeps %s placeholders decorative and reserves the requested rows', (shape) => {
-    const { container } = render(<LoadingState shape={shape} rows={3} />);
+    const { container } = render(<LoadingState label="Loading the schedule…" shape={shape} rows={3} />);
     const reserved = container.querySelector('.loading-state__placeholder');
     expect(reserved).toHaveAttribute('data-loading-shape', shape);
     expect(reserved).toHaveAttribute('aria-hidden', 'true');
@@ -96,15 +105,17 @@ describe('LoadingState', () => {
   });
 
   it('can render only the task label without reserving content space', () => {
-    const { container } = render(<LoadingState rows={0} />);
+    const { container } = render(<LoadingState label="Loading the schedule…" rows={0} />);
     expect(container.querySelector('.loading-state__placeholder')).toBeNull();
-    expect(screen.getByRole('status')).toHaveAccessibleName('Loading…');
+    expect(screen.getByText('Loading the schedule…')).toBeVisible();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('previews the same layout and late explanation without starting request timers', () => {
-    const { container } = render(<LoadingStateView shape="directory" stage="prolonged" />);
+    const { container } = render(<LoadingStateView label="Loading the schedule…" shape="directory" stage="prolonged" still />);
     expect(container.querySelector('.loading-state')).toHaveAttribute('data-loading-shape', 'directory');
-    expect(screen.getByRole('status')).toHaveTextContent('after a minute');
+    expect(screen.getByText(/after a minute/)).toBeVisible();
+    expect(screen.queryByRole('status')).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 });

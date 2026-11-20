@@ -104,15 +104,18 @@ describe('attendee ticket selection', () => {
     try {
       mount();
       const region = screen.getByRole('region', { name: 'Ticket information' });
-      const status = screen.getByRole('status', { name: 'Loading ticket information…' });
+      const status = screen.getByRole('status');
       expect(status.closest('[aria-busy="true"]')).toBeNull();
       expect(region).toHaveAttribute('aria-busy', 'true');
+      expect(status).toBeEmptyDOMElement();
+      expect(screen.getByText('Loading ticket information…')).toBeVisible();
       act(() => vi.advanceTimersByTime(999));
       expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
       act(() => vi.advanceTimersByTime(1));
       expect(status.parentElement).toHaveAttribute('data-loading-stage', 'active');
+      expect(status.textContent).toBe('Loading ticket information…');
       act(() => vi.advanceTimersByTime(9000));
-      expect(status).toHaveTextContent('This is taking longer than usual.');
+      expect(status.textContent).toBe('This is taking longer than usual. We’re still waiting for a response.');
       act(() => vi.advanceTimersByTime(49_999));
       expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
       act(() => vi.advanceTimersByTime(1));
@@ -143,13 +146,14 @@ describe('attendee ticket selection', () => {
     const region = screen.getByRole('region', { name: 'Ticket information' });
     expect(await screen.findByRole('alert')).toHaveTextContent('Ticket information is unavailable.');
     expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(screen.queryByRole('status', { name: 'Loading ticket information…' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading ticket information…')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry ticket information' }));
-    const authWait = await screen.findByRole('status', { name: 'Checking your sign-in…' });
+    const authWait = await screen.findByText('Checking your sign-in…');
     expect(authWait.closest('[aria-busy="true"]')).toBeNull();
     state.auth = { user: buyer, loading: false };
     view.rerender(ticketRoute());
-    const questions = screen.getByRole('status', { name: 'Loading registration questions…' });
+    expect(screen.getByText('Loading registration questions…')).toBeVisible();
+    const questions = screen.getByRole('status');
     expect(questions.parentElement).toHaveAttribute('data-loading-stage', 'initial');
     expect(questions.closest('[aria-busy="true"]')).toBeNull();
     expect(authWait).not.toBeInTheDocument();
@@ -703,7 +707,7 @@ describe('registration questions in the ticket stepper', () => {
     mount();
     await fill();
     fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
-    const status = await screen.findByRole('status', { name: 'Loading the updated questions…' });
+    const status = await screen.findByText('Loading the updated questions…');
     const region = screen.getByRole('region', { name: 'Ticket information' });
     expect(status.closest('[aria-busy="true"]')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'true');

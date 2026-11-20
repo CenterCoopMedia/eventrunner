@@ -399,7 +399,7 @@ function ScheduleRoutes({ personalSchedule }) {
 }
 
 it.each([800, 10_000])('carries a %i ms code wait through account and bookmark loading', async (codeWait) => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame'] });
   const heldUp = vi.fn();
   window.addEventListener('eventrunner:held-up', heldUp);
   let finish;
@@ -409,17 +409,26 @@ it.each([800, 10_000])('carries a %i ms code wait through account and bookmark l
   useMyBookmarksMock.mockReturnValue({ bookmarkedIds: new Set(), loading: true });
   const view = render(myScheduleElement({ route, auth, initialEntries: ['/schedule'] }));
   const tick = (ms) => act(() => vi.advanceTimersByTime(ms));
-  const status = () => screen.getByRole('status', { name: 'Loading your schedule…' });
+  const status = () => view.container.querySelector('.loading-status [role="status"]');
   const stage = () => status().closest('.loading-status');
+  const late = 'This is taking longer than usual. We’re still waiting for a response.';
   try {
     expect(screen.getByRole('heading', { name: 'Program' })).toBeInTheDocument();
     await act(async () => fireEvent.click(screen.getByRole('link', { name: 'Open my schedule' })));
-    expect(status()).toHaveTextContent('Loading your schedule…');
+    expect(screen.getByText('Loading your schedule…')).toBeVisible();
+    expect(status()).toBeEmptyDOMElement();
     expect(status()).toHaveAttribute('aria-live', 'polite');
     expect(stage()).toHaveAttribute('data-loading-stage', 'initial');
     expect(view.container.querySelectorAll('.loading-state__row')).toHaveLength(3);
-    tick(codeWait);
-    if (codeWait === 10_000) expect(status()).toHaveTextContent('longer than usual');
+    if (codeWait === 10_000) {
+      tick(1000);
+      expect(status().textContent).toBe('Loading your schedule…');
+      tick(9000);
+      expect(status().textContent).toBe(late);
+    } else {
+      tick(codeWait);
+      expect(status()).toBeEmptyDOMElement();
+    }
     await act(async () => finish());
     expect(view.container.querySelectorAll('.loading-state__row')).toHaveLength(3);
 
@@ -429,23 +438,30 @@ it.each([800, 10_000])('carries a %i ms code wait through account and bookmark l
       expect(view.container.querySelector('.held-figure')).toBeNull();
       tick(1);
       expect(stage()).toHaveAttribute('data-loading-stage', 'active');
+      expect(status().textContent).toBe('Loading your schedule…');
       expect(view.container.querySelector('.held-figure')).toBeInTheDocument();
       tick(600);
       view.rerender(myScheduleElement({ route, auth: { user: { uid: 'u1' }, loading: false }, profile: { profileReady: false } }));
       expect(stage()).toHaveAttribute('data-loading-stage', 'active');
       tick(8_400);
+      expect(status().textContent).toBe(late);
+    } else {
+      tick(50);
+      expect(status()).toBeEmptyDOMElement();
     }
-    expect(status()).toHaveTextContent('longer than usual');
+    expect(stage().querySelector('.loading-status__detail').textContent).toBe(late);
     view.rerender(myScheduleElement({ route }));
     expect(screen.getByRole('heading', { name: 'My schedule' })).toBeInTheDocument();
-    expect(status()).toHaveTextContent('longer than usual');
+    tick(50);
+    expect(status()).toBeEmptyDOMElement();
+    expect(stage().querySelector('.loading-status__detail').textContent).toBe(late);
     expect(view.container.querySelectorAll('.loading-state__row')).toHaveLength(3);
     expect(heldUp).toHaveBeenCalledTimes(1);
 
     useMyBookmarksMock.mockReturnValue({ bookmarkedIds: new Set(), loading: false });
     view.rerender(myScheduleElement({ route }));
     expect(screen.getByRole('heading', { name: 'No bookmarked sessions yet' })).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: 'Loading your schedule…' })).toBeNull();
+    expect(status()).toBeNull();
     expect(view.container.querySelector('.held-figure')).toBeNull();
 
     useMyBookmarksMock.mockReturnValue({ bookmarkedIds: new Set(), loading: true });

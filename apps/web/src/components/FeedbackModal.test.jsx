@@ -175,7 +175,8 @@ describe('FeedbackModal', () => {
     expect(submit).toBeEnabled();
     expect(submit).toHaveFocus();
     expect(cancel).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('status')).toHaveTextContent('Sending your feedback.');
+    expect(screen.getByText(/Sending your feedback\./)).toBeVisible();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
 
     // Native close requests can become noncancelable after an earlier
     // Escape. Model the resulting close, rather than another canceled event.

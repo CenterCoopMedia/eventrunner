@@ -146,11 +146,11 @@ describe('the record list', () => {
     expect(subscribed.slice(-2)).toEqual(['cmsPages', 'cmsPages_drafts']);
     // The content listeners are closed, and nothing of theirs is drawn.
     expect(listeners.has('cmsContent')).toBe(false);
-    expect(screen.getByRole('status', { name: 'Loading the records…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the records…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Hello' })).toBeNull();
 
     report('cmsPages', [{ id: 'about', label: 'About', title: 'About the event', revision: 2, publishedAt: at('2026-09-20T10:00:00Z') }]);
-    expect(screen.getByRole('status', { name: 'Loading the records…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the records…', { selector: '.loading-status__label' })).toBeInTheDocument();
     report('cmsPages_drafts', []);
     expect(recordLinks()).toEqual(['About the event']);
     expect(within(table()).getByRole('link')).toHaveAttribute('href', '/admin/versions/cmsPages/about');
@@ -227,12 +227,12 @@ describe('the record list', () => {
 
   it('waits for both listeners before drawing anything', () => {
     renderPage();
-    expect(screen.getByRole('status', { name: 'Loading the records…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the records…', { selector: '.loading-status__label' })).toBeInTheDocument();
     report('cmsContent', CONTENT_LIVE);
-    expect(screen.getByRole('status', { name: 'Loading the records…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the records…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Records' })).toBeNull();
     report('cmsContent_drafts', CONTENT_DRAFTS);
-    expect(screen.queryByRole('status', { name: 'Loading the records…' })).toBeNull();
+    expect(screen.queryByText('Loading the records…', { selector: '.loading-status__label' })).toBeNull();
     expect(recordLinks()).toHaveLength(3);
   });
 
@@ -251,7 +251,7 @@ describe('the record list', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('The records did not load. The page tries again on its own.');
     expect(screen.queryByRole('region', { name: 'Records' })).toBeNull();
     expect(screen.queryByRole('heading', { name: /No content blocks/ })).toBeNull();
-    expect(screen.queryByRole('status', { name: 'Loading the records…' })).toBeNull();
+    expect(screen.queryByText('Loading the records…', { selector: '.loading-status__label' })).toBeNull();
   });
 });
 
@@ -314,7 +314,7 @@ describe('removed records', () => {
     expect(readVersions).not.toHaveBeenCalled();
     report('cmsPages_drafts', []);
     expect(recordLinks()).toEqual(['Current page']);
-    expect(screen.getByRole('status', { name: 'Loading removed records…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading removed records…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(readVersions).toHaveBeenCalledExactlyOnceWith('cmsPages', null);
     expect(subscribed).toEqual(['cmsPages', 'cmsPages_drafts']);
     await act(async () => answer({ entries: [

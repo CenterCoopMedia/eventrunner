@@ -536,7 +536,7 @@ describe('AdminEmailLog', () => {
     await renderPage();
     callMock.mockImplementation(() => new Promise(() => {}));
     fireEvent.click(within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' }));
-    const loading = screen.getByRole('status', { name: 'Loading the message…' });
+    const loading = screen.getByText('Loading the message…', { selector: '.loading-status__label' });
     expect(loading).toHaveTextContent('Loading the message…');
   });
 
