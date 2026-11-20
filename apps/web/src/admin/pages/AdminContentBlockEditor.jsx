@@ -335,6 +335,9 @@ export default function AdminContentBlockEditor({ mode }) {
   // the last successful save) — the reference point for clearing a PRIOR
   // type's stale fields when the operator switches types and saves again.
   const savedBlockTypeRef = useRef(null);
+  // The Short text form as it was when the operator switched away from it,
+  // so switching back restores the words and translations (issue #1184).
+  const shortTextRef = useRef(null);
 
   useEffect(() => {
     if (mode !== 'edit') return;
@@ -357,6 +360,7 @@ export default function AdminContentBlockEditor({ mode }) {
     setContent(editable);
     setSavedEdit(contentEditSnapshot(nextField, editable));
     savedBlockTypeRef.current = doc?.blockType ?? null;
+    shortTextRef.current = null;
   }, [mode, sectionId, fieldParam, existingRow, contentReady]);
 
   useEffect(() => {
@@ -483,7 +487,10 @@ export default function AdminContentBlockEditor({ mode }) {
   const currentFieldId = isExisting ? fieldParam ?? fieldId : fieldId;
 
   function changeBlockType(nextType) {
+    if (content.blockType === 'text' && nextType !== 'text') shortTextRef.current = content;
+    const restored = nextType === 'text' ? shortTextRef.current : null;
     setContent((current) => {
+      if (restored) return { ...restored, order: current.order, visible: current.visible };
       // Short text to Text (issue #1184) keeps the words, and the Spanish
       // ones, as one paragraph, the way the public page drew them.
       if (current.blockType === 'text' && nextType === 'richtext') {

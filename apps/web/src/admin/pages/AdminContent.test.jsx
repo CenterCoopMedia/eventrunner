@@ -945,6 +945,26 @@ describe('creating and editing a block', () => {
     });
   });
 
+  it('restores the Short text words when a switch to Text is undone', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [{
+      id: 'intro__note', section: 'intro', field: 'note', blockType: 'text',
+      value: 'Fees and deadlines', order: 3, visible: true, status: 'clean', revision: 1,
+    }];
+    fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__note', status: 'dirty' }));
+
+    await renderAt('/admin/content/scholarships/intro/note');
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
+    const picker = screen.getByRole('group', { name: 'Block type' });
+    fireEvent.click(within(picker).getByRole('radio', { name: 'Text' }));
+    fireEvent.click(within(picker).getByRole('radio', { name: 'Short text' }));
+    expect(screen.getByRole('textbox', { name: 'Text' })).toHaveValue('Fees and deadlines');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields).toMatchObject({ blockType: 'text', value: 'Fees and deadlines' });
+  });
+
   it('clears the old block type’s stale fields when switching types', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [CTA_BLOCK_DRAFT];
