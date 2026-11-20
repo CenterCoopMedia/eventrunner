@@ -39,7 +39,9 @@ import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
 import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
-import { VENUE_MAP_SECTION_ID } from 'shared/venue';
+import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
+import { useVenueMapImage } from '../../components/VenueMap.jsx';
+import { openStreetMapCoordinates } from '../../components/AreaMap.jsx';
 import { builtInSectionBlockTypes } from 'shared/page';
 import { isStarterContent } from 'shared/seed';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
@@ -186,6 +188,9 @@ function slotValue(slot) {
   return slot === 'above' ? 'above' : 'main';
 }
 
+// The section the area map draws in on the travel page (ContentPage).
+const AREA_MAP_SECTION_ID = 'travel_local';
+
 export default function AdminPageEditor({ mode }) {
   const { user } = useAuth();
   const { pageId } = useParams();
@@ -209,22 +214,28 @@ function PageEditor({ mode }) {
   // A cta or link_group that leads to a section that is off, or to a page
   // that is not public, is dropped first, as the public page does
   // (lib/linkTargets.js), so the columns split the blocks the reader gets.
+  // Targets are the published pages: publishing this page does not publish
+  // the page a link leads to.
   const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
     contentRows
       .map((row) => row.current)
       .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     features,
-    ready ? rows.map((row) => row.current).filter(Boolean) : null,
+    ready ? rows.map((row) => row.live).filter(Boolean) : null,
   );
   // The section that takes the Long read opening on the public page
   // (ContentPage): the first section with something in it, on a custom page
-  // that states the Long read template. The venue map section counts as
-  // something, as it does there.
+  // that states the Long read template. A map section counts only when its
+  // map draws, as it does there.
+  const venueMapShown = Boolean(useVenueMapImage(resolveVenueMap(eventConfig)));
+  const areaMapShown = Boolean(openStreetMapCoordinates(eventConfig?.venue?.mapUrl));
+  const sectionHasContent = (current, section) => sectionPreviewBlocks(section).length > 0
+    || (section.id === VENUE_MAP_SECTION_ID && venueMapShown)
+    || (section.id === AREA_MAP_SECTION_ID && current.id === VENUE_MAP_PAGE_ID && areaMapShown);
   const longReadSection = (current) => (current.systemPage || current.template !== 'long-read'
     ? null
-    : (current.sections ?? []).find((section) => section.id === VENUE_MAP_SECTION_ID
-      || sectionPreviewBlocks(section).length > 0)?.id ?? null);
+    : (current.sections ?? []).find((section) => sectionHasContent(current, section))?.id ?? null);
   const sectionBlockCount = (section) => {
     if (!contentReady) return contentError ? '' : 'Counting blocks…';
     const count = contentRows.filter((row) => row.current?.section === section.id).length;
