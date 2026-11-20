@@ -112,7 +112,7 @@ async function renderPage(path = '/admin/email-log', options) {
       </Routes>
     </MemoryRouter>,
   );
-  await waitFor(() => expect(screen.queryByLabelText('Loading the email log…')).toBeNull());
+  await waitFor(() => expect(screen.queryByText('Loading the email log…', { selector: '.loading-status__label' })).toBeNull());
   return result;
 }
 

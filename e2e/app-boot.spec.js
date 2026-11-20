@@ -145,7 +145,7 @@ for (const colorScheme of ['light', 'dark']) {
       await expect(status).toHaveText('Opening this site…');
       await expect(copy).toHaveText('Opening this site…');
       // The entry is still held. A complete document can ship live updates.
-      expect(await page.evaluate(() => document.readyState)).toBe('complete');
+      expect(await page.evaluate(() => globalThis.document.readyState)).toBe('complete');
       await expect(status).toHaveAttribute('aria-live', 'polite');
       await expect(status).toHaveAttribute('aria-atomic', 'true');
       await expect(page.locator('#app-boot svg, #app-boot img, #app-boot canvas')).toHaveCount(0);

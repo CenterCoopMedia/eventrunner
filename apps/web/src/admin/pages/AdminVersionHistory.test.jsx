@@ -134,7 +134,7 @@ async function renderPage(path = `/admin/versions/${DOC_PATH}`, options) {
       </Routes>
     </MemoryRouter>,
   );
-  await waitFor(() => expect(screen.queryByLabelText('Loading the version history…')).toBeNull());
+  await waitFor(() => expect(screen.queryByText('Loading the version history…', { selector: '.loading-status__label' })).toBeNull());
   return result;
 }
 

@@ -82,8 +82,8 @@ async function renderAt(path) {
     </MemoryRouter>,
   );
   await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   }, { timeout: 10_000 });
 }
 

@@ -160,7 +160,7 @@ async function renderAt(path) {
     await Promise.resolve();
   });
   await waitFor(
-    () => expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument(),
+    () => expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument(),
     { timeout: 10_000 },
   );
   return result;

@@ -128,10 +128,10 @@ async function renderAt(path) {
   // budget itself rather than lean on the file-level config.
   await waitFor(
     () => {
-      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Loading event settings…')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Loading badges…')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading event settings…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading badges…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme
     // editor's frame renders real pages), so the first mount in a file can

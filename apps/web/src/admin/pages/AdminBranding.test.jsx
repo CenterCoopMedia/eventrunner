@@ -162,8 +162,8 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   // budget itself rather than lean on the file-level config.
   await waitFor(
     () => {
-      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
     },
     // The frame renders the whole public app, so the first mount in this
     // file is slower than the default budget allows for.

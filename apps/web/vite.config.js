@@ -78,7 +78,9 @@ function nonBlockingEntry() {
           tags: [{
             tag: 'script',
             attrs: { 'data-app-entry': true },
-            children: 'for (const entry of document.querySelectorAll("link[data-app-entry]")) import(entry.href);',
+            children: `for (const entry of document.querySelectorAll("link[data-app-entry]")) {
+  import(entry.href).catch((error) => console.error(error));
+}`,
             injectTo: 'body',
           }],
         };

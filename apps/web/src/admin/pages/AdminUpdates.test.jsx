@@ -73,8 +73,8 @@ async function renderAt(path) {
     </MemoryRouter>,
   );
   await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
     // The page chunk owns these listeners; shell readiness does not prove it loaded.
     expect(adminSubscriptions.get('cmsUpdates')).toEqual(expect.any(Function));
     expect(adminSubscriptions.get('cmsUpdates_drafts')).toEqual(expect.any(Function));
