@@ -152,7 +152,8 @@ describe('speaker-wide private discussion draft', () => {
       expect(fetch).toHaveBeenCalledTimes(2);
       const request = JSON.parse(fetch.mock.calls[1][1].body);
       const form = screen.getByRole('form', { name: 'Speaker discussion points' });
-      const status = screen.getByRole('status', { name: 'Saving discussion points…' });
+      const status = document.querySelector('.loading-status [role="status"]');
+      expect(screen.getByText('Saving discussion points…')).toBeVisible();
       expect(form).toHaveAttribute('aria-busy', 'true');
       expect(status.closest('[aria-busy="true"]')).toBeNull();
       expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
@@ -166,7 +167,7 @@ describe('speaker-wide private discussion draft', () => {
       fireEvent.click(screen.getByRole('tab', { name: 'Details' }));
       act(() => vi.advanceTimersByTime(8999));
       openDiscussion();
-      const resumed = screen.getByRole('status', { name: 'Saving discussion points…' });
+      const resumed = document.querySelector('.loading-status [role="status"]');
       expect(resumed.parentElement).toHaveAttribute('data-loading-stage', 'active');
       act(() => vi.advanceTimersByTime(1));
       expect(resumed).toHaveTextContent('This is taking longer than usual.');
@@ -204,7 +205,8 @@ describe('speaker-wide private discussion draft', () => {
     vi.useFakeTimers();
     try {
       fireEvent.click(screen.getByRole('button', { name: 'Load current submission' }));
-      const status = screen.getByRole('status', { name: 'Loading saved discussion points…' });
+      const status = document.querySelector('.loading-status [role="status"]');
+      expect(screen.getByText('Loading saved discussion points…')).toBeVisible();
       expect(status.closest('[aria-busy="true"]')).toBeNull();
       expect(form).toHaveAttribute('aria-busy', 'true');
       expect(screen.getByRole('textbox', { name: 'Discussion points' })).toBe(field);

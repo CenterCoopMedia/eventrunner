@@ -167,7 +167,7 @@ for (const width of [1440, 390, 320]) {
       await expect(message).toHaveAttribute('readonly', '');
       await expect(email).toHaveAttribute('readonly', '');
       await expect(category).toBeDisabled();
-      await expect(dialog.getByRole('status')).toContainText('Sending your feedback');
+      await expect(dialog.locator('.loading-status__label')).toContainText('Sending your feedback');
       await page.keyboard.press('Tab');
       await expect(message).toBeFocused();
       await page.keyboard.press('Shift+Tab');
@@ -245,13 +245,14 @@ for (const width of [1440, 390, 320]) {
     // The figure's visible moving layer: the drawing's part, or the ampersand.
     const indicator = preview.locator('.held-figure__part:visible, .held-figure__glyph:visible');
     await expect(stage).toHaveValue('initial');
-    await expect(preview.getByRole('status')).toHaveText('Loading the schedule…');
+    const copy = preview.locator('.loading-status__copy');
+    await expect(copy).toHaveText('Loading the schedule…');
     await expect(indicator).toHaveCount(0);
     await stage.selectOption('active');
     await expect(indicator).toBeVisible();
     await expect(indicator).toHaveCSS('animation-name', 'held-figure-gesture');
     await stage.selectOption('slow');
-    await expect(preview.getByRole('status')).toContainText('longer than usual');
+    await expect(copy).toContainText('longer than usual');
     await expect(preview.getByRole('progressbar')).toHaveCount(0);
 
     for (const shape of ['rows', 'schedule', 'directory']) {
@@ -272,9 +273,9 @@ for (const width of [1440, 390, 320]) {
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(indicator).toHaveCSS('animation-name', 'none');
-    await expect(preview.getByRole('status')).toContainText('longer than usual');
+    await expect(copy).toContainText('longer than usual');
     await stage.selectOption('prolonged');
-    await expect(preview.getByRole('status')).toContainText('after a minute');
+    await expect(copy).toContainText('after a minute');
     await expect(preview.getByRole('button')).toHaveCount(0);
     await expect(indicator).toHaveCSS('animation-name', 'none');
     await capture(page, `loading-continued-wait-${width}`);
@@ -291,7 +292,7 @@ test('a pending Schedule request keeps its motion across the one-minute boundary
     await pending.promise;
     await route.continue();
   });
-  const loading = page.getByRole('status', { name: 'Loading schedule…', exact: true });
+  const loading = page.locator('.loading-status__copy').filter({ hasText: 'Loading schedule…' });
   const indicator = page.locator('.held-figure__part:visible, .held-figure__glyph:visible');
 
   try {

@@ -113,9 +113,9 @@ async function renderAt(path) {
   );
   await waitFor(
     () => {
-      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Loading overview…')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading overview…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
     },
     { timeout: 10_000 },
   );
@@ -233,14 +233,14 @@ describe('the admin overview', () => {
     fetch.mockReturnValueOnce(held.promise);
     await renderAt('/admin/overview');
 
-    expect(await screen.findByRole('status', { name: 'Loading the event figures…' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading the event figures…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Event figures' })).toBeNull();
 
     await act(async () => {
       held.release(okResponse(STATS));
     });
     expect(await screen.findByRole('heading', { name: 'Event figures' })).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: 'Loading the event figures…' })).toBeNull();
+    expect(screen.queryByText('Loading the event figures…', { selector: '.loading-status__label' })).toBeNull();
   });
 
   it('shows the server’s words and no figures when the first read fails', async () => {

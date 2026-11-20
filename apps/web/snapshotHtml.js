@@ -58,15 +58,14 @@ export function snapshotHtml() {
 
 export function injectSnapshotHtml(html, { routes, attributes, display }) {
   const dom = new JSDOM(html);
-  const modules = [...dom.window.document.querySelectorAll('script[type="module"], link[rel="modulepreload"]')].map((tag) => {
+  const modules = [...dom.window.document.querySelectorAll('script[data-app-entry], link[rel="modulepreload"]')].map((tag) => {
     const markup = tag.outerHTML;
     tag.remove();
     return markup;
   });
   const page = dom.serialize();
   dom.window.close();
-  // Keep Vite's exact resource tags in the document (and bundle budget),
-  // but let the static content paint before starting their requests.
+  // Let the static content paint before starting the module requests.
   const entry = `<template id="app-modules">${modules.join('\n')}</template>`;
   const templates = routes.map(({ route, viewport, html: markup }) =>
     `<template data-snapshot-route="${route}" data-snapshot-viewport="${viewport}">${markup}</template>`).join('\n');
@@ -85,17 +84,7 @@ export function injectSnapshotHtml(html, { routes, attributes, display }) {
       const matchesSnapshot = ${displayMatches} && ${snapshotRoutes}.includes(location.hash.slice(1) || '/');
       if (!matchesSnapshot) {
         const entry = document.getElementById('app-modules');
-        for (const source of [...entry.content.children]) {
-          if (source.localName === 'link') document.head.appendChild(source);
-          else if (source.hasAttribute('src')) {
-            const hint = document.createElement('link');
-            hint.rel = 'modulepreload';
-            for (const { name, value } of source.attributes) {
-              if (name !== 'type') hint.setAttribute(name === 'src' ? 'href' : name, value);
-            }
-            document.head.appendChild(hint);
-          }
-        }
+        for (const link of entry.content.querySelectorAll('link')) document.head.appendChild(link);
       }
       ${preload ? `if (${displayMatches} && ['/', '/schedule'].includes((location.hash.slice(1) || '/').split('?')[0])) {
         document.head.insertAdjacentHTML('beforeend', ${JSON.stringify(preload).replace(/</g, '\\u003c')});

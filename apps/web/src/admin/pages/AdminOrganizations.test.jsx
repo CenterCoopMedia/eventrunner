@@ -86,8 +86,8 @@ async function renderAt(path) {
     </MemoryRouter>,
   );
   await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   }, { timeout: 10_000 });
 }
 
@@ -141,10 +141,10 @@ describe('the organizations list', () => {
     await renderAt('/admin/organizations');
     // The first test in the file pays for the list chunk's first transform,
     // which can pass the default second when other files run beside it.
-    expect(await screen.findByRole('status', { name: 'Loading organizations…' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('Loading organizations…', { selector: '.loading-status__label' }, { timeout: 5000 })).toBeInTheDocument();
     await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
     pushOrganizations(LIVE, DRAFTS);
-    expect(screen.queryByRole('status', { name: 'Loading organizations…' })).toBeNull();
+    expect(screen.queryByText('Loading organizations…', { selector: '.loading-status__label' })).toBeNull();
   });
 
   it('offers the first organization when there is none', async () => {

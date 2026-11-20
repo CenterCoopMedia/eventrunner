@@ -83,7 +83,9 @@ describe('emailed-code sign-in', () => {
     });
     renderSignIn();
     const region = await screen.findByRole('region', { name: 'Sign-in options' });
-    const status = screen.getByRole('status', { name: 'Checking your sign-in…' });
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    expect(screen.getByText('Checking your sign-in…')).toBeVisible();
     expect(status.closest('[aria-busy="true"]')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'true');
     await waitFor(() => expect(finishAuth).toBeTypeOf('function'));

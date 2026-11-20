@@ -169,7 +169,7 @@ describe('the attendee dashboard shell', () => {
       auth: { user: null, isAdmin: false, loading: true },
       profile: { profile: null, status: 'signed-out', needsProfileSetup: false },
     });
-    expect(screen.getByRole('status', { name: 'Loading your dashboard…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading your dashboard…', { selector: '.loading-status__label' })).toBeInTheDocument();
   });
 });
 

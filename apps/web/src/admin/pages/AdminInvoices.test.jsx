@@ -76,7 +76,7 @@ async function renderAt(path) {
     </MemoryRouter>,
   );
   await waitFor(() => {
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   }, { timeout: 10_000 });
 }
 

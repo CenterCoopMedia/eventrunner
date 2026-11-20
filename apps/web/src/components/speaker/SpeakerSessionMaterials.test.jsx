@@ -55,7 +55,8 @@ describe('SpeakerSessionMaterials', () => {
       authUser = { ...authUser };
       view.rerender(<SpeakerSessionMaterials sessionId="session-one" speakerId="speaker-one" />);
       const region = screen.getByRole('region', { name: 'Session materials' });
-      const status = screen.getByRole('status', { name: 'Loading materials…' });
+      const status = screen.getByRole('status');
+      expect(screen.getByText('Loading materials…')).toBeVisible();
       expect(region).toHaveAttribute('aria-busy', 'true');
       expect(status.closest('[aria-busy="true"]')).toBeNull();
       expect(fileInput).not.toBeVisible();
@@ -65,11 +66,11 @@ describe('SpeakerSessionMaterials', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Try loading again' }));
       expect(listMaterials).toHaveBeenCalledTimes(3);
       expect(listMaterials).toHaveBeenLastCalledWith({ user: authUser, sessionId: 'session-one' });
-      expect(screen.getByRole('status', { name: 'Loading materials…' }).parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      expect(screen.getByRole('status').parentElement).toHaveAttribute('data-loading-stage', 'initial');
       await act(async () => retry.resolve([]));
       await act(async () => slow.resolve([{ id: 'old', type: 'file', filename: 'Outdated handout' }]));
       expect(screen.queryByText('Outdated handout')).not.toBeInTheDocument();
-      expect(screen.queryByRole('status', { name: 'Loading materials…' })).not.toBeInTheDocument();
+      expect(status).not.toBeInTheDocument();
       expect(region).toHaveAttribute('aria-busy', 'false');
       expect(screen.getByRole('textbox', { name: 'Link URL' })).toHaveValue('https://example.org/draft');
       expect(screen.getByLabelText('File')).toBe(fileInput);

@@ -49,21 +49,24 @@ function tree({ Page, path, sharedWait }) {
 describe.each(CASES)('$name loading feedback', (page) => {
   it('names the wait, escalates outside the busy content and removes the indicator when the read resolves', async () => {
     render(tree(page));
-    const status = screen.getByRole('status', { name: page.label });
+    const status = screen.getByRole('status');
     const region = screen.getByRole('region', { name: page.region });
     expect(status.closest('[aria-busy="true"]')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'true');
     expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'initial');
+    expect(status).toBeEmptyDOMElement();
+    expect(screen.getByText(page.label)).toBeVisible();
     act(() => vi.advanceTimersByTime(1000));
     expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'active');
+    expect(status.textContent).toBe(page.label);
     act(() => vi.advanceTimersByTime(9000));
-    expect(status).toHaveTextContent('This is taking longer than usual.');
+    expect(status.textContent).toBe('This is taking longer than usual. We’re still waiting for a response.');
     act(() => vi.advanceTimersByTime(50000));
-    expect(status).toHaveTextContent('We haven’t received a result after a minute.');
+    expect(status.textContent).toBe('We haven’t received a result after a minute. You can keep waiting.');
     expect(state.tickets.mock.calls.length + state.changes.mock.calls.length).toBe(1);
 
     await act(async () => finish(page.result));
-    expect(screen.queryByRole('status', { name: page.label })).toBeNull();
+    expect(status).not.toBeInTheDocument();
     expect(region).toHaveAttribute('aria-busy', 'false');
     expect(screen.getByText(page.ready, { exact: true })).toBeInTheDocument();
   });
@@ -71,27 +74,32 @@ describe.each(CASES)('$name loading feedback', (page) => {
   it('names the data wait after sign-in and keeps the original deadline on shared routes', async () => {
     state.user = null; state.loading = true;
     const view = render(tree(page));
-    const auth = screen.getByRole('status', { name: 'Checking your sign-in…' });
-    act(() => vi.advanceTimersByTime(30_000));
+    const auth = screen.getByRole('status');
+    expect(auth).toBeEmptyDOMElement();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(auth.textContent).toBe('Checking your sign-in…');
+    act(() => vi.advanceTimersByTime(29_000));
     expect(auth).toHaveTextContent('This is taking longer than usual.');
     expect(state.tickets).not.toHaveBeenCalled();
     expect(state.changes).not.toHaveBeenCalled();
 
     state.user = READER; state.loading = false;
     view.rerender(tree(page));
-    expect(screen.queryByRole('status', { name: 'Checking your sign-in…' })).toBeNull();
-    const data = screen.getByRole('status', { name: page.label });
+    expect(screen.queryByText('Checking your sign-in…')).toBeNull();
+    expect(screen.getByText(page.label)).toBeVisible();
+    const data = screen.getByRole('status');
     expect(data.closest('.loading-state')).toHaveAttribute('data-loading-stage', page.sharedWait ? 'slow' : 'initial');
     expect(data.closest('[aria-busy="true"]')).toBeNull();
     if (page.sharedWait) {
-      expect(data).toHaveTextContent('This is taking longer than usual.');
+      expect(data).toBeEmptyDOMElement();
+      expect(data.closest('.loading-state').querySelector('.loading-status__detail')).toHaveTextContent('This is taking longer than usual.');
       act(() => vi.advanceTimersByTime(29_999));
       expect(data).not.toHaveTextContent('We haven’t received a result after a minute.');
       act(() => vi.advanceTimersByTime(1));
       expect(data).toHaveTextContent('We haven’t received a result after a minute.');
     }
     await act(async () => finish(page.result));
-    expect(screen.queryByRole('status', { name: page.label })).toBeNull();
+    expect(data).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: page.region })).toHaveAttribute('aria-busy', 'false');
   });
 });

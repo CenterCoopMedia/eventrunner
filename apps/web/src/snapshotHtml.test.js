@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { injectSnapshotHtml } from '../snapshotHtml.js';
 
 function documentFor(route, { search = '', width = 390, paints = [], visibility = 'visible', paintSupported = true } = {}) {
-  const html = injectSnapshotHtml('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/app.css"><link rel="modulepreload" href="/assets/shared.js" crossorigin></head><body><div id="root">Opening</div><script type="module" src="/assets/index-test.js" crossorigin></script></body></html>', {
+  const html = injectSnapshotHtml(`<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/app.css"><link rel="modulepreload" href="/assets/shared.js" crossorigin>
+    <link rel="modulepreload" href="/assets/index-test.js" crossorigin data-app-entry></head>
+    <body><div id="root">Opening</div><script data-app-entry>import('/assets/index-test.js');</script></body></html>`, {
     routes: ['/', '/schedule', '/speakers'].flatMap((path) => ['compact', 'standard', 'wide'].map((viewport) => ({
       route: path,
       viewport,
@@ -54,7 +57,7 @@ describe('parser snapshot selection', () => {
     for (const route of ['/signin', '/profile', '/schedule?q=local']) {
       const document = documentFor(route);
       expect(document.querySelector('#root').textContent).toBe('Opening');
-      expect(document.querySelector('script[src]').getAttribute('src')).toBe('/assets/index-test.js');
+      expect(document.querySelector('script[data-app-entry]').textContent).toContain('/assets/index-test.js');
       expect(document.head.querySelector('link[href="/assets/index-test.js"]').getAttribute('rel')).toBe('modulepreload');
     }
     expect(documentFor('/speakers', { search: '?style=zine' }).querySelector('#root').textContent).toBe('Opening');
@@ -71,23 +74,23 @@ describe('parser snapshot selection', () => {
       const document = documentFor('/schedule', { width, paints });
       expect(document.querySelector('#root main').dataset.layout).toBe(layout);
       expect(document.querySelector('#root').dataset.snapshotViewport).toBe(layout);
-      expect(document.querySelector('script[src]')).toBeNull();
+      expect(document.querySelector('script[data-app-entry]')).toBeNull();
       expect(document.querySelector('link[rel="modulepreload"]')).toBeNull();
       paints[0]('first-paint');
-      expect(document.querySelector('script[src]')).toBeNull();
+      expect(document.querySelector('script[data-app-entry]')).toBeNull();
       paints.shift()('first-contentful-paint');
-      expect(document.querySelector('script[src]').getAttribute('src')).toBe('/assets/index-test.js');
-      expect(document.querySelector('script[src]').hasAttribute('crossorigin')).toBe(true);
+      expect(document.querySelector('script[data-app-entry]').textContent).toContain('/assets/index-test.js');
+      expect(document.querySelector('link[data-app-entry]').hasAttribute('crossorigin')).toBe(true);
       expect(document.querySelector('link[rel="modulepreload"]').getAttribute('href')).toBe('/assets/shared.js');
     }
-    expect(documentFor('/', { visibility: 'hidden' }).querySelector('script[src]')).not.toBeNull();
-    expect(documentFor('/', { paintSupported: false }).querySelector('script[src]')).not.toBeNull();
+    expect(documentFor('/', { visibility: 'hidden' }).querySelector('script[data-app-entry]')).not.toBeNull();
+    expect(documentFor('/', { paintSupported: false }).querySelector('script[data-app-entry]')).not.toBeNull();
     const paints = [];
     const document = documentFor('/', { paints });
     document.visibilityState = 'hidden';
     document.dispatchEvent(new Event('visibilitychange'));
-    expect(document.querySelectorAll('script[src]')).toHaveLength(1);
+    expect(document.querySelectorAll('script[data-app-entry]')).toHaveLength(1);
     paints.shift()('first-contentful-paint');
-    expect(document.querySelectorAll('script[src]')).toHaveLength(1);
+    expect(document.querySelectorAll('script[data-app-entry]')).toHaveLength(1);
   });
 });

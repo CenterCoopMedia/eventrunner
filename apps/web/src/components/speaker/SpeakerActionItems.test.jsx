@@ -59,7 +59,8 @@ describe('speaker action items', () => {
     listMaterials.mockReturnValue(pending);
     render(view());
 
-    const status = screen.getByRole('status', { name: 'Checking your next steps…' });
+    const status = screen.getByRole('status');
+    expect(screen.getByText('Checking your next steps…')).toBeVisible();
     const region = screen.getByRole('region', { name: 'Speaker checklist' });
     expect(status.closest('[aria-busy="true"]')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'true');
@@ -76,7 +77,7 @@ describe('speaker action items', () => {
     expect(listMaterials).toHaveBeenCalledTimes(2);
 
     await act(async () => finish([{ reviewStatus: 'approved' }]));
-    expect(screen.queryByRole('status', { name: 'Checking your next steps…' })).toBeNull();
+    expect(status).not.toBeInTheDocument();
     expect(region).toHaveAttribute('aria-busy', 'false');
     expect(screen.getByRole('progressbar', { name: '2 of 4 items complete' })).toBeInTheDocument();
   });
@@ -89,7 +90,7 @@ describe('speaker action items', () => {
     const { rerender } = render(view());
     act(() => vi.advanceTimersByTime(300));
     await act(async () => finish([{ reviewStatus: 'approved' }]));
-    expect(screen.queryByRole('status', { name: 'Checking your next steps…' })).toBeNull();
+    expect(screen.queryByText('Checking your next steps…')).toBeNull();
     expect(screen.getByRole('progressbar', { name: '2 of 4 items complete' })).toBeInTheDocument();
 
     listMaterials.mockReturnValue(new Promise(() => {}));
@@ -97,7 +98,8 @@ describe('speaker action items', () => {
     act(() => vi.advanceTimersByTime(10000));
     expect(screen.getByRole('status')).toHaveTextContent('This is taking longer than usual.');
     rerender(view({ user: { uid: 'account-three' } }));
-    const status = screen.getByRole('status', { name: 'Checking your next steps…' });
+    const status = screen.getByRole('status');
+    expect(screen.getByText('Checking your next steps…')).toBeVisible();
     expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'initial');
     expect(status).not.toHaveTextContent('This is taking longer than usual.');
     expect(screen.queryByRole('progressbar')).toBeNull();

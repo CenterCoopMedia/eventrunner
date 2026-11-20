@@ -15,7 +15,9 @@ function verifyBuild(dist, base, manifest) {
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
   const chunks = JSON.parse(fs.readFileSync(path.join(dist, '.vite/manifest.json'), 'utf8'));
   const entry = chunks['index.html'];
-  assert.ok(html.includes(`src="${base}${entry.file}"`), 'entry script must use the asset base');
+  assert.ok(html.includes(`<link rel="modulepreload" crossorigin href="${base}${entry.file}" data-app-entry>`),
+    'entry module preload must use the asset base');
+  assert.ok(html.includes('<script data-app-entry>'), 'entry module must have an importer');
   assert.ok(html.includes(`href="${base}branding/favicon.svg"`), 'favicon must use the asset base');
   assert.ok(html.includes(`href="${base}manifest.webmanifest"`), 'manifest must use the asset base');
   for (const stylesheet of entry.css ?? []) {

@@ -374,7 +374,7 @@ describe('account transitions', () => {
     renderFeed();
     await openFeedAs(makeUser('staffer'), PENDING);
     expect(listenersFor('social_posts')).toHaveLength(0);
-    expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
+    expect(screen.getByText(/Loading the attendee feed/, { selector: '.loading-status__label' })).toBeInTheDocument();
 
     cachedProbes.delete('staffer');
     await act(async () => { window.dispatchEvent(new Event('online')); });
@@ -503,7 +503,7 @@ describe('what the feed shows', () => {
   it('states loading, empty, unavailable and refused', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
-    expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
+    expect(screen.getByText(/Loading the attendee feed/, { selector: '.loading-status__label' })).toBeInTheDocument();
     const feed = activeFeedListeners()[0];
     pushPosts(feed, []);
     expect(screen.getByRole('heading', { name: 'No posts yet' })).toBeInTheDocument();
@@ -976,7 +976,7 @@ describe('the thread page', () => {
       return () => {};
     });
     renderThread();
-    expect(screen.getByRole('status', { name: 'Loading…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByText('Not found page')).not.toBeInTheDocument();
     expect(listenersFor('social_posts')).toHaveLength(0);
     expect(listenersFor('social_posts/root1')).toHaveLength(0);
@@ -985,7 +985,7 @@ describe('the thread page', () => {
     pushDoc('users/ada', { uid: 'ada', ...APPROVED });
     pushDoc('config/features', FEED_ON, { fromCache: true });
     await act(async () => {});
-    expect(screen.getByRole('status', { name: 'Loading…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByText('Not found page')).not.toBeInTheDocument();
     expect(listenersFor('social_posts')).toHaveLength(0);
     expect(listenersFor('social_posts/root1')).toHaveLength(0);

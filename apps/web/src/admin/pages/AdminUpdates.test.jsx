@@ -73,8 +73,8 @@ async function renderAt(path) {
     </MemoryRouter>,
   );
   await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
     // The page chunk owns these listeners; shell readiness does not prove it loaded.
     expect(adminSubscriptions.get('cmsUpdates')).toEqual(expect.any(Function));
     expect(adminSubscriptions.get('cmsUpdates_drafts')).toEqual(expect.any(Function));
@@ -122,11 +122,11 @@ describe('the updates list', () => {
     await renderAt('/admin/updates');
     // The page's own chunk loads first, then both listeners subscribe.
     await waitFor(() => expect(adminSubscriptions.has('cmsUpdates_drafts')).toBe(true));
-    expect(screen.getByRole('status', { name: 'Loading updates…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading updates…', { selector: '.loading-status__label' })).toBeInTheDocument();
     act(() => adminSubscriptions.get('cmsUpdates')([PUBLISHED]));
-    expect(screen.getByRole('status', { name: 'Loading updates…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading updates…', { selector: '.loading-status__label' })).toBeInTheDocument();
     act(() => adminSubscriptions.get('cmsUpdates_drafts')([PUBLISHED_CLEAN]));
-    expect(screen.queryByRole('status', { name: 'Loading updates…' })).toBeNull();
+    expect(screen.queryByText('Loading updates…', { selector: '.loading-status__label' })).toBeNull();
     expect(screen.getByRole('link', { name: PUBLISHED.title })).toBeInTheDocument();
   });
 
@@ -442,7 +442,7 @@ describe('the update editor', () => {
     act(() => adminSubscriptions.get('cmsUpdates')([EDITED_LIVE]));
     // Only the live revision is in: no form yet, so nothing can be saved
     // from the live values.
-    expect(screen.getByRole('status', { name: 'Loading update…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading update…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
 
     act(() => adminSubscriptions.get('cmsUpdates_drafts')([draft]));

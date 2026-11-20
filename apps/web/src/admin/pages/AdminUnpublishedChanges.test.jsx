@@ -113,8 +113,8 @@ async function renderAt(path) {
     </MemoryRouter>,
   );
   await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   }, { timeout: 10_000 });
   await screen.findByRole('heading', { level: 1, name: 'Unpublished changes' }, { timeout: 5000 });
 }
@@ -211,14 +211,14 @@ afterEach(() => vi.useRealTimers());
 describe('the Unpublished changes page', () => {
   it('waits for every collection, then says nothing is waiting', async () => {
     await renderAt('/admin/unpublished');
-    expect(screen.getByLabelText('Loading unpublished changes…')).toBeInTheDocument();
-    expect(screen.getByLabelText('Loading recent publishes…')).toBeInTheDocument();
+    expect(screen.getByText('Loading unpublished changes…', { selector: '.loading-status__label' })).toBeInTheDocument();
+    expect(screen.getByText('Loading recent publishes…', { selector: '.loading-status__label' })).toBeInTheDocument();
     act(() => {
       for (const collection of ALL.slice(0, 5)) drafts.get(collection).onNext([]);
     });
-    expect(screen.getByLabelText('Loading unpublished changes…')).toBeInTheDocument();
+    expect(screen.getByText('Loading unpublished changes…', { selector: '.loading-status__label' })).toBeInTheDocument();
     act(() => drafts.get('cmsTimeline').onNext([]));
-    expect(screen.queryByLabelText('Loading unpublished changes…')).toBeNull();
+    expect(screen.queryByText('Loading unpublished changes…', { selector: '.loading-status__label' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Nothing is waiting to be published' })).toBeInTheDocument();
     expect(screen.getByText(/Edit your pages to add content or change what visitors see/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit pages' })).toHaveAttribute('href', '/admin/pages');

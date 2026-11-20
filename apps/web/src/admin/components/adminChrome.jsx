@@ -129,10 +129,10 @@ export function AdminEmptyState({ title, description, action = null }) {
  * @param {{ label: string, routeAttempt?: object }} props
  */
 export function AdminLoadingState({ label, routeAttempt }) {
-  const { stage } = useLoadingStage({ routeAttempt });
+  const { stage, clock } = useLoadingStage({ routeAttempt });
   return (
     <div className="admin-loading-state py-md text-admin-sm text-admin-ink-secondary">
-      <LoadingStatus label={label} stage={stage} figure="ring" />
+      <LoadingStatus label={label} stage={stage} figure="ring" clock={clock} />
     </div>
   );
 }

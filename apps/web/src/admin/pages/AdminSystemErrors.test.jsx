@@ -93,8 +93,8 @@ async function renderPage() {
   // gate is still checking, which is a flake under load, not a bug.
   await waitFor(
     () => {
-      expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme
     // editor's frame renders real pages), so the first mount in a file can

@@ -134,13 +134,13 @@ describe('Attendees', () => {
   it('shows a loading state until a snapshot arrives, and the empty state only for a real empty result', () => {
     renderPage();
     // No snapshot yet: "nobody signed up" would be a lie at this point.
-    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' }))
+    expect(screen.getByText('Loading the attendee directory…', { selector: '.loading-status__label' }))
       .toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'No attendee profiles yet' })).toBeNull();
 
     pushProfiles([]);
     expect(screen.getByRole('heading', { name: 'No attendee profiles yet' })).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: 'Loading the attendee directory…' })).toBeNull();
+    expect(screen.queryByText('Loading the attendee directory…', { selector: '.loading-status__label' })).toBeNull();
   });
 
   it('renders a profile whose fields are the wrong type instead of crashing the directory', () => {
@@ -236,7 +236,7 @@ describe('Attendees', () => {
     );
 
     expect(screen.queryByText('Private Person')).toBeNull();
-    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the attendee directory…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(subscribeDirectoryMock.mock.calls.at(-1)[0]).toEqual({ includeAttendeesOnly: false });
 
     act(() => previousOnNext([{ id: 'u1', displayName: 'Private Person' }]));
@@ -275,7 +275,7 @@ describe('Attendees', () => {
     );
 
     expect(screen.queryByText('Private Person')).toBeNull();
-    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading the attendee directory…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(subscribeDirectoryMock.mock.calls.at(-1)[0]).toEqual({ includeAttendeesOnly: false });
   });
 

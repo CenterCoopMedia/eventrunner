@@ -37,10 +37,23 @@ import { newSubmissionKey } from '../lib/submissionKey.js';
 import { blankPitch, clearPitch, restorePitch, savePitch, submissionOf } from '../lib/pitchDraft.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { IS_DEMO } from '../lib/demoMode.js';
-import LoadingState from '../components/LoadingState.jsx';
+import LoadingState, { LoadingStateView } from '../components/LoadingState.jsx';
+import LoadingAnnouncement from '../components/LoadingAnnouncement.jsx';
+import useLoadingStage from '../lib/useLoadingStage.js';
 
 const hrefFor = (step) => `/pitch/${step.slug}`;
 const FORM_STEPS = PITCH_STEPS.filter((step) => step.slug !== 'review');
+
+function PitchAvailability({ checking, result }) {
+  const label = 'Checking submissions…';
+  const { stage, clock } = useLoadingStage({ active: checking });
+  return (
+    <>
+      {checking ? <LoadingStateView label={label} stage={stage} rows={0} announce={false} /> : null}
+      <LoadingAnnouncement label={label} stage={stage} clock={clock} result={checking ? undefined : result} resultClassName="font-semibold" />
+    </>
+  );
+}
 
 /** The step that holds a field the check named: `presenters.1.email` → presenters. */
 function stepOfField(field) {
@@ -156,10 +169,7 @@ export default function SessionPitch() {
       <p className="max-w-prose text-lead text-text-secondary">Share an idea for {event.shortName}. Tell the organizers what people will learn and how you will involve them.</p>
       <section className="space-y-xs border-t-hairline border-rule-hairline pt-sm" aria-labelledby="pitch-call-heading">
         <h2 id="pitch-call-heading" className="sr-only">Call for sessions</h2>
-        {checkingCall ? <LoadingState label="Checking submissions…" rows={0} /> : null}
-        <p role="status" className={checkingCall ? 'sr-only' : 'font-semibold'}>
-          {checkingCall ? null : IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : open ? 'Submissions are open' : 'Submissions are closed'}
-        </p>
+        <PitchAvailability checking={checkingCall} result={IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : open ? 'Submissions are open' : 'Submissions are closed'} />
         <div role="region" aria-label="Submission availability" aria-busy={checkingCall} className="space-y-xs">
           {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p>
             : open ? <p className="text-caption text-text-secondary">There is no set deadline. The organizers close submissions when they are ready.</p> : null}

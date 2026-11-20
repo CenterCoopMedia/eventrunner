@@ -1,10 +1,6 @@
 import HeldFigure from './HeldFigure.jsx';
+import LoadingAnnouncement, { WAITING_DETAILS } from './LoadingAnnouncement.jsx';
 import './loadingState.css';
-
-const WAITING_DETAILS = {
-  slow: 'This is taking longer than usual. We’re still waiting for a response.',
-  prolonged: 'We haven’t received a result after a minute. You can keep waiting.',
-};
 
 const RING = (
   <svg className="loading-status__activity" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
@@ -14,14 +10,15 @@ const RING = (
 );
 
 /**
- * One stable live region; the decorative activity cue never announces. The
- * public site draws the held-up figure and the admin keeps its ring. `none`
+ * The public site draws the held-up figure and the admin keeps its ring. `none`
  * is for a status beside a busy control, which draws the page's one figure.
  * `still` is for previews that show a stage without waiting.
  *
- * @param {{ label?: string, stage?: string, figure?: 'held' | 'ring' | 'none', still?: boolean }} props
+ * @param {{ label?: string, stage?: string, figure?: 'held' | 'ring' | 'none', still?: boolean, clock?: object, announce?: boolean, prolongedAnnouncement?: string }} props
  */
-export default function LoadingStatus({ label = 'Loading…', stage = 'initial', figure = 'held', still = false }) {
+export default function LoadingStatus({
+  label = 'Loading…', stage = 'initial', figure = 'held', still = false, clock, announce = true, prolongedAnnouncement,
+}) {
   const detail = WAITING_DETAILS[stage];
   const waiting = stage !== 'initial';
   return (
@@ -34,16 +31,13 @@ export default function LoadingStatus({ label = 'Loading…', stage = 'initial',
           {waiting ? <HeldFigure stage={stage} still={still} /> : null}
         </span>
       ) : null}
-      <p
-        role="status"
-        aria-label={label}
-        aria-live="polite"
-        aria-atomic="true"
-        className="loading-status__copy"
-      >
+      <p aria-hidden={!still && !waiting ? 'true' : undefined} className="loading-status__copy">
         <span className="loading-status__label">{label}</span>
         {detail ? <span className="loading-status__detail">{detail}</span> : null}
       </p>
+      {announce && !still ? (
+        <LoadingAnnouncement label={label} stage={stage} clock={clock} prolongedAnnouncement={prolongedAnnouncement} />
+      ) : null}
     </div>
   );
 }

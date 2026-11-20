@@ -82,8 +82,8 @@ async function renderAt(path) {
     </MemoryRouter>,
   );
   await waitFor(() => {
-    expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading admin…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   }, { timeout: 10_000 });
 }
 
@@ -181,12 +181,12 @@ describe('the timeline list', () => {
       expect(adminSubscriptions.has('cmsTimeline')).toBe(true);
       expect(adminSubscriptions.has('cmsTimeline_drafts')).toBe(true);
     });
-    expect(await screen.findByRole('status', { name: 'Loading timeline…' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading timeline…', { selector: '.loading-status__label' })).toBeInTheDocument();
     act(() => adminSubscriptions.get('cmsTimeline')(LIVE, { fromCache: false }));
-    expect(screen.getByRole('status', { name: 'Loading timeline…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading timeline…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'The first meeting', exact: true })).toBeNull();
     act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS, { fromCache: false }));
-    expect(screen.queryByRole('status', { name: 'Loading timeline…' })).toBeNull();
+    expect(screen.queryByText('Loading timeline…', { selector: '.loading-status__label' })).toBeNull();
     expect(screen.getByText('4 entries')).toBeInTheDocument();
   });
 
@@ -463,7 +463,7 @@ describe('the timeline entry editor', () => {
     act(() => adminSubscriptions.get('cmsTimeline')(LIVE));
     // Only the live revision is in: no form yet, so nothing can be saved
     // from the live values.
-    expect(screen.getByRole('status', { name: 'Loading entry…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading entry…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
 
     act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS));

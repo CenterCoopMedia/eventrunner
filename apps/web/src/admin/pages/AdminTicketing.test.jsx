@@ -68,7 +68,7 @@ describe('AdminTicketing', () => {
       return Promise.reject(new Error(`unexpected call: ${name}`));
     });
     render(<AdminTicketing />);
-    expect(screen.getByRole('status', { name: 'Loading ticketing status…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading ticketing status…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Ticket code for check-in')).not.toBeInTheDocument();
     expect(callMock).toHaveBeenCalledTimes(1);
@@ -162,7 +162,7 @@ describe('AdminTicketing', () => {
       return Promise.reject(new Error(`unexpected call: ${name}`));
     });
     render(<AdminTicketing />);
-    expect(await screen.findByRole('status', { name: 'Loading Stripe ticketing…' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading Stripe ticketing…', { selector: '.loading-status__label' })).toBeInTheDocument();
     await waitFor(() => expect(callMock).toHaveBeenCalledWith('ticketingCommerceAdmin', { action: 'catalog' }));
     const refresh = screen.getByRole('button', { name: 'Refresh' });
     refresh.focus();
@@ -172,7 +172,7 @@ describe('AdminTicketing', () => {
     expect(await screen.findByRole('heading', { name: 'Stripe sales' })).toBeInTheDocument();
     expect(screen.getByLabelText('Ticket code for check-in')).toBeInTheDocument();
     expect(refresh).toHaveFocus();
-    expect(screen.queryByRole('status', { name: 'Loading Stripe ticketing…' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading Stripe ticketing…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   });
 
   it('retries an initial Stripe catalog failure in place and clears the stale error', async () => {
@@ -197,7 +197,7 @@ describe('AdminTicketing', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry Stripe ticketing' }));
     expect(screen.queryByText('The Stripe catalog is temporarily unavailable.')).not.toBeInTheDocument();
-    expect(screen.getByRole('status', { name: 'Loading Stripe ticketing…' })).toBeInTheDocument();
+    expect(screen.getByText('Loading Stripe ticketing…', { selector: '.loading-status__label' })).toBeInTheDocument();
     await waitFor(() => expect(catalogCalls).toBe(2));
     await act(async () => resolveCatalog({ mode: 'test', catalog: { published: false, currency: 'usd', ticketTypes: [] } }));
     expect(await screen.findByRole('heading', { name: 'Stripe sales' })).toBeInTheDocument();

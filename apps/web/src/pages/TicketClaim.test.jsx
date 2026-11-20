@@ -131,7 +131,9 @@ describe('signed out', () => {
     const entry = '/ticket/claim?order=group-order-123&source=confirmation';
     renderClaim(entry);
     const region = await screen.findByRole('region', { name: 'Ticket claim' });
-    const waiting = screen.getByRole('status', { name: 'Checking your sign-in…' });
+    const waiting = within(screen.getByRole('main')).getByRole('status');
+    expect(waiting).toBeEmptyDOMElement();
+    expect(screen.getByText('Checking your sign-in…')).toBeVisible();
     expect(waiting.closest('[aria-busy="true"]')).toBeNull();
     expect(region).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
@@ -156,20 +158,26 @@ describe('signed out', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     try {
       await act(async () => { renderClaim('/ticket/claim?order=group-order-123'); });
-      const auth = screen.getByRole('status', { name: 'Checking your sign-in…' });
-      act(() => vi.advanceTimersByTime(30_000));
+      const auth = within(screen.getByRole('main')).getByRole('status');
+      expect(auth).toBeEmptyDOMElement();
+      act(() => vi.advanceTimersByTime(1000));
+      expect(auth.textContent).toBe('Checking your sign-in…');
+      act(() => vi.advanceTimersByTime(29_000));
       expect(auth).toHaveTextContent('This is taking longer than usual.');
 
       await act(async () => setAuthUser(signedInUser));
-      const account = screen.getByRole('status', { name: 'Setting up your account…' });
-      expect(account).toHaveTextContent('This is taking longer than usual.');
+      const account = within(screen.getByRole('main')).getByRole('status');
+      const accountLabel = screen.getByText('Setting up your account…');
+      expect(accountLabel).toBeVisible();
+      expect(accountLabel.closest('[aria-hidden="true"]')).toBeNull();
+      expect(account).toBeEmptyDOMElement();
       expect(auth).not.toBeInTheDocument();
       act(() => vi.advanceTimersByTime(29_999));
       expect(account.parentElement).toHaveAttribute('data-loading-stage', 'slow');
       expect(screen.queryByRole('link', { name: 'Reload claim page' })).not.toBeInTheDocument();
       act(() => vi.advanceTimersByTime(1));
       expect(account.parentElement).toHaveAttribute('data-loading-stage', 'prolonged');
-      expect(account).toHaveTextContent('We haven’t received a result after a minute.');
+      expect(account).toHaveTextContent('Check your connection and reload this page');
       expect(heldUp).toHaveBeenCalledOnce();
 
       await act(async () => profileListeners.get(signedInUser.uid)({ id: signedInUser.uid }));
@@ -298,7 +306,8 @@ describe('signed in', () => {
     vi.useFakeTimers();
     try {
       act(() => profileListeners.get(signedInUser.uid)({ id: 'previous-account' }));
-      const status = screen.getByRole('status', { name: 'Setting up your account…' });
+      const status = within(screen.getByRole('main')).getByRole('status');
+      expect(status).toBeEmptyDOMElement();
       const region = screen.getByRole('region', { name: 'Ticket claim' });
       expect(status.closest('[aria-busy="true"]')).toBeNull();
       expect(region).toHaveAttribute('aria-busy', 'true');
