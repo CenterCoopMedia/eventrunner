@@ -14,7 +14,7 @@ const { internals: { scopeMatches } } = require('./providers/stripe.cjs');
 const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
-const OPERATOR_ACTIONS = new Set(['saveCatalog', 'pauseSales', 'issueComp', 'allocateRefund', 'releaseHold']);
+const OPERATOR_ACTIONS = new Set(['saveCatalog', 'pauseSales', 'issueComp', 'issueCompCsv', 'allocateRefund', 'releaseHold']);
 const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets', 'promoCodes']);
 // Promo codes are staff-editable (ADR 0008 §6); they live in promoCodes.cjs.
 const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile', 'savePromoCode', 'deletePromoCode']);
@@ -392,12 +392,14 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
       else if (action === 'updateAttendee') result = await correctAttendee(deps);
       else if (action === 'releaseHold') result = await releaseHold(deps);
       else if (action === 'cancelTickets' || action === 'allocateRefund') result = await changeAdmission({ ...deps, allocate: action === 'allocateRefund' });
-      else if (action === 'issueComp') {
+      else if (action === 'issueComp' || action === 'issueCompCsv') {
         confirm(body);
         const { createCompOrder } = require('./stripeCheckout.cjs');
-        const created = await createCompOrder({ ...deps, actorUid: actor.uid, ticketTypeId: body.ticketTypeId, attendees: body.attendees, requestId: body.requestId, reason: reasonOf(body) });
+        const csvUpload = action === 'issueCompCsv';
+        const created = await createCompOrder({ ...deps, actorUid: actor.uid, ticketTypeId: body.ticketTypeId, attendees: body.attendees, requestId: body.requestId, reason: reasonOf(body), csvUpload });
         const orderId = created.orderId || created.id || created.order?.id;
         result = await readOrderDetail({ ...deps, orderId });
+        if (csvUpload) result.reused = !created.created;
       } else if (action === 'reconcile') {
         const orderId = idOf(body.orderId, 'Order');
         const logRef = auditRef(db);
