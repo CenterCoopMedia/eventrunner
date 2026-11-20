@@ -2,7 +2,6 @@ import { internalRoutePath } from 'shared/languageUrls';
 import { joinEventPath } from 'shared/config/publicPath';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { sanitizeHtml } from '../lib/sanitizeHtml.js';
-import './PublicRichText.css';
 
 export default function PublicRichText({ value, ...props }) {
   const { localize, rootHref, navigate } = usePublicLanguage();
