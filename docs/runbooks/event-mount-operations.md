@@ -95,6 +95,16 @@ Archive with `decommission-client.yml -f mode=archive`: the mount returns 404 an
 
 ## 10. Clean up a rehearsal
 
-Reverse in dependency order: old-host redirects, routes (remove and sync each event), fixture content and accounts, redirect and configuration rules, old hosts back to DNS-only, provider settings (allowed origins, Auth domains, publisher), Console variable and Console deploy, projection bucket, Custom Domain then Worker, cache and WAF rules, temporary tokens, temporary Owner membership. Read back each one. **Proven** (runs 1 and 2).
+Reverse in dependency order and read back each step:
+
+1. Disable the old-host redirects, and `remove` each route.
+2. Set each event's deploy variables back to their baseline (`EVENT_ALLOWED_ORIGINS`, and the publisher flag and account if the rehearsal enabled them). `deploy-client.yml` writes these into the running functions, so they must be in place before the event's last Deploy.
+3. Run `sync_event_mount` for each event. Its Deploy restores the standalone address and applies the baseline settings. If the settings changed after that Deploy, run a standalone Deploy. Verify the running functions' `EVENT_PUBLIC_URL` and `EVENT_ALLOWED_ORIGINS` and a CORS preflight from the removed host (no `Access-Control-Allow-Origin`).
+4. Only then remove what the running functions no longer use: the publisher job, its image repository and grants, and the publisher service account.
+5. Fixture content and accounts, Auth authorized domains, redirect and configuration rules, old hosts back to DNS-only.
+6. Console variable, then **Deploy console**, then the projection bucket.
+7. Custom Domain, then Worker, then cache and WAF rules, then temporary tokens and the temporary Owner membership.
+
+**Proven** (run 2 in this order; run 1 restored the origins and publisher flag after the rollback syncs and needed a second standalone Deploy of each event).
 
 Delete synthetic sign-in accounts one at a time, or run the account cleanup yourself after a batch delete: a batch delete through the Auth admin API does not fire `onUserDeleted`, so the `users` document and the per-account records stay (run 2).
