@@ -13,14 +13,6 @@
 //                       the UI reflects the same rule rather than letting an
 //                       operator hit a wall.
 //
-// `path` is a plain text input validated SERVER-side: root-level paths are
-// canonical (issue #52 — `/scholarships`, not `/p/scholarships`), resolved by
-// App.jsx's catch-all route, and cmsSavePage owns the rules — segment shape,
-// the reserved first segments in shared/routing, '/' being the home page's,
-// and uniqueness across both revisions. So this file hardcodes no shape and
-// surfaces the server's rejection verbatim; the reserved list below is shown
-// as a hint only, read from that same registry so it cannot drift.
-//
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
 // the BLOCK_TYPES registry, and `defaultBlocks` are the placeholders a new
 // site is seeded with. Neither is edited here; both pass through a save.
@@ -28,10 +20,14 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
+import { firstPathSegment, isCanonicalPagePath, isReservedPathSegment } from 'shared/routing';
+import { generateSlug } from 'shared/slug';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { isReadOnlyDemo } from '../../lib/readOnlyDemo.js';
-import { useAdminApi } from '../adminApi.js';
+import { fieldLabel, useAdminApi } from '../adminApi.js';
+import { contentError as describeContentError } from '../contentError.js';
+import { focusFirstError } from '../../lib/focusFirstError.js';
 import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminContent } from '../useAdminContent.js';
@@ -128,6 +124,56 @@ const CUSTOM_TEMPLATE = 'custom';
 // Survives edits and reordering without becoming part of the persisted payload.
 const EDITOR_SECTION_KEY = Symbol('editor section');
 
+const ADDRESS_START = 'Enter a web address that starts with /, such as /parking.';
+
+function suggestedAddress(label) {
+  const slug = generateSlug(label);
+  if (!slug) return '';
+  return `/${isReservedPathSegment(slug) ? `${slug}-page` : slug}`;
+}
+
+function addressError(path, systemPage) {
+  if (typeof path !== 'string' || !path.startsWith('/')) return ADDRESS_START;
+  if (!isCanonicalPagePath(path)) {
+    if (path.includes('//')) return 'Use one slash at a time in the web address.';
+    if (path.endsWith('/')) return 'Remove the slash at the end of the web address.';
+    return 'Use lowercase letters, numbers and hyphens in the web address, such as /parking-guide.';
+  }
+  if (systemPage) return null;
+  if (path === '/') return '/ is the home page. Choose another address, such as /parking.';
+  const segment = firstPathSegment(path);
+  if (isReservedPathSegment(segment)) {
+    const example = segment === 'pitch' ? '/pitch-a-session' : `/${segment}-page`;
+    return `/${segment} is used by the system. Choose another address, such as ${example}.`;
+  }
+  return null;
+}
+
+function pageSaveError(error, path, systemPage) {
+  const fieldErrors = (error?.fieldErrors ?? []).filter(({ field }) => field).map(({ field, message }) => {
+    if (field !== 'path') return { field, message: `Check ${fieldLabel(field).toLowerCase()} and try again.` };
+    if (systemPage) return { field, message: 'This built-in page has a fixed web address. Contact support for help.' };
+    return {
+      field,
+      message: message.includes(' is already used by page ')
+        ? `Another page already uses ${path}. Choose a different web address.`
+        : addressError(path, false) ?? 'Choose a different web address and try again.',
+    };
+  });
+  return {
+    ...describeContentError(error, { fallback: 'The page could not be saved. Keep it open and contact support for help.' }),
+    code: error?.code,
+    fieldErrors,
+  };
+}
+
+function pagePublishError(error) {
+  const fallback = error?.queueId
+    ? 'Publishing could not finish. Choose Resume publish to continue.'
+    : 'Check Recent publishes for the result before trying again.';
+  return { ...describeContentError(error, { fallback }), code: error?.code };
+}
+
 /** Plain words for the layout variants (design brief §6.1, §8.5). */
 const LAYOUT_LABELS = Object.freeze({
   header: 'Header',
@@ -210,6 +256,8 @@ function PageEditor({ mode }) {
   const { rows, ready, error: listenerError, findRow } = useAdminPages({ includeNavigationLinks: mode === 'create' });
   const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
   const { theme, eventConfig, features } = useEventConfig();
+  const [page, setPage] = useState(() => blankPage());
+  const address = page.path ?? suggestedAddress(page.label);
   // The count staff see is the content the section holds (both revisions of
   // one block are one block), not its seed list.
   // What the public page draws for a section once this page is published:
@@ -266,7 +314,7 @@ function PageEditor({ mode }) {
     const own = rows.find((row) => row.live?.id === page.id)?.live ?? {};
     return [
       ...rows.map((row) => row.live).filter((live) => live && live.id !== page.id),
-      { ...own, id: page.id, path: page.path, visible: page.visible },
+      { ...own, id: page.id, path: address, visible: page.visible },
     ];
   };
   const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
@@ -315,7 +363,6 @@ function PageEditor({ mode }) {
   // find out.
   const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
-  const [page, setPage] = useState(() => blankPage());
   // The page's sections in the order the public page reads them, with their
   // blocks, for the one pull quote a page may draw (blocks/pullQuoteBudget):
   // a system page reads its slots above, main, below (SystemPage); a custom
@@ -403,7 +450,10 @@ function PageEditor({ mode }) {
   }, [mode, pageId, ready, rows]);
 
   useEffect(() => {
-    if (error) errorRef.current?.focus();
+    if (!error) return;
+    if (error.fieldErrors?.some(({ field }) => field === 'path' || field === 'label')
+      && focusFirstError(formRef.current)) return;
+    errorRef.current?.focus();
   }, [error]);
 
   useEffect(() => {
@@ -519,6 +569,12 @@ function PageEditor({ mode }) {
       });
       return;
     }
+    const invalidAddress = addressError(address, page.systemPage);
+    if (invalidAddress) {
+      setErrorTitle('Check the web address');
+      setError({ fieldErrors: [{ field: 'path', message: invalidAddress }] });
+      return;
+    }
     const creating = mode === 'create' && savedId === null;
     if (creating && (!ready || !contentReady)) {
       setError({
@@ -543,22 +599,25 @@ function PageEditor({ mode }) {
     let assigned = assignPageIds(page, { pageIds, sectionIds });
     if (creating) assigned = { ...assigned, order: nextStoredOrder(rows) };
     if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
-    const payload = toPagePayload(assigned);
+    const savedPage = { ...assigned, path: address };
+    const payload = toPagePayload(savedPage);
     setBusy(publish ? 'publish' : 'draft');
     let stage = 'save';
     try {
       await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
       // The next session keeps newer typing under the assigned document id.
       // Stop the old new-page session before its cleanup can write it back.
-      if (creating) localDraft.discard();
-      else localDraft.saved(pageSnapshot(assigned), beforeAssignment);
+      if (creating) {
+        localDraft.discard();
+        setPage((current) => current.path === null ? { ...current, path: address } : current);
+      } else localDraft.saved(pageSnapshot(savedPage), beforeAssignment);
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt: a failed publish must not leave the id editable,
       // because retrying under a different id would create a second document
       // and orphan the draft that just landed.
       setSavedId(payload.id);
       loadedIdRef.current = payload.id;
-      setSavedSnapshot(pageSnapshot(assigned));
+      setSavedSnapshot(pageSnapshot(savedPage));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         return;
@@ -572,16 +631,17 @@ function PageEditor({ mode }) {
       });
       reportPublish(response, [payload.id]);
     } catch (err) {
-      if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
+      if (stage === 'publish') setErrorTitle('The draft was saved. Check the publish result');
+      else if (err?.code === 'network') setErrorTitle('The save could not be confirmed');
       if (creating && stage === 'save' && err?.status === 409) {
         rejectedPageIds.current.add(payload.id);
         setPage((current) => ({ ...current, id: '' }));
         setError({
-          message: 'That page id was already taken. Save again to use a new one.',
+          message: 'Another page was created at the same time. Save again to keep your page.',
         });
         return;
       }
-      setError(err);
+      setError(stage === 'publish' ? pagePublishError(err) : pageSaveError(err, address, page.systemPage));
       if (err?.code === 'unauthenticated') localDraft.flush();
       // A part-way publish failure carries the queue row to resume from.
       if (err?.queueId) setResumeQueueId(err.queueId);
@@ -593,7 +653,7 @@ function PageEditor({ mode }) {
   /** cmsPublish answers 200 even when it skipped what you asked for. */
   function reportPublish(response, requestedIds) {
     const verdict = summarizePublish(response, 'cmsPages', requestedIds);
-    if (!verdict.ok) throw new Error(verdict.message);
+    if (!verdict.ok) throw Object.assign(new Error(verdict.message), { contentPublishResult: true });
     setStatus(verdict.message);
   }
 
@@ -605,14 +665,14 @@ function PageEditor({ mode }) {
   async function resumePublish() {
     setBusy('publish');
     setError(null);
-    setErrorTitle('The draft is saved, and it is not published');
+    setErrorTitle('The draft was saved. Check the publish result');
     setStatus('');
     try {
       const response = await call('cmsPublish', { queueId: resumeQueueId });
       setResumeQueueId(null);
       reportPublish(response, [savedId ?? page.id]);
     } catch (err) {
-      setError(err);
+      setError(pagePublishError(err));
       if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
       setBusy(null);
@@ -628,8 +688,11 @@ function PageEditor({ mode }) {
       localDraft.discard();
       reportDeleted({ ...deleted, collection: 'cmsPages', docId: page.id, editorPath: `/admin/pages/${encodeURIComponent(page.id)}` }, '/admin/pages');
     } catch (err) {
-      setErrorTitle('The server refused the delete');
-      setError(err);
+      setErrorTitle('The page could not be deleted');
+      setError({
+        ...describeContentError(err, { fallback: 'Keep this page open and contact support for help.' }),
+        code: err?.code,
+      });
       setBusy(null);
     }
   }
@@ -664,7 +727,7 @@ function PageEditor({ mode }) {
             {unsaved ? <UnsavedEditBadge /> : null}
           </>
         )}
-        identifiers={page.path || null}
+        identifiers={address || null}
         description="Save a draft to keep your changes. Publish to show them on the site."
         feedback={status || error ? <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
@@ -709,7 +772,9 @@ function PageEditor({ mode }) {
               try {
                 const value = localDraft.restore();
                 if (value === null) return;
-                const restored = toEditablePage(JSON.parse(value));
+                const copy = JSON.parse(value);
+                const restored = toEditablePage(copy);
+                if (!isExisting && copy.path === null) restored.path = null;
                 restored.sections = restored.sections.map((section) => ({ ...section, [EDITOR_SECTION_KEY]: nextSectionKey.current++ }));
                 setPage(restored);
               } catch {
@@ -779,7 +844,7 @@ function PageEditor({ mode }) {
               change too (functions/src/cms/pages.cjs). */}
           <TextField
             label="Path"
-            value={page.path}
+            value={address}
             onChange={(value) => update({ path: value })}
             error={errorFor('path')}
             readOnly={isSystemPage}

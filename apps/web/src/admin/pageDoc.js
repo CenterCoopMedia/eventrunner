@@ -133,7 +133,8 @@ export function toEditablePage(doc) {
 
 /** A blank page for the create form. */
 export function blankPage() {
-  return toEditablePage({ id: '', label: '', path: '', order: 0, visible: true });
+  // null lets a new page follow its label until the address is edited.
+  return { ...toEditablePage({ id: '', label: '', order: 0, visible: true }), path: null };
 }
 
 /** A blank section accepts every block type. */
@@ -214,7 +215,7 @@ export function toPagePayload(page) {
 
 /** Stable comparison for the unsaved-edit guard. Editor-only keys are omitted. */
 export function pageSnapshot(page) {
-  return JSON.stringify(toPagePayload(page));
+  return JSON.stringify({ ...toPagePayload(page), path: page.path });
 }
 
 /**
