@@ -114,6 +114,12 @@ async function installRecorder(page, resultsSelector) {
         if (action && event.isTrusted) action.inputs.push({ type, key: event.key ?? null, at: event.timeStamp });
       }, { capture: true });
     }
+    // Text can arrive with no keydown (an accented character is inserted as
+    // text). Input events anchor the settle time; they are not interactions.
+    globalThis.addEventListener('input', (event) => {
+      const action = current();
+      if (action && event.isTrusted) action.textInputs.push(event.timeStamp);
+    }, { capture: true });
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         const action = actionAt(entry.startTime);
@@ -146,7 +152,8 @@ async function installRecorder(page, resultsSelector) {
         });
       }
     }).observe({ type: 'long-animation-frame', buffered: true });
-    // The next frame after the last change to the results or the count line.
+    // The end of the frame that rendered the last change to the results or
+    // the count line.
     globalThis.addEventListener('DOMContentLoaded', () => {
       new globalThis.MutationObserver((mutations) => {
         const action = current();
@@ -156,8 +163,17 @@ async function installRecorder(page, resultsSelector) {
           return element?.closest(`${selector}, [role="status"]`);
         });
         if (!relevant) return;
-        action.lastMutation = performance.now();
-        globalThis.requestAnimationFrame(() => { action.settledFrame = performance.now(); });
+        const mutation = performance.now();
+        action.lastMutation = mutation;
+        // A task posted from requestAnimationFrame runs after that frame's
+        // style, layout and paint, so the stamp includes the rendering work.
+        globalThis.requestAnimationFrame(() => {
+          const channel = new globalThis.MessageChannel();
+          channel.port1.onmessage = () => {
+            if (action.lastMutation === mutation) action.settledFrame = performance.now();
+          };
+          channel.port2.postMessage(null);
+        });
       }).observe(globalThis.document.body, { childList: true, subtree: true, characterData: true, attributes: true });
     });
   }, resultsSelector);
@@ -165,7 +181,7 @@ async function installRecorder(page, resultsSelector) {
 
 async function startAction(page, label) {
   await page.evaluate((name) => {
-    const action = { label: name, startedAt: performance.now(), inputs: [], events: [], shifts: [], frames: [],
+    const action = { label: name, startedAt: performance.now(), inputs: [], textInputs: [], events: [], shifts: [], frames: [],
       lastMutation: null, settledFrame: null };
     globalThis.latencyRecord.action = action;
     globalThis.latencyRecord.actions.push(action);
@@ -196,13 +212,15 @@ function summarize(action, resultNodes) {
     interactions.set(entry.interactionId, Math.max(interactions.get(entry.interactionId) ?? 0, entry.duration));
   }
   const durations = [...interactions.values()];
-  const first = action.inputs[0]?.at ?? null;
-  const last = action.inputs.at(-1)?.at ?? null;
+  const anchors = [...action.inputs.map(({ at }) => at), ...action.textInputs].sort((a, b) => a - b);
+  const first = anchors[0] ?? null;
+  const last = anchors.at(-1) ?? null;
   const sum = (list, pickValue) => list.reduce((total, item) => total + pickValue(item), 0);
   return {
     label: action.label,
     trustedInputs: action.inputs.length,
     keydowns: keyInputs.length,
+    textInputs: action.textInputs.length,
     eventTimingInteractions: durations.length,
     // Inputs below the 16 ms reporting floor, or never reported, are absent.
     missingEventTimingSamples: Math.max(0, action.inputs.length - durations.length),

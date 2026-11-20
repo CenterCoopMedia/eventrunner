@@ -63,7 +63,8 @@ createRoot(document.getElementById('root')).render(
       <ContentContext.Provider value={content}>
         <AuthContext.Provider value={auth}>
           <ProfileContext.Provider value={profile}>
-            <main>
+            {/* The top-navigation content frame from components/Layout.jsx. */}
+            <main id="main-content" tabIndex={-1} className="stage flex-1 pb-2xl pt-xl">
               <Routes>
                 <Route path="schedule" element={<Schedule />} />
                 <Route path="attendees" element={<Attendees />} />
