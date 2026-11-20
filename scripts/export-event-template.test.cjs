@@ -182,6 +182,19 @@ test('--page narrows the export to the named pages', async () => {
   assert.ok(template.content.every((c) => template.pages[0].sections.some((s) => s.id === c.section)));
 });
 
+test('a template carries navigation links and their order alongside pages', async () => {
+  const db = await pastEvent();
+  const links = [
+    { id: 'directions', label: 'Directions', url: 'https://example.org/directions', order: 15, visible: true, systemPage: false },
+    { id: 'help', label: 'Get help', url: '/faq', order: 25, visible: true, systemPage: false },
+  ];
+  for (const link of links) await db.collection('cmsPages').doc(link.id).set(link);
+  const { template, value, output } = await exportFrom(db);
+  assert.equal(value, 0, output);
+  assert.deepEqual(template.pages.filter((entry) => entry.url), links);
+  assert.equal(parseTemplateFile(JSON.stringify(template)).ok, true);
+});
+
 test('a bilingual export reports omitted text and distinguishes copied section translations', async () => {
   const db = await pastEvent();
   await db.collection('config').doc('event').update({ contentLanguages: { default: 'en', available: ['en', 'es'] } });

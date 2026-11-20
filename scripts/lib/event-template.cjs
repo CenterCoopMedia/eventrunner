@@ -69,7 +69,7 @@ const THEME_TEMPLATE_KEYS = Object.freeze([
 
 /** Page document keys (functions/src/cms/pages.cjs PAGE_KEYS). */
 const PAGE_TEMPLATE_KEYS = Object.freeze([
-  'id', 'label', 'title', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template',
+  'id', 'label', 'title', 'path', 'url', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template',
 ]);
 
 /** Keys every content block carries besides its block type's own fields. */
@@ -81,7 +81,7 @@ const INCLUDED = Object.freeze({
   'config/theme': 'colours, fonts, style and layout choices (not the logo files)',
   'config/features': 'feature switches',
   'config/badges': 'badge categories',
-  cmsPages: 'live page documents and their section structure',
+  cmsPages: 'live page documents, their section structure, and navigation links',
   cmsContent: 'live content blocks on the selected pages, except the legal pages',
 });
 
@@ -753,7 +753,7 @@ function pageSetErrors(pages) {
   const errors = [];
   for (const [label, values] of [
     ['id', pages.map((p) => p.id)],
-    ['path', pages.map((p) => p.path)],
+    ['path', pages.flatMap((p) => typeof p.path === 'string' ? [p.path] : [])],
     ['section', pages.flatMap((p) => (Array.isArray(p.sections) ? p.sections : []).map((sec) => sec?.id))],
   ]) {
     const seen = new Set();
