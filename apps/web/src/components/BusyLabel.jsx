@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { STAGES } from '../lib/useLoadingStage.js';
-import { announce, withdraw } from '../lib/announce.js';
+import { announce, prepareAnnouncer } from '../lib/announce.js';
 
 /** The waiting stage at which a busy control says it is late (ten seconds). */
 export const LATE_AFTER = STAGES.find(([, stage]) => stage === 'slow')[0];
@@ -35,18 +35,23 @@ export function useBusyLate(busy) {
  * @param {{ busy: boolean, pending: string, late?: string, children: React.ReactNode }} props
  */
 export default function BusyLabel({ busy, pending, late, children }) {
+  const ref = useRef(null);
   const isLate = useBusyLate(busy);
   const lateText = late ?? lateWords(pending);
   const line = `${lateText.replace(/…$/, '.')} This is taking longer than usual.`;
 
+  // The region is in place from the press, ten seconds before its line.
+  useEffect(() => {
+    if (busy) prepareAnnouncer(ref.current);
+  }, [busy]);
+
   useEffect(() => {
     if (!isLate) return undefined;
-    announce(line);
-    return () => withdraw(line);
+    return announce(ref.current, line);
   }, [isLate, line]);
 
   return (
-    <span className="inline-grid min-w-0">
+    <span ref={ref} className="inline-grid min-w-0">
       <span className={`[grid-area:1/1] ${busy ? 'invisible' : ''}`} aria-hidden={busy || undefined}>{children}</span>
       <span className={`[grid-area:1/1] ${busy && !isLate ? '' : 'invisible'}`} aria-hidden={!busy || isLate || undefined}>
         {pending}

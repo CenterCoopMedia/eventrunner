@@ -1,9 +1,16 @@
-// One polite live region for lines that happen inside a control. A control's
+// A polite live region for lines that happen inside a control. A control's
 // own text is its name, and a changed name is not announced, so a busy
 // control that turns late says so here, once.
-let region = null;
+//
+// The region lives in the open modal dialog that holds the control, because
+// a modal makes everything outside it inert; otherwise it lives on the body.
+// Mount it when the work starts (prepareAnnouncer), so assistive technology
+// has registered the empty region before its first line arrives.
+const regions = new WeakMap();
 
-function liveRegion() {
+export function prepareAnnouncer(node) {
+  const host = node?.closest?.('dialog[open]') ?? document.body;
+  let region = regions.get(host);
   if (region?.isConnected) return region;
   region = document.createElement('div');
   region.setAttribute('role', 'status');
@@ -11,15 +18,16 @@ function liveRegion() {
   region.setAttribute('aria-atomic', 'true');
   region.dataset.announcer = '';
   region.className = 'sr-only';
-  document.body.append(region);
+  host.append(region);
+  regions.set(host, region);
   return region;
 }
 
-export function announce(text) {
-  liveRegion().textContent = text;
-}
-
-/** Clears the region only when it still holds `text`, so a newer line stays. */
-export function withdraw(text) {
-  if (region?.isConnected && region.textContent === text) region.textContent = '';
+/** Says `text` in the region for `node`, and returns a way to take it back. */
+export function announce(node, text) {
+  const region = prepareAnnouncer(node);
+  region.textContent = text;
+  return () => {
+    if (region.textContent === text) region.textContent = '';
+  };
 }

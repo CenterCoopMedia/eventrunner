@@ -24,7 +24,7 @@ function when(value) {
   return date ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
 }
 
-function NoteEntry({ note, mine, busy, onSave, feedback }) {
+function NoteEntry({ note, mine, busy, saving, onSave, feedback }) {
   const [draft, setDraft] = useState(null);
   // The text the edit started from; the server refuses the save if it changed.
   const [base, setBase] = useState('');
@@ -36,7 +36,7 @@ function NoteEntry({ note, mine, busy, onSave, feedback }) {
         <div className="flex flex-wrap gap-xs">
           <button type="button" className={secondaryButtonClass} disabled={busy || !draft.trim() || draft.trim() === note.text}
             onClick={async () => { if (await onSave(note.id, draft, base)) setDraft(null); }}>
-            <BusyLabel busy={busy} pending="Saving your note…">Save</BusyLabel>
+            <BusyLabel busy={saving} pending="Saving your note…">Save</BusyLabel>
           </button>
           <button type="button" className={linkButtonClass} disabled={busy} onClick={() => setDraft(null)}>Cancel</button>
         </div>
@@ -120,7 +120,7 @@ export default function PitchNotes({ pitch, call }) {
             </li>
           ) : null}
           {notes.map((note) => (
-            <NoteEntry key={note.id} note={note} mine={Boolean(user?.uid) && note.uid === user.uid} busy={busy}
+            <NoteEntry key={note.id} note={note} mine={Boolean(user?.uid) && note.uid === user.uid} busy={busy} saving={busy && where === note.id}
               feedback={where === note.id ? feedback : null}
               onSave={(noteId, draft, baseText) => save({ action: 'edit', noteId, text: draft, baseText }, 'Note updated.')} />
           ))}
@@ -130,7 +130,7 @@ export default function PitchNotes({ pitch, call }) {
       )}
       <form onSubmit={add} className="flex flex-col gap-sm">
         <TextAreaField help="Write a private review note for event staff. It is never sent to the person who pitched." label="Add a note" value={text} onChange={setText} maxLength={MAX_LENGTH} rows={3} disabled={busy} />
-        <div><button type="submit" className={secondaryButtonClass} disabled={busy || !text.trim()}><BusyLabel busy={busy} pending="Adding the note…">Add note</BusyLabel></button></div>
+        <div><button type="submit" className={secondaryButtonClass} disabled={busy || !text.trim()}><BusyLabel busy={busy && where === 'add'} pending="Adding the note…">Add note</BusyLabel></button></div>
         {where === 'add' ? feedback : null}
       </form>
     </div>

@@ -42,7 +42,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-const announcer = () => document.querySelector('[data-announcer]');
+const announcer = () => document.body.querySelector(':scope > [data-announcer]');
 
 describe('BusyLabel', () => {
   it('names the work from the press, says it is late at ten seconds, and rests when the work ends', async () => {
@@ -55,10 +55,13 @@ describe('BusyLabel', () => {
     fireEvent.click(button);
     expect(button).toHaveAccessibleName('Saving the session…');
     expect(button).toHaveAttribute('aria-busy', 'true');
+    // The empty region is in place from the press, before it has a line.
+    expect(announcer()).toBeInTheDocument();
+    expect(announcer().textContent).toBe('');
 
     advance(9999);
     expect(button).toHaveAccessibleName('Saving the session…');
-    expect(announcer()?.textContent ?? '').toBe('');
+    expect(announcer().textContent).toBe('');
 
     advance(1);
     expect(button).toHaveAccessibleName('Still saving the session…');
@@ -115,5 +118,16 @@ describe('BusyLabel', () => {
     expect(button).toHaveAccessibleName('Saving the session…');
     advance(9999);
     expect(button).toHaveAccessibleName('Saving the session…');
+  });
+
+  it('announces inside the open modal dialog that holds the control', () => {
+    const request = deferred();
+    render(<dialog open aria-label="Confirm"><SaveControl save={() => request.promise} /></dialog>);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    advance(10000);
+    const region = dialog.querySelector('[data-announcer]');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toHaveTextContent('Still saving the session. This is taking longer than usual.');
   });
 });
