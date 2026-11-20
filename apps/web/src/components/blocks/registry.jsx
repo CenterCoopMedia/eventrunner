@@ -16,9 +16,7 @@ import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
 import UnknownBlock from './UnknownBlock.jsx';
 
-export const loadLinkGroupBlock = () => import('./LinkGroupBlock.jsx');
 export const loadLatestUpdatesBlock = () => import('./LatestUpdatesBlock.jsx');
-export const loadSponsorPackageBlock = () => import('./SponsorPackageBlock.jsx');
 
 export const BLOCK_RENDERERS = Object.freeze({
   // Keep the Home hero, information cards and opening copy ready for first
@@ -33,9 +31,9 @@ export const BLOCK_RENDERERS = Object.freeze({
   map: lazy(() => import('./MapBlock.jsx')),
   quote: lazy(() => import('./QuoteBlock.jsx')),
   faq_item: lazy(() => import('./FaqItemBlock.jsx')),
-  link_group: lazy(loadLinkGroupBlock),
+  link_group: lazy(() => import('./LinkGroupBlock.jsx')),
   latest_updates: lazy(loadLatestUpdatesBlock),
-  sponsor_package: lazy(loadSponsorPackageBlock),
+  sponsor_package: lazy(() => import('./SponsorPackageBlock.jsx')),
   gallery: lazy(() => import('./GalleryBlock.jsx')),
   timeline: lazy(() => import('./TimelineBlock.jsx')),
 });
@@ -114,12 +112,12 @@ export function rendererFor(blockType) {
     : UnknownBlock;
 }
 
-/** Render one cmsContent block through the registry. */
-export default function BlockRenderer({ block }) {
+/** Render a block or a run of blocks of its type through the registry. */
+export default function BlockRenderer({ block, run }) {
   const Renderer = rendererFor(block?.blockType);
   return (
     <Suspense fallback={block ? <BlockPlaceholder block={block} /> : null}>
-      <Renderer block={block} />
+      <Renderer block={block} run={run} />
     </Suspense>
   );
 }

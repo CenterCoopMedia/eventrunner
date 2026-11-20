@@ -5,12 +5,13 @@ import { withoutSwitchedOffLinks } from './linkTargets.js';
 
 export function usePageSectionBlocks(sections, features) {
   const { pages, getSectionBlocks } = usePublicContent();
-  const sectionsById = new Map(sections.map(({ id }) => [
-    id,
-    withoutSwitchedOffLinks(getSectionBlocks(id), features, pages),
-  ]));
-  const needsUpdates = Boolean(features?.updates) && [...sectionsById.values()].some((blocks) =>
-    blocks.some((block) => block.blockType === 'latest_updates'));
+  const sectionsById = new Map();
+  let needsUpdates = false;
+  for (const { id } of sections) {
+    const blocks = withoutSwitchedOffLinks(getSectionBlocks(id), features, pages);
+    sectionsById.set(id, blocks);
+    if (features?.updates && blocks.some((block) => block.blockType === 'latest_updates')) needsUpdates = true;
+  }
   const [withUpdates, setWithUpdates] = useState(null);
 
   useEffect(() => {

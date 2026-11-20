@@ -6,24 +6,15 @@
 // stack, link groups into titled lists grouped by their `group` field.
 // Everything else renders one-by-one through the registry, so an unknown
 // type still hits the UnknownBlock fallback.
-import { lazy, Suspense } from 'react';
-import BlockRenderer, { loadLinkGroupBlock, loadSponsorPackageBlock } from './registry.jsx';
+import BlockRenderer from './registry.jsx';
 import StatBlock from './StatBlock.jsx';
 import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
-const LinkGroups = lazy(() => loadLinkGroupBlock().then(({ LinkGroups }) => ({ default: LinkGroups })));
-const SponsorPackages = lazy(() => loadSponsorPackageBlock().then(({ SponsorPackages }) => ({ default: SponsorPackages })));
 
 const blockKey = (block, index) =>
   block.id ?? `${block.section}__${block.field ?? index}`;
 
-function DeferredRun({ Renderer, blocks }) {
-  return (
-    <Suspense fallback={<div aria-hidden="true" className="min-h-16" />}>
-      <Renderer blocks={blocks} />
-    </Suspense>
-  );
-}
+const groupedRun = (run) => <BlockRenderer block={run[0]} run={run} />;
 
 // How each batched run renders. Ids outside this map render individually.
 const RUN_RENDERERS = {
@@ -58,8 +49,8 @@ const RUN_RENDERERS = {
       ))}
     </div>
   ),
-  link_group: (run) => <DeferredRun Renderer={LinkGroups} blocks={run} />,
-  sponsor_package: (run) => <DeferredRun Renderer={SponsorPackages} blocks={run} />,
+  link_group: groupedRun,
+  sponsor_package: groupedRun,
 };
 
 export default function SectionBlocks({ blocks }) {

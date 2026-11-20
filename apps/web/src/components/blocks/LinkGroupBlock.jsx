@@ -26,7 +26,8 @@ import { internalRoutePath } from 'shared/languageUrls';
 const LINK_CLASS =
   'touch-target inline-flex items-center text-body text-accent underline decoration-accent/40 underline-offset-2 hover:text-accent-strong';
 
-export default function LinkGroupBlock({ block }) {
+export default function LinkGroupBlock({ block, run }) {
+  if (run) return <LinkGroups blocks={run} />;
   if (!block?.url || !block?.label || !isSafeHref(block.url)) return null;
   return (
     <li lang={block.publicLanguage}>
@@ -43,7 +44,7 @@ export default function LinkGroupBlock({ block }) {
   );
 }
 
-export function LinkGroups({ blocks }) {
+function LinkGroups({ blocks }) {
   const groups = new Map();
   for (const block of blocks) {
     const name = block.group ?? '';

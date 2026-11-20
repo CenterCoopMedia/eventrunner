@@ -20,7 +20,8 @@ export function sponsorLimitLabel(limit) {
   return limit === 1 ? '1 sponsor' : `${limit} sponsors`;
 }
 
-export default function SponsorPackageBlock({ block }) {
+export default function SponsorPackageBlock({ block, run }) {
+  if (run) return <SponsorPackages blocks={run} />;
   if (!text(block?.name)) return null;
   const price = text(block.price);
   const openTo = sponsorLimitLabel(block.limit);
@@ -40,7 +41,7 @@ export default function SponsorPackageBlock({ block }) {
   );
 }
 
-export function SponsorPackages({ blocks }) {
+function SponsorPackages({ blocks }) {
   return (
     <ul className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
       {blocks.filter((block) => text(block?.name)).map((block, index) => (
