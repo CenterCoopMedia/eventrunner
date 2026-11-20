@@ -56,7 +56,7 @@
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
 import { Outlet, matchPath, useLocation } from 'react-router';
-import { resolveHeader } from 'shared/theme';
+import { resolveFooterLogo, resolveHeader, resolveHeaderLogo } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config/socialAccounts';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useDeviceBookmarks } from '../hooks/useDeviceBookmarks.js';
@@ -349,8 +349,17 @@ export default function Layout() {
   // The Branding tab's footer slot, falling back to the uploaded primary
   // logo as that tab promises. A flat seeded placeholder is not a client
   // logo, so like the header the footer shows only uploaded assets.
+  // The organizer can turn the footer logo off (#1167).
   const footerSlot = typeof theme?.logos?.footer === 'string' ? theme.logos.footer.trim() : '';
-  const footerLogo = footerSlot.split('/').length > 2 ? brandingSrc(footerSlot) : uploadedPrimary;
+  const footerLogo = !resolveFooterLogo(theme) ? null
+    : footerSlot.split('/').length > 2 ? brandingSrc(footerSlot) : uploadedPrimary;
+  // What the header shows (#1167): the name, the primary logo instead of
+  // it, or both. Without a primary logo that loads, the name is shown.
+  const headerLogo = resolveHeaderLogo(theme, Boolean(uploadedPrimary));
+  // Describes the footer logo; the event name stands in when it is blank.
+  const logoAlt = typeof theme?.logoAlt === 'string' && theme.logoAlt.trim()
+    ? theme.logoAlt.trim()
+    : eventConfig?.name ?? '';
   // A slot can point at an object that has since been deleted from the
   // bucket. The shell must degrade to the wordmark, never to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
@@ -392,6 +401,8 @@ export default function Layout() {
   const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
   const readOnlyDemo = isReadOnlyDemo(eventConfig);
   const historicalDemo = readOnlyDemo && eventConfig.shortName === 'NC Local';
+  const headerShowsLogo = !historicalDemo && headerLogo !== 'name'
+    && Boolean(uploadedPrimary) && failedLogo !== uploadedPrimary;
 
   // The navigation IS the page list (lib/siteNavigation.js). Every visible
   // page document becomes a link, in its own `order`, with system pages
@@ -594,8 +605,9 @@ export default function Layout() {
             name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}
             place={plate.edition}
+            identity={headerShowsLogo ? headerLogo : 'name'}
             mark={
-              !historicalDemo && uploadedPrimary && failedLogo !== uploadedPrimary ? (
+              headerShowsLogo ? (
                 // A wide logo keeps its own proportions at the mark's height.
                 <img
                   src={uploadedPrimary}
@@ -651,7 +663,7 @@ export default function Layout() {
             {footerLogo && failedFooterLogo !== footerLogo ? (
               <img
                 src={footerLogo}
-                alt=""
+                alt={logoAlt}
                 className="site-footer-logo mb-sm h-12 w-auto max-w-[12rem] object-contain"
                 height={48}
                 loading="lazy"

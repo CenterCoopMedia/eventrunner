@@ -29,6 +29,7 @@ function Dateline({ dates, place, className = '' }) {
  *   dates?: string | null,
  *   place?: string | null,       // the venue's city and region, or its name
  *   mark?: import('react').ReactNode,
+ *   identity?: 'name' | 'logo' | 'both', // what `mark` is: an icon beside the name, the logo instead of it, or the logo with it
  *   to?: string,                 // where the identity links
  *   mobileControl?: import('react').ReactNode, // small-screen navigation disclosure
  *   actions?: import('react').ReactNode, // account controls when navigation is beside the page
@@ -41,6 +42,7 @@ export default function Header({
   dates = null,
   place = null,
   mark = null,
+  identity = 'name',
   to = '/',
   children = null,
   mobileControl = null,
@@ -50,15 +52,22 @@ export default function Header({
   // overlay), so an unrecognized value renders the base header.
   const treatment = THEME_HEADERS.includes(variant) ? variant : DEFAULT_HEADER;
 
-  // The repeated title uses one line. Beside a mark on phones,
-  // it remains available to screen readers without taking layout space.
+  // The repeated title uses one line. Beside an icon on phones, it remains
+  // available to screen readers without taking layout space. A logo shown
+  // instead of the name keeps the name as the link's accessible name; a
+  // logo shown with the name keeps it visible at every width (#1167).
+  const logoOnly = Boolean(mark) && identity === 'logo';
+  const logoAndName = Boolean(mark) && identity === 'both';
+  const titleClass = logoOnly
+    ? ' sr-only'
+    : mark && !logoAndName ? ' site-header-title--with-mark' : '';
   const title = (
-    <span className={`site-header-title block min-w-0 truncate${mark ? ' site-header-title--with-mark' : ''}`}>
+    <span className={`site-header-title block min-w-0 truncate${titleClass}`}>
       {name}
     </span>
   );
   const wordmark = (
-    <span className="inline-flex max-w-full items-start gap-xs">
+    <span className={`inline-flex max-w-full items-start gap-xs${logoAndName ? ' site-header-wordmark--both' : ''}`}>
       {mark}
       {title}
     </span>
@@ -89,7 +98,7 @@ export default function Header({
       <div className="site-header-treatment site-header-minimal flex flex-wrap items-center gap-x-md gap-y-2xs border-b-hairline border-b-rule-hairline py-sm">
         <p className="site-header-identity font-heading text-body text-text-primary">
           {identityLink(
-            mark ? (
+            mark && !logoAndName ? (
               <>
                 {mark}
                 <span className="sr-only">{name}</span>

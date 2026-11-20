@@ -182,8 +182,43 @@ const THEME_LOGO_SLOTS = Object.freeze(['primary', 'mark', 'footer', 'ogDefault'
 const THEME_DOC_KEYS = Object.freeze([
   'colors', 'fonts', 'texture', 'radius', 'density', 'mode', 'header',
   'logos', 'placeholderLogos', 'preset', 'optionPicks', 'tokens', 'motifSet',
-  'brandColor', 'navPlacement', 'adminScheme',
+  'brandColor', 'navPlacement', 'adminScheme', 'headerLogo', 'footerLogo', 'logoAlt',
 ]);
+
+/**
+ * What the header shows as the site's identity (#1167): the event name, the
+ * primary logo instead of the name, or both. `name` may still carry the
+ * square icon beside the name, as it always has.
+ */
+const THEME_HEADER_LOGOS = Object.freeze(['name', 'logo', 'both']);
+
+/** The longest logo description a theme may store. */
+const THEME_LOGO_ALT_MAX = 150;
+
+/**
+ * The header identity a theme asks for. A theme that has not chosen keeps
+ * the rule the header had before the choice existed: an uploaded primary
+ * logo leads the name, otherwise the name stands alone.
+ *
+ * @param {object} theme
+ * @param {boolean} hasLogo whether an uploaded primary logo resolves
+ * @returns {'name'|'logo'|'both'}
+ */
+function resolveHeaderLogo(theme, hasLogo) {
+  if (THEME_HEADER_LOGOS.includes(theme?.headerLogo)) return theme.headerLogo;
+  return hasLogo ? 'both' : 'name';
+}
+
+/**
+ * Whether the footer shows a logo. A theme that has not chosen shows one
+ * whenever a footer or primary logo is set (#1166).
+ *
+ * @param {object} theme
+ * @returns {boolean}
+ */
+function resolveFooterLogo(theme) {
+  return typeof theme?.footerLogo === 'boolean' ? theme.footerLogo : true;
+}
 
 /**
  * The `config/theme.colors` keys the dark derivation covers. Order is the
@@ -1434,6 +1469,10 @@ module.exports = {
   THEME_DENSITY_STEPS,
   THEME_LOGO_SLOTS,
   THEME_DOC_KEYS,
+  THEME_HEADER_LOGOS,
+  THEME_LOGO_ALT_MAX,
+  resolveHeaderLogo,
+  resolveFooterLogo,
   THEME_NAV_PLACEMENTS,
   DEFAULT_NAV_PLACEMENT,
   THEME_COLOR_KEYS,

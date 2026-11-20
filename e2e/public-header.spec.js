@@ -135,3 +135,45 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
     });
   }
 }
+
+// Header logo choice (#1167): "Logo only" and "Logo and name" at phone and
+// desktop widths. The home link keeps the event name either way.
+for (const variant of ['standard', 'masthead']) {
+  for (const identity of ['logo', 'both']) {
+    test(`${variant} header with a wide logo shows ${identity === 'logo' ? 'the logo only' : 'the logo and the name'}`, async ({ page }) => {
+      await page.route('**/*', (route) => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+      for (const width of [390, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(`${origin}/?variant=${variant}&logo=wide&identity=${identity}&source=after`);
+        const home = page.getByRole('link', { name: NAME, exact: true });
+        await expect(home).toBeVisible();
+        await page.evaluate(() => globalThis.document.fonts.ready);
+        await page.locator('header img').evaluateAll((images) => Promise.all(images.map((image) => image.decode())));
+        const measured = await page.locator('header').evaluate((header) => {
+          const logo = header.querySelector('img').getBoundingClientRect();
+          const title = header.querySelector('.site-header-title');
+          const box = title.getBoundingClientRect();
+          return {
+            logo: { top: logo.top, bottom: logo.bottom, right: logo.right, height: logo.height, width: logo.width },
+            title: { top: box.top, left: box.left, width: box.width },
+            titleHidden: globalThis.getComputedStyle(title).position === 'absolute',
+            scrollWidth: globalThis.document.documentElement.scrollWidth,
+          };
+        });
+        await page.screenshot({ path: path.join(EVIDENCE, `public-header-logo--${variant}--${identity}--${width}.png`), animations: 'disabled' });
+        expect(measured.scrollWidth).toBeLessThanOrEqual(width);
+        expect(measured.logo.height).toBeGreaterThan(0);
+        expect(measured.logo.width / measured.logo.height).toBeCloseTo(240 / 48, 1);
+        if (identity === 'logo') {
+          expect(measured.titleHidden).toBe(true);
+        } else {
+          expect(measured.titleHidden).toBe(false);
+          expect(measured.title.width).toBeGreaterThan(0);
+          // Beside the logo on a desktop, under it on a phone.
+          if (width === 390) expect(measured.title.top).toBeGreaterThanOrEqual(measured.logo.bottom - 1);
+          else expect(measured.title.left).toBeGreaterThanOrEqual(measured.logo.right);
+        }
+      }
+    });
+  }
+}

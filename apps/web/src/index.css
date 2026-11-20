@@ -2678,6 +2678,12 @@
     .site-header-title--with-mark {
       @apply sr-only;
     }
+    /* Logo and name on a phone: the name sits under the logo rather than
+       beside it, so neither is cut short (#1167). */
+    .site-header-wordmark--both {
+      flex-direction: column;
+      gap: var(--space-3xs);
+    }
     .site-masthead__bar,
     .site-header-identity-row {
       display: flex;
