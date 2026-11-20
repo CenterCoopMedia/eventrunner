@@ -36,8 +36,7 @@ let origin;
 test.beforeAll(async () => {
   const { createServer } = await import('vite');
   const { default: react } = await import('@vitejs/plugin-react');
-  // configFile is off, so reuse the console's prebundle list; without it the
-  // dev server serves the CommonJS shared package with no default export.
+  // configFile is off, so reuse the Console's resolver and prebundle list.
   const { default: consoleConfig } = await import('../console/web/vite.config.js');
   server = await createServer({
     configFile: false,
@@ -55,6 +54,7 @@ test.beforeAll(async () => {
       },
       react(),
     ],
+    resolve: consoleConfig.resolve,
     optimizeDeps: consoleConfig.optimizeDeps,
     server: { host: '127.0.0.1', port: 0, fs: { allow: [ROOT] } },
     define: {

@@ -57,6 +57,7 @@ test.beforeAll(async () => {
   console.log(`console-design: before console source ${base}; after ${git(['rev-parse', 'HEAD']).trim()}`);
   const { build, preview } = await import('vite');
   const { default: react } = await import('@vitejs/plugin-react');
+  const { default: consoleConfig } = await import('../console/web/vite.config.js');
   const savedNodeEnvironment = process.env.NODE_ENV;
   try {
     for (const phase of ['before', 'after']) {
@@ -72,6 +73,7 @@ test.beforeAll(async () => {
       } else await fs.cp(path.join(ROOT, 'console/web/public'), publicDir, { recursive: true });
       const outDir = path.join(scratch, phase);
       await build({ configFile: false, root: FIXTURE, base: '/', publicDir, logLevel: 'warn',
+        resolve: consoleConfig.resolve,
         plugins: [{ name: 'console-design-source', enforce: 'pre',
           resolveId(source, importer) {
             if (importer && source.startsWith('.') && path.resolve(path.dirname(importer.split('?')[0]), source) === FIREBASE) {
