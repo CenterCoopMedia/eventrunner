@@ -29,6 +29,16 @@ function countProgress(progress, key) {
 }
 
 export function publishRunCounts(row) {
+  const replacement = row?.mediaReplacement;
+  if (Array.isArray(replacement?.places)) {
+    return {
+      requested: replacement.places.length,
+      published: replacement.places.filter(({ docPath }) => replacement.completed?.[docPath.replace(/_drafts\//, '/')] === true).length,
+      skipped: replacement.places.filter(({ docPath }) => typeof replacement.completed?.[docPath.replace(/_drafts\//, '/')] === 'string').length,
+      measured: replacement.places.length > 1,
+      replacing: true,
+    };
+  }
   return {
     requested: countIds(row?.request),
     published: countProgress(row?.progress, 'published'),
@@ -51,16 +61,17 @@ const RUN_WORDS = Object.freeze({
  * @returns {{ id: string, word: string, tone: string, sentence: string|null }}
  */
 export function runSummary(row) {
-  const { requested, published, skipped } = publishRunCounts(row);
+  const { requested, published, skipped, replacing } = publishRunCounts(row);
   const known = RUN_WORDS[row?.status];
   if (!known) return { id: row?.id, word: 'Unknown', tone: 'neutral', sentence: null };
   let sentence;
+  const action = replacing ? 'image placements updated' : 'published';
   if (row.status === 'done') {
-    sentence = `${published} of ${requested} published.`;
+    sentence = `${published} of ${requested} ${action}.`;
   } else if (row.status === 'running') {
-    sentence = `${published} of ${requested} published so far.`;
+    sentence = `${published} of ${requested} ${action} so far.`;
   } else {
-    sentence = `${published} of ${requested} published before it stopped.`;
+    sentence = `${published} of ${requested} ${action} before it stopped.`;
   }
   if (skipped > 0) sentence += ` ${skipped} skipped.`;
   return { id: row.id, word: known.word, tone: known.tone, sentence };

@@ -32,6 +32,7 @@ import AssetModal from './AssetModal.jsx';
 import { BRANDING_NOTE } from './mediaErrors.js';
 import UploadModal from './UploadModal.jsx';
 import AdminIconControl from '../AdminIconControl.jsx';
+import ModalShell from './ModalShell.jsx';
 
 /** Case-insensitive match across the fields a person would search by. */
 function matches(asset, term) {
@@ -58,9 +59,10 @@ export default function MediaLibrary({
   selectedPath = null,
   selectedPaths = null,
   emptyHint = null,
+  excludedAssetId = null,
 }) {
   const library = useMediaLibrary({ folder });
-  const { assets, loading, error, scanUsage, upload, updateMetadata, remove } = library;
+  const { assets, loading, error, scanUsage, upload, updateMetadata, remove, replace } = library;
   const { adminTier } = useAuth();
   const operator = adminTier === 'operator';
   const brandingLocked = folder === 'branding' && !operator;
@@ -71,7 +73,7 @@ export default function MediaLibrary({
   const searchRef = useRef(null);
   const searchId = useId();
 
-  const visible = useMemo(() => assets.filter((asset) => matches(asset, term)), [assets, term]);
+  const visible = useMemo(() => assets.filter((asset) => asset.id !== excludedAssetId && matches(asset, term)), [assets, excludedAssetId, term]);
   const choosing = typeof onSelect === 'function';
 
   return (
@@ -169,7 +171,7 @@ export default function MediaLibrary({
                   )}
                 </span>
               </button>
-              {choosing ? (
+              {choosing && !excludedAssetId ? (
                 <AdminIconControl
                   label={`File details for ${asset.title || asset.filename || 'image'}`}
                   icon="more"
@@ -205,6 +207,12 @@ export default function MediaLibrary({
           scanUsage={scanUsage}
           updateMetadata={updateMetadata}
           remove={remove}
+          replace={replace}
+          renderReplacementPicker={({ onSelect, onClose, returnFocusRef }) => (
+            <ModalShell title="Choose the replacement image" onClose={onClose} returnFocusRef={returnFocusRef}>
+              <MediaLibrary folder={folder} excludedAssetId={detail.id} onSelect={onSelect} />
+            </ModalShell>
+          )}
           operator={operator}
           returnFocusRef={searchRef}
           onChanged={({ type, asset: changed }) => {

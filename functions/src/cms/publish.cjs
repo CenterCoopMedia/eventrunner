@@ -34,7 +34,8 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 const { listDirty, publishDocs, logAdminAction, isValidDocId, isAlreadyExistsError, internals } = require('./store.cjs');
-const { publisherNotificationSecrets, refreshSiteAfterPublish, withPublisherNotifier } = require('./publisher.cjs');
+const { publisherNotificationSecrets, refreshSiteAfterPublish, requestSitePublish, withPublisherNotifier } = require('./publisher.cjs');
+const { runMediaReplacement } = require('../media/replace.cjs');
 const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
 const { isComingSoon } = require('./launch.cjs');
 
@@ -127,6 +128,7 @@ function createCmsPublishHandler({
   env = process.env,
   fetchImpl,
   notifyOperator,
+  getBucket = () => require('../core/storage.cjs').getBucket(),
   now = Date.now,
   log = console,
 }) {
@@ -134,12 +136,20 @@ function createCmsPublishHandler({
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
-    const { queueId, requestId } = req.body || {};
+    const { queueId, requestId, mediaReplacement } = req.body || {};
     if (requestId !== undefined) {
       if (queueId !== undefined) return badRequest(res, 'Use queueId alone to resume a publish.');
       if (typeof requestId !== 'string' || requestId.length !== 36 || !REQUEST_ID_PATTERN.test(requestId)) {
         return badRequest(res, 'requestId must be a lowercase UUID v4.');
       }
+    }
+    const replace = (queueRef, body) => runMediaReplacement({
+      db, getBucket, queueRef, body, actor, now, log, res,
+      publish: (queueId) => requestSitePublish({ db, queueId, env, fetchImpl, notifyOperator, now, log }),
+    });
+    if (mediaReplacement !== undefined) {
+      if (!requestId) return badRequest(res, 'An image replacement requires a requestId.');
+      return replace(db.collection('cmsPublishQueue').doc(requestId), mediaReplacement);
     }
 
     let queueRef;
@@ -155,6 +165,7 @@ function createCmsPublishHandler({
       const snap = await queueRef.get();
       if (!snap.exists) return notFound(res, 'No such publish queue row.');
       const row = snap.data();
+      if (row.mediaReplacement) return replace(queueRef);
       if (row.status === 'done') {
         return res.status(200).json({ queueId: queueRef.id, status: 'done', results: row.progress || {} });
       }
@@ -329,7 +340,6 @@ function createUpdatePublishStatusHandler({ db, auth, getConfig, now = Date.now,
     const ref = db.collection('cmsPublishQueue').doc(queueId);
     const snap = await ref.get();
     if (!snap.exists) return notFound(res, 'No such publish queue row.');
-
     await ref.set(
       {
         status,

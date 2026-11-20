@@ -55,10 +55,10 @@ export function useMediaLibrary({ folder = null } = {}) {
 
   /** Scan the library (or specific paths) so the UI can warn before deleting. */
   const scanUsage = useCallback(
-    async (paths = null) => {
-      const response = await call('scanMediaUsage', paths ? { paths } : {});
+    async (paths = null, { replacement = false } = {}) => {
+      const response = await call('scanMediaUsage', paths ? { paths, ...(replacement ? { replacement } : {}) } : {});
       const scanned = response?.usage ?? {};
-      setUsage((current) => ({ ...current, ...scanned }));
+      if (!replacement) setUsage((current) => ({ ...current, ...scanned }));
       return scanned;
     },
     [call],
@@ -94,6 +94,10 @@ export function useMediaLibrary({ folder = null } = {}) {
     ({ assetId, force = false }) => call('mediaDelete', { assetId, force }),
     [call],
   );
+  const replace = useCallback(
+    (requestId, mediaReplacement) => call('cmsPublish', { requestId, mediaReplacement }),
+    [call],
+  );
 
   return {
     assets,
@@ -104,5 +108,6 @@ export function useMediaLibrary({ folder = null } = {}) {
     upload,
     updateMetadata,
     remove,
+    replace,
   };
 }

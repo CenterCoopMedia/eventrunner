@@ -134,6 +134,12 @@ function changesWords(count) {
  * @returns {{ ok: boolean, message: string }}
  */
 export function summarizeAll(response) {
+  if (Array.isArray(response?.failed)) {
+    const failures = response.failed.length;
+    return failures > 0
+      ? { ok: false, message: `${failures} ${failures === 1 ? 'image placement needs' : 'image placements need'} attention. Open the Media Library to review.` }
+      : { ok: true, message: 'Image replacement complete.' };
+  }
   const results = response?.results && typeof response.results === 'object' ? response.results : {};
   const collections = Object.keys(results);
   if (collections.length === 0) return { ok: true, message: 'Nothing was waiting to be published.' };

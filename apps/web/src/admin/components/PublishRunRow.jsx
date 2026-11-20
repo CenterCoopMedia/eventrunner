@@ -29,12 +29,16 @@ export default function RunRow({ row, timeZone, busyKey, controlProps, notice, r
       </p>
       {failed ? (
         <div className="flex flex-col items-start gap-2xs">
-          <p className="text-admin-sm text-admin-ink">Some changes were not published. Resume to finish publishing them.</p>
-          <p className="text-admin-sm text-admin-ink-secondary">
-            Resume publishes the latest saved changes that are still waiting.
-          </p>
+          {row.mediaReplacement ? (
+            <p className="text-admin-sm text-admin-ink">Resume the replacement to retry the remaining image placements.</p>
+          ) : (
+            <>
+              <p className="text-admin-sm text-admin-ink">Some changes were not published. Resume to finish publishing them.</p>
+              <p className="text-admin-sm text-admin-ink-secondary">Resume publishes the latest saved changes that are still waiting.</p>
+            </>
+          )}
           <button type="button" {...controlProps(key, secondaryButtonClass)}>
-            {busyKey === key ? 'Resuming…' : 'Resume publish'}
+            {busyKey === key ? 'Resuming…' : row.mediaReplacement ? 'Resume replacement' : 'Resume publish'}
           </button>
         </div>
       ) : null}

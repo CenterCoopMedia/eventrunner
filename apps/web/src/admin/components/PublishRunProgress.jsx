@@ -33,10 +33,12 @@ export default function PublishRunProgress({ run }) {
   const showBar = Boolean(active && counts?.measured && counts.requested > 0 && elapsed >= SHOW_BAR_MS);
   let countMessage = '';
   if (counts?.requested > 0 && (!active || showBar)) {
-    const { published, requested, skipped } = counts;
-    const noun = requested === 1 ? 'change' : 'changes';
+    const { published, requested, skipped, replacing } = counts;
+    const action = replacing
+      ? (requested === 1 ? 'image placement updated' : 'image placements updated')
+      : (requested === 1 ? 'change published' : 'changes published');
     const ending = active ? '.' : ' before the run stopped.';
-    countMessage = `${published} of ${requested} ${noun} published${ending}`;
+    countMessage = `${published} of ${requested} ${action}${ending}`;
     if (skipped > 0) countMessage += ` ${skipped} skipped.`;
   }
 

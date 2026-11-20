@@ -209,6 +209,15 @@ describe('runSummary', () => {
     expect(runSummary({ id: 'q6', status: 'complete' })).toEqual({ id: 'q6', word: 'Unknown', tone: 'neutral', sentence: null });
     expect(runSummary({ id: 'q7' }).word).toBe('Unknown');
   });
+
+  it('counts committed draft and published placements in a replacement receipt', () => {
+    const mediaReplacement = {
+      places: [{ docPath: 'cmsContent/hero' }, { docPath: 'cmsContent_drafts/hero' }, { docPath: 'config/theme' }],
+      completed: { 'cmsContent/hero': true },
+    };
+    expect(runSummary({ id: 'replace', status: 'failed', mediaReplacement }).sentence)
+      .toBe('2 of 3 image placements updated before it stopped.');
+  });
 });
 
 describe('mergeRuns', () => {

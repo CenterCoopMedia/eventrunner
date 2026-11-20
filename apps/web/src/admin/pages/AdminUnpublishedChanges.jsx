@@ -281,8 +281,8 @@ export default function AdminUnpublishedChanges() {
     setBusyKey(key);
     setNotice(null);
     let result;
+    const resumeRow = body.queueId ? runs.runs.find((row) => row.id === body.queueId) : null;
     try {
-      const resumeRow = body.queueId ? runs.runs.find((row) => row.id === body.queueId) : null;
       const response = await publishTracked(body, resumeRow);
       result = read(response);
     } catch (err) {
@@ -291,7 +291,7 @@ export default function AdminUnpublishedChanges() {
       busyRef.current = false;
       setBusyKey(null);
     }
-    const message = result.ok && key !== 'open' ? 'Published.' : result.message;
+    const message = result.ok && key !== 'open' && !resumeRow?.mediaReplacement ? 'Published.' : result.message;
     setNotice({ key, tone: result.ok ? 'ok' : 'error', message });
     showToast(message, result.ok ? { announce: false } : { tone: 'error', announce: false });
   }
