@@ -23,6 +23,19 @@ import { presetRemapsLoaded, registerPresetRemaps } from 'shared/theme';
 
 let loading = null;
 
+async function importPresetRemaps() {
+  const module = await import('shared/presetRemaps');
+  if (presetRemapsLoaded()) return;
+  // Keep this check outside the import. Vite wraps the import and can fulfill
+  // it with undefined when the preload error listener starts a reload.
+  if (!module) {
+    const error = new Error('The preset remaps module did not load.');
+    error.name = 'ChunkLoadError';
+    throw error;
+  }
+  registerPresetRemaps(module.PRESET_REMAPS);
+}
+
 /**
  * Resolve once the remaps are registered.
  *
@@ -31,14 +44,10 @@ let loading = null;
 export function loadPresetRemaps() {
   if (presetRemapsLoaded()) return Promise.resolve();
   if (!loading) {
-    loading = import('shared/presetRemaps')
-      .then((module) => {
-        if (!presetRemapsLoaded()) registerPresetRemaps(module.PRESET_REMAPS);
-      })
-      .catch((error) => {
-        loading = null;
-        throw error;
-      });
+    loading = importPresetRemaps().catch((error) => {
+      loading = null;
+      throw error;
+    });
   }
   return loading;
 }

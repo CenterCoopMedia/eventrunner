@@ -1,10 +1,20 @@
 // Smoke test: the app shell renders end to end from the committed historical
 // snapshot — providers nest, routes resolve, and the snapshot content
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import EventRouter from './EventRouter.jsx';
+
+let delayedRemaps;
+vi.mock('./lib/presetRemaps.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    loadPresetRemaps: () => delayedRemaps ?? actual.loadPresetRemaps(),
+    presetRemapsLoaded: () => !delayedRemaps && actual.presetRemapsLoaded(),
+  };
+});
 
 let renderFailure = null;
 vi.mock('./pages/Home.jsx', async (importOriginal) => {
@@ -120,7 +130,7 @@ vi.mock('./lib/profileSource.js', () => ({
 import App from './App.jsx';
 import { collection, doc, where } from 'firebase/firestore';
 import { reloadPage } from './lib/pageReload.js';
-import { eventConfig } from '@generated/eventConfig.js';
+import { eventConfig, theme as snapshotTheme } from '@generated/eventConfig.js';
 import siteContent from '@generated/siteContent.js';
 import pagesData from '@generated/pagesData.js';
 
@@ -410,6 +420,60 @@ describe('app shell', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Draft-only headline' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('direct entry while the preset remaps load', () => {
+  beforeEach(() => {
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    delayedRemaps = undefined;
+    history.replaceState(null, '', '/');
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it.each(['/', '/events/workshop/'])('keeps the update readable under %s and applies the complete live style', async (base) => {
+    const remaps = Promise.withResolvers();
+    delayedRemaps = remaps.promise;
+    vi.stubEnv('BASE_URL', base);
+    history.replaceState(null, '', `${base}updates/arrival`);
+    render(<EventRouter><App /></EventRouter>);
+    act(() => {
+      configSubscriptions.get('theme')({ preset: 'zine' });
+      contentSubscriptions.get('cmsUpdates').onNext([{ id: 'arrival', title: 'Workshop arrival', visible: true }]);
+    });
+
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Workshop arrival' });
+    const root = document.documentElement;
+    const runtimeStyle = document.getElementById('event-theme-runtime');
+    expect(root.dataset.theme).toBe(snapshotTheme.preset);
+    expect(runtimeStyle.textContent).toBe('');
+    expect(screen.getByRole('link', { name: /Back to updates/ })).toHaveAttribute('href', `${base}updates`);
+
+    await act(async () => {
+      delayedRemaps = undefined;
+      remaps.resolve();
+    });
+    expect(root.dataset.theme).toBe('zine');
+    expect(runtimeStyle.textContent).toContain('--callout-angle: -2.5deg;');
+    expect(heading).toBeInTheDocument();
+  });
+
+  it('holds the Admin route until the remaps load', async () => {
+    const remaps = Promise.withResolvers();
+    delayedRemaps = remaps.promise;
+    renderAt('/admin/branding');
+    expect(screen.getByText('Loading admin…')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: /sign in/i })).not.toBeInTheDocument();
+
+    await act(async () => {
+      delayedRemaps = undefined;
+      remaps.resolve();
+    });
+    expect(await screen.findByRole('heading', { level: 1, name: /sign in/i })).toBeInTheDocument();
   });
 });
 
