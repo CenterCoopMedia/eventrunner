@@ -110,7 +110,7 @@ test('an applicant reaches setup without review chunks, with focus after a delay
     await page.getByRole('link', { name: ORG.name, exact: true }).click();
     await page.getByRole('link', { name: 'Synthetic gathering', exact: true }).click();
     await page.getByRole('link', { name: 'Continue the setup' }).click();
-    await expect(page.getByRole('status')).toHaveText('Loading.');
+    await expect(page.getByRole('status')).toHaveText('Loading the page.');
     await expect(page.getByRole('main')).toBeFocused();
     release();
     await expect(page.getByRole('heading', { name: 'Your organization', exact: true })).toBeVisible();
