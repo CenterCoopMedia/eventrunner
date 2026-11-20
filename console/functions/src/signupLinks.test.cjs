@@ -302,6 +302,7 @@ test('only a current Owner can add the event to an organization, and a refusal l
   await assert.rejects(redeem('o2', ana), { status: 404 });
   await assert.rejects(redeem('nope', ana), { status: 404 });
   await assert.rejects(redeem('a/b', ana), { status: 400 });
+  await assert.rejects(redeem(42, ana), { status: 400 });
   await db.collection('organizations').doc('o1').collection('members').doc('ana').delete();
   await assert.rejects(redeem('o1', ana), { status: 404 }, 'a removed Owner is refused');
   assert.equal(db.paths('').length, before - 1, 'only the removed membership is gone');

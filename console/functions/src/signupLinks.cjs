@@ -181,8 +181,8 @@ async function targetOrganization(tx, db, body, user) {
   if (body.orgId === undefined || body.orgId === null || body.orgId === '') {
     return { orgRef: db.collection('organizations').doc(), organizationName: requireName(body.organizationName), carried: null, isNew: true };
   }
-  const orgRef = db.collection('organizations').doc(body.orgId);
   await requireOwner(db, body.orgId, user, NOT_OWNER, get);
+  const orgRef = db.collection('organizations').doc(body.orgId);
   const org = await get(orgRef);
   const requests = await get(db.collection(APPLICATIONS).where('orgId', '==', body.orgId));
   return {
