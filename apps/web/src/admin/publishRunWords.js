@@ -64,6 +64,9 @@ export function runSummary(row) {
   const { requested, published, skipped, replacing } = publishRunCounts(row);
   const known = RUN_WORDS[row?.status];
   if (!known) return { id: row?.id, word: 'Unknown', tone: 'neutral', sentence: null };
+  if (row.menuOrder && row.status === 'done') {
+    return { id: row.id, word: known.word, tone: known.tone, sentence: 'Menu order published.' };
+  }
   let sentence;
   const action = replacing ? 'image placements updated' : 'published';
   if (row.status === 'done') {

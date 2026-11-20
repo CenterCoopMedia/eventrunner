@@ -38,6 +38,7 @@ const { publisherNotificationSecrets, refreshSiteAfterPublish, requestSitePublis
 const { runMediaReplacement } = require('../media/replace.cjs');
 const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
 const { isComingSoon } = require('./launch.cjs');
+const { publishMenuOrder } = require('./menuOrder.cjs');
 
 const MAX_DOC_IDS = 2000;
 const QUEUE_LIST_DEFAULT = 20;
@@ -136,16 +137,26 @@ function createCmsPublishHandler({
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
-    const { queueId, requestId, mediaReplacement } = req.body || {};
+    const { queueId, requestId, mediaReplacement, menuOrder } = req.body || {};
     if (requestId !== undefined) {
       if (queueId !== undefined) return badRequest(res, 'Use queueId alone to resume a publish.');
       if (typeof requestId !== 'string' || requestId.length !== 36 || !REQUEST_ID_PATTERN.test(requestId)) {
         return badRequest(res, 'requestId must be a lowercase UUID v4.');
       }
     }
+    const publishSnapshot = (id) => requestSitePublish({ db, queueId: id, env, fetchImpl, notifyOperator, now, log });
+    if (menuOrder !== undefined) {
+      if (!requestId || mediaReplacement !== undefined || req.body.all || req.body.collection || req.body.docIds) {
+        return badRequest(res, 'Publish the menu order on its own.');
+      }
+      return publishMenuOrder({
+        db, ids: menuOrder, queueRef: db.collection('cmsPublishQueue').doc(requestId),
+        actor, now, log, res, publish: publishSnapshot,
+      });
+    }
     const replace = (queueRef, body) => runMediaReplacement({
       db, getBucket, queueRef, body, actor, now, log, res,
-      publish: (queueId) => requestSitePublish({ db, queueId, env, fetchImpl, notifyOperator, now, log }),
+      publish: publishSnapshot,
     });
     if (mediaReplacement !== undefined) {
       if (!requestId) return badRequest(res, 'An image replacement requires a requestId.');
