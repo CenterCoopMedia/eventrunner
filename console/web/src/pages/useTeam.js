@@ -11,21 +11,31 @@ export function useTeam(orgId) {
   const [stale, setStale] = useState(false);
   const inFlight = useRef(false);
 
-  // A read repeated while an older one hangs: only the newest one lands. A
-  // superseded read returns null, and its caller leaves the state to the
-  // newer read.
-  const latest = useRef(0);
+  // Reads land in the order they started: the first answer shows at once,
+  // and an older read that answers after a newer one has landed (with a
+  // team or a failure) returns null, so its caller leaves the state to the
+  // newer read. The count belongs to the organization on screen: a new one
+  // starts a new count, and a read or a mutation's follow-up for a previous
+  // organization never starts, lands or resets it.
+  const reads = useRef({ orgId, started: 0, landed: 0 });
+  if (reads.current.orgId !== orgId) reads.current = { orgId, started: 0, landed: 0 };
+  const refreshes = useRef(0);
   const load = useCallback(async () => {
-    const attempt = ++latest.current;
+    if (reads.current.orgId !== orgId) return null;
+    const count = reads.current;
+    const attempt = ++count.started;
+    const current = () => count === reads.current && attempt >= count.landed;
     try {
       const body = await callApi('getTeam', { orgId });
-      if (attempt !== latest.current) return null;
+      if (!current()) return null;
+      count.landed = attempt;
       setData(body);
       setError('');
       setStale(false);
       return '';
     } catch (err) {
-      if (attempt !== latest.current) return null;
+      if (!current()) return null;
+      count.landed = attempt;
       setError(err.message);
       return err.message;
     }
@@ -34,11 +44,13 @@ export function useTeam(orgId) {
   useEffect(() => { load(); }, [load]);
 
   const refresh = useCallback(async () => {
+    refreshes.current += 1;
     setRefreshing(true);
     const problem = await load();
+    refreshes.current -= 1;
+    setRefreshing(refreshes.current > 0);
     if (problem === null) return;
     setOutcome((current) => current ? { ...current, refreshError: problem ? `We could not refresh the team. ${problem}` : '' } : current);
-    setRefreshing(false);
   }, [load]);
 
   const change = useCallback(async (name, body, message) => {
@@ -49,6 +61,7 @@ export function useTeam(orgId) {
     setOutcome(null);
     try {
       await callApi(name, { orgId, ...body });
+      if (reads.current.orgId !== orgId) return true;
       const problem = await load();
       if (problem !== null) setStale(Boolean(problem));
       setOutcome({ key, kind: 'success', message, refreshError: problem ? `The change is saved, but we could not refresh the team. ${problem}` : '' });
