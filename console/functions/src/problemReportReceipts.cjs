@@ -23,6 +23,7 @@ async function storeProblemReportReceipt({ db, now }, id, report, reporter, rend
       description: report.description,
       url: report.url,
       project: reporter.project,
+      reporterEmail: reporter.email,
       createdAt,
       expiresAt,
       screenshotCount: images.length,
@@ -47,7 +48,7 @@ async function getProblemReportReceipts({ db, now }, { user, body }) {
     if (typeof body.id !== 'string' || !SCREENSHOT_ID_RE.test(body.id)) throw new ConsoleError(404, 'not-found', MISSING);
     const doc = await db.collection(RECEIPTS).doc(body.id).get();
     if (!available(doc.data(), now)) throw new ConsoleError(404, 'not-found', MISSING);
-    return { body: { receipt: receiptView(doc) } };
+    return { body: { receipt: { ...receiptView(doc), reporterEmail: doc.data().reporterEmail ?? null } } };
   }
   const list = await db.collection(RECEIPTS).orderBy('createdAt', 'desc').limit(30).get();
   const receipts = list.docs.filter((doc) => available(doc.data(), now)).map(receiptView);

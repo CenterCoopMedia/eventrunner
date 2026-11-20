@@ -36,6 +36,7 @@ export default function ProblemReportReceipts() {
       {data?.receipt ? (
         <div>
           <p>{LABELS[data.receipt.category]} · {data.receipt.project}</p>
+          {data.receipt.reporterEmail ? <p className="report-description">Reporter {data.receipt.reporterEmail}</p> : null}
           <p className="report-description">{data.receipt.description}</p>
           <p className="report-description">Page <a href={data.receipt.url}>{data.receipt.url}</a></p>
           <ScreenshotViewer

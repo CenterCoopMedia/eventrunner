@@ -140,7 +140,13 @@ test('screenshots stay in the Console receipt, out of the relay, and require ope
   assert.ok(!JSON.stringify(sent[0].body).includes('problem-reports'));
   const receipt = await getProblemReportReceipts(deps, { user: operator, body: { id } });
   assert.equal(receipt.body.receipt.screenshotCount, 1);
+  assert.equal(receipt.body.receipt.reporterEmail, 'pat@example.org');
   assert.ok(!('image' in receipt.body.receipt));
+  const list = await getProblemReportReceipts(deps, { user: operator, body: {} });
+  assert.ok(!('reporterEmail' in list.body.receipts[0]));
+  await assert.rejects(() => getProblemReportReceipts(deps, {
+    user: { email: 'client@example.test' }, body: { id },
+  }), { status: 403 });
   await assert.rejects(() => readProblemReportScreenshot(deps, {
     user: { email: 'client@example.test' }, body: { id, index: 0 },
   }), { status: 403 });

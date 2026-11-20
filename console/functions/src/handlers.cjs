@@ -257,7 +257,7 @@ function buildHandlers({ startBuild } = {}) {
     return clientAuths.get(projectId);
   };
   handlers[REPORT_FUNCTION] = onRequest({
-    region, secrets: [...reportSecrets, postmarkToken], memory: '512MiB', concurrency: 2,
+    region, secrets: [...reportSecrets, postmarkToken], memory: '512MiB', cpu: 1, concurrency: 2,
   }, async (req, res) => {
     const origin = req.headers?.origin;
     const extraOrigins = parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS);

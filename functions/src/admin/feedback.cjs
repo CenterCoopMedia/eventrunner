@@ -409,7 +409,7 @@ function buildHandlers() {
   };
 
   return {
-    submitFeedback: onRequest({ region, secrets, memory: '512MiB', concurrency: 2 }, withCors(async (req, res) => {
+    submitFeedback: onRequest({ region, secrets, memory: '512MiB', cpu: 1, concurrency: 2 }, withCors(async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');
       const { getEventConfig } = require('../core/config.cjs');
       const { getEmailProvider } = require('../email/providers/index.cjs');

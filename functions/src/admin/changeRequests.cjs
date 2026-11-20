@@ -824,7 +824,7 @@ function buildHandlers() {
   } = require('./changeRequestNotices.cjs');
 
   return {
-    submitChangeRequest: expose(createSubmitChangeRequestHandler, { secrets, memory: '512MiB', concurrency: 2 }),
+    submitChangeRequest: expose(createSubmitChangeRequestHandler, { secrets, memory: '512MiB', cpu: 1, concurrency: 2 }),
     updateChangeRequestStatus: expose(createUpdateChangeRequestStatusHandler, { secrets }),
     saveChangeRequestOutcome: expose(createSaveChangeRequestOutcomeHandler),
     deleteChangeRequest: expose(createDeleteChangeRequestHandler),
