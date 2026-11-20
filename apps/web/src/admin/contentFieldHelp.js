@@ -13,7 +13,7 @@ const FIELD_HINTS = Object.freeze({
   },
   cta: {
     label: 'Write the short action phrase shown on the button or link.',
-    url: 'Enter the page address this button or link should open.',
+    url: 'Enter a full web address that starts with https://, or a page on this site such as /travel.',
     external: 'Open this link in a new tab when it leads away from the event site.',
   },
   stat: STAT_CONTRACT_HINTS,
@@ -28,7 +28,7 @@ const FIELD_HINTS = Object.freeze({
   link_group: {
     group: 'Name the group this link belongs under.',
     label: 'Write the text attendees should select to open the link.',
-    url: 'Enter the page address this link should open.',
+    url: 'Enter a full web address that starts with https://, or a page on this site such as /travel.',
   },
 });
 
