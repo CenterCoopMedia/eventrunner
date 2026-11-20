@@ -58,6 +58,7 @@ function shellQuote(value) {
 
 export default defineConfig({
   testDir: './e2e',
+  testMatch: process.env.PLAYWRIGHT_CONSOLE_ONLY === 'true' ? '**/console-*.spec.js' : undefined,
   // The four journeys share one seeded emulator project (config/bootstrap,
   // the demo fixture's speakers/sessions) — running spec files in parallel
   // would race writes to that shared state, so the whole suite is serial.

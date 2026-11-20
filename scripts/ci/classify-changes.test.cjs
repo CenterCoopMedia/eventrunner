@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { changedPaths, classifyPaths, JOB_NAMES } = require('./classify-changes.cjs');
+const { changedPaths, classifyEvent, classifyPaths, JOB_NAMES } = require('./classify-changes.cjs');
 
 function selected(result) {
   return JOB_NAMES.filter((name) => result.jobs[name]);
@@ -27,6 +27,7 @@ test('docs-only changes select documentation checks and the copy gate', () => {
   assert.equal(result.jobs.unitWeb, false);
   assert.equal(result.jobs.rules, false);
   assert.equal(result.jobs.e2e, false);
+  assert.equal(result.e2eConsoleOnly, false);
 });
 
 test('a document a unit test reads also selects the unit tier', () => {
@@ -132,13 +133,16 @@ test('application and backend changes select their relevant suites', () => {
   // npm test files read apps/web (seed and route checks, the bundle budget).
   assert.deepEqual(selected(app), ['demo', 'lint', 'audit', 'unit', 'unitWeb', 'build', 'hygiene', 'e2e']);
   assert.equal(app.jobs.rules, false);
+  assert.equal(app.e2eConsoleOnly, false);
 
   assert.equal(backend.mode, 'backend');
   assert.deepEqual(selected(backend), ['lint', 'audit', 'unit', 'rules', 'e2e']);
   assert.equal(backend.jobs.unitWeb, false);
   assert.equal(backend.jobs.build, false);
+  assert.equal(backend.e2eConsoleOnly, false);
 
   assert.equal(shared.mode, 'shared');
+  assert.equal(shared.e2eConsoleOnly, false);
   assert.deepEqual(selected(shared), [
     'demo',
     'lint',
@@ -220,7 +224,11 @@ test('workflow, configuration, and dependency changes select the full matrix', (
     const result = classifyPaths([path]);
     assert.equal(result.mode, 'full', path);
     assert.deepEqual(selected(result), JOB_NAMES, path);
+    assert.equal(result.e2eConsoleOnly, false, path);
   }
+  const manual = classifyEvent({ eventName: 'workflow_dispatch' });
+  assert.deepEqual(selected(manual), JOB_NAMES);
+  assert.equal(manual.e2eConsoleOnly, false);
 });
 
 test('mixed changes take the union of their tiers', () => {
@@ -228,9 +236,11 @@ test('mixed changes take the union of their tiers', () => {
     'README.md',
     'apps/web/src/App.jsx',
     'firestore.rules',
+    'console/web/src/pages/Team.jsx',
   ]);
 
   assert.equal(result.mode, 'mixed');
+  assert.equal(result.e2eConsoleOnly, false);
   assert.deepEqual(selected(result), [
     'docs',
     'demo',
@@ -257,6 +267,7 @@ test('a rules file also selects the unit tier, because unit tests read it', () =
     const result = classifyPaths([path]);
     assert.equal(result.mode, 'rules', path);
     assert.deepEqual(selected(result), ['unit', 'rules', 'e2e'], path);
+    assert.equal(result.e2eConsoleOnly, false, path);
   }
 });
 
@@ -273,12 +284,12 @@ test('the two longest suites run in shards, and each shard is told its slice', (
   const job = (name, next) => workflow.slice(workflow.indexOf(`\n  ${name}:`), workflow.indexOf(`\n  ${next}:`));
 
   const e2e = job('e2e', 'gate');
-  assert.match(e2e, /strategy:\s+fail-fast: false\s+matrix:\s+shard: \[1, 2, 3\]/);
-  assert.match(e2e, /PLAYWRIGHT_SHARD: \$\{\{ matrix\.shard \}\}\/3/);
+  assert.match(e2e, /strategy:\s+fail-fast: false\s+matrix:\s+shard: \$\{\{ fromJSON\(needs\.changes\.outputs\.e2eConsoleOnly == 'true' && '\[1\]' \|\| '\[1, 2, 3\]'\) \}\}/);
+  assert.match(e2e, /PLAYWRIGHT_SHARD: .*e2eConsoleOnly != 'true' && format\('\{0\}\/3', matrix\.shard\)/);
   // The demo evidence is one job's work, not three.
   for (const step of ['demo_builds', 'demo_visuals']) {
     const at = e2e.indexOf(`id: ${step}`);
-    assert.match(e2e.slice(at, at + 200), /matrix\.shard == 1/, step);
+    assert.match(e2e.slice(at, at + 350), /matrix\.shard == 1/, step);
   }
   // Artifact names must differ per shard, or the uploads collide.
   assert.match(e2e, /name: admin-visual-evidence-\$\{\{ matrix\.shard \}\}/);
@@ -323,13 +334,15 @@ test('the browser suite runner passes a shard to Playwright only when one is set
   assert.match(runner, /"npx playwright test\$\{PLAYWRIGHT_SHARD:\+ --shard=\$PLAYWRIGHT_SHARD\}"/);
 });
 
-test('the client console routes to its own suites, never the event site’s browser suite', () => {
+test('console code selects the console browser suite', () => {
   const web = classifyPaths(['console/web/src/pages/Team.jsx']);
   assert.equal(web.mode, 'console');
-  assert.deepEqual(selected(web), ['lint', 'audit', 'unitWeb', 'build']);
+  assert.deepEqual(selected(web), ['lint', 'audit', 'unitWeb', 'build', 'e2e']);
+  assert.equal(web.e2eConsoleOnly, true);
 
   const backend = classifyPaths(['console/functions/src/invites.cjs']);
-  assert.deepEqual(selected(backend), ['lint', 'audit', 'unit']);
+  assert.deepEqual(selected(backend), ['lint', 'audit', 'unit', 'e2e']);
+  assert.equal(backend.e2eConsoleOnly, true);
 
   assert.deepEqual(selected(classifyPaths(['console/firestore.rules'])), ['rules']);
   assert.deepEqual(selected(classifyPaths(['console/tests/console.rules.test.js'])), ['lint', 'rules']);
