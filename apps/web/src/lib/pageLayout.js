@@ -59,6 +59,27 @@ export const SECTION_SLOTS = Object.freeze(['above', 'main', 'below']);
  */
 export const DEFAULT_SECTION_SLOT = 'main';
 
+/**
+ * How one section sets its blocks on the stage (issue #1153). Fixed choices,
+ * never free CSS:
+ *
+ *   reading   one column at the reading measure. The default, and what an
+ *             absent value means, so every stored section keeps its look.
+ *   wide      one column at the wide measure (72ch, the top of the readable
+ *             45-75 character range); images and lists take the stage.
+ *   columns   blocks side by side in two columns, one column on a phone.
+ */
+export const SECTION_LAYOUTS = Object.freeze(['reading', 'wide', 'columns']);
+export const DEFAULT_SECTION_LAYOUT = 'reading';
+
+/**
+ * @param {object|null} section
+ * @returns {'reading'|'wide'|'columns'}
+ */
+export function sectionLayoutOf(section) {
+  return SECTION_LAYOUTS.includes(section?.layout) ? section.layout : DEFAULT_SECTION_LAYOUT;
+}
+
 /** @param {unknown} doc @returns {object} the doc's `layout` map, or {} */
 function layoutMapOf(doc) {
   const layout = doc?.layout;

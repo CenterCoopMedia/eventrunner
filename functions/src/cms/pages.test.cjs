@@ -10,6 +10,7 @@ const {
   PAGE_LAYOUT_VALUES,
   SECTION_SLOTS,
   PAGE_TEMPLATE_IDS,
+  SECTION_LAYOUTS,
 } = require('./pages.cjs');
 const { PAGE_TEMPLATE_LAYOUTS } = require('./pageTemplates.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
@@ -409,6 +410,25 @@ test('validatePageDoc rejects an unknown slot by name, naming the section', () =
   const { ok, errors } = validatePageDoc(page);
   assert.equal(ok, false);
   assert.ok(errors.some((e) => e.startsWith('sections[0].slot:') && e.includes('"beside"')));
+});
+
+// --------------------------------------------- section layout (#1153)
+
+test('validatePageDoc accepts a section with no layout, and every fixed layout', () => {
+  assert.equal(validatePageDoc(validPage()).ok, true);
+  for (const layout of SECTION_LAYOUTS) {
+    const page = validPage();
+    page.sections[0].layout = layout;
+    assert.equal(validatePageDoc(page).ok, true, `layout ${layout}`);
+  }
+});
+
+test('validatePageDoc rejects an unknown section layout by name', () => {
+  const page = validPage();
+  page.sections[0].layout = 'three-columns';
+  const { ok, errors } = validatePageDoc(page);
+  assert.equal(ok, false);
+  assert.ok(errors.some((e) => e.startsWith('sections[0].layout:') && e.includes('"three-columns"')));
 });
 
 test('validatePageDoc rejects non-objects without throwing', () => {

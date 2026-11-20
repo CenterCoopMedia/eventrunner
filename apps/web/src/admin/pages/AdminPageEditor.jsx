@@ -37,6 +37,9 @@ import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
+import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
+import { builtInSectionBlockTypes } from 'shared/page';
+import { isStarterContent } from 'shared/seed';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
 import { moveItem, nextStoredOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
@@ -45,6 +48,8 @@ import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedCha
 import {
   PAGE_LAYOUT_DEFAULTS,
   PAGE_LAYOUT_VALUES,
+  resolvePageLayout,
+  sectionsBySlot,
 } from '../../lib/pageLayout.js';
 import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
 import {
@@ -195,6 +200,13 @@ function PageEditor({ mode }) {
   const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
   // The count staff see is the content the section holds (both revisions of
   // one block are one block), not its seed list.
+  // What the public page would draw for a section now: its current blocks
+  // (the draft where there is one), in order, without hidden blocks or
+  // starter text the public site leaves out.
+  const sectionPreviewBlocks = (section) => contentRows
+    .map((row) => row.current)
+    .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const sectionBlockCount = (section) => {
     if (!contentReady) return contentError ? '' : 'Counting blocks…';
     const count = contentRows.filter((row) => row.current?.section === section.id).length;
@@ -207,6 +219,15 @@ function PageEditor({ mode }) {
   const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
+  // The page's sections in the order the public page reads them, with their
+  // blocks, for the one pull quote a page may draw (blocks/pullQuoteBudget):
+  // a system page reads its slots above, main, below (SystemPage); a custom
+  // page reads its stored order (ContentPage).
+  const slots = sectionsBySlot(page.sections ?? []);
+  const quoteBudget = {
+    sections: page.systemPage ? [...slots.above, ...slots.main, ...slots.below] : (page.sections ?? []),
+    getSectionBlocks: (id) => sectionPreviewBlocks({ id }),
+  };
   const [savedSnapshot, setSavedSnapshot] = useState(() => (
     mode === 'create' ? pageSnapshot(blankPage()) : null
   ));
@@ -884,6 +905,23 @@ function PageEditor({ mode }) {
                       />
                     </div>
                   </div>
+
+                  {/* Home's built-in sections draw their own arrangement, so a
+                      layout choice would change nothing there. */}
+                  {builtInSectionBlockTypes(page, section) ? null : (
+                    <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+                      <SectionLayoutChoice
+                        value={section.layout}
+                        onChange={(layout) => updateSection(sectionIndex, { layout })}
+                        label={section.label}
+                        blocks={sectionPreviewBlocks(section)}
+                        blocksReady={contentReady}
+                        previewId={`admin-section-preview-${sectionIndex}`}
+                        budget={quoteBudget}
+                        readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
+                      />
+                    </div>
+                  )}
 
                   {/* What this section SAYS is written under Content. The page
                       document's starter list only seeds a brand-new site

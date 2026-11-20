@@ -22,22 +22,38 @@ import PublishedTimeline from './timeline/PublishedTimeline.jsx';
  *   title: string,                    // the section's own label
  *   blocks: object[],                 // the section's visible blocks, in order
  *   arrangement: 'grid' | 'list',     // the page's arrangement
+ *   layout?: 'reading'|'wide'|'columns', // the section's layout (issue #1153)
  *   action?: import('react').ReactNode, // the section's edit link (issue #198)
  *   showTimeline?: boolean,
  * }} props
  */
-export default function HistorySection({ id, title, blocks, arrangement, action = null, showTimeline = true }) {
+export default function HistorySection({ id, title, blocks, arrangement, layout = 'reading', action = null, showTimeline = true }) {
   const { timeline } = useContent();
   if (blocks.length === 0 && (!showTimeline || !timeline?.length)) return null;
   return (
     <section aria-labelledby={id} className="page-section">
       <SectionHead level={2} id={id} title={title} action={action} />
-      {/* The same wrapper the default section draws, so the operator's
-          blocks keep the width the page's arrangement gives them. */}
-      <div className={arrangement === 'grid' ? 'mt-md' : 'measure mt-md'}>
-        {blocks.length > 0 ? <SectionBlocks blocks={blocks} /> : null}
-        {showTimeline ? <PublishedTimeline className={blocks.length > 0 ? 'mt-lg' : ''} /> : null}
-      </div>
+      {/* The same wrapper the default section draws (SystemPage), so the
+          operator's blocks keep the width the page's arrangement gives them.
+          A Wide or Two columns layout is for the blocks only: the timeline
+          keeps the width the arrangement gives it. */}
+      {layout === 'reading' || blocks.length === 0 ? (
+        <div className={arrangement === 'grid' ? 'mt-md' : 'measure mt-md'}>
+          {blocks.length > 0 ? <SectionBlocks blocks={blocks} layout={layout} /> : null}
+          {showTimeline ? <PublishedTimeline className={blocks.length > 0 ? 'mt-lg' : ''} /> : null}
+        </div>
+      ) : (
+        <>
+          <div className="mt-md">
+            <SectionBlocks blocks={blocks} layout={layout} />
+          </div>
+          {showTimeline ? (
+            <div className={arrangement === 'grid' ? 'mt-lg' : 'measure mt-lg'}>
+              <PublishedTimeline />
+            </div>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }

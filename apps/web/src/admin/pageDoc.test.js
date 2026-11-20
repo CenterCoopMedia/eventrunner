@@ -15,6 +15,7 @@ import {
 import {
   PAGE_LAYOUT_DEFAULTS,
   PAGE_LAYOUT_VALUES,
+  SECTION_LAYOUTS,
   SECTION_SLOTS,
 } from '../lib/pageLayout.js';
 import { PAGE_TEMPLATES, PAGE_TEMPLATE_IDS, templateLayout } from '../lib/pageTemplates.js';
@@ -95,6 +96,18 @@ describe('toEditablePage', () => {
   });
 });
 
+// A section layout (#1153) is stored only when it is one of the fixed
+// choices. Absent means reading width, so an old section saves as it was.
+describe('section layout round-trip', () => {
+  it('keeps a chosen layout and stores nothing for an absent or unknown one', () => {
+    const withLayout = (layout) => ({ ...STORED, sections: [{ ...STORED.sections[0], layout }] });
+    expect(toPagePayload(toEditablePage(withLayout('columns'))).sections[0].layout).toBe('columns');
+    expect(toPagePayload(toEditablePage(STORED)).sections[0]).not.toHaveProperty('layout');
+    expect(toPagePayload(toEditablePage(withLayout('sideways'))).sections[0]).not.toHaveProperty('layout');
+    expect(backend.validatePageDoc(toPagePayload(toEditablePage(withLayout('wide')))).errors).toEqual([]);
+  });
+});
+
 // The two key lists must stay in step (brief §6.2): validatePageDoc rejects
 // an unknown top-level or section key BY NAME, so a one-sided addition here
 // breaks every save of a seeded page. Imported from the functions source the
@@ -109,6 +122,10 @@ describe('cmsPages key parity with the server', () => {
   it('mirrors the layout variants and the section slots the server accepts', () => {
     expect(PAGE_LAYOUT_VALUES).toEqual(backend.PAGE_LAYOUT_VALUES);
     expect([...SECTION_SLOTS]).toEqual([...backend.SECTION_SLOTS]);
+  });
+
+  it('mirrors the section layouts the server accepts', () => {
+    expect([...SECTION_LAYOUTS]).toEqual([...backend.SECTION_LAYOUTS]);
   });
 
   // A template is a named bundle of layout values, and the two copies of

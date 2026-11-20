@@ -6,6 +6,7 @@
 // stack, link groups into titled lists grouped by their `group` field.
 // Everything else renders one-by-one through the registry, so an unknown
 // type still hits the UnknownBlock fallback.
+import './SectionBlocks.css';
 import BlockRenderer from './registry.jsx';
 import StatBlock from './StatBlock.jsx';
 import FactBlock from './FactBlock.jsx';
@@ -53,9 +54,11 @@ const RUN_RENDERERS = {
   sponsor_package: groupedRun,
 };
 
-export default function SectionBlocks({ blocks }) {
-  if (!blocks?.length) return null;
-
+/**
+ * The blocks in order, with consecutive blocks of a run type (stats, facts,
+ * list items, questions, link groups, sponsor packages) drawn as one run.
+ */
+function renderBlocks(blocks) {
   const rendered = [];
   let i = 0;
   while (i < blocks.length) {
@@ -78,6 +81,41 @@ export default function SectionBlocks({ blocks }) {
       i += 1;
     }
   }
+  return rendered;
+}
 
-  return <div className="space-y-lg">{rendered}</div>;
+/**
+ * @param {{ blocks: object[], layout?: 'reading'|'wide'|'columns' }} props
+ *   `layout` is the section's stored choice (lib/pageLayout.js
+ *   sectionLayoutOf). `columns` puts the first half of the blocks in the
+ *   left column and the rest in the right, once the section is wide enough;
+ *   blocks are counted one by one, so four questions split two and two. The
+ *   frame is a size container, so a narrow section stacks as a phone does.
+ */
+export default function SectionBlocks({ blocks, layout = 'reading' }) {
+  if (!blocks?.length) return null;
+
+  if (layout === 'columns') {
+    // The first half of the blocks fills the left column and the rest the
+    // right, so reading order is the same in two columns as in one: text
+    // then its picture, or a list of places split down the middle. The
+    // right column is marked so a page's opening (the long read drop cap)
+    // stays on the first block only.
+    const half = Math.ceil(blocks.length / 2);
+    return (
+      <div className="section-blocks-frame">
+        <div className="section-blocks section-blocks--columns">
+          <div className="space-y-lg">{renderBlocks(blocks.slice(0, half))}</div>
+          {blocks.length > 1 ? (
+            <div className="section-blocks__rest space-y-lg">{renderBlocks(blocks.slice(half))}</div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={layout === 'wide' ? 'section-blocks section-blocks--wide space-y-lg' : 'space-y-lg'}>
+      {renderBlocks(blocks)}
+    </div>
+  );
 }

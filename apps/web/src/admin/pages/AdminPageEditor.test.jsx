@@ -842,6 +842,27 @@ describe('page editor', () => {
     expect(bodyOf(0).page.sections[0].defaultBlocks).toEqual(defaultBlocks);
   });
 
+  // Section layout (issue #1153): chosen by picture on the section, stored
+  // only when it differs from reading width.
+  it('saves a section layout chosen by picture, and reading width as no value', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, sections: [{ ...SCHOLARSHIPS_DRAFT.sections[0], layout: 'wide' }] }];
+    fetch.mockResolvedValue(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 0 blocks' }));
+    const layout = screen.getByRole('group', { name: 'Layout' });
+    expect(within(layout).getByRole('radio', { name: 'Wide' })).toBeChecked();
+
+    fireEvent.click(within(layout).getByRole('radio', { name: 'Two columns' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.sections[0].layout).toBe('columns');
+
+    fireEvent.click(within(layout).getByRole('radio', { name: 'Reading width' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).page.sections[0]).not.toHaveProperty('layout');
+  });
+
   // Layout variants and section slots (design brief §6.1, §6.2).
   // THE OPERATOR PICKS A TASK. The individual variants are still reachable,
   // behind a disclosure, for the page that genuinely needs to differ.

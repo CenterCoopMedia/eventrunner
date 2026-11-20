@@ -8,12 +8,11 @@
 //
 // Types the section does not take stay listed, disabled, with the reason,
 // so nobody has to guess why a familiar option is missing.
-import { memo, useEffect, useId, useRef, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import SectionBlocks from '../../components/blocks/SectionBlocks.jsx';
 import Timeline from '../../components/editorial/Timeline.jsx';
 import WayfindingIcon from '../../components/editorial/WayfindingIcon.jsx';
-import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
-import { applyThemePreview, releaseThemePreviewTarget } from '../themePreview.js';
+import { usePublicThemeScope } from '../usePublicThemeScope.js';
 import { BLOCK_TYPE_IDS, blockTypeFor, blockTypeLabel } from '../blockTypes.js';
 import './blockTypePicker.css';
 
@@ -35,10 +34,6 @@ export const BLOCK_TYPE_SUMMARIES = Object.freeze({
   sponsor_package: 'A sponsorship level with its price and benefits.',
   timeline: 'Past editions in order, with optional links and images.',
 });
-
-function prefersDarkNow() {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches === true;
-}
 
 const SAMPLE_BLOCKS = Object.freeze({
   text: { value: 'Welcome to the summit' },
@@ -116,10 +111,9 @@ const Example = memo(function Example({ typeId }) {
  * }} props
  */
 export default function BlockTypePicker({ value, onChange, allowed = [], sectionName, error }) {
-  const { publicTheme: theme } = useEventConfig();
   const name = useId();
   const errorId = `${name}-error`;
-  const gridRef = useRef(null);
+  const [grid, setGrid] = useState(null);
   const takes = allowed.length ? allowed : BLOCK_TYPE_IDS;
   // What the section takes comes first; the rest follow, disabled.
   const ordered = [...BLOCK_TYPE_IDS.filter((id) => takes.includes(id) || id === value), ...BLOCK_TYPE_IDS.filter((id) => !takes.includes(id) && id !== value)];
@@ -130,27 +124,12 @@ export default function BlockTypePicker({ value, onChange, allowed = [], section
 
   // The site's theme reaches the examples only. Admin controls read admin
   // tokens, which the theme never sets, so the radios keep the admin look.
-  // A theme that follows the system mode is applied again when the system
-  // mode changes, as the public page does.
-  const [systemDark, setSystemDark] = useState(() => prefersDarkNow());
-  useEffect(() => {
-    const query = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (!query) return undefined;
-    const change = () => setSystemDark(query.matches);
-    query.addEventListener('change', change);
-    return () => query.removeEventListener('change', change);
-  }, []);
-  useEffect(() => {
-    const grid = gridRef.current;
-    if (!theme || !grid) return undefined;
-    applyThemePreview(theme, { scopes: [{ element: grid, id: 'admin-block-examples' }] });
-    return () => releaseThemePreviewTarget(grid);
-  }, [theme, systemDark]);
+  usePublicThemeScope(grid, 'admin-block-examples');
 
   return (
     <fieldset className="admin-block-picker" aria-describedby={error ? errorId : undefined}>
       <legend className="admin-block-picker__legend">Block type</legend>
-      <div ref={gridRef} className="admin-block-picker__grid">
+      <div ref={setGrid} className="admin-block-picker__grid">
         {listed.map((id) => {
           const disabled = !takes.includes(id) && id !== value;
           const inputId = `${name}-${id}`;

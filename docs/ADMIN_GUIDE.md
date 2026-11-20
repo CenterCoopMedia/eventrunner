@@ -200,6 +200,8 @@ One page can still differ. **Change the individual settings** also carries **Nav
 
 **A system page** — home, schedule, speakers, sponsors, attendees, updates — keeps its built-in feature and lets you put sections around it. Each section on one of those pages picks where it is inserted: **Before the main feature** or **After the main feature**. Custom pages have no built-in feature, so they have no insertion point to pick.
 
+**Each section picks its layout by picture.** Open a section in the page editor and choose one of three layouts. **Reading width** is one narrow column, the easiest to read, and every section starts with it. **Wide** is one column that uses more of the page; lines stay short enough to read. **Two columns** puts the first half of the section's blocks on the left and the rest on the right; a phone shows one column. Beside the choice, the editor draws the section's own content in the site's theme, at a computer width and at a phone width, the way the public page draws it. Save and publish the page to put the layout on the public site. The home hero and other built-in sections keep their own layout and offer no choice.
+
 ## Sessions
 
 The schedule itself: Create, edit, publish, and delete a session. Saving writes a draft, and publishing sends it to the public schedule, the same two steps every other content tab uses. Use **Preview draft** to read the session's public page with the draft applied before you publish it.

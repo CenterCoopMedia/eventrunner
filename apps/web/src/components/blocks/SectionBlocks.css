@@ -1,0 +1,24 @@
+/* Section layouts (issue #1153), chosen per section in the page editor.
+   Wide raises the reading measure to 72ch, the top of the readable 45-75
+   character range; nothing in it runs the full stage as one line. Columns
+   splits the blocks into a left and a right column once the section itself
+   is 40rem wide, so a phone, and an admin preview drawn at phone width,
+   show one column. Text in a column fills it, up to the 72ch cap. */
+.section-blocks--wide {
+  --measure-text: 72ch;
+}
+.section-blocks-frame {
+  container-type: inline-size;
+}
+.section-blocks--columns {
+  --measure-text: 72ch;
+  display: grid;
+  gap: var(--space-lg);
+  align-items: start;
+}
+@container (min-width: 40rem) {
+  .section-blocks--columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-xl);
+  }
+}

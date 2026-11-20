@@ -24,7 +24,7 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import SectionEditLink from '../components/SectionEditLink.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
 import HistorySection from '../components/HistorySection.jsx';
-import { resolvePageLayout } from '../lib/pageLayout.js';
+import { resolvePageLayout, sectionLayoutOf } from '../lib/pageLayout.js';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import { eventDateRangeLabel, formatDayDate, formatDayHours } from '../lib/eventTime.js';
 import { SEED_WHEN_PLACEHOLDER, isStarterContent } from 'shared/seed';
@@ -266,6 +266,7 @@ export default function Home() {
           title={section.label}
           blocks={blocks}
           arrangement={resolvePageLayout(page).arrangement}
+          layout={sectionLayoutOf(section)}
           action={editLink}
           showTimeline={!hasTimelineBlock}
         />

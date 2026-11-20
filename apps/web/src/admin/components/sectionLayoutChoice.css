@@ -1,0 +1,44 @@
+/* Section layout choice and preview (issue #1153). Admin tokens draw the
+   choice; the site's theme reaches only the preview frames. */
+.admin-section-layout { display: grid; gap: var(--space-md); min-width: 0; }
+.admin-section-layout__choices { display: grid; gap: var(--space-xs); grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; border: 0; min-width: 0; }
+.admin-section-layout__legend { grid-column: 1 / -1; margin-bottom: var(--space-xs); font-family: var(--admin-font-ui); font-size: var(--admin-text-base); font-weight: 600; color: rgb(var(--admin-ink-rgb)); }
+.admin-section-layout__option {
+  display: flex; flex-direction: column; gap: var(--space-2xs); min-width: 0; padding: var(--space-xs); cursor: pointer;
+  border: 1px solid rgb(var(--admin-rule-control-rgb)); border-radius: var(--admin-radius); background: rgb(var(--admin-ground-raised-rgb));
+}
+.admin-section-layout__option[data-selected] { border-color: rgb(var(--admin-action-rgb)); background: rgb(var(--admin-action-soft-rgb)); outline: 1px solid rgb(var(--admin-action-rgb)); outline-offset: -2px; }
+.admin-section-layout__option:focus-within { outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb)); outline-offset: var(--admin-focus-offset); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-section-layout__option:hover { border-color: rgb(var(--admin-action-rgb)); }
+}
+.admin-section-layout__picture { display: block; width: 100%; max-width: 8rem; height: auto; }
+.admin-section-layout__page { fill: rgb(var(--admin-ground-soft-rgb)); stroke: rgb(var(--admin-rule-control-rgb)); }
+.admin-section-layout__ink { fill: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-section-layout__option[data-selected] .admin-section-layout__ink { fill: rgb(var(--admin-action-rgb)); }
+.admin-section-layout__head { display: flex; align-items: center; gap: var(--space-2xs); }
+.admin-section-layout__head input { flex: none; width: 1.125rem; height: 1.125rem; accent-color: rgb(var(--admin-action-rgb)); }
+.admin-section-layout__name { font-size: var(--admin-text-sm); font-weight: 600; color: rgb(var(--admin-ink-rgb)); }
+.admin-section-layout__summary { font-size: var(--admin-text-xs); line-height: 1.4; color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-section-layout__frames { display: grid; gap: var(--space-md); grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); align-items: start; }
+.admin-section-layout__frame { margin: 0; min-width: 0; }
+.admin-section-layout__window {
+  position: relative; overflow: hidden; max-height: 24rem;
+  border: 1px solid rgb(var(--admin-rule-hairline-rgb)); border-radius: var(--admin-radius-small);
+  background: rgb(var(--color-surface-rgb, 250 250 249));
+}
+.admin-section-layout__stage { display: block; border: 0; transform-origin: top left; pointer-events: none; }
+/* Inside the preview document: the public surface, type and spacing. */
+.admin-section-layout__page {
+  padding: var(--space-lg);
+  background: rgb(var(--color-surface-rgb, 250 250 249)); color: rgb(var(--color-text-primary-rgb, 28 28 28));
+  font-family: var(--font-body);
+}
+.admin-section-layout__caption { margin-top: var(--space-2xs); font-family: var(--admin-font-data); font-size: var(--admin-text-xs); color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-section-layout__empty { font-size: var(--admin-text-sm); color: rgb(var(--admin-ink-secondary-rgb)); }
+@media (max-width: 40rem) {
+  .admin-section-layout__choices { grid-template-columns: minmax(0, 1fr); }
+  .admin-section-layout__option { flex-direction: row; align-items: center; }
+  .admin-section-layout__picture { width: 4rem; flex: none; }
+  .admin-section-layout__frames { grid-template-columns: minmax(0, 1fr); }
+}
