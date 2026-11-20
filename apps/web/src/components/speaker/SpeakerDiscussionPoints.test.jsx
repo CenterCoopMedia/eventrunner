@@ -140,16 +140,50 @@ describe('speaker-wide private discussion draft', () => {
     expect(screen.getByText('Your current changes have not been saved.')).toBeInTheDocument();
   });
 
-  it('keeps edits made while a successful save is in flight', async () => {
+  it('shows the save stages outside the busy form and keeps newer edits and the deadline across tabs', async () => {
     const pending = deferred();
     fetch.mockResolvedValueOnce(response({ submission: null })).mockReturnValueOnce(pending.promise);
     render(hub()); openDiscussion();
     await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled());
-    edit('First question.'); submit();
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    const request = JSON.parse(fetch.mock.calls[1][1].body);
-    edit('Still editing.');
-    await act(async () => { pending.resolve(response({ submission: savedFor(request) })); });
+    edit('First question.');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      await act(async () => submit());
+      expect(fetch).toHaveBeenCalledTimes(2);
+      const request = JSON.parse(fetch.mock.calls[1][1].body);
+      const form = screen.getByRole('form', { name: 'Speaker discussion points' });
+      const status = screen.getByRole('status', { name: 'Saving discussion points…' });
+      expect(form).toHaveAttribute('aria-busy', 'true');
+      expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      expect(status.parentElement.querySelector('svg')).toBeNull();
+
+      act(() => vi.advanceTimersByTime(999));
+      expect(status.parentElement.querySelector('svg')).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(status.parentElement.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      edit('Still editing.');
+      fireEvent.click(screen.getByRole('tab', { name: 'Details' }));
+      act(() => vi.advanceTimersByTime(8999));
+      openDiscussion();
+      const resumed = screen.getByRole('status', { name: 'Saving discussion points…' });
+      expect(resumed.parentElement).toHaveAttribute('data-loading-stage', 'active');
+      act(() => vi.advanceTimersByTime(1));
+      expect(resumed).toHaveTextContent('This is taking longer than usual.');
+      act(() => vi.advanceTimersByTime(49_999));
+      expect(resumed).not.toHaveTextContent('We haven’t received a result after a minute.');
+      act(() => vi.advanceTimersByTime(1));
+      expect(resumed).toHaveTextContent('We haven’t received a result after a minute. You can keep waiting.');
+      expect(screen.queryByRole('button', { name: /retry|try loading again/i })).toBeNull();
+      await act(async () => submit());
+      expect(fetch).toHaveBeenCalledTimes(2);
+
+      await act(async () => pending.resolve(response({ submission: savedFor(request) })));
+      expect(resumed).not.toBeInTheDocument();
+      expect(screen.getByRole('form', { name: 'Speaker discussion points' })).toHaveAttribute('aria-busy', 'false');
+    } finally {
+      vi.useRealTimers();
+    }
     expect(screen.getByRole('textbox')).toHaveValue('Still editing.');
     expect(screen.getByText('Your current changes have not been saved.')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(/^Last confirmed submission:/);
