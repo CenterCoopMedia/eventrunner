@@ -55,8 +55,11 @@
             link.media = 'print';
           }
         };
-        // The body may parse after a deadline has passed; start from there.
-        document.addEventListener('DOMContentLoaded', update, { once: true });
+        // The body may arrive after a deadline has passed. The parser reaches
+        // #console-boot without waiting for the app's module or stylesheet, so
+        // look for it until it exists, then start from the current line.
+        const start = () => (document.getElementById('console-boot') ? update() : setTimeout(start, 50));
+        start();
         [1000, 10000].filter((at) => at > performance.now())
           .forEach((at) => setTimeout(update, Math.max(0, Math.ceil(at - performance.now()))));
         document.addEventListener('click', (event) => {

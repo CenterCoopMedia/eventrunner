@@ -62,9 +62,16 @@ describe('the first-load message', () => {
   it('starts from the right line when the page arrives after both deadlines', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     vi.advanceTimersByTime(12000);
-    const boot = mountBoot();
+    // The head script runs before the body exists; the body arrives later.
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    document.body.innerHTML = '';
+    new Function(doc.head.querySelector('script:not([src])').textContent)();
+    vi.advanceTimersByTime(200);
+    document.body.append(document.importNode(doc.getElementById('root'), true));
+    const boot = document.getElementById('console-boot');
+    expect(boot.querySelector('[role="status"]').textContent).toBe('');
+    vi.advanceTimersByTime(50);
     expect(vi.getTimerCount()).toBe(0);
-    document.dispatchEvent(new Event('DOMContentLoaded'));
     expect(boot.querySelector('[role="status"]').textContent).toMatch('taking longer than usual');
     expect(boot.querySelector('button').hidden).toBe(false);
   });
