@@ -120,7 +120,7 @@ describe('AppRoutes', () => {
       expect(screen.getByRole('main')).toHaveFocus();
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
       await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-      expect(screen.getByRole('status')).toHaveTextContent('Loading.');
+      expect(screen.getByRole('status')).toHaveTextContent('Loading the page.');
       await act(async () => teamImport.finish({ default: () => <h1 tabIndex={-1}>Deferred team</h1> }));
       expect(screen.getByRole('heading', { name: 'Deferred team' })).toHaveFocus();
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -176,7 +176,7 @@ describe('AppRoutes', () => {
 
   it('waits for the sign-in state before it decides', () => {
     renderApp('/', fakeAuth({ user: null, ready: false }));
-    expect(screen.getByRole('status')).toHaveTextContent('Loading');
+    expect(screen.getByRole('status')).toHaveTextContent('Checking your sign-in.');
   });
 
   it('asks a reader with an unconfirmed email to confirm it by an emailed link', async () => {

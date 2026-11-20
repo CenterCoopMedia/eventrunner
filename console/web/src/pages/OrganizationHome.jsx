@@ -30,7 +30,7 @@ export default function OrganizationHome() {
 
   const refresh = <IconControl icon="refresh" label="Refresh event sites" disabled={loading} onClick={() => setRefreshKey((value) => value + 1)} />;
   if (error && !data) return <div><p className="message error" role="alert">{error}</p>{refresh}</div>;
-  if (!data) return <LoadingState>Loading the organization.</LoadingState>;
+  if (!data) return <LoadingState onRetry={() => setRefreshKey((value) => value + 1)}>Loading the organization.</LoadingState>;
 
   return (
     <section aria-labelledby="org-title">

@@ -9,7 +9,7 @@ function RouteLoading() {
     const timer = setTimeout(() => setVisible(true), 300);
     return () => clearTimeout(timer);
   }, []);
-  return visible ? <LoadingState>Loading.</LoadingState> : null;
+  return visible ? <LoadingState>Loading the page.</LoadingState> : null;
 }
 
 /** Each page has a new boundary; setup step URLs keep the same page instance. */

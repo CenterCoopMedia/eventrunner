@@ -52,7 +52,7 @@ export default function ConsoleSettings() {
 
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (loadError) return <div className="stack"><p className="message error" role="alert">{loadError.message}</p><IconControl icon="refresh" label="Refresh settings" onClick={() => setRefreshKey((value) => value + 1)} /></div>;
-  if (!values) return <LoadingState>Loading the settings.</LoadingState>;
+  if (!values) return <LoadingState onRetry={() => setRefreshKey((value) => value + 1)}>Loading the settings.</LoadingState>;
 
   function change(field, value) {
     setValues((current) => ({ ...current, [field]: value }));

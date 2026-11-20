@@ -11,13 +11,21 @@ export function useTeam(orgId) {
   const [stale, setStale] = useState(false);
   const inFlight = useRef(false);
 
+  // A read repeated while an older one hangs: only the newest one lands. A
+  // superseded read returns null, and its caller leaves the state to the
+  // newer read.
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const attempt = ++latest.current;
     try {
-      setData(await callApi('getTeam', { orgId }));
+      const body = await callApi('getTeam', { orgId });
+      if (attempt !== latest.current) return null;
+      setData(body);
       setError('');
       setStale(false);
       return '';
     } catch (err) {
+      if (attempt !== latest.current) return null;
       setError(err.message);
       return err.message;
     }
@@ -28,6 +36,7 @@ export function useTeam(orgId) {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     const problem = await load();
+    if (problem === null) return;
     setOutcome((current) => current ? { ...current, refreshError: problem ? `We could not refresh the team. ${problem}` : '' } : current);
     setRefreshing(false);
   }, [load]);
@@ -41,7 +50,7 @@ export function useTeam(orgId) {
     try {
       await callApi(name, { orgId, ...body });
       const problem = await load();
-      setStale(Boolean(problem));
+      if (problem !== null) setStale(Boolean(problem));
       setOutcome({ key, kind: 'success', message, refreshError: problem ? `The change is saved, but we could not refresh the team. ${problem}` : '' });
       return true;
     } catch (err) {

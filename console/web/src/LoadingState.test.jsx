@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useEffect, useState } from 'react';
 import LoadingState from './LoadingState.jsx';
 
 afterEach(() => vi.useRealTimers());
@@ -33,5 +34,88 @@ describe('console waiting feedback', () => {
     render(<LoadingState>Loading the agreement.</LoadingState>);
     expect(screen.getByRole('status')).toHaveAttribute('data-loading-stage', 'initial');
     expect(screen.getByRole('status')).not.toHaveTextContent('longer than expected');
+  });
+
+  it('offers Try again on a read at ten seconds, and the next read renders the page without a reload', async () => {
+    vi.useFakeTimers();
+    const answers = [];
+    const read = vi.fn(() => new Promise((resolve) => answers.push(resolve)));
+    function Page() {
+      const [data, setData] = useState(null);
+      const [attempt, setAttempt] = useState(0);
+      useEffect(() => {
+        let live = true;
+        read().then((body) => { if (live) setData(body); });
+        return () => { live = false; };
+      }, [attempt]);
+      if (!data) return <LoadingState onRetry={() => setAttempt((value) => value + 1)}>Loading the team.</LoadingState>;
+      return <h1 tabIndex={-1}>{data.name}</h1>;
+    }
+    const { container } = render(<main><Page /></main>);
+    const indicator = () => container.querySelector('.console-loading-indicator');
+    act(() => vi.advanceTimersByTime(999));
+    expect(screen.getByRole('status')).toHaveAttribute('data-loading-stage', 'initial');
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.getByRole('status')).toHaveAttribute('data-loading-stage', 'active');
+    act(() => vi.advanceTimersByTime(8999));
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.getByRole('status')).toHaveTextContent('This is taking longer than expected.');
+
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('status')).toHaveAttribute('data-loading-stage', 'initial');
+    // The same control, busy, keeps the keyboard and refuses a second press.
+    expect(retry).toHaveAccessibleName('Trying again…');
+    expect(retry).toHaveAttribute('aria-busy', 'true');
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    expect(document.activeElement).toBe(retry);
+    fireEvent.click(retry);
+    expect(read).toHaveBeenCalledTimes(2);
+
+    await act(async () => answers[1]({ name: 'The team' }));
+    // The indicator leaves in the same render that shows the content, and
+    // focus moves from the retry to the page heading.
+    expect(screen.getByRole('heading', { name: 'The team' })).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'The team' }));
+    expect(indicator()).toBeNull();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // The read that never answered in time changes nothing when it lands.
+    await act(async () => answers[0]({ name: 'Stale team' }));
+    expect(screen.getByRole('heading', { name: 'The team' })).toBeInTheDocument();
+  });
+
+  it('offers no Try again without a read to repeat', () => {
+    vi.useFakeTimers();
+    render(<LoadingState>Checking your sign-in.</LoadingState>);
+    act(() => vi.advanceTimersByTime(60000));
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('moves focus to the recovery control when the retried read fails', async () => {
+    vi.useFakeTimers();
+    const answers = [];
+    const read = vi.fn(() => new Promise((resolve, reject) => answers.push(reject)));
+    function Page() {
+      const [error, setError] = useState('');
+      const [attempt, setAttempt] = useState(0);
+      useEffect(() => {
+        let live = true;
+        read().catch((err) => { if (live) setError(err.message); });
+        return () => { live = false; };
+      }, [attempt]);
+      if (error) return <div><p role="alert">{error}</p><button type="button">Refresh the team</button></div>;
+      return <LoadingState onRetry={() => setAttempt((value) => value + 1)}>Loading the team.</LoadingState>;
+    }
+    render(<main tabIndex={-1}><Page /></main>);
+    act(() => vi.advanceTimersByTime(10000));
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    await act(async () => answers[1](new Error('The team could not be loaded.')));
+    expect(screen.getByRole('alert')).toHaveTextContent('The team could not be loaded.');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Refresh the team' }));
   });
 });

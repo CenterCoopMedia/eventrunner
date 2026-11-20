@@ -27,9 +27,66 @@
     <meta name="twitter:description" content="Use your signup link to answer a few questions, accept the agreement and start building your event site." />
     <meta name="twitter:image" content="https://console.eventrunner.org/og-console.png" />
     <meta name="twitter:image:alt" content="Event Runner console: set up your event site" />
+    <style>
+      #console-boot { box-sizing: border-box; padding: 24px; color-scheme: light dark; color: CanvasText; background: Canvas; font: 16px/1.5 system-ui, sans-serif; }
+      #console-boot p { max-width: 36em; margin: 0 0 16px; }
+      #console-boot button { color: inherit; background: transparent; border: 1px solid; padding: 6px 12px; font: inherit; cursor: pointer; }
+    </style>
+    <script>
+      // A slow first load says so; a fast one paints nothing. This runs in the
+      // head, ahead of the app's stylesheet, so it never waits for it. React
+      // replaces #console-boot on its first render, and a later tick finds
+      // nothing to change. At ten seconds a stylesheet that has not arrived
+      // stops blocking paint, so the delay line and Reload can show; it
+      // applies again the moment it loads.
+      (() => {
+        const controls = () => {
+          const boot = document.getElementById('console-boot');
+          const status = boot?.querySelector('[role="status"]');
+          const reload = boot?.querySelector('button');
+          return status && reload ? { status, reload } : null;
+        };
+        const update = () => {
+          const found = controls();
+          if (!found) return;
+          const elapsed = performance.now();
+          found.status.textContent = elapsed >= 10000
+            ? 'The console is taking longer than usual to open. You can keep waiting or reload this page.'
+            : elapsed >= 1000 ? 'Opening the console…' : '';
+          found.reload.hidden = elapsed < 10000;
+          if (elapsed < 10000) return;
+          for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
+            if (link.sheet || link.media === 'print') continue;
+            link.addEventListener('load', () => { link.media = 'all'; }, { once: true });
+            link.media = 'print';
+          }
+        };
+        // The body may arrive after a deadline has passed. The parser reaches
+        // #console-boot without waiting for the app's module or stylesheet, so
+        // look for its controls until they exist, then start from the current
+        // line. Stop looking once the app has replaced it.
+        const start = () => {
+          if (controls()) return update();
+          const first = document.getElementById('root')?.firstElementChild;
+          if (first && first.id !== 'console-boot') return undefined;
+          return setTimeout(start, 50);
+        };
+        start();
+        [1000, 10000].filter((at) => at > performance.now())
+          .forEach((at) => setTimeout(update, Math.max(0, Math.ceil(at - performance.now()))));
+        document.addEventListener('click', (event) => {
+          if (event.target.closest?.('#console-boot button')) location.reload();
+        });
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="console-boot">
+        <p role="status" aria-live="polite" aria-atomic="true"></p>
+        <button type="button" hidden>Reload this page</button>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
