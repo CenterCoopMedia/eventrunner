@@ -138,10 +138,9 @@ function isRulesPath(path) {
     path === 'vitest.rules.config.js';
 }
 
-// The client console (ADR 0007) is its own app in console/. It never
-// ships with an event site, so its changes skip the site's demo, hygiene
-// and browser suites. Its package and tool files still fail open
-// (isFullPath runs first on those).
+// The client console (ADR 0007) ships separately from event sites, so its
+// code changes select the console browser specs. Package and tool files
+// still select the full matrix through isFullPath.
 function isConsoleAppPath(path) {
   return path.startsWith('console/web/') && !isMarkdownPath(path);
 }
@@ -207,6 +206,8 @@ function resultForPaths(paths, mode, categories) {
     consoleHosting,
     full,
   } = categories;
+  const fullE2e = app || backend || shared || rules || full;
+  const consoleE2e = consoleApp || consoleBackend;
   const jobs = {
     docs: docs || full,
     demo: demo || publicSite || app || shared || full,
@@ -224,15 +225,15 @@ function resultForPaths(paths, mode, categories) {
     build: app || shared || consoleApp || consoleHosting || full,
     hygiene: app || shared || full,
     rules: rules || rulesTests || backend || shared || consoleRules || consoleHosting || full,
-    e2e: app || backend || shared || rules || full,
+    e2e: fullE2e || consoleE2e,
   };
-  return { paths, mode, jobs };
+  return { paths, mode, jobs, e2eConsoleOnly: consoleE2e && !fullE2e };
 }
 
 function classifyPaths(input) {
   const paths = uniquePaths(input);
   if (paths.length === 0) {
-    return { paths, mode: 'full', jobs: allJobs() };
+    return { paths, mode: 'full', jobs: allJobs(), e2eConsoleOnly: false };
   }
 
   const categories = {
@@ -295,7 +296,7 @@ function changedPaths(base, head, runGit = execFileSync) {
 
 function classifyEvent({ eventName, base, head, runGit = execFileSync } = {}) {
   if (eventName !== 'pull_request') {
-    return { paths: [], mode: 'full', jobs: allJobs() };
+    return { paths: [], mode: 'full', jobs: allJobs(), e2eConsoleOnly: false };
   }
   return classifyPaths(changedPaths(base, head, runGit));
 }
@@ -305,6 +306,7 @@ function writeOutputs(result, outputPath) {
   const lines = [
     `mode=${result.mode}`,
     `paths=${result.paths.length}`,
+    `e2eConsoleOnly=${result.e2eConsoleOnly}`,
     ...JOB_NAMES.map((name) => `${name}=${result.jobs[name]}`),
   ];
   fs.appendFileSync(outputPath, `${lines.join('\n')}\n`);
@@ -317,7 +319,9 @@ function main(env = process.env) {
     head: env.GITHUB_HEAD_SHA,
   });
   writeOutputs(result, env.GITHUB_OUTPUT);
-  console.log(`ci changes: ${result.mode}; selected jobs: ${JOB_NAMES.filter((name) => result.jobs[name]).join(', ')}`);
+  const selected = JOB_NAMES.filter((name) => result.jobs[name]);
+  const scope = result.e2eConsoleOnly ? '; E2E scope: console' : '';
+  console.log(`ci changes: ${result.mode}; selected jobs: ${selected.join(', ')}${scope}`);
   return 0;
 }
 
