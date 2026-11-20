@@ -146,7 +146,7 @@ describe('admin Sessions workspace', () => {
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
       .toEqual(['Public session', 'Time and structure', 'Location', 'Speaker materials', 'Publishing']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'Public title', 'Public description', 'Spanish public title', 'Spanish public description', 'Recording link',
+      'Public title', 'Public description', 'Spanish public title', 'Spanish public description', 'Speaker to add', 'Recording link',
       'Event day', 'Parent session', 'Start time', 'End time', 'Track',
       'Room', 'Location label', 'Request speaker materials',
       'Show on the schedule',
@@ -187,6 +187,45 @@ describe('admin Sessions workspace', () => {
     expect(bodyOf(0)).toEqual({
       collection: 'cmsSchedule', docId: 'panel', fields: saved, visible: false,
     });
+  });
+
+  it('edits the draft speaker references and can clear the last one on publish', async () => {
+    await renderAt('/admin/sessions/panel');
+    const panel = {
+      id: 'panel', title: 'Panel', description: 'Panel description.', dayId: 'day-1',
+      startTime: '09:15', endTime: '10:00', visible: true,
+    };
+    await pushSessions([{ ...panel, speakerIds: ['pat'] }], [
+      { ...panel, speakerIds: ['rae'], status: 'dirty' },
+    ]);
+    act(() => adminSubscriptions.get('speakers')([
+      { id: 'pat', firstName: 'Pat', lastName: 'Lee', status: 'draft' },
+      { id: 'rae', firstName: 'Rae', lastName: 'Okonkwo', status: 'approved' },
+      { id: 'removed', firstName: 'Former', lastName: 'Speaker', status: 'removed' },
+    ]));
+    const picker = await screen.findByRole('combobox', { name: 'Speaker to add' });
+    const selected = screen.getByRole('list', { name: 'Session speakers' });
+    expect(selected).toHaveTextContent('Rae Okonkwo');
+    expect(selected).not.toHaveTextContent('Pat Lee');
+    expect(within(picker).queryByRole('option', { name: 'Rae Okonkwo' })).toBeNull();
+    expect(within(picker).queryByRole('option', { name: 'Former Speaker' })).toBeNull();
+
+    fireEvent.change(picker, { target: { value: 'pat' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add speaker' }));
+    fireEvent.click(within(selected).getByRole('button', { name: 'Remove Rae Okonkwo' }));
+    expect(picker).toHaveFocus();
+    fetch.mockResolvedValueOnce(response({ docId: 'panel', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Draft saved. It is not live until you publish it.')).toBeInTheDocument();
+    expect(bodyOf(0).fields.speakerIds).toEqual(['pat']);
+
+    fireEvent.click(within(selected).getByRole('button', { name: 'Remove Pat Lee' }));
+    fetch.mockResolvedValueOnce(response({ docId: 'panel', status: 'dirty' }))
+      .mockResolvedValueOnce(response({ results: { cmsSchedule: { published: ['panel'], skipped: [] } } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(bodyOf(1).fields.speakerIds).toEqual([]);
+    expect(bodyOf(2)).toEqual({ collection: 'cmsSchedule', docIds: ['panel'] });
   });
 
   it('waits for both revisions before it fills the form and saves the draft values', async () => {
@@ -268,6 +307,11 @@ describe('admin Sessions workspace', () => {
   it('creates a draft through the generic schedule endpoint', async () => {
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });
+    act(() => adminSubscriptions.get('speakers')([
+      { id: 'pat', firstName: 'Pat', lastName: 'Lee' },
+    ]));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Speaker to add' }), { target: { value: 'pat' } });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
     expect(screen.queryByLabelText('Session id')).not.toBeInTheDocument();
@@ -282,7 +326,7 @@ describe('admin Sessions workspace', () => {
     expect(bodyOf(0)).toMatchObject({
       collection: 'cmsSchedule',
       docId: 'opening-session',
-      fields: { title: 'Opening session', dayId: 'day-1', startTime: '09:00', endTime: '10:00' },
+      fields: { title: 'Opening session', dayId: 'day-1', startTime: '09:00', endTime: '10:00', speakerIds: ['pat'] },
     });
   });
 
