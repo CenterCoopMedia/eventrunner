@@ -247,6 +247,8 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 
 **Home hero image.** Open **Home → Hero**. If there is no image block, the **Hero image** slot lets you choose an image and add the required alt text. Save the image draft, or save and publish it. The image then appears in the block list for normal editing. Hero holds at most four blocks. If all four places are in use, remove a block before adding the picture. **Settings → Branding → Identity → Homepage hero image** edits the same image.
 
+**Images in the page body.** Set **Image size** to Small, Medium, Large or Full width. The picture can shrink to fit a narrow screen. Use **Image alignment** to position the picture and caption to the left, centre or right. The home hero has its own fixed layout.
+
 **Add a Google map to a page.** Open the page and section in Content, then add a **Map** block. In Google Maps, choose **Share → Embed a map**. Paste the copied HTML or its embed link in **Google Maps embed**. Enter a label that names the place, such as “Map of the convention center”. Add a street address if you want it to appear below the map and be used by the **Open in Google Maps** link. Check the preview, then publish the block.
 
 **Use the event’s venue.** Select **Use the event’s venue** in a **Map** block to show the place saved in **Settings → Event settings → Venue**. The block uses the venue name and street address for the interactive map and the saved **Map URL** for its outside link. The uploaded **Venue map** image shows the building and its rooms.

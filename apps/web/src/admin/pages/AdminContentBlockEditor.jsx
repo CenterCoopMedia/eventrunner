@@ -61,6 +61,7 @@ import {
   DestructiveConfirm,
   Notice,
   Panel,
+  SelectField,
   ServerErrorSummary,
   TextField,
   TextAreaField,
@@ -82,6 +83,10 @@ import BusyLabel from '../../components/BusyLabel.jsx';
 // text, which keeps the existing public and lazy-chunk budgets intact.
 const RichTextEditor = lazy(() => import('../components/RichTextEditor.jsx'));
 
+const IMAGE_LAYOUT_CHOICES = {
+  full: 'Full width', small: 'Small (320 px)', medium: 'Medium (640 px)', large: 'Large (1280 px)',
+  left: 'Left', center: 'Centre', right: 'Right',
+};
 
 /**
  * What the public site does with a link that leads nowhere a reader can
@@ -126,7 +131,7 @@ function linkTargetWarning(blockTypeId, fieldId, value, features, pageRows) {
 }
 
 /** One control per registry field, chosen by the field's declared type. */
-function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, pageRows }) {
+function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, pageRows, fixedHero }) {
   const fields = valueFieldsOf(blockTypeId);
   if (!blockTypeFor(blockTypeId)) {
     return (
@@ -143,6 +148,15 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
         const value = values[field.id];
         const error = errorFor(field.id);
         const hint = contentFieldHelp(blockTypeId, field.id);
+        if (field.choices) {
+          if (fixedHero) return null;
+          return (
+            <SelectField key={field.id} label={name} help={hint} error={error}
+              value={value || field.choices[0]}
+              options={field.choices.map((choice) => ({ value: choice, label: IMAGE_LAYOUT_CHOICES[choice] }))}
+              onChange={(next) => onChange(field.id, next)} />
+          );
+        }
         if (field.type === 'boolean') {
           return (
             <div key={field.id} className="flex items-center">
@@ -639,6 +653,7 @@ export default function AdminContentBlockEditor({ mode }) {
         errorFor={errorFor}
         features={features}
         pageRows={pagesLoading ? null : pageRows}
+        fixedHero={sectionId === 'hero' && page?.current?.path === '/'}
       />
       {content.blockType === 'map' ? (
         <MapBlock block={content.values} preview />

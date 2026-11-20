@@ -34,6 +34,8 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'caption', type: 'string', required: false },
       { id: 'focalX', type: 'number', required: false },
       { id: 'focalY', type: 'number', required: false },
+      { id: 'size', type: 'string', required: false, choices: ['full', 'small', 'medium', 'large'] },
+      { id: 'alignment', type: 'string', required: false, choices: ['left', 'center', 'right'] },
     ],
   },
   map: {

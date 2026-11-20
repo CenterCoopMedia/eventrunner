@@ -10,6 +10,8 @@ const FIELD_HINTS = Object.freeze({
     caption: 'Add a short caption displayed with the picture.',
     focalX: 'Choose the part of the picture to keep across a crop: 0 is the left edge and 100 is the right.',
     focalY: 'Choose the part of the picture to keep down a crop: 0 is the top edge and 100 is the bottom.',
+    size: 'Set how wide the image can appear. It can shrink to fit the page on a smaller screen.',
+    alignment: 'Position the image and its caption within the available space.',
   },
   map: {
     useEventVenue: 'Use the venue name, address and map link saved in Event settings.',

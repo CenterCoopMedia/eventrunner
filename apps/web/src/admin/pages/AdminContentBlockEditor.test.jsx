@@ -164,6 +164,7 @@ describe('AdminContentBlockEditor value fields', () => {
 
     const urlInput = screen.getByRole('textbox', { name: 'Image' });
     expect(urlInput).not.toHaveAttribute('type', 'url');
+    expect(screen.queryByLabelText('Image size')).not.toBeInTheDocument();
     fireEvent.change(urlInput, { target: { value: 'cms-images/banner.jpg' } });
     expect(urlInput).toHaveValue('cms-images/banner.jpg');
 
@@ -176,6 +177,23 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(call).toBeTruthy();
     const body = JSON.parse(call[1].body);
     expect(body.fields.url).toBe('cms-images/banner.jpg');
+  });
+
+  it('saves image size and alignment for an image in the page body', async () => {
+    pagesLive = [{ ...HOME_PAGE, sections: [{ ...HOME_PAGE.sections[0], id: 'welcome', allowedBlocks: ['image'] }] }];
+    await renderAt('/admin/content/home/welcome/_new');
+    const size = await screen.findByLabelText('Image size');
+    const alignment = screen.getByLabelText('Image alignment');
+    expect(size).toHaveValue('full');
+    expect(alignment).toHaveValue('left');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Image' }), { target: { value: 'cms-images/banner.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Banner' } });
+    fireEvent.change(size, { target: { value: 'medium' } });
+    fireEvent.change(alignment, { target: { value: 'right' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
+    expect(JSON.parse(call[1].body).fields).toMatchObject({ blockType: 'image', size: 'medium', alignment: 'right' });
   });
 
   // The Home hero takes text, a button and an image. The picker lists those

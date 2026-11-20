@@ -28,13 +28,7 @@ describe('admin block palette', () => {
       const mirror = BLOCK_TYPES[id];
       expect(mirror.label, `label for '${id}'`).toBe(backend.label);
       expect(mirror.description, `description for '${id}'`).toBe(backend.description);
-      expect(mirror.fields, `fields for '${id}'`).toEqual(
-        backend.fields.map((field) => ({
-          id: field.id,
-          type: field.type,
-          required: field.required,
-        })),
-      );
+      expect(mirror.fields, `fields for '${id}'`).toEqual(backend.fields);
     }
   });
 

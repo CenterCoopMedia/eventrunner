@@ -109,6 +109,8 @@ export function toContentFields(content) {
       fields[field.id] = DELETE_FIELD_SENTINEL;
     } else if (field.type === 'boolean') {
       fields[field.id] = Boolean(raw);
+    } else if (field.choices) {
+      fields[field.id] = raw || DELETE_FIELD_SENTINEL;
     } else if (field.type === 'number') {
       // A blank number is a deletion, not an omission. cmsUpdateContent
       // merges the payload onto the stored draft, so a key left out keeps
@@ -171,6 +173,8 @@ const EDITORIAL_FIELD_LABELS = Object.freeze({
     caption: 'Caption',
     focalX: 'Horizontal focus',
     focalY: 'Vertical focus',
+    size: 'Image size',
+    alignment: 'Image alignment',
   },
   map: { useEventVenue: 'Use the event’s venue', embedUrl: 'Google Maps embed', label: 'Map label', address: 'Address' },
   cta: { label: 'Button text', url: 'Destination', external: 'Open in a new tab' },
