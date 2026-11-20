@@ -16,6 +16,10 @@ import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
 import UnknownBlock from './UnknownBlock.jsx';
 
+export const loadLinkGroupBlock = () => import('./LinkGroupBlock.jsx');
+export const loadLatestUpdatesBlock = () => import('./LatestUpdatesBlock.jsx');
+export const loadSponsorPackageBlock = () => import('./SponsorPackageBlock.jsx');
+
 export const BLOCK_RENDERERS = Object.freeze({
   // Keep the Home hero, information cards and opening copy ready for first
   // paint. Add new block types with a dynamic import.
@@ -29,9 +33,9 @@ export const BLOCK_RENDERERS = Object.freeze({
   map: lazy(() => import('./MapBlock.jsx')),
   quote: lazy(() => import('./QuoteBlock.jsx')),
   faq_item: lazy(() => import('./FaqItemBlock.jsx')),
-  link_group: lazy(() => import('./LinkGroupBlock.jsx')),
-  latest_updates: lazy(() => import('./LatestUpdatesBlock.jsx')),
-  sponsor_package: lazy(() => import('./SponsorPackageBlock.jsx')),
+  link_group: lazy(loadLinkGroupBlock),
+  latest_updates: lazy(loadLatestUpdatesBlock),
+  sponsor_package: lazy(loadSponsorPackageBlock),
   gallery: lazy(() => import('./GalleryBlock.jsx')),
   timeline: lazy(() => import('./TimelineBlock.jsx')),
 });
@@ -83,9 +87,6 @@ function BlockPlaceholder({ block }) {
     return block.useEventVenue === true
       ? <VenueMapPlaceholder address={fields.address} />
       : <MapPlaceholder address={fields.address} />;
-  }
-  if (block.blockType === 'link_group') {
-    return <li aria-hidden="true" className="min-h-11" />;
   }
   if (block.blockType === 'faq_item') {
     return (

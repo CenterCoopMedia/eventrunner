@@ -7,17 +7,23 @@
 // Everything else renders one-by-one through the registry, so an unknown
 // type still hits the UnknownBlock fallback.
 import { lazy, Suspense } from 'react';
-import BlockRenderer from './registry.jsx';
+import BlockRenderer, { loadLinkGroupBlock, loadSponsorPackageBlock } from './registry.jsx';
 import StatBlock from './StatBlock.jsx';
 import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
-import { sponsorPackageDraws } from './sponsorPackageData.js';
-
-const LinkGroups = lazy(() => import('./LinkGroupBlock.jsx')
-  .then(({ LinkGroups }) => ({ default: LinkGroups })));
+const LinkGroups = lazy(() => loadLinkGroupBlock().then(({ LinkGroups }) => ({ default: LinkGroups })));
+const SponsorPackages = lazy(() => loadSponsorPackageBlock().then(({ SponsorPackages }) => ({ default: SponsorPackages })));
 
 const blockKey = (block, index) =>
   block.id ?? `${block.section}__${block.field ?? index}`;
+
+function DeferredRun({ Renderer, blocks }) {
+  return (
+    <Suspense fallback={<div aria-hidden="true" className="min-h-16" />}>
+      <Renderer blocks={blocks} />
+    </Suspense>
+  );
+}
 
 // How each batched run renders. Ids outside this map render individually.
 const RUN_RENDERERS = {
@@ -52,23 +58,8 @@ const RUN_RENDERERS = {
       ))}
     </div>
   ),
-  link_group: (run) => (
-    <Suspense fallback={<div aria-hidden="true" className="min-h-16" />}>
-      <LinkGroups blocks={run} />
-    </Suspense>
-  ),
-  // A run of sponsor packages (#193) is one list of entries, each ruled on
-  // top: no box, no card. A package with no name is left out rather than
-  // drawn as an empty entry.
-  sponsor_package: (run) => (
-    <ul className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
-      {run.filter(sponsorPackageDraws).map((block, i) => (
-        <li key={blockKey(block, i)} className="border-t-hairline border-t-rule-hairline pt-sm">
-          <BlockRenderer block={block} />
-        </li>
-      ))}
-    </ul>
-  ),
+  link_group: (run) => <DeferredRun Renderer={LinkGroups} blocks={run} />,
+  sponsor_package: (run) => <DeferredRun Renderer={SponsorPackages} blocks={run} />,
 };
 
 export default function SectionBlocks({ blocks }) {

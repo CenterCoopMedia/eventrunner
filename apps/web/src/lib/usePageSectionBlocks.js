@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { loadLatestUpdatesBlock } from '../components/blocks/registry.jsx';
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { withoutSwitchedOffLinks } from './linkTargets.js';
 
@@ -16,7 +17,7 @@ export function usePageSectionBlocks(sections, features) {
     if (!needsUpdates) return undefined;
     let active = true;
     let unsubscribe;
-    import('../components/blocks/LatestUpdatesBlock.jsx').then(({ subscribeLatestUpdates }) => {
+    loadLatestUpdatesBlock().then(({ subscribeLatestUpdates }) => {
       if (!active) return;
       unsubscribe = subscribeLatestUpdates((resolveBlock) => {
         if (active) setWithUpdates(() => resolveBlock);
