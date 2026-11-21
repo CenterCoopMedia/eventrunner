@@ -264,7 +264,7 @@ test('a released hold whose promo code was removed still releases', async () => 
 });
 
 test('a processing payment keeps inventory and cannot enter the pending_info entitlement hold', async () => {
-  const { db, provider, reconcile } = fixture();
+  const { db, provider, reconcile } = fixture({ order: { ...ORDER, checkoutUrl: 'https://checkout.stripe.com/c/pay/example' } });
   provider.readFinancialState = async () => {
     const data = state();
     return { ...data, session: { ...data.session, payment_status: 'unpaid' },
@@ -274,6 +274,7 @@ test('a processing payment keeps inventory and cannot enter the pending_info ent
   assert.equal(result.paymentPending, true);
   assert.equal(db.ids('tickets').length, 0);
   assert.equal(db.read('ticket_orders', ORDER.id).paymentStatus, 'pending');
+  assert.equal(db.read('ticket_orders', ORDER.id).checkoutUrl, null);
   assert.equal(db.read('ticket_inventory', 'current').held, 2);
 });
 

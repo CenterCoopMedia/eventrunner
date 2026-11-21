@@ -601,6 +601,7 @@ async function readPurchaserOrder({ db, provider, actor, orderId, requestId, now
   });
   return {
     ...checkoutResponse(order), currency: order.currency, currencyExponent: order.currencyExponent,
+    canRecoverCheckout: order.status === 'pending' && !order.stripeSessionId,
     subtotalAmount: order.subtotalAmount, totalAmount: order.totalAmount,
     taxAmount: order.taxAmount, feeAmount: order.feeAmount, taxTreatment: order.taxTreatment,
     refundStatus: order.refundStatus, refundedAmount: order.refundedAmount,
