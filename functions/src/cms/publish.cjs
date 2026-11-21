@@ -25,15 +25,14 @@
  *     progress: { [collection]: { published, skipped, chunksCommitted } }, plannedChunks,
  *     requestedBy, requestedAt, updatedAt, finishedAt?, error?, note? }
  *
- * Because publishDocs records progress per committed chunk and skips
- * already-recorded docIds, resuming a failed row is exactly a re-run:
- * completed chunks are not re-published and revisions never double-bump.
+ * A resume keeps the published and skipped outcomes from completed chunks
+ * and processes the remaining items.
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
-const { listDirty, publishDocs, logAdminAction, isValidDocId, isAlreadyExistsError, internals } = require('./store.cjs');
+const { listDirty, publishDocs, remainingPublishIds, logAdminAction, isValidDocId, isAlreadyExistsError, internals } = require('./store.cjs');
 const { publisherNotificationSecrets, refreshSiteAfterPublish, requestSitePublish, withPublisherNotifier } = require('./publisher.cjs');
 const { runMediaReplacement } = require('../media/replace.cjs');
 const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
@@ -196,30 +195,29 @@ function createCmsPublishHandler({
       if (!request || typeof request !== 'object') {
         return badRequest(res, 'That queue row has no stored request to resume.');
       }
-      // Re-checked on resume, not trusted from the first run: the world has
-      // moved since the row was written, and a parent deleted in between
-      // must stop the remainder of the run.
-      const refusal = await structuralRefusal({ db }, request);
-      if (refusal) return badRequest(res, refusal);
-      // Claim the row in one transaction: two resumes can both pass the
-      // checks above, but only one may move the row to 'running'.
+      // Check against the progress of the row we claim. A skipped parent
+      // cannot satisfy the publish set for a child that is still pending.
       const claim = await db.runTransaction(async (tx) => {
         const current = await tx.get(queueRef);
-        const status = current.exists ? current.data()?.status : undefined;
-        if (status === 'running' || status === 'done') return status;
+        const { status, progress } = current.data() || {};
+        if (status === 'running' || status === 'done') return { status };
+        const cmsSchedule = remainingPublishIds(request.cmsSchedule ?? [], progress?.cmsSchedule);
+        const refusal = await structuralRefusal({ db }, { cmsSchedule });
+        if (refusal) return { status: 'refused', refusal };
         tx.set(queueRef, {
           status: 'running',
           error: null,
           plannedChunks: countPlannedChunks(request),
           updatedAt: new Date(now()),
         }, { merge: true });
-        return 'claimed';
+        return { status: 'claimed' };
       });
-      if (claim === 'done') {
+      if (claim.status === 'refused') return badRequest(res, claim.refusal);
+      if (claim.status === 'done') {
         const latest = (await queueRef.get()).data() || {};
         return res.status(200).json({ queueId: queueRef.id, status: 'done', results: latest.progress || {} });
       }
-      if (claim === 'running') {
+      if (claim.status === 'running') {
         return sendError(res, 409, 'already-running', 'That publish is already running. Wait for it to finish.');
       }
     } else {

@@ -304,16 +304,27 @@ test('cmsPublish failure mid-way → 500 with queueId, row failed; resume with {
 
 test('the correlated row advances with committed chunks and keeps skips distinct through resume', async () => {
   const ids = Array.from({ length: 134 }, (_, index) => `block-${index}`);
+  const [missingId, editedId] = ids;
   const db = makeFakeDb(Object.fromEntries(ids.slice(1).map((id) => [
     `cmsContent_drafts/${id}`, { value: id, status: 'dirty' },
   ])));
-  db.failAtCommit = 2;
+  db.failAtCommit = 3;
+  const saveDraft = (docId, value) => writeDraft({
+    db, collection: 'cmsContent', docId, fields: { value }, visible: true,
+    actor: { uid: 'editor', email: 'editor@example.org' }, now,
+  });
+  const skipped = [{ docId: missingId, reason: 'no-draft' }, { docId: editedId, reason: 'conflict' }];
   const snapshots = [];
   const originalBatch = db.batch.bind(db);
+  let edited = false;
   db.batch = () => {
     const batch = originalBatch();
     const commit = batch.commit.bind(batch);
     batch.commit = async () => {
+      if (!edited) {
+        edited = true;
+        await saveDraft(editedId, 'newer draft');
+      }
       const before = db.read('cmsPublishQueue', REQUEST_ID);
       await commit();
       const after = db.read('cmsPublishQueue', REQUEST_ID);
@@ -334,12 +345,13 @@ test('the correlated row advances with committed chunks and keeps skips distinct
   assert.deepEqual(first.before.progress, {});
   assert.equal(first.after.status, 'running');
   assert.deepEqual(first.after.progress.cmsContent, {
-    published: ids.slice(1, 132), skipped: [{ docId: ids[0], reason: 'no-draft' }], chunksCommitted: 1,
+    published: ids.slice(2, 132), skipped, chunksCommitted: 1,
   });
-  assert.deepEqual(first.live, ids.slice(1, 132));
+  assert.deepEqual(first.live, ids.slice(2, 132));
   assert.equal(db.read('cmsPublishQueue', REQUEST_ID).status, 'failed');
   assert.deepEqual(db.read('cmsPublishQueue', REQUEST_ID).progress, first.after.progress);
 
+  await saveDraft(missingId, 'new draft');
   const resumed = fakeRes();
   await handler(req({ body: { queueId: REQUEST_ID } }), resumed);
   assert.equal(resumed.statusCode, 200);
@@ -349,9 +361,14 @@ test('the correlated row advances with committed chunks and keeps skips distinct
   const final = db.read('cmsPublishQueue', REQUEST_ID);
   assert.equal(final.status, 'done');
   assert.deepEqual(final.request, { cmsContent: ids });
-  assert.deepEqual(final.progress.cmsContent.published, ids.slice(1));
-  assert.deepEqual(final.progress.cmsContent.skipped, [{ docId: ids[0], reason: 'no-draft' }]);
-  assert.equal(db.ids('cmsVersionHistory').length, 133);
+  assert.deepEqual(final.progress.cmsContent, { published: ids.slice(2), skipped, chunksCommitted: 2 });
+  assert.deepEqual(resumed.body.results, final.progress);
+  assert.deepEqual(db.ids('cmsContent'), ids.slice(2));
+  assert.equal(db.ids('cmsVersionHistory').length, 132);
+  assert.equal(db.read('cmsContent_drafts', editedId).value, 'newer draft');
+  assert.equal(db.read('cmsContent_drafts', editedId).status, 'dirty');
+  assert.equal(db.read('cmsContent_drafts', missingId).value, 'new draft');
+  assert.equal(db.read('cmsContent_drafts', missingId).status, 'dirty');
 });
 
 test('cmsPublish resume of an unknown queueId → 404', async () => {
@@ -690,6 +707,34 @@ test('a resume re-checks the parent rule against the world as it is now', async 
   assert.match(res.body.error.message, /which is not published/);
   // The row is left failed, not flipped to running.
   assert.equal(db.read('cmsPublishQueue', 'q1').status, 'failed');
+});
+
+test('a skipped schedule parent must be live before its pending child can resume', async () => {
+  const db = parentAndChildDb();
+  const skipped = [{ docId: 'session-parent', reason: 'conflict' }];
+  await db.collection('cmsPublishQueue').doc('q1').set({
+    status: 'failed',
+    request: { cmsSchedule: ['session-parent', 'session-clinic'] },
+    progress: { cmsSchedule: { published: [], skipped, chunksCommitted: 1 } },
+  });
+  const handler = createCmsPublishHandler({ ...deps(db), env: {} });
+  const refused = fakeRes();
+  await handler(req({ body: { queueId: 'q1' } }), refused);
+  assert.equal(refused.statusCode, 400);
+  assert.match(refused.body.error.message, /session-parent.*which is not published/);
+  assert.equal(db.read('cmsPublishQueue', 'q1').status, 'failed');
+  assert.deepEqual(db.ids('cmsSchedule'), []);
+
+  const parentPublished = fakeRes();
+  await handler(req({ body: { collection: 'cmsSchedule', docIds: ['session-parent'] } }), parentPublished);
+  assert.equal(parentPublished.statusCode, 200);
+
+  const resumed = fakeRes();
+  await handler(req({ body: { queueId: 'q1' } }), resumed);
+  assert.equal(resumed.statusCode, 200);
+  assert.deepEqual(resumed.body.results.cmsSchedule, { published: ['session-clinic'], skipped, chunksCommitted: 2 });
+  assert.equal(db.read('cmsSchedule', 'session-parent').revision, 1);
+  assert.equal(db.read('cmsSchedule', 'session-clinic').revision, 1);
 });
 
 test('the publish-set rule binds cmsSchedule only', async () => {
