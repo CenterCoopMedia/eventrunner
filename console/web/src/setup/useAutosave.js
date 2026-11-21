@@ -1,12 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { clearKeptAnswer, keepAnswer, readKeptAnswer, removeKeptAnswer } from './keptAnswers.js';
+import { keepAnswer, removeKeptAnswer } from './keptAnswers.js';
 
 // The masthead waits for the mounted setup's save before signing out.
 export const SetupSaveContext = createContext(null);
-
-function keepUnsaved(entries) {
-  for (const { scope, value } of entries.values()) keepAnswer(scope, value);
-}
 
 /**
  * Save as the client types (ADR 0007 §3). `queue(value)` waits `delay` ms
@@ -72,19 +68,14 @@ export function useAutosave({ save, onResult, scope, activeStep, delay = 800 }) 
           const current = latest.current.get(value.step);
           if (result?.saved === false) {
             entry.state = 'unsaved';
-            if (current) keepAnswer(current.scope, current.value);
-          } else if (current === entry) {
-            clearKeptAnswer(savedScope, value.step);
-            latest.current.delete(value.step);
           } else {
-            removeKeptAnswer(savedScope, value);
+            if (result?.saved === true) removeKeptAnswer(savedScope, value);
+            if (current === entry) latest.current.delete(value.step);
           }
         } catch (err) {
           entry.state = 'error';
           entry.error = err.message;
           entry.failure = { status: err.status ?? 0, code: err.code ?? 'network' };
-          const current = latest.current.get(value.step);
-          if (current) keepAnswer(current.scope, current.value);
         }
         updateStatus();
       }
@@ -94,7 +85,10 @@ export function useAutosave({ save, onResult, scope, activeStep, delay = 800 }) 
   }, [updateStatus]);
 
   const queue = useCallback((value) => {
-    latest.current.set(value.step, { value, scope: scopeRef.current, state: 'waiting' });
+    const savedScope = scopeRef.current;
+    latest.current.set(value.step, { value, scope: savedScope, state: 'waiting' });
+    // A browser can discard the page without running a lifecycle callback.
+    keepAnswer(savedScope, value);
     clearTimeout(timer.current);
     timer.current = setTimeout(flush, delay);
     updateStatus();
@@ -104,8 +98,7 @@ export function useAutosave({ save, onResult, scope, activeStep, delay = 800 }) 
     clearTimeout(timer.current);
     timer.current = null;
     for (const { scope: savedScope, value } of latest.current.values()) {
-      keepAnswer(savedScope, value);
-      if (JSON.stringify(readKeptAnswer(savedScope, value.step)) !== JSON.stringify(value)) return false;
+      if (!keepAnswer(savedScope, value)) return false;
     }
     // Authentication is about to end. Recovery reopens the copy explicitly,
     // without an unmount retry against the signed-out session.
@@ -115,23 +108,18 @@ export function useAutosave({ save, onResult, scope, activeStep, delay = 800 }) 
 
   useEffect(() => {
     const beforeUnload = (event) => {
-      keepUnsaved(latest.current);
       event.preventDefault();
       event.returnValue = '';
     };
-    const preserve = () => {
-      keepUnsaved(latest.current);
-      // Save and token lookup may outlive this page; the copy comes first.
-      flush({ keepalive: true });
-    };
-    const visibility = () => { if (document.visibilityState === 'hidden') preserve(); };
+    const send = () => flush({ keepalive: true });
+    const visibility = () => { if (document.visibilityState === 'hidden') send(); };
     document.addEventListener('visibilitychange', visibility);
-    window.addEventListener('pagehide', preserve);
+    window.addEventListener('pagehide', send);
     const dirty = status === 'waiting' || status === 'saving' || status === 'error' || status === 'unsaved';
     if (dirty) window.addEventListener('beforeunload', beforeUnload);
     return () => {
       document.removeEventListener('visibilitychange', visibility);
-      window.removeEventListener('pagehide', preserve);
+      window.removeEventListener('pagehide', send);
       if (dirty) window.removeEventListener('beforeunload', beforeUnload);
     };
   }, [flush, status]);
@@ -143,18 +131,14 @@ export function useAutosave({ save, onResult, scope, activeStep, delay = 800 }) 
       const finished = await flush();
       if (!finished || [...latest.current.values()].some(({ state }) => state !== 'unsaved')) return false;
       // A completed refusal (such as a taken name) must not trap the reader
-      // in setup. Explicit sign-out discards their copies after auth exits;
-      // stop unmount cleanup from writing the refused answer back then.
+      // in setup. Explicit sign-out discards their copies after auth exits.
       latest.current.clear();
       return true;
     };
     return () => { beforeSignOut.current = null; };
   }, [beforeSignOut, flush]);
 
-  useEffect(() => () => {
-    keepUnsaved(latest.current);
-    flush();
-  }, [flush]);
+  useEffect(() => () => { flush(); }, [flush]);
 
   return { status, error, failure, queue, flush, keepForSignIn, signingOut: signOut?.signingOut || false };
 }

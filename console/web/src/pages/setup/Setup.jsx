@@ -19,7 +19,7 @@ import IconControl from '../../IconControl.jsx';
 import StepList from '../../setup/StepList.jsx';
 import { rememberReturn, useAuth } from '../../auth.jsx';
 import KeptAnswer from '../../setup/KeptAnswer.jsx';
-import { readKeptAnswer } from '../../setup/keptAnswers.js';
+import { clearRequestKeptAnswers, readKeptAnswer } from '../../setup/keptAnswers.js';
 
 const WebAddressStep = lazy(() => import('./WebAddressStep.jsx'));
 
@@ -158,6 +158,13 @@ function SetupRequest({ user, signOut, orgId, appId, stepPath }) {
     queue({ step: step.id, answers: value });
   }, [step, setApp, queue]);
 
+  function restoreAnswer(answers) {
+    const current = applicationNow.current.answers[step.id];
+    const value = { ...current, ...answers };
+    if (step.id === 'event') value.venue = { ...current.venue, ...answers.venue };
+    onChange(value);
+  }
+
   useEffect(() => {
     if (!app || !step || presetStep.current === step.id) return;
     presetStep.current = step.id;
@@ -259,7 +266,7 @@ function SetupRequest({ user, signOut, orgId, appId, stepPath }) {
         {View ? (
           <form id={formId} noValidate onSubmit={(event) => { event.preventDefault(); if (continueStep) continueSetup(); }}>
           <KeptAnswer key={`${user?.uid}/${orgId}/${appId}/${step.id}`} scope={scope} step={step.id}
-          onUse={onChange}
+          onUse={restoreAnswer}
           onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} />
           <Suspense fallback={<LoadingState>Loading your setup.</LoadingState>}>
           <StepErrorFocus showAll={showAll} visit={location.key} />
@@ -295,7 +302,10 @@ function SetupRequest({ user, signOut, orgId, appId, stepPath }) {
             orgId={orgId}
             appId={appId}
             onRefresh={reload}
-            onAccepted={(result) => navigate(statusPath(orgId, appId), { state: { copyFailed: result.copySent === false } })}
+            onAccepted={(result) => {
+              clearRequestKeptAnswers(scope);
+              navigate(statusPath(orgId, appId), { state: { copyFailed: result.copySent === false } });
+            }}
           />
         ) : null}
         </fieldset>

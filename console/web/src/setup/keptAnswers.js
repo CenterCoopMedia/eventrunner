@@ -1,4 +1,37 @@
 // Answers stay in this tab, scoped to the signed-in reader and request.
+// Only these form fields can enter browser storage. Connection credentials
+// and any other properties carried by the application stay out of the copy.
+const KEPT_FIELDS = {
+  organization: ['name', 'website', 'address'],
+  event: ['name', 'shortName', 'tagline', 'timezone'],
+  webAddress: ['name'],
+  tickets: ['choice'],
+  email: ['senderName', 'replyTo'],
+};
+
+function textFields(value, names) {
+  const fields = {};
+  for (const name of names) {
+    const text = value?.[name];
+    if (typeof text === 'string') fields[name] = text;
+  }
+  return fields;
+}
+
+function keptValue(value) {
+  const { step, answers } = value ?? {};
+  if (!Object.hasOwn(KEPT_FIELDS, step) || !answers) return null;
+  const fields = textFields(answers, KEPT_FIELDS[step]);
+  if (step === 'tickets' && answers.choice === null) fields.choice = null;
+  if (step === 'event') {
+    if (Array.isArray(answers.days)) {
+      fields.days = answers.days.map((day) => textFields(day, ['date', 'startTime', 'endTime', 'label']));
+    }
+    if (answers.venue) fields.venue = textFields(answers.venue, ['name', 'address']);
+  }
+  return Object.keys(fields).length ? { step, answers: fields } : null;
+}
+
 function userPrefix(userId) {
   return `console.setup.${encodeURIComponent(userId)}:`;
 }
@@ -9,8 +42,9 @@ function key(scope, step) {
 
 export function readKeptAnswer(scope, step) {
   try {
-    const value = JSON.parse(window.sessionStorage.getItem(key(scope, step)));
-    return value?.step === step && value.answers && typeof value.answers === 'object' ? value : null;
+    const name = key(scope, step);
+    const value = name && JSON.parse(window.sessionStorage.getItem(name));
+    return value?.step === step ? keptValue(value) : null;
   } catch {
     return null;
   }
@@ -18,26 +52,34 @@ export function readKeptAnswer(scope, step) {
 
 export function keepAnswer(scope, value) {
   try {
-    const name = key(scope, value.step);
-    if (name) window.sessionStorage.setItem(name, JSON.stringify(value));
+    const kept = keptValue(value);
+    const name = kept && key(scope, kept.step);
+    if (!name) return false;
+    window.sessionStorage.setItem(name, JSON.stringify(kept));
+    return true;
   } catch {
-    // Storage can be blocked or full; the normal save still runs.
+    return false;
   }
 }
 
 export function removeKeptAnswer(scope, value) {
   try {
-    const name = key(scope, value.step);
     // An older response must not remove a newer answer's copy.
-    if (window.sessionStorage.getItem(name) === JSON.stringify(value)) window.sessionStorage.removeItem(name);
+    const kept = keptValue(value);
+    if (kept && JSON.stringify(readKeptAnswer(scope, kept.step)) === JSON.stringify(kept)) {
+      window.sessionStorage.removeItem(key(scope, kept.step));
+    }
   } catch {
     // Storage can be blocked.
   }
 }
 
-export function clearKeptAnswer(scope, step) {
+export function clearRequestKeptAnswers(scope) {
+  if (!scope?.userId) return;
   try {
-    window.sessionStorage.removeItem(key(scope, step));
+    for (const step of Object.keys(KEPT_FIELDS)) {
+      window.sessionStorage.removeItem(key(scope, step));
+    }
   } catch {
     // Storage can be blocked.
   }
