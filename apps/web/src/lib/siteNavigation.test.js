@@ -46,6 +46,14 @@ it('orders visible custom links with pages and checks the destinations', () => {
   expect(isPublicPage(link, ALL_ON)).toBe(false);
 });
 
+it('only shows a custom link to a built-in landing page while the page is published and visible', () => {
+  const alias = { id: 'program', label: 'Program', url: '/schedule', order: 2, visible: true, systemPage: false };
+  const schedule = { ...SCHEDULE, path: '/old-schedule' };
+  expect(labels(buildNavItems([alias, schedule], ALL_ON))).toEqual(['Schedule', 'Program']);
+  expect(buildNavItems([alias, { ...schedule, visible: false }], ALL_ON)).toEqual([]);
+  expect(buildNavItems([alias], ALL_ON)).toEqual([]);
+});
+
 describe('the system page routes', () => {
   it('is keyed by the seeded document id, never by an editable path', () => {
     // The whole point of keying by id: the key is the document's identity,
