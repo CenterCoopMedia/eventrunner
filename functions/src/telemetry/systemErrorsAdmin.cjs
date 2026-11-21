@@ -58,6 +58,10 @@ const KIND_SWEEP_PAGE_SIZE = 200;
 // Every system_errors id: a Firestore auto id (20), an auth.otp sha256 (64)
 // or invoice_review_<40 hex>. Checked before any read.
 const ERROR_ID_RE = /^[A-Za-z0-9_-]{8,128}$/;
+// Firestore reserves ids of the form __...__.
+const RESERVED_ID_RE = /^__.*__$/;
+// A reporter controls the path depth; deeper segments collapse into one `*`.
+const MAX_ROUTE_SEGMENTS = 4;
 const SAFE_KIND_RE = /^[a-z0-9-]{1,80}$/;
 // Route names a page URL may report, copied from apps/web/src/routes.jsx and
 // admin/AdminApp.jsx. logClientError is unauthenticated, so any other segment
@@ -130,7 +134,8 @@ function routeOf(url) {
   } catch {
     return null;
   }
-  const segments = pathname.split('/').filter(Boolean);
+  let segments = pathname.split('/').filter(Boolean);
+  if (segments.length > MAX_ROUTE_SEGMENTS) segments = segments.slice(0, MAX_ROUTE_SEGMENTS);
   const known = (segment, i) => (i === 0 && PUBLIC_ROUTES.has(segment))
     || (i === 1 && segments[0] === 'admin' && ADMIN_SECTIONS.has(segment));
   return `/${segments.map((segment, i) => (known(segment, i) ? segment : '*')).join('/')}`;
@@ -171,7 +176,7 @@ function createGetSystemErrorHandler({ db, auth, getConfig, log = console }) {
   return async function getSystemError(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const id = req.body?.id;
-    if (typeof id !== 'string' || !ERROR_ID_RE.test(id)) {
+    if (typeof id !== 'string' || !ERROR_ID_RE.test(id) || RESERVED_ID_RE.test(id)) {
       return badRequest(res, 'id must be an error id from an operator alert.');
     }
     const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'operator' });
@@ -181,7 +186,8 @@ function createGetSystemErrorHandler({ db, auth, getConfig, log = console }) {
     try {
       snap = await db.collection('system_errors').doc(id).get();
     } catch (err) {
-      log.error('getSystemError read failed', err);
+      // A fixed message and the SDK status only: the exception text is not logged.
+      log.error('getSystemError read failed', { code: typeof err?.code === 'number' || typeof err?.code === 'string' ? err.code : null });
       return internal(res, 'The error log is temporarily unavailable. Try again.');
     }
     if (!snap.exists) return notFound(res, 'No error record has that id.');
