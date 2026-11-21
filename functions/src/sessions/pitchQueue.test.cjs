@@ -77,6 +77,39 @@ test('re-importing a pitch updates its content and retains review decisions and 
   assert.deepEqual((await send(removed)).body, { imported: 0, updated: 0, unchanged: 1 });
 });
 
+test('a pitch re-import keeps unmatched co-presenter details with the same person', async () => {
+  const db = makeFakeDb({ 'config/bootstrap': bootstrap });
+  const send = (proposal) => invoke(db, 'import', 'staff', { source: 'external-form', rows: [proposal] });
+  const original = { ...row,
+    presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test', presenter_1_organization: 'Source newsroom', presenter_1_role: 'Reporter',
+    presenter_2_name: 'Cy', presenter_2_email: 'cy@example.test', presenter_2_organization: 'Cy newsroom', presenter_2_role: 'Editor',
+  };
+  assert.deepEqual((await send(original)).body, { imported: 1, updated: 0, unchanged: 0 });
+  const [id] = db.ids('session_pitches');
+  const [lead, bo, cy] = db.read('session_pitches', id).presenters;
+  const correctedBo = { ...bo, organization: 'Staff newsroom', role: 'Staff role' };
+  await db.collection('session_pitches').doc(id).update({ presenters: [lead, correctedBo, cy] });
+
+  const partial = { ...row,
+    presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test',
+    presenter_2_name: 'Cy', presenter_2_email: 'cy@example.test',
+  };
+  assert.deepEqual((await send(partial)).body, { imported: 0, updated: 0, unchanged: 1 });
+  assert.deepEqual(db.read('session_pitches', id).presenters, [lead, correctedBo, cy]);
+
+  const reordered = { ...row,
+    presenter_1_name: 'Cy', presenter_1_email: 'cy@example.test',
+    presenter_3_name: 'Bo Updated', presenter_3_email: 'bo@example.test', presenter_3_role: '',
+    presenter_4_name: 'Dee', presenter_4_email: 'dee@example.test',
+  };
+  assert.deepEqual((await send(reordered)).body, { imported: 0, updated: 1, unchanged: 0 });
+  const saved = db.read('session_pitches', id);
+  assert.deepEqual(saved.presenters, [lead, cy, { ...correctedBo, name: 'Bo Updated', role: null },
+    { name: 'Dee', email: 'dee@example.test', organization: null, role: null, lead: false }]);
+  assert.equal(saved.sourceValues.presenters[2].organization, 'Source newsroom');
+  assert.deepEqual((await send(reordered)).body, { imported: 0, updated: 0, unchanged: 1 });
+});
+
 test('a pitch imported before source tracking keeps the staff correction on replay', async () => {
   const body = { source: 'external-form', rows: [row] };
   const [{ id, ...original }] = readImport(body).rows;

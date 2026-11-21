@@ -420,7 +420,15 @@ function readImportedExtras(source, { email }) {
     if (field === 'leadName' || field === 'leadRole') continue;
     extras[field] = checked.pitch[field] ?? null;
   }
-  const presenterMapping = { name: present.includes('leadName'), role: present.includes('leadRole'), coPresenters: presenterRows.length > 0 };
+  const presenterMapping = {
+    name: present.includes('leadName'),
+    role: present.includes('leadRole'),
+    // An empty list means the mapped columns explicitly removed all co-presenters.
+    coPresenters: presenterRows.length ? coPresenters.map((row) => ({
+      organization: Object.hasOwn(row, 'organization'),
+      role: Object.hasOwn(row, 'role'),
+    })) : null,
+  };
   if (presenterMapping.name || presenterMapping.role || presenterMapping.coPresenters) {
     extras.presenters = presenterList({
       leadName: leadName || null,
