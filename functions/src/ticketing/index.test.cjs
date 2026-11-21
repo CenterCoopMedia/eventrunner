@@ -237,6 +237,7 @@ test('getTicketingStatus is admin-gated', async () => {
 });
 
 test('getTicketingStatus reads Stripe charge availability for the configured account', async () => {
+  const Stripe = require('stripe');
   const { createStripeProvider } = require('./providers/stripe.cjs');
   const env = {
     EVENT_TICKETING_EVENT_ID: 'sample-event',
@@ -251,17 +252,15 @@ test('getTicketingStatus reads Stripe charge availability for the configured acc
     [new Error('private-provider-detail'), null],
   ];
   const calls = [];
-  const provider = createStripeProvider({
-    env,
-    stripeClient: { accounts: {
-      async retrieve(...args) {
-        const [account] = cases[calls.length];
-        calls.push(args);
-        if (account instanceof Error) throw account;
-        return account;
-      },
-    } },
+  const stripeClient = new Stripe('sk_test_fixture', {
+    httpClient: Stripe.createFetchHttpClient(async (url, { method }) => {
+      const [account] = cases[calls.length];
+      calls.push([url, method]);
+      if (account instanceof Error) throw account;
+      return Response.json(account);
+    }),
   });
+  const provider = createStripeProvider({ env, stripeClient });
   const handler = createGetTicketingStatusHandler({
     db: makeFakeDb(), provider, auth, now: () => T0,
     getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN] } }),
@@ -279,7 +278,7 @@ test('getTicketingStatus reads Stripe charge availability for the configured acc
     assert.equal(res.body.chargesEnabled, expected);
     assert.doesNotMatch(JSON.stringify(res.body), /acct_Sample|acct_Other|private-provider-detail/);
   }
-  assert.deepEqual(calls, cases.map(() => [null, {}, { timeout: 3_000, maxNetworkRetries: 0 }]));
+  assert.deepEqual(calls, cases.map(() => ['https://api.stripe.com/v1/account', 'GET']));
 });
 
 test('getTicketingStatus reports Eventbrite credential rejection separately from an unavailable check', async () => {

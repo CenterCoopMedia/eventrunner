@@ -129,7 +129,8 @@ function createStripeProvider({ env = process.env, db, stripeClient, now = () =>
   // With no Connect account header, GET /v1/account is the account owning
   // the configured key. An account name in metadata cannot establish this.
   async function readAccount(options) {
-    const account = await sdk().accounts.retrieve(null, {}, options);
+    const accounts = sdk().accounts;
+    const account = await (options ? accounts.retrieveCurrent({}, options) : accounts.retrieve());
     if (account?.id !== scope.stripeAccountId) throw new Error('Stripe account does not match deployment.');
     return account;
   }
