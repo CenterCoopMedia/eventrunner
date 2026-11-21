@@ -77,7 +77,7 @@ export default function MapBlock({ block, preview = false }) {
       src={src}
       label={label}
       address={address}
-      href={googleMapsSearch(address || label)}
+      href={address ? googleMapsSearch(address) : src}
       publicLanguage={block.publicLanguage}
       preview={preview}
     />
