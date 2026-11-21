@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { FEATURE_CHOICES } from '../featureChoices.js';
+import { settingsConflict } from '../settingsChanges.js';
 import { CheckboxField, Notice, SaveStatus } from './formControls.jsx';
 
-/** Uses the same operator-only, whole-document save as the Features page. */
+/** Uses the same operator-only save as the Features page. */
 export default function FeatureSwitch({ featureKeys }) {
   const { isOperator } = useAuth();
-  const { features, sources } = useEventConfig();
+  const { features, liveFeatures, sources } = useEventConfig();
   const call = useAdminApi();
   const pending = useRef(false);
   const [saving, setSaving] = useState(false);
@@ -28,14 +28,17 @@ export default function FeatureSwitch({ featureKeys }) {
     setSaving(true);
     setError('');
     setSaved('');
-    const next = Object.fromEntries(KNOWN_FEATURE_KEYS.map((key) => [key, features?.[key] === true]));
-    next[featureKey] = checked;
     try {
-      await call('updateFeatures', { features: next });
+      await call('updateFeatures', {
+        features: {
+          changes: { [featureKey]: checked },
+          expected: { [featureKey]: (liveFeatures ?? features)?.[featureKey] ?? null },
+        },
+      });
       setAwaiting({ key: featureKey, enabled: checked });
       setSaved(`${FEATURE_CHOICES[featureKey].label} setting saved.`);
     } catch (err) {
-      setError(err.message);
+      setError(settingsConflict(err, { [`features.${featureKey}`]: FEATURE_CHOICES[featureKey].label })?.message ?? err.message);
     } finally {
       pending.current = false;
       setSaving(false);

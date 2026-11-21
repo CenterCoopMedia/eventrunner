@@ -234,7 +234,10 @@ describe('the setup stepper', () => {
 
     await screen.findByText('1 of 6 steps done');
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness', 'updateEventConfig', 'webMcpCheckEventReadiness']);
-    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ event: { legal: { reviewRequired: false } } });
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ event: {
+      changes: { legal: { reviewRequired: false } },
+      expected: { legal: { reviewRequired: true } },
+    } });
     const done = await openStep('Approve the privacy policy and terms');
     expect(within(done).getByText('Done')).toBeInTheDocument();
     expect(within(done).queryByRole('checkbox')).toBeNull();

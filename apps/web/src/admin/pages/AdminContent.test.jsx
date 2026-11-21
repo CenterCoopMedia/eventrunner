@@ -241,7 +241,10 @@ it('opens footer editing from Content and saves a page selection beside existing
   fireEvent.click(editor.getByRole('button', { name: 'Save footer pages' }));
   await editor.findByText('Footer pages saved.');
   expect(urlOf(0)).toMatch(/\/updateEventConfig$/);
-  expect(bodyOf(0)).toEqual({ event: { footerPageGroup: { heading: 'Explore', pageIds: ['faq', 'scholarships'] } } });
+  expect(bodyOf(0)).toEqual({ event: {
+    changes: { footerPageGroup: { heading: 'Explore', pageIds: ['faq', 'scholarships'] } },
+    expected: { footerPageGroup: { heading: null, pageIds: null } },
+  } });
 });
 
 function heroUnloadBlocked() {

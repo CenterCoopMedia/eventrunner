@@ -1029,7 +1029,7 @@ The page sends a package of up to 9 MB built from at most 50,000 stored document
 
 ## Settings → Event settings
 
-The event's own identity fields: Name, dates, time zone, venue, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. Saving keeps values that the form does not edit.
+Set the event name, dates, time zone, venue, social accounts, milestones, places, movements, and map. Saving changes only the fields you edited. If another organizer changed one of those fields since you opened the page, the form names the conflict and keeps your edits. Open Event settings in a new tab, review the current values, and reapply the edits you want to save.
 
 **From address.** The address is shown as read-only text for all admins, including operators. To send from a different address, contact us. Operators can still edit the sender name and reply-to address. Staff can read those values.
 
@@ -1165,7 +1165,7 @@ The questions are stored in `config/registration_form`, which anyone can read, b
 
 ## Settings → Features
 
-Saving replaces the whole feature settings document. The form sends every known flag with its current value.
+Saving changes only the switches you edited. If another organizer changed one of those switches since you opened the page, the form names the conflict and keeps your choices. Open Features in a new tab, check the current switches, and reapply the changes you want to save.
 
 Google Calendar sync requires Public schedule, Session bookmarks and Calendar export (.ics); keep it off until the operator signs the [Calendar onboarding checklist](CLIENT_ONBOARDING.md#6-optional-google-calendar-sync-configfeaturescalendarsync).
 

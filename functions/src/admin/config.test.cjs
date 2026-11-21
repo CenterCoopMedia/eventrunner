@@ -4,8 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  createUpdateEventConfigHandler,
-  createUpdateFeaturesHandler,
+  createUpdateEventConfigHandler: eventHandler,
+  createUpdateFeaturesHandler: featuresHandler,
   createUpdateThemeHandler,
   createUpdateBadgesHandler,
   internals: { applyConfigWrite, findReadOnlyViolations },
@@ -186,6 +186,28 @@ function makeReq(body, { token = 'admin-token', method = 'POST' } = {}) {
   return { method, body, headers: { authorization: token ? `Bearer ${token}` : undefined } };
 }
 
+// Validation and permissions cases use the fields stored when the fixture
+// opens the editor. Concurrency cases below supply the original values explicitly.
+function openEditor(factory, deps, docId) {
+  const handle = factory(deps);
+  function loadedFields(changes, stored) {
+    return Object.fromEntries(Object.entries(changes).map(([key, value]) => [
+      key, value && typeof value === 'object' && !Array.isArray(value)
+        ? loadedFields(value, stored?.[key])
+        : stored?.[key] ?? null,
+    ]));
+  }
+  return (req, res) => {
+    const changes = req.body?.[docId];
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return handle(req, res);
+    const expected = loadedFields(changes, deps.db.docs.get(`config/${docId}`));
+    return handle({ ...req, body: { ...req.body, [docId]: { changes, expected } } }, res);
+  };
+}
+
+const createUpdateEventConfigHandler = (deps) => openEditor(eventHandler, deps, 'event');
+const createUpdateFeaturesHandler = (deps) => openEditor(featuresHandler, deps, 'features');
+
 function makeRes() {
   const res = {
     statusCode: null,
@@ -209,6 +231,93 @@ function makeRes() {
   };
   return res;
 }
+
+for (const { docId, factory, seed, first, second, stale, field, savedFields } of [
+  {
+    docId: 'event',
+    factory: eventHandler,
+    seed: validEvent({ registration: { actionLabel: 'Register', goal: 100 } }),
+    first: { changes: { registration: { actionLabel: 'Get tickets' } }, expected: { registration: { actionLabel: 'Register' } } },
+    second: { changes: { registration: { goal: 200 } }, expected: { registration: { goal: 100 } } },
+    stale: { changes: { registration: { actionLabel: 'Sign up' }, tagline: 'Also changed' }, expected: { registration: { actionLabel: 'Register' }, tagline: null } },
+    field: /registration\.actionLabel: changed/,
+    savedFields: { registration: { actionLabel: 'Get tickets', goal: 200 } },
+  },
+  {
+    docId: 'features',
+    factory: featuresHandler,
+    seed: { schedule: true, speakers: false, socialFeed: false },
+    first: { changes: { schedule: false }, expected: { schedule: true } },
+    second: { changes: { speakers: true }, expected: { speakers: false } },
+    stale: { changes: { schedule: false, sponsors: true }, expected: { schedule: true, sponsors: null } },
+    field: /features\.schedule: changed/,
+    savedFields: { schedule: false, speakers: true, socialFeed: false },
+  },
+]) {
+  test(`${docId} settings keep concurrent edits to different fields and refuse a stale edit to the same field`, async () => {
+    const docPath = `config/${docId}`;
+    const deps = makeDeps({ [docPath]: seed });
+    const handle = factory(deps);
+    async function save(edit) {
+      const response = makeRes();
+      await handle(makeReq({ [docId]: edit }), response);
+      return response;
+    }
+
+    // Land the first operator's save during the second operator's read.
+    // The second transaction must retry against the committed document.
+    deps.db.onTransactionRead = async (key) => {
+      if (key !== docPath) return;
+      deps.db.onTransactionRead = null;
+      const fresh = await save(first);
+      assert.equal(fresh.statusCode, 200, JSON.stringify(fresh.body));
+    };
+    const different = await save(second);
+    assert.equal(different.statusCode, 200, JSON.stringify(different.body));
+    const saved = deps.db.docs.get(docPath);
+    for (const [key, value] of Object.entries(savedFields)) assert.deepEqual(saved[key], value);
+    assert.equal(deps.db.rows('cmsVersionHistory').length, 2);
+
+    const writes = [...deps.db.writes];
+    const conflict = await save(stale);
+    assert.equal(conflict.statusCode, 409);
+    assert.equal(conflict.body.error.code, 'settings-conflict');
+    assert.match(conflict.body.error.message, field);
+    assert.match(conflict.body.error.message, /Open this page in a new tab/);
+    assert.deepEqual(deps.db.writes, writes);
+    assert.strictEqual(deps.db.docs.get(docPath), saved);
+
+    const olderEditor = await save(stale.changes);
+    assert.equal(olderEditor.statusCode, 409);
+    assert.deepEqual(deps.db.writes, writes);
+  });
+}
+
+test('an edit to a venue map names the conflict when a teammate clears the map', async () => {
+  const map = { image: 'cms-images/a/plan.png', alt: 'Floor plan', markers: [] };
+  const deps = makeDeps({ 'config/event': validEvent({ venue: { map } }) });
+  const handle = eventHandler(deps);
+  const cleared = makeRes();
+  await handle(makeReq({
+    event: {
+      changes: { venue: { map: null } },
+      expected: { venue: { map: { ...map, captionMode: null } } },
+    },
+  }), cleared);
+  assert.equal(cleared.statusCode, 200);
+  const writes = [...deps.db.writes];
+
+  const stale = makeRes();
+  await handle(makeReq({
+    event: {
+      changes: { venue: { map: { captionMode: 'overlay' } } },
+      expected: { venue: { map: { $present: true, captionMode: null } } },
+    },
+  }), stale);
+  assert.equal(stale.statusCode, 409);
+  assert.match(stale.body.error.message, /venue\.map: changed/);
+  assert.deepEqual(deps.db.writes, writes);
+});
 
 const ACTOR = { uid: 'admin-1', email: ADMIN_EMAIL };
 
