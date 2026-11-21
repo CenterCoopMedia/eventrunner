@@ -138,9 +138,9 @@ describe('ImageBlock', () => {
     resetImageSizeCacheForTest();
     stubManifests({ 'cms-images/a1b2c3/hall.jpg': readyManifest('cms-images/a1b2c3/hall.jpg', 1500) });
     try {
-      const { container } = render(<ImageBlock block={{ url: 'cms-images/a1b2c3/hall.jpg', alt: 'x' }} />);
-      const img = container.querySelector('img');
-      await waitFor(() => expect(img).toHaveAttribute('srcset'));
+      const { getByRole } = render(<ImageBlock block={{ url: 'cms-images/a1b2c3/hall.jpg', alt: 'x' }} />);
+      await waitFor(() => expect(getByRole('img', { name: 'x' })).toHaveAttribute('srcset'));
+      const img = getByRole('img', { name: 'x' });
       expect(img).toHaveAttribute('sizes', '100vw');
       expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
       expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
