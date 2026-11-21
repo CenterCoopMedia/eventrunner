@@ -248,7 +248,6 @@ the normal main push can start client deployments. Do not print the value or put
 | `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. Set to `true` after provisioning the site-publisher Cloud Run job (§9.1) |
 | `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§9) |
 | `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.jobsExecutorWithOverrides` on the publisher job (§9) |
-| `EVENT_AIRTABLE_ENABLED` | `false` by default. `true` lets staff refresh session pitches from Airtable and binds the `AIRTABLE_API_TOKEN` secret. Create the secret first ([session pitches](operator/session-pitches.md#refresh-pitches-from-airtable)) |
 
 App Check activation requires two successful deploys. First set
 `VITE_FIREBASE_APP_CHECK_SITE_KEY` and wait for that deploy to finish. Then set
@@ -269,7 +268,6 @@ Set the applicable rows as Environment **secrets**
 | `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER = eventbrite` or `stripe`; Stripe requires a secret or restricted key matching `EVENT_STRIPE_MODE`. With Stripe, `invoiceAdmin` binds it too, for invoice pay links. `manual` and `none` use no ticketing API token |
 | `TICKETING_WEBHOOK_SECRET` | `eventbrite` or `stripe`; for Eventbrite, generate a random value of at least 32 characters (`openssl rand -hex 32`). Eventbrite does not sign deliveries, so `register-ticketing-webhook.cjs` puts this secret in the webhook URL. A live Stripe Connect build generates a per-site signing secret and shares it only with the trusted Console receiver; a direct test endpoint uses Stripe's endpoint signing secret. `manual` and `none` use no webhook secret |
 | `OPERATOR_WEBHOOK_URL`, `OPERATOR_WEBHOOK_SECRET` | `EVENT_OPERATOR_NOTIFIER = webhook` |
-| `AIRTABLE_API_TOKEN` | `EVENT_AIRTABLE_ENABLED = true`. An Airtable personal access token with only the `data.records:read` scope and only the pitch base. Store it in Secret Manager only |
 
 There is deliberately no `FIREBASE_SERVICE_ACCOUNT` secret in this list — WIF (§1–2) replaces the
 service-account-key deploy credential entirely.

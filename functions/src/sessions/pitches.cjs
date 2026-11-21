@@ -472,6 +472,17 @@ const EDITABLE_FIELDS = Object.freeze([
   'audienceLevel', 'presenters', 'accessNeeds', 'notes',
 ]);
 
+const CORE_SOURCE_FIELDS = ['email', 'title', 'description', 'organization', 'format'];
+const SOURCE_FIELDS = [...CORE_SOURCE_FIELDS, ...IMPORT_FIELDS, 'presenters'];
+
+function lastSourceValues(pitch) {
+  if (pitch.sourceValues) return pitch.sourceValues;
+  const submitted = { ...pitch, ...pitch.submitted };
+  return Object.fromEntries(SOURCE_FIELDS
+    .filter((field) => CORE_SOURCE_FIELDS.includes(field) || submitted[field] !== undefined)
+    .map((field) => [field, submitted[field] ?? null]));
+}
+
 /** A stored pitch's proposal, for the first-edit copy and the change list. */
 function storedProposal(stored) {
   const proposal = {};
@@ -545,14 +556,8 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
         tx.update(ref, {
           ...next,
           ...(stored.submitted ? {} : { submitted: { ...before, at: stored.createdAt ?? null } }),
-          // A pitch from Airtable that predates sourceValues gets them now,
-          // from the values before this edit, so the next refresh does not
-          // read the correction as a change to undo.
-          ...(stored.source === 'airtable' && !stored.sourceValues
-            ? { sourceValues: Object.fromEntries(['email', 'title', 'description', 'organization', 'format', ...IMPORT_FIELDS, 'presenters']
-              .filter((key) => ['email', 'title', 'description', 'organization', 'format'].includes(key) || stored[key] !== undefined)
-              .map((key) => [key, stored[key] ?? null])) }
-            : {}),
+          // Keep the source baseline for the next CSV import of this pitch.
+          ...(stored.source && !stored.sourceValues ? { sourceValues: lastSourceValues(stored) } : {}),
           reviewRevision: nextRevision,
           editedAt: at,
           editedBy: gate.email,
@@ -749,6 +754,7 @@ module.exports = {
     readClosesAt,
     readSubmission,
     readFormSubmission,
+    lastSourceValues,
     proposalOf,
     rateLimitWindow,
     pitchIdFor,

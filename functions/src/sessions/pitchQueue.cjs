@@ -5,22 +5,14 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId, writeDraft } = require('../cms/store.cjs');
 const { validateSessionShape, validateSessionStructure } = require('../schedule/sessions.cjs');
-const { internals: { readSubmission, MAX_BODY_BYTES } } = require('./pitches.cjs');
-const { IMPORT_FIELDS, readImportedExtras, sameValue, speakerCandidates } = require('shared/pitchForm');
+const { internals: { readSubmission, lastSourceValues, MAX_BODY_BYTES } } = require('./pitches.cjs');
+const { readImportedExtras, sameValue, speakerCandidates } = require('shared/pitchForm');
 const { inviteSpeaker, internals: { DEFAULT_INVITE_TYPE } } = require('../speakers/invites.cjs');
 
 const hash = (text) => createHash('sha256').update(text).digest('hex');
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function fail(status, code, message) { const err = new Error(message); err.status = status; err.code = code; throw err; }
 function revisionOf(row) { return Number.isSafeInteger(row.reviewRevision) ? row.reviewRevision : 0; }
-
-const SOURCE_FIELDS = ['email', 'title', 'description', 'organization', 'format', ...IMPORT_FIELDS, 'presenters'];
-
-function lastSourceValues(pitch) {
-  if (pitch.sourceValues) return pitch.sourceValues;
-  const submitted = { ...pitch, ...pitch.submitted };
-  return Object.fromEntries(SOURCE_FIELDS.filter((field) => submitted[field] !== undefined).map((field) => [field, submitted[field]]));
-}
 
 // The lead's contact fields are tracked separately from the presenter list.
 function compareSourceValue(field, value) {
@@ -95,7 +87,9 @@ async function importPitches({ db, actor, body, at }) {
       const changed = Object.keys(incoming).filter((field) =>
         !sameValue(compareSourceValue(field, incoming[field]), compareSourceValue(field, field === 'presenters' ? previousPresenters : baseline[field])),
       );
-      if (!changed.length) return;
+      // A matching, consented row is present in the source again.
+      const restored = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);
+      if (!changed.length && !restored) return;
       const patch = Object.fromEntries(changed.map((field) => [field, incoming[field]]));
       // An unmapped presenter list stays intact. The stored lead mirrors the
       // required contact fields so review and conversion agree on its address.
@@ -120,7 +114,9 @@ async function importPitches({ db, actor, body, at }) {
       }
       updated += 1;
       tx.update(refs[i], { ...patch, reviewRevision: revisionOf(stored) + 1,
-        sourceValues: { ...baseline, ...incoming }, sourceUpdatedAt: at, sourceChangedFields: changed });
+        ...(changed.length ? { sourceValues: { ...baseline, ...incoming }, sourceUpdatedAt: at, sourceChangedFields: changed } : {}),
+        ...(restored ? { sourceRemovedAt: null, sourceConsentMissingAt: null } : {}),
+      });
     });
     if (imported || updated) tx.set(db.collection('admin_logs').doc(), { action: 'importSessionPitches', docPath: 'session_pitches', uid: actor.uid, email: actor.email, at, details: { count: imported, updated, source: parsed.rows[0].source } });
     return { imported, updated, unchanged: snaps.length - imported - updated };

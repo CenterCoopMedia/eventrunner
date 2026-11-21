@@ -88,6 +88,26 @@ test('a pitch imported before source tracking keeps the staff correction on repl
   assert.equal(db.writes.length, 0);
 });
 
+test('a matching CSV row restores an Airtable pitch only with renewed consent', async () => {
+  const body = { source: 'airtable', rows: [row] };
+  const [{ id, source, externalId, ...sourceValues }] = readImport(body).rows;
+  const original = { ...sourceValues, source, externalId, sourceValues,
+    title: 'Staff correction', status: 'accepted', privateNotes: 'Staff notes', reviewRevision: 3,
+    sourceRemovedAt: new Date(1), sourceConsentMissingAt: new Date(2),
+    sourceUpdatedAt: new Date(3), sourceChangedFields: ['format'],
+  };
+  const db = makeFakeDb({ 'config/bootstrap': bootstrap, [`session_pitches/${id}`]: original });
+  const withoutConsent = await invoke(db, 'import', 'staff', { ...body, rows: [{ ...row, consent: false }] });
+  assert.equal(withoutConsent.statusCode, 400);
+  assert.equal(db.writes.length, 0);
+
+  assert.deepEqual((await invoke(db, 'import', 'staff', body)).body, { imported: 0, updated: 1, unchanged: 0 });
+  assert.deepEqual(db.read('session_pitches', id), { ...original, reviewRevision: 4,
+    sourceRemovedAt: null, sourceConsentMissingAt: null,
+  });
+  assert.deepEqual((await invoke(db, 'import', 'staff', body)).body, { imported: 0, updated: 0, unchanged: 1 });
+});
+
 const bootstrap = { adminEmails: ['operator@example.test'], staffEmails: ['staff@example.test'] };
 const auth = { async verifyIdToken(token) {
   return { uid: token, email: `${token}@example.test`, email_verified: token !== 'unverified' };

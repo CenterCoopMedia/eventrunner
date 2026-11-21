@@ -2,7 +2,7 @@
 // visible message uses the same language as the controls.
 export function plannerMessage(message) {
   const text = String(message || 'This action did not finish. Try again.');
-  if (/AIRTABLE_API_TOKEN|firebase|firestore|(?:cmsSchedule|cmsOrganizations|session_materials|speaker_logistics)\/|\b(?:schemaVersion|permission-denied|failed-precondition)\b/i.test(text)) {
+  if (/firebase|firestore|(?:cmsSchedule|cmsOrganizations|session_materials|speaker_logistics)\/|\b(?:schemaVersion|permission-denied|failed-precondition)\b/i.test(text)) {
     return 'This action could not finish. Try again or contact support.';
   }
   return text

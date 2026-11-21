@@ -72,9 +72,6 @@ const ADMIN_READABLE = [
   { path: "session_pitches/pitch-tier", tier: "admin" },
   // Pitch email settings (issue #324): the receipt mode and edited wording.
   { path: "session_pitch_settings/notices", tier: "admin" },
-  // Airtable pitch intake: the operator chooses the source; staff see runs.
-  { path: "session_pitch_sources/airtable", tier: "operator" },
-  { path: "session_pitch_sync/airtable", tier: "admin" },
   // Session confirmation delivery records: staff read them on the speaker
   // editor; only sendSessionConfirmation writes them.
   { path: "session_confirmations/sess-tier__spk-tier", tier: "admin" },
@@ -304,8 +301,6 @@ beforeAll(async () => {
       updatedAt: new Date(),
     });
     await setDoc(doc(db, "admin_logs/l1"), { action: "cmsPublish" });
-    await setDoc(doc(db, "session_pitch_sources/airtable"), { enabled: true, baseId: "appAAAAAAAAAAAAAA", table: "Pitches" });
-    await setDoc(doc(db, "session_pitch_sync/airtable"), { running: null, lastRun: null });
     await setDoc(doc(db, "media_assets/asset-1"), {
       path: "cms-images/asset-1/hero.png",
       contentType: "image/png",
