@@ -159,19 +159,28 @@ function SpeakerSchedule({ call }) {
     setResult((current) => ({ tone, message, seq: (current?.seq ?? 0) + 1 }));
   }, []);
 
+  const apply = useCallback((next) => {
+    formRevision.current += 1;
+    setData(next);
+    setForm({ ...formFrom(next), loadedVersion: formRevision.current });
+    setDueProblem(null);
+    setOffsetsProblem(null);
+    setPreview(null);
+    previewRevision.current = null;
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const next = await call('reminderSchedules', { action: 'get', schedule: 'speakers' });
-      setData(next);
-      setForm(formFrom(next));
+      apply(next);
       setLoadError(null);
     } catch (err) {
       setLoadError(communicationsError(err, 'The schedule could not be loaded. Try again.'));
     } finally {
       setLoading(false);
     }
-  }, [call]);
+  }, [apply, call]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -193,11 +202,6 @@ function SpeakerSchedule({ call }) {
     setForm({ ...form, ...patch });
     setPreview(null);
     setResult(null);
-  }
-
-  function apply(next) {
-    setData(next);
-    setForm(formFrom(next));
   }
 
   async function run(kind, body, onDone) {
@@ -243,7 +247,6 @@ function SpeakerSchedule({ call }) {
       topics: READINESS_ITEMS.filter((item) => form.topics.has(item)),
     }, (next) => {
       apply(next);
-      setPreview(null);
       show(next.state === 'paused' && data.state === 'on' ? 'caution' : 'ok', next.state === 'paused' && data.state === 'on'
         ? 'Settings saved. The schedule is paused until you preview and approve it again.'
         : 'Settings saved.');
@@ -273,7 +276,6 @@ function SpeakerSchedule({ call }) {
     }
     run('approve', { action: 'approve', wordingVersion: preview.wordingVersion, settingsVersion: preview.settingsVersion }, (next) => {
       apply(next);
-      setPreview(null);
       show('ok', 'Approved. Scheduled speaker reminders are on.');
     });
   }
@@ -342,7 +344,7 @@ function SpeakerSchedule({ call }) {
             <FieldError message={offsetsProblem} />
           </fieldset>
 
-          <EventDateTimeField help="Set the deadline for missing items."
+          <EventDateTimeField key={form.loadedVersion} help="Set the deadline for missing items."
             label="Due date"
             value={form.dueAt}
             timeZone={timeZone}
