@@ -2128,12 +2128,21 @@
     .site-header-dateline { display: none; }
     .site-header-treatment .historical-demo-logo { max-inline-size: 100%; }
     /* A banner-shaped logo fills the width left of Menu, up to 4rem tall,
-       so its small text can be read (#1342). Square and tall logos keep
-       the running mark size. */
+       so its small text can be read (#1342). It never draws smaller than
+       the mark size it has on wider screens, and the image keeps its
+       proportions in its box, so a small file scales up too. Square and
+       tall logos keep the mark size. */
+    :has(> .site-logo--banner) { inline-size: 100%; }
     .site-logo.site-logo--banner {
+      inline-size: 100%;
       block-size: auto;
+      min-inline-size: min(calc(1.5rem * var(--logo-ratio)), 10rem);
       max-block-size: 4rem;
       max-inline-size: 100%;
+      object-position: left center;
+    }
+    .site-logo--masthead.site-logo--banner {
+      min-inline-size: min(calc(2.5rem * var(--logo-ratio)), 14rem);
     }
     /* Menu centres on the banner rather than on its bottom edge. */
     .site-header-identity-row:has(.site-logo--banner) > * { align-self: center; }
