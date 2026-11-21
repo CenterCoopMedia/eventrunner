@@ -341,8 +341,8 @@ a file or output. It requires exactly one endpoint, the live Console
 `stripeConnectWebhook` URL, enabled, live mode and Connect, with the event not
 yet selected. The update sends only `enabled_events`: the existing list plus the
 one event. It then reads the endpoint back and requires exactly one added event
-and every other field unchanged. On any other difference it restores the
-original list at once and exits 2. It prints endpoint IDs only by their last
+and every other field unchanged. On any other difference it writes nothing
+more, prints UNEXPECTED and exits 2. It prints endpoint IDs only by their last
 four characters.
 
 ```sh
@@ -373,16 +373,15 @@ const added = after.enabled_events.filter(e => !before.enabled_events.includes(e
 const removed = before.enabled_events.filter(e => !after.enabled_events.includes(e));
 console.log("DIFF", JSON.stringify({ added, removed, other_fields_identical: rest(before) === rest(after) }));
 if (rest(before) !== rest(after) || removed.length || added.length !== 1 || added[0] !== ADD) {
-  await api("POST", `webhook_endpoints/${id}`, enc(before.enabled_events));
-  console.log("ROLLED BACK", JSON.stringify(view(await api("GET", `webhook_endpoints/${id}`))));
+  console.log("UNEXPECTED: no further write; run the read-only check and report");
   process.exit(2);
 }
 console.log("OK", new Date().toISOString());
 '
 ```
 
-Stop on a nonzero exit. If the block failed after printing BEFORE, the update
-may have been applied without a readback. Do not rerun it blind: read the
+Stop on a nonzero exit. After exit 2 (UNEXPECTED), or a failure after printing
+BEFORE, the endpoint may hold the update, another change, or both. Do not rerun it blind: read the
 endpoint with this read-only block and compare it with the printed BEFORE list.
 
 ```sh
@@ -400,14 +399,15 @@ for (const e of j.data) console.log(JSON.stringify({ id: "..." + e.id.slice(-4),
 `rest_sha256` hashes every endpoint field except `enabled_events`, so an equal
 hash means no other field changed. If `rest_sha256` equals BEFORE and the events
 are exactly BEFORE plus `account.application.deauthorized`, the change is
-complete. If both equal BEFORE, run the update block again. If the events differ
-in any other way, restore the BEFORE list with the rollback below and stop. If
-`rest_sha256` differs, stop and report: the update block never sends another
-field.
+complete. If both equal BEFORE, run the update block again. Otherwise stop and
+report the difference to the coordinator; another operator may have changed
+the endpoint, and only a deliberate decision may overwrite its event list.
 
-To undo the change, send one update to the same endpoint with only
-`enabled_events[]` set to the BEFORE list, using the same stdin key method, and
-read it back.
+To undo the change, first run the read-only check. Only if its `rest_sha256`
+equals BEFORE and its events are exactly BEFORE plus
+`account.application.deauthorized`, send one update to the same endpoint with
+only `enabled_events[]` set to the BEFORE list, using the same stdin key method,
+and run the read-only check again.
 
 No test event can prove live delivery. Use the first naturally occurring
 deauthorization. Confirm in Stripe that it received HTTP 200 from the Console,
