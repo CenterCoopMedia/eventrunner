@@ -362,7 +362,7 @@ export default function AdminContentSection() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-xs">
+                  <div className="flex min-w-0 flex-wrap items-center gap-xs">
                     <ReorderControls
                       label={label}
                       index={index}

@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
+import { expectPageFits, setReflowProfile } from './reflow.mjs';
 
 async function captureWorkspace(page, evidenceDir, name, viewport) {
   await page.setViewportSize(viewport);
@@ -112,4 +113,24 @@ test('Content has readable page and section indexes at desktop and narrow widths
   await directLink.press('Enter');
   await expect(page).toHaveURL(destination);
   await expect(page.getByRole('heading', { level: 1, name: sectionName, exact: true })).toBeVisible();
+
+  await setReflowProfile(page, { width: 320, rootSize: 32 });
+  const moveDown = page.getByRole('main').getByRole('button', { name: /^Move .+ down$/ }).first();
+  await expect(moveDown).toBeEnabled();
+  const blockRow = moveDown.locator('xpath=ancestor::li[1]');
+  const reorderButtons = blockRow.getByRole('button', { name: /^(Drag|Move) / });
+  await expect(reorderButtons).toHaveCount(3);
+  const outOfBounds = await reorderButtons.evaluateAll((buttons) => buttons.flatMap((button) => {
+    const row = button.closest('li').getBoundingClientRect();
+    const target = button.getBoundingClientRect();
+    return target.left < row.left - 1 || target.right > row.right + 1
+      || target.width < 44 || target.height < 44 ? [button.getAttribute('aria-label')] : [];
+  }));
+  expect(outOfBounds, 'all three block reorder buttons fit inside the row at 200% text').toEqual([]);
+  await expectPageFits(page);
+  await blockRow.screenshot({ path: path.join(evidenceDir, 'cms-content-block-320-enlarged.png'), animations: 'disabled' });
+  await moveDown.click();
+  await expect(page.getByText(/moved to position 2 of/)).toBeAttached();
+  await page.getByRole('main').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByText(/moved to position 2 of/)).toHaveCount(0);
 });
