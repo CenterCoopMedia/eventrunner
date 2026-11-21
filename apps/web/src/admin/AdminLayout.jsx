@@ -562,6 +562,7 @@ function AdminDesk() {
   // The rail can hide on a wide screen only; a phone has its own Menu.
   const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed);
   const railHidden = wide && railCollapsed;
+  const railRef = useRef(null);
   const railToggleRef = useRef(null);
   const toggleRail = () => {
     const next = !railCollapsed;
@@ -638,6 +639,21 @@ function AdminDesk() {
   useEffect(() => {
     setTour((run) => (run !== null && run > 0 ? run : readTourDone(uid) || onSetup ? null : 0));
   }, [uid, onSetup]);
+  useLayoutEffect(() => {
+    if (wide || !mobileDocketOpen) return undefined;
+    const rail = railRef.current;
+    // The fixed sheet starts below the bar even when the event name wraps.
+    const measure = () => {
+      rail.style.setProperty('--admin-phone-bar-height', `${rail.getBoundingClientRect().height}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(rail);
+    return () => {
+      observer?.disconnect();
+      rail.style.removeProperty('--admin-phone-bar-height');
+    };
+  }, [wide, mobileDocketOpen]);
   useEffect(() => {
     if (wide || !mobileDocketOpen) return undefined;
     // The sheet owns the phone viewport while it is open. Lock the document
@@ -684,11 +700,12 @@ function AdminDesk() {
         Skip to main content
       </a>
       <div
+        ref={railRef}
         className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto"
         data-collapsed={railHidden ? 'true' : undefined}
       >
         {/* The event name and the rail toggle stay pinned to the top of the rail. */}
-        <div className="admin-rail__job flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline bg-admin-rail-ground px-sm lg:sticky lg:top-0 lg:z-10 lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
+        <div className="admin-rail__job flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline bg-admin-rail-ground px-sm py-2xs lg:sticky lg:top-0 lg:z-10 lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
           {markSrc && !markFailed ? (
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-admin-small bg-admin-ground-raised p-3xs lg:h-9 lg:w-9">
               <img
@@ -700,7 +717,7 @@ function AdminDesk() {
             </span>
           ) : null}
           <p
-            className={`min-w-0 truncate text-admin-base font-bold text-admin-rail-ink${railHidden ? ' sr-only' : ''}`}
+            className={`min-w-0 wrap-anywhere text-admin-base font-bold text-admin-rail-ink${railHidden ? ' sr-only' : ''}`}
           >
             {eventConfig.shortName}
           </p>
@@ -720,7 +737,7 @@ function AdminDesk() {
         {railHidden ? <CollapsedDocket docket={docket} activeGroup={activeGroup} pathname={pathname} /> : null}
 
         <details
-          className="admin-mobile-docket max-w-[65%] shrink-0 lg:flex lg:min-h-0 lg:max-w-none lg:flex-1 lg:flex-col"
+          className="admin-mobile-docket max-w-[65%] shrink-0 self-center lg:flex lg:min-h-0 lg:max-w-none lg:flex-1 lg:flex-col lg:self-auto"
           open={wide || mobileDocketOpen}
           onToggle={(event) => {
             if (!wide) setMobileDocketOpen(event.currentTarget.open);
@@ -743,7 +760,7 @@ function AdminDesk() {
           <div
             id="admin-docket"
             hidden={railHidden}
-            className="admin-mobile-docket__content fixed inset-x-0 bottom-0 top-14 z-40 min-h-0 overflow-y-auto overscroll-contain bg-admin-rail-ground lg:static lg:z-auto lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-visible">
+            className="admin-mobile-docket__content fixed inset-x-0 bottom-0 top-[var(--admin-phone-bar-height,3.5rem)] z-40 min-h-0 overflow-y-auto overscroll-contain bg-admin-rail-ground lg:static lg:z-auto lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-visible">
             <div className="px-md py-xs lg:px-xs">
               <button type="button" className={`${railButtonClass} w-full justify-between`} onClick={openCommands}>
                 Find work <span aria-hidden="true" className="font-admin-data text-admin-xs">{/Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘K' : 'Ctrl+K'}</span>
