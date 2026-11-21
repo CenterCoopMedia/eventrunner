@@ -9,6 +9,7 @@ const {
   EVENT_CONFIG,
   FORBIDDEN_COLLECTIONS,
   makeDb,
+  callImport,
   previewAndCommit,
   writtenCollections,
 } = require('./importTestKit.cjs');
@@ -160,10 +161,16 @@ test('a new session is a hidden draft; no live document is written', async () =>
 
 test('speakers link by speaker external ID or by slug; an unknown one is a row error', async () => {
   const db = makeDb(speakerSeed());
-  const { commit } = await previewAndCommit(db, body([
+  const input = body([
     { ...ROW, Speakers: 'SPK-1; grace-hopper' },
     { ...ROW, Ref: 'SES-2', Title: 'Second', Speakers: 'SPK-404' },
-  ]));
+  ]);
+  const preview = await callImport(db, input);
+  assert.equal(preview.body.rows[0].verdict, 'create');
+  const commit = await callImport(db, {
+    ...input, dryRun: false, confirmDigest: preview.body.digest, expectedPlan: preview.body.plan,
+  });
+  assert.equal(commit.statusCode, 200);
   assert.equal(commit.body.rows[0].verdict, 'create');
   assert.deepEqual(db.read('cmsSchedule_drafts', 'verification-at-speed').speakerIds, ['spk-a', 'spk-b']);
   assert.equal(commit.body.rows[1].verdict, 'error');

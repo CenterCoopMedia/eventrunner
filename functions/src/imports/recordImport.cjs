@@ -372,11 +372,14 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
     try {
       rowPlan = await db.runTransaction(async (tx) => {
         const reads = new Map();
-        const reader = trackVersions ? { async get(ref) {
-          const snap = await tx.get(ref);
+        const track = (snap) => {
           for (const doc of snap.docs ?? [snap]) reads.set(doc.ref.path, doc.data() ?? null);
           return snap;
-        } } : tx;
+        };
+        const reader = trackVersions ? {
+          async get(ref) { return track(await tx.get(ref)); },
+          async getAll(...refs) { return (await tx.getAll(...refs)).map(track); },
+        } : tx;
         if (expectedPlan !== undefined && importer.loadContext) {
           const currentContext = await importer.loadContext({ db, get: (ref) => tx.get(ref) });
           if (confirmationVersion(currentContext) !== confirmationVersion(context)) throw new ConfirmationConflict();

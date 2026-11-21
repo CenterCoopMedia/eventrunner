@@ -403,8 +403,8 @@ async function removeFromDirectory({ db, uid, signInEmail, actor, now, expectedV
   return db.runTransaction(async (tx) => {
     // Every read first, as Firestore requires.
     const userSnap = await tx.get(userRef);
-    requireConfirmation(expectedVersion, userRef.path, userSnap.data() ?? null);
     if (!userSnap.exists) return { outcome: 'absent' };
+    requireConfirmation(expectedVersion, userRef.path, userSnap.data());
     const bootstrapSnap = await tx.get(bootstrapRef);
     const claims = [];
     for (const store of DIRECTORY_STORES) {
