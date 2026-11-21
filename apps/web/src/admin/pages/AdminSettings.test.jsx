@@ -138,6 +138,7 @@ async function renderAt(path) {
     // outrun the default budget on a loaded machine.
     { timeout: 20_000 },
   );
+  if (path === '/admin/features') await screen.findByRole('heading', { name: 'Features' });
   return result;
 }
 
@@ -609,11 +610,11 @@ describe('event settings', () => {
     expect(fetch).not.toHaveBeenCalled();
 
     // Fixed, and the same control saves.
-    fireEvent.change(name, { target: { value: 'Main hall' } });
+    fireEvent.change(name, { target: { value: 'Main hall stage' } });
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.changes.venue.places[0].name).toBe('Main hall');
+    expect(bodyOf(0).event.changes.venue.places[0].name).toBe('Main hall stage');
   });
 
   it('refuses a stored movement whose endpoint names no place', async () => {
