@@ -57,6 +57,13 @@ import { reloadPage } from '../lib/pageReload.js';
 
 const AuthContext = createContext(null);
 
+// Firebase reports the first auth state only after its own startup, and that
+// startup has no overall time limit: on a phone it loads Google's auth iframe
+// script first, and it waits on IndexedDB, which can stop answering (issue
+// 1357). After this wait the sign-in page offers its options and a retry.
+// The check itself goes on, and its answer replaces that view when it comes.
+const SIGN_IN_WAIT_MS = 15_000;
+
 /**
  * Error shape every OTP endpoint failure is normalized to. `code` mirrors the
  * server's error.code ('rate-limited', 'invalid-code', …) plus 'network' for
@@ -143,6 +150,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [switchingAccount, setSwitchingAccount] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const [authWaitEnded, setAuthWaitEnded] = useState(false);
   const retryAuth = useCallback(() => globalThis.location.reload(), []);
   // Refreshing checks the same user again. A failed check returns to loading
   // while it retries. The Access page keeps the current verdict until the
@@ -177,6 +185,15 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }), () => setAuthError('Sign-in could not load. Reload this page to try again.'));
   }, []);
+
+  // Only the sign-in page reads authStalled. A protected page keeps waiting
+  // for Firebase's answer, so this timeout never reads as signed out.
+  useEffect(() => {
+    if (!loading) return undefined;
+    const timer = window.setTimeout(() => setAuthWaitEnded(true), SIGN_IN_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
+  const authStalled = loading && authWaitEnded;
 
   // Admin probes (see module comment). Run once per signed-in user, and
   // again on refreshAdminStatus. A permission-denied answer on the first
@@ -330,6 +347,7 @@ export function AuthProvider({ children }) {
       adminCheckFailed,
       adminTier,
       loading,
+      authStalled,
       authError,
       retryAuth,
       refreshAdminStatus,
@@ -346,6 +364,7 @@ export function AuthProvider({ children }) {
       adminCheckFailed,
       adminTier,
       loading,
+      authStalled,
       authError,
       retryAuth,
       refreshAdminStatus,
