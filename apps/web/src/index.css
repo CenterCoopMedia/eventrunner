@@ -2127,6 +2127,16 @@
     .site-header-identity-row .nameplate__meta,
     .site-header-dateline { display: none; }
     .site-header-treatment .historical-demo-logo { max-inline-size: 100%; }
+    /* A banner-shaped logo fills the width left of Menu, up to 4rem tall,
+       so its small text can be read (#1342). Square and tall logos keep
+       the running mark size. */
+    .site-logo.site-logo--banner {
+      block-size: auto;
+      max-block-size: 4rem;
+      max-inline-size: 100%;
+    }
+    /* Menu centres on the banner rather than on its bottom edge. */
+    .site-header-identity-row:has(.site-logo--banner) > * { align-self: center; }
     .demo-toolbar > p { flex-basis: 100%; }
     .demo-toolbar > button { flex: 1 1 auto; }
 

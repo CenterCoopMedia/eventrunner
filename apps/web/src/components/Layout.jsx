@@ -382,6 +382,9 @@ export default function Layout() {
   const [markFailed, setMarkFailed] = useState(false);
   // The address that failed, so a newly published logo gets its own try.
   const [failedLogo, setFailedLogo] = useState(null);
+  // The address of a loaded logo at least twice as wide as tall. On phones
+  // it runs as a banner across the free width beside Menu (#1342).
+  const [bannerLogo, setBannerLogo] = useState(null);
   const [failedFooterLogo, setFailedFooterLogo] = useState(null);
   // A runtime config/event doc can replace `legal` wholesale (shallow
   // overlay) with a partial or malformed object; fall back per-field so one
@@ -631,8 +634,12 @@ export default function Layout() {
                 <img
                   src={uploadedPrimary}
                   alt=""
-                  className={`site-logo ${headerVariant === 'masthead' ? 'site-logo--masthead' : ''}`}
+                  className={`site-logo ${headerVariant === 'masthead' ? 'site-logo--masthead' : ''}${bannerLogo === uploadedPrimary ? ' site-logo--banner' : ''}`}
                   height={markSize.px}
+                  onLoad={(event) => {
+                    const { naturalWidth, naturalHeight } = event.currentTarget;
+                    setBannerLogo(naturalHeight > 0 && naturalWidth >= 2 * naturalHeight ? uploadedPrimary : null);
+                  }}
                   onError={() => setFailedLogo(uploadedPrimary)}
                 />
               ) : markSrc && !markFailed ? (
