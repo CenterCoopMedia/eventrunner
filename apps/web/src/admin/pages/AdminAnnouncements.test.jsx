@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,9 +20,10 @@ vi.mock('../components/AnnouncementEmailComposer.jsx', () => ({
 }));
 
 import AdminAnnouncements from './AdminAnnouncements.jsx';
+import { LATE_AFTER } from '../../components/BusyLabel.jsx';
 
 function renderPage() {
-  return render(<MemoryRouter><AdminAnnouncements /></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={['/admin/announcements']}><AdminAnnouncements /></MemoryRouter>);
 }
 
 describe('AdminAnnouncements', () => {
@@ -79,6 +80,46 @@ describe('AdminAnnouncements', () => {
     expect(screen.getByLabelText('Message')).toHaveValue('Old message');
     expect(screen.getByLabelText('Priority')).toHaveValue('urgent');
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
+
+  it('keeps the draft and sends only one save while waiting for a late result', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let reply;
+    call.mockImplementationOnce(() => new Promise((resolve) => { reply = resolve; }));
+    renderPage();
+    act(() => report([]));
+    const message = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await act(async () => vi.advanceTimersByTimeAsync(LATE_AFTER));
+
+    expect(screen.getByText(/the save result is unknown/i)).toBeVisible();
+    const check = screen.getByRole('link', { name: /check saved changes/i });
+    expect(check).toHaveAttribute('href', '/admin/announcements');
+    expect(check).toHaveAttribute('target', '_blank');
+    expect(message).toHaveValue('Use the east entrance.');
+    fireEvent.submit(message.closest('form'));
+    expect(call).toHaveBeenCalledTimes(1);
+
+    await act(async () => reply({ id: 'a1' }));
+    expect(screen.queryByText(/the save result is unknown/i)).not.toBeInTheDocument();
+    expect(message).toHaveValue('');
+  });
+
+  it('keeps a lost save reply unknown and blocks a repeat submission', async () => {
+    call.mockRejectedValueOnce({ code: 'network', status: 0 });
+    renderPage();
+    act(() => report([]));
+    const message = screen.getByRole('textbox', { name: 'Message' });
+    fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await screen.findByText(/the save result is unknown/i);
+    expect(message).toHaveValue('Use the east entrance.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.submit(message.closest('form'));
+    await waitFor(() => expect(call).toHaveBeenCalledTimes(1));
   });
 
   it('keeps both drafts mounted while switching between site banners and email', () => {

@@ -17,6 +17,7 @@
 // the BLOCK_TYPES registry, and `defaultBlocks` are the placeholders a new
 // site is seeded with. Neither is edited here; both pass through a save.
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -394,7 +395,7 @@ function PageEditor({ mode }) {
   ));
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'delete'
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
   const [status, setStatus] = useState('');
   // Set once a create has landed, so the form switches to editing that
   // document instead of trying to create it again.
@@ -511,7 +512,7 @@ function PageEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading page…" />;
+    return <AdminLoadingState recover label="Loading page…" />;
   }
 
   if (mode === 'edit' && loadedIdRef.current !== pageId) {
@@ -523,7 +524,7 @@ function PageEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading page…" />;
+    return <AdminLoadingState recover label="Loading page…" />;
   }
 
   const update = (patch) => setPage((current) => ({ ...current, ...patch }));
@@ -556,7 +557,7 @@ function PageEditor({ mode }) {
   }
 
   async function save({ publish }) {
-    if (localDraft.recovery) return;
+    if (busy !== null || unconfirmedSave || localDraft.recovery) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -600,7 +601,7 @@ function PageEditor({ mode }) {
     if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
     const savedPage = { ...assigned, path: address };
     const payload = toPagePayload(savedPage);
-    setBusy(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     let stage = 'save';
     try {
       await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
@@ -630,8 +631,8 @@ function PageEditor({ mode }) {
       });
       reportPublish(response, [payload.id]);
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       if (stage === 'publish') setErrorTitle('The draft was saved. Check the publish result');
-      else if (err?.code === 'network') setErrorTitle('The save could not be confirmed');
       if (creating && stage === 'save' && err?.status === 409) {
         rejectedPageIds.current.add(payload.id);
         setPage((current) => ({ ...current, id: '' }));
@@ -736,7 +737,7 @@ function PageEditor({ mode }) {
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to pages
             </Link>
-            <button type="submit" className={secondaryButtonClass} disabled={busy !== null || Boolean(localDraft.recovery)} aria-busy={busy === 'draft' || undefined}>
+            <button type="submit" className={secondaryButtonClass} disabled={unconfirmedSave || busy !== null || Boolean(localDraft.recovery)} aria-busy={busy === 'draft' || undefined}>
               <BusyLabel busy={busy === 'draft'} pending="Saving the page draft…">Save draft</BusyLabel>
             </button>
             <button
@@ -752,6 +753,7 @@ function PageEditor({ mode }) {
         }
       />
 
+      <AdminPendingSave busy={busy === 'draft' || busy === 'publish'} to={mode === 'create' ? '/admin/pages' : '.'} unconfirmed={unconfirmedSave} />
       {!addressOnlyError ? <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} /> : null}
       {error?.code === 'unauthenticated' && unsaved ? (
         <Notice tone="caution" message={localDraft.kept

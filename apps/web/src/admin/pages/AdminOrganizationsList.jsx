@@ -1,3 +1,4 @@
+import AdminPendingSave from '../components/AdminPendingSave.jsx';
 import { plannerMessage } from '../plannerErrors.js';
 import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 // The organizations list (issue #192): every organization the sponsors page
@@ -166,6 +167,7 @@ export default function AdminOrganizationsList() {
 
   return (
     <div ref={frameRef} className="flex flex-col gap-md">
+      <AdminPendingSave busy={savingOrder || publishing !== null} />
       <AdminPageHeader help="Manage sponsors and partners in the order they appear on the site."
         title="Organizations"
         identifiers={`${rows.length} organization${rows.length === 1 ? '' : 's'}`}
@@ -219,7 +221,7 @@ export default function AdminOrganizationsList() {
       ) : null}
 
       {loading ? (
-        <AdminLoadingState label="Loading organizations…" />
+        <AdminLoadingState recover label="Loading organizations…" />
       ) : ordered.length === 0 ? (
         <AdminEmptyState
           title="No organizations yet"

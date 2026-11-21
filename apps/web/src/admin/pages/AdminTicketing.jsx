@@ -253,10 +253,11 @@ function StatusCard({ status, error, onRefresh, busy, call }) {
           busy={busy} label={busy ? 'Checking…' : 'Refresh'} icon="refresh" />
       }
     >
+      {busy && status ? <AdminLoadingState quiet label="Loading ticketing status…" onRetry={onRefresh} /> : null}
       {error ? (
         <Notice tone="error" message={error} />
       ) : !status ? (
-        <AdminLoadingState label="Loading ticketing status…" />
+        <AdminLoadingState label="Loading ticketing status…" onRetry={onRefresh} />
       ) : (
         <dl className="grid grid-cols-1 gap-sm text-admin-sm sm:grid-cols-2">
           <div>
@@ -545,6 +546,8 @@ function TicketList({ call, refreshToken }) {
   // so it sends this and not the form, which may have been edited since.
   const [applied, setApplied] = useState({});
   const [loading, setLoading] = useState(false);
+  const request = useRef(0);
+  const pendingAppend = useRef(false);
   const [error, setError] = useState(null);
   const [accountResult, setAccountResult] = useState(null);
   const accountResultRef = useRef(null);
@@ -562,6 +565,8 @@ function TicketList({ call, refreshToken }) {
 
   const search = useCallback(
     async (append = false) => {
+      const id = ++request.current;
+      pendingAppend.current = append;
       setLoading(true);
       setError(null);
       setAccountResult(null);
@@ -574,13 +579,14 @@ function TicketList({ call, refreshToken }) {
         }
         const body = append && cursor ? { ...filter, cursor } : filter;
         const result = await call('ticketingListTickets', body);
+        if (request.current !== id) return;
         setTickets((prev) => (append ? [...(prev ?? []), ...result.tickets] : result.tickets));
         setCursor(result.nextCursor);
         setApplied(filter);
       } catch (err) {
-        setError(plannerMessage(err?.message ?? 'The ticket list could not be loaded.'));
+        if (request.current === id) setError(plannerMessage(err?.message ?? 'The ticket list could not be loaded.'));
       } finally {
-        setLoading(false);
+        if (request.current === id) setLoading(false);
       }
     },
     [call, email, status, cursor, applied],
@@ -633,9 +639,8 @@ function TicketList({ call, refreshToken }) {
         </div>
       ) : null}
 
-      {tickets === null ? (
-        <AdminLoadingState label="Loading tickets…" />
-      ) : tickets.length === 0 ? (
+      {loading ? <AdminLoadingState label="Loading tickets…" quiet={tickets !== null} onRetry={() => search(pendingAppend.current)} /> : null}
+      {tickets === null ? null : tickets.length === 0 ? (
         <AdminEmptyState title="No tickets found" description="Import a CSV above, or adjust your search." />
       ) : (
         <AdminTableScroll className="max-h-[28rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline">
@@ -692,17 +697,20 @@ export default function AdminTicketing() {
   const [status, setStatus] = useState(null);
   const [statusError, setStatusError] = useState(null);
   const [statusBusy, setStatusBusy] = useState(false);
+  const statusRequest = useRef(0);
   const [refreshToken, setRefreshToken] = useState(0);
 
   const refreshStatus = useCallback(async () => {
+    const id = ++statusRequest.current;
     setStatusBusy(true);
     setStatusError(null);
     try {
-      setStatus(await call('getTicketingStatus', {}));
+      const result = await call('getTicketingStatus', {});
+      if (statusRequest.current === id) setStatus(result);
     } catch (err) {
-      setStatusError(plannerMessage(err?.message ?? 'The ticketing status could not be loaded.'));
+      if (statusRequest.current === id) setStatusError(plannerMessage(err?.message ?? 'The ticketing status could not be loaded.'));
     } finally {
-      setStatusBusy(false);
+      if (statusRequest.current === id) setStatusBusy(false);
     }
   }, [call]);
 
@@ -724,7 +732,7 @@ export default function AdminTicketing() {
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} call={call} />
       {confirmedProvider === 'stripe' ? <>
         <TicketButtonSettings call={call} />
-        <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
+        <Suspense fallback={<AdminLoadingState recover label="Loading Stripe ticketing…" />}>
           <StripeTicketingWorkspace call={call} chargesEnabled={status.chargesEnabled} />
         </Suspense>
       </> : ['eventbrite', 'manual', 'none'].includes(confirmedProvider) ? <>

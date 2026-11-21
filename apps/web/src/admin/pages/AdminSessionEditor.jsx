@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
 import PlannerSwitch from '../components/PlannerSwitch.jsx';
@@ -132,8 +133,8 @@ export default function AdminSessionEditor({ mode }) {
   const [speakerToAdd, setSpeakerToAdd] = useState('');
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [action, setAction] = useState(null);
-  const saving = action !== null;
+  const { action: action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
@@ -268,7 +269,7 @@ export default function AdminSessionEditor({ mode }) {
     setSpeakerToAdd('');
     const docId = creating ? nextForm.id : currentId;
     const endpoint = creating ? 'cmsCreateContent' : 'cmsUpdateContent';
-    setAction(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -313,6 +314,7 @@ export default function AdminSessionEditor({ mode }) {
         navigate(`/admin/sessions/${encodeURIComponent(docId)}`, { replace: true });
       }
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(plannerError(err));
     } finally {
@@ -354,7 +356,7 @@ export default function AdminSessionEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading session…" />;
+    return <AdminLoadingState recover label="Loading session…" />;
   }
 
   return (
@@ -413,6 +415,7 @@ export default function AdminSessionEditor({ mode }) {
         }
       />
 
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/sessions' : '.'} unconfirmed={unconfirmedSave} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog

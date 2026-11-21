@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import StripeTicketList from './StripeTicketList.jsx';
+import { LATE_AFTER } from '../../components/BusyLabel.jsx';
 
 describe('StripeTicketList order filters', () => {
   it('names each order and ticket action even when the buyer and order repeat', async () => {
@@ -29,6 +30,29 @@ describe('StripeTicketList order filters', () => {
     fireEvent.change(screen.getByLabelText('Order state'), { target: { value: 'exception' } });
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     await waitFor(() => expect(call).toHaveBeenLastCalledWith('ticketingCommerceAdmin', { action: 'orders', limit: 25, status: 'exception' }));
+  });
+
+  it('retries a stalled orders read without letting the old response replace it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      let reply;
+      const call = vi.fn()
+        .mockImplementationOnce(() => new Promise((resolve) => { reply = resolve; }))
+        .mockResolvedValueOnce({ orders: [{ id: 'ord-new', purchaserEmail: 'current@example.org' }] });
+      render(<StripeTicketList call={call} kind="orders" catalog={null} timezone="UTC" refreshToken={0} onOpenOrder={vi.fn()} />);
+      expect(screen.getByText('Loading orders…')).toBeVisible();
+      await act(async () => vi.advanceTimersByTimeAsync(LATE_AFTER));
+      const retry = screen.getByRole('button', { name: 'Try again' });
+      await act(async () => fireEvent.click(retry));
+      expect(screen.getByText('current@example.org')).toBeVisible();
+      expect(call.mock.calls).toEqual(Array(2).fill(['ticketingCommerceAdmin', { action: 'orders', limit: 25 }]));
+
+      await act(async () => reply({ orders: [{ id: 'ord-old', purchaserEmail: 'stale@example.org' }] }));
+      expect(screen.getByText('current@example.org')).toBeVisible();
+      expect(screen.queryByText('stale@example.org')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
