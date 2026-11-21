@@ -205,6 +205,7 @@ describe('the admin shell', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Publishing is unavailable.');
     expect(readCommandRecents(signedInUid)).toEqual([]);
     const created = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(created.fields.name).toBe('Command organization');
     await confirmCommandDraft(created.collection, created.docId, created.fields);
     expect(readCommandRecents(signedInUid)).toEqual([{ to: '/admin/organizations/command-organization', label: 'Command organization' }]);
     expect(screen.getByRole('alert')).toHaveTextContent('Publishing is unavailable.');
@@ -212,7 +213,9 @@ describe('the admin shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(3));
     expect(String(globalThis.fetch.mock.calls[2][0])).toMatch(/\/cmsUpdateContent$/);
-    expect(JSON.parse(globalThis.fetch.mock.calls[2][1].body)).toMatchObject({ docId: 'command-organization', fields: { name: 'Command organization' } });
+    expect(JSON.parse(globalThis.fetch.mock.calls[2][1].body)).toEqual({
+      collection: 'cmsOrganizations', docId: 'command-organization', fields: {},
+    });
   });
 
   it.each([

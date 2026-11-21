@@ -342,7 +342,7 @@ describe('the organization editor', () => {
     fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields.name).toBe(DRAFTS[0].name);
+    expect(bodyOf(0)).toEqual({ collection: 'cmsOrganizations', docId: 'tide-media', fields: {} });
   });
 
   it('keeps public details, placement, and logo in separate cards with every control reachable', async () => {
