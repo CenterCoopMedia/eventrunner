@@ -92,7 +92,10 @@ describe('catalog sales windows', () => {
     await screen.findByText('The current saved catalog is loaded. Review it before making more changes.');
     expect(screen.getByLabelText('Event sales end Date')).toHaveValue('');
     expect(screen.getByText('No end restriction.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
+    const save = screen.getByRole('button', { name: 'Save ticket settings' });
+    expect(save).toHaveAttribute('aria-disabled', 'false');
+    fireEvent.click(save);
+    expect(screen.queryByText('Correct the marked sales times before saving.')).not.toBeInTheDocument();
     await screen.findByText('Catalog saved. Existing orders keep the prices they were issued with.');
     expect(call.mock.calls.at(-1)[1].catalog.salesEndAt).toBeNull();
   });

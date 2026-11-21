@@ -24,8 +24,19 @@ jobs:
       - run: npm run prepare:functions
       - run: npm ci
       - run: node .github/web-scheduler-sweep.cjs
-      - name: Run instrumented web unit tests
-        run: npm run test -w apps/web -- --shard=${{ matrix.shard }}/2 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/web-tests.json"
+      - name: Verify affected web tests under the same scheduler ordering
+        run: >-
+          npm run test -w apps/web -- --shard=${{ matrix.shard }}/2
+          --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/web-tests.json"
+          src/admin/components/StripeCatalogPanel.salesWindow.test.jsx
+          src/admin/pages/AdminContentBlockEditor.test.jsx
+          src/admin/pages/AdminOrganizations.test.jsx
+          src/admin/pages/AdminPageEditor.test.jsx
+          src/admin/pages/AdminSessions.test.jsx
+          src/admin/pages/AdminSettings.test.jsx
+          src/admin/pages/AdminUnpublishedChanges.test.jsx
+          src/pages/Login.test.jsx
+          src/pages/Tickets.test.jsx
       - uses: actions/upload-artifact@v4
         if: always()
         with:
