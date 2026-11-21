@@ -412,7 +412,8 @@ jobs:
     name: ${{ needs.changes.outputs.e2eConsoleOnly == 'true' && 'Console E2E on emulators' || format('E2E on emulators (shard {0} of 3)', matrix.shard) }}
     needs: changes
     if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.local != 'true'
-    runs-on: ubuntu-latest
+    # The pinned Playwright WebKit build supports Ubuntu 24.04.
+    runs-on: ${{ matrix.shard == 1 && needs.changes.outputs.e2eConsoleOnly != 'true' && 'ubuntu-24.04' || 'ubuntu-latest' }}
     # Full e2e uses three runners, each with its own emulator suite. Console
     # specs fit on one runner. The gate reads the result of the whole matrix.
     strategy:
@@ -476,21 +477,12 @@ jobs:
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: firebase-emulators-${{ runner.os }}-
       - name: Install the pinned Chromium sandbox helper
+        id: chromium_sandbox
         run: |
           helper="$(node -e "const path = require('node:path'); console.log(path.join(path.dirname(require('@playwright/test').chromium.executablePath()), 'chrome_sandbox'))")"
           test -f "$helper"
           sudo install -o root -g root -m 4755 "$helper" "$CHROME_DEVEL_SANDBOX"
           test -u "$CHROME_DEVEL_SANDBOX"
-      - name: Run e2e tests
-        id: e2e_journeys
-        # Invoke the script directly rather than through `npm run test:e2e`
-        # (which is just this same script — see package.json) so local and
-        # CI share exactly one invocation path, with nothing to drift: the
-        # captured-mail log every OTP/invite journey reads only exists
-        # because scripts/dev/run-e2e.sh tees `emulators:exec`'s output to
-        # it before Playwright starts. Reimplementing the emulators:exec
-        # call here instead would silently drop that tee.
-        run: bash scripts/dev/run-e2e.sh
       - name: Cache Playwright WebKit
         if: matrix.shard == 1 && needs.changes.outputs.e2eConsoleOnly != 'true'
         uses: actions/cache@v4
@@ -518,6 +510,11 @@ jobs:
           name: browser-text-settings
           path: playwright-text-settings-report/
           retention-days: 7
+      - name: Run e2e tests
+        id: e2e_journeys
+        if: ${{ !cancelled() && steps.chromium_sandbox.outcome == 'success' }}
+        # Use the same emulator wrapper as npm run test:e2e for captured mail.
+        run: bash scripts/dev/run-e2e.sh
       - name: Build the public demo for visual evidence
         id: demo_builds
         # One shard builds the demo evidence; the other two only run specs.

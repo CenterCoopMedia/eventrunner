@@ -1,4 +1,4 @@
-/* global document, getComputedStyle, innerWidth, devicePixelRatio, visualViewport, screen, navigator */
+/* global document, getComputedStyle, innerWidth, devicePixelRatio, visualViewport, screen */
 import { chromium, expect, test as base } from '@playwright/test';
 import { REFLOW_PROFILES, setReflowProfile, setRootTextSize } from './reflow.mjs';
 
