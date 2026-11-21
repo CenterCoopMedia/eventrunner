@@ -41,6 +41,11 @@
   .admin-section-layout__option { display: grid; grid-template-columns: 4rem minmax(0, 1fr); align-items: center; }
   .admin-section-layout__picture { grid-row: span 2; }
 }
+@container section-layout (max-width: 12rem) {
+  .admin-section-layout__option { grid-template-columns: minmax(0, 1fr); padding-inline: var(--space-2xs); }
+  .admin-section-layout__picture { grid-row: auto; max-width: 4rem; }
+  .admin-section-layout__head { flex-wrap: wrap; }
+}
 @media (max-width: 40rem) {
   .admin-section-layout__frames { grid-template-columns: minmax(0, 1fr); }
 }
