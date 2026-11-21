@@ -189,7 +189,8 @@ export function AuthProvider({ children }) {
   // check: the gate shows "We could not check your admin access" with a
   // retry, never the shell. The one exception is an admin this page session
   // already confirmed with the server: a failed recheck keeps that verdict,
-  // so a network blip mid-session does not close the shell. The server
+  // so a network blip mid-session does not close the shell, and asks the
+  // server again until it answers (see the retry effect below). The server
   // still refuses every admin call it does not authorize.
   useEffect(() => {
     if (!user) return undefined;
@@ -207,7 +208,7 @@ export function AuthProvider({ children }) {
       if (cancelled) return;
       if (drafts === 'error') {
         setVerdict((current) => (current?.user === user && current.status === 'admin'
-          ? current
+          ? { ...current, recheckPending: true }
           : { user, status: 'denied', tier: null, checkFailed: true }));
         return;
       }
@@ -240,12 +241,14 @@ export function AuthProvider({ children }) {
   const isAdmin = adminStatus === 'admin';
   const isOperator = adminTier === 'operator';
 
-  // A failed check is never replaced by the probe effect alone, so a staff
-  // reader who opened the app offline would wait forever. Ask the server
-  // again when the browser reconnects, and every 30 s as a backstop, until
-  // it answers. "Check again" asks at once.
+  // A failed check, or a recheck that could not reach the server, is never
+  // replaced by the probe effect alone: a staff reader who opened the app
+  // offline would wait forever, and a kept admin verdict would outlive a
+  // revocation. Ask the server again when the browser reconnects, and every
+  // 30 s as a backstop, until it answers. "Check again" asks at once.
+  const awaitingServer = adminCheckFailed || ownVerdict?.recheckPending === true;
   useEffect(() => {
-    if (!adminCheckFailed) return undefined;
+    if (!awaitingServer) return undefined;
     const retry = () => setProbeRun((run) => run + 1);
     window.addEventListener('online', retry);
     const timer = window.setInterval(retry, 30_000);
@@ -253,7 +256,7 @@ export function AuthProvider({ children }) {
       window.removeEventListener('online', retry);
       window.clearInterval(timer);
     };
-  }, [adminCheckFailed]);
+  }, [awaitingServer]);
 
   const signInWithGoogle = useCallback(
     async () => {

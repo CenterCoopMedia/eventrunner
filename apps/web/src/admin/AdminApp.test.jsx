@@ -432,6 +432,14 @@ describe('admin route gating', () => {
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'We could not check your admin access' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+
+    // The unanswered recheck still asks again on reconnect, so a revocation
+    // made meanwhile takes effect.
+    serverUnreachable = false;
+    adminProbeShouldSucceed = false;
+    await act(async () => { window.dispatchEvent(new Event('online')); });
+    expect(await screen.findByRole('heading', { name: 'You don’t have admin access' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
   });
 
   it('does not gate the public site behind the admin routes', async () => {
