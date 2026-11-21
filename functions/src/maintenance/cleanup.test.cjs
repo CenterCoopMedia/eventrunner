@@ -172,6 +172,30 @@ test('a row matching more than one query is swept once', async () => {
   assert.equal(db.writes.filter((w) => w.path === 'cmsPublishQueue/q1').length, 1);
 });
 
+test('the sweep preserves a publish resumed and a publisher completed after the scan', async () => {
+  const db = makeFakeDb({
+    'cmsPublishQueue/active': { status: 'running', updatedAt: OLD },
+    'cmsPublishQueue/published': { status: 'done', publisher: { status: 'running', startedAt: OLD } },
+  });
+  const queue = db.collection('cmsPublishQueue');
+  const events = [];
+  db.beforeCommit = async () => {
+    // A second sweep releases the old run and the organizer resumes it.
+    await queue.doc('active').set({ status: 'failed' }, { merge: true });
+    await queue.doc('active').set({ status: 'running', updatedAt: RECENT }, { merge: true });
+    await queue.doc('published').set({ publisher: { status: 'done', finishedAt: RECENT } }, { merge: true });
+  };
+
+  const result = await sweepStrandedPublishRows({ db, now, log: quiet, notifyOperator: async (event) => events.push(event) });
+
+  assert.deepEqual(result, { scanned: 2, publishFailed: 0, publisherFailed: 0 });
+  assert.deepEqual(db.read('cmsPublishQueue', 'active'), { status: 'running', updatedAt: RECENT });
+  assert.deepEqual(db.read('cmsPublishQueue', 'published').publisher, {
+    status: 'done', startedAt: OLD, finishedAt: RECENT,
+  });
+  assert.deepEqual(events, []);
+});
+
 test('the sweep is idempotent — a second run writes nothing', async () => {
   const db = makeFakeDb({
     'cmsPublishQueue/q1': { status: 'running', updatedAt: OLD },

@@ -182,9 +182,17 @@ async function sweepStrandedPublishRows({
   let publishFailed = 0;
   let publisherFailed = 0;
   for (const doc of seen.values()) {
-    const parts = strandedParts(doc.data(), nowMs, timeoutMs);
-    if (!parts.publish && !parts.publisher) continue;
-    await doc.ref.set(strandedPatch({ ...parts, at, timeoutMs }), { merge: true });
+    const candidate = strandedParts(doc.data(), nowMs, timeoutMs);
+    if (!candidate.publish && !candidate.publisher) continue;
+    // A publish can finish or resume after the query finds it.
+    const parts = await db.runTransaction(async (tx) => {
+      const current = await tx.get(doc.ref);
+      const currentParts = strandedParts(current.data(), nowMs, timeoutMs);
+      if (!currentParts.publish && !currentParts.publisher) return null;
+      tx.set(doc.ref, strandedPatch({ ...currentParts, at, timeoutMs }), { merge: true });
+      return currentParts;
+    });
+    if (!parts) continue;
     if (parts.publish) publishFailed += 1;
     if (parts.publisher) publisherFailed += 1;
     log.warn(
