@@ -116,8 +116,8 @@ function positiveInteger(value) {
 
 /**
  * Read a manifest the function wrote, for the page. Returns the copies the
- * page may list, each at its real width, and the original's width; or null
- * when the manifest is not a ready manifest for this very object.
+ * page may list, each at its real width, and the original's dimensions.
+ * Older manifests can omit height. A manifest for another object returns null.
  *
  * The manifest is public data read over the network, so every field is
  * checked: a copy must sit at this source's own copy path for the stated
@@ -125,7 +125,7 @@ function positiveInteger(value) {
  *
  * @param {unknown} path the original
  * @param {unknown} manifest the parsed manifest.json
- * @returns {{ generation: string, width: number,
+ * @returns {{ generation: string, width: number, height?: number,
  *             sizes: Array<{ width: number, path: string }> } | null}
  */
 function readImageSizeManifest(path, manifest) {
@@ -145,7 +145,12 @@ function readImageSizeManifest(path, manifest) {
     if (!byWidth.has(width)) byWidth.set(width, { width, path: expected });
   }
   const sizes = [...byWidth.values()].sort((a, b) => a.width - b.width);
-  return { generation, width: manifest.width, sizes };
+  return {
+    generation,
+    width: manifest.width,
+    ...(positiveInteger(manifest.height) ? { height: manifest.height } : {}),
+    sizes,
+  };
 }
 
 /**

@@ -13,6 +13,7 @@
 // checks); the same href allowlist keeps data:/attacker-controlled schemes
 // out even though javascript: is inert on <img src> in modern browsers.
 import { IMAGE_SIZE_WIDTHS } from 'shared/imageSizes';
+import { imageDimensions } from '@generated/siteContent.js';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
 import { useSizedImageSources } from '../../lib/useImageSizeSrcSet.js';
@@ -28,6 +29,8 @@ export default function ImageBlock({ block }) {
   const alignmentClass = block.alignment === 'center' ? 'mx-auto' : block.alignment === 'right' ? 'ml-auto' : '';
   const hasLayout = Boolean(width || alignmentClass);
   const sizes = width ? `(max-width: ${width}px) 100vw, ${width}px` : '100vw';
+  // The live content overlay can replace a block while retaining its upload path.
+  const dimensions = sources.path ? imageDimensions[sources.path] : undefined;
   const image = (
     <img
       lang={block.publicLanguage}
@@ -36,9 +39,14 @@ export default function ImageBlock({ block }) {
       sizes={sources.srcSet ? sizes : undefined}
       onError={sources.onError}
       alt={block.alt ?? ''}
+      width={dimensions?.width}
+      height={dimensions?.height}
       loading="lazy"
       className={`h-auto max-w-full rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08] ${alignmentClass}`}
-      style={sources.pending ? { visibility: 'hidden' } : undefined}
+      style={sources.pending ? {
+        visibility: 'hidden',
+        aspectRatio: dimensions ? `${dimensions.width} / ${dimensions.height}` : undefined,
+      } : undefined}
     />
   );
   return (

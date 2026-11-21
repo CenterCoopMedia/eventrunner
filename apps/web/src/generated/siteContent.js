@@ -449,4 +449,6 @@ export const siteContent = {
   },
 };
 
+export const imageDimensions = {};
+
 export default siteContent;

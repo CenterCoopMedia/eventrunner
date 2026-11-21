@@ -5,7 +5,7 @@
 // scheme itself, the same way sanitizeHtml.js already does for richtext
 // links.
 import { describe, expect, it, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { readyManifest, stubManifests } from '../../test/imageSizeManifests.js';
 import { resetImageSizeCacheForTest } from '../../lib/mediaSource.js';
 import { MemoryRouter } from 'react-router';
@@ -14,6 +14,11 @@ import LinkGroupBlock from './LinkGroupBlock.jsx';
 import ImageBlock from './ImageBlock.jsx';
 
 const UNSAFE_URLS = ['javascript:alert(1)', ' JAVASCRIPT:alert(1)', 'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)'];
+
+vi.mock('@generated/siteContent.js', async (importOriginal) => ({
+  ...await importOriginal(),
+  imageDimensions: { 'cms-images/fixture/hall.jpg': { width: 1200, height: 800 } },
+}));
 
 describe('CtaBlock', () => {
   it('renders nothing for an unsafe url', () => {
@@ -130,6 +135,34 @@ describe('ImageBlock', () => {
   it('renders an image for a safe url', () => {
     const { getByRole } = render(<ImageBlock block={{ url: 'https://example.org/i.png', alt: 'x' }} />);
     expect(getByRole('img')).toHaveAttribute('src', 'https://example.org/i.png');
+    expect(getByRole('img')).not.toHaveAttribute('height');
+  });
+
+  it('reserves the snapshot dimensions before the manifest resolves and through original fallback', async () => {
+    const url = 'cms-images/fixture/hall.jpg';
+    resetImageSizeCacheForTest();
+    stubManifests({ [url]: { ...readyManifest(url, 1200), height: 800 } });
+    try {
+      const { container, getByRole, rerender } = render(<ImageBlock block={{ url, alt: 'Hall', size: 'small' }} />);
+      const pendingImage = container.querySelector('img');
+      expect(pendingImage).not.toHaveAttribute('src');
+      expect(pendingImage).toHaveAttribute('width', '1200');
+      expect(pendingImage).toHaveAttribute('height', '800');
+      expect(pendingImage.style.aspectRatio).toBe('1200 / 800');
+      await waitFor(() => expect(getByRole('img', { name: 'Hall' })).toHaveAttribute('srcset'));
+
+      const img = getByRole('img', { name: 'Hall' });
+      fireEvent.error(img);
+      expect(img).not.toHaveAttribute('srcset');
+      expect(img.getAttribute('src')).toContain(encodeURIComponent(url));
+      expect(img).toHaveAttribute('height', '800');
+      expect(img).toHaveAttribute('loading', 'lazy');
+
+      rerender(<ImageBlock block={{ url: 'https://example.org/replacement.jpg', alt: 'Replacement' }} />);
+      expect(getByRole('img', { name: 'Replacement' })).not.toHaveAttribute('height');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   // The picker stores this shape (admin/components/media/ImagePicker.jsx);

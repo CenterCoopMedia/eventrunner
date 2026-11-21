@@ -15,6 +15,7 @@ const viewports = [{ width: 390, height: 844 }, { width: 1280, height: 900 }];
 const pageRef = () => adminDb().doc(`cmsPages/${pageId}`);
 const blockRef = () => adminDb().doc(`cmsContent/${section}__${field}`);
 let asset;
+let dimensions;
 let idToken;
 
 test.use({ trace: 'off', screenshot: 'off' });
@@ -52,6 +53,8 @@ test.beforeAll(async () => {
   const source = await fs.readFile('apps/web/public/demo/summit-gathering.webp');
   // Only the screenshot run needs a desktop-resolution fixture and variants.
   const bytes = process.env.CAPTION_EVIDENCE_DIR ? source : await sharp(source).resize({ width: 320 }).webp().toBuffer();
+  const { width, height } = await sharp(bytes).metadata();
+  dimensions = { width, height };
   const uploaded = await callFunction('mediaUpload', {
     folder: 'cms-images',
     contentType: 'image/webp',
@@ -86,6 +89,36 @@ async function saveLibraryText() {
   const updated = await callFunction('mediaUpdateMetadata', { assetId: asset.id, caption, credit }, idToken);
   expect(updated.status).toBe(200);
 }
+
+test('a published photo reserves its responsive height before its manifest arrives', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.route('**/src/generated/siteContent.js*', async (route) => {
+    const response = await route.fetch();
+    const snapshot = JSON.stringify({ [asset.path]: dimensions });
+    await route.fulfill({ response, body: `${await response.text()}\nObject.assign(imageDimensions, ${snapshot});\n` });
+  });
+  const manifestPath = `${path.posix.dirname(asset.path)}/_sizes/manifest.json`;
+  const { promise: manifestGate, resolve: releaseManifest } = Promise.withResolvers();
+  await page.route((url) => decodeURIComponent(url.pathname).endsWith(`/o/${manifestPath}`), async (route) => {
+    await manifestGate;
+    await route.continue();
+  });
+  const image = page.locator(`img[alt="${alt}"]`);
+  let reserved;
+  try {
+    await page.goto(`/${pageId}`, { waitUntil: 'domcontentloaded' });
+    await expect(image).toHaveCSS('visibility', 'hidden');
+    reserved = await image.evaluate((node) => node.getBoundingClientRect().toJSON());
+    expect(reserved.width).toBeGreaterThan(0);
+    expect(reserved.width).toBeLessThan(dimensions.width);
+    expect(reserved.height).toBeCloseTo(reserved.width * dimensions.height / dimensions.width, 0);
+  } finally {
+    releaseManifest();
+  }
+  await image.scrollIntoViewIfNeeded();
+  await expect.poll(() => image.evaluate((node) => node.naturalWidth)).toBeGreaterThan(0);
+  expect((await image.boundingBox()).height).toBeCloseTo(reserved.height, 0);
+});
 
 test('library text follows an open non-home image and fits inside its overlay', async ({ page }) => {
   await page.goto(`/${pageId}`, { waitUntil: 'domcontentloaded' });
