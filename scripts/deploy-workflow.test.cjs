@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { buildVersion } = require('../apps/web/buildVersion.js');
 
 // Normalized to LF: every marker and pattern below matches on literal
 // `\n`, and a CRLF checkout (the Windows git default) would otherwise
@@ -160,6 +161,35 @@ test('web deployment passes the client error reporting setting', () => {
     build,
     /VITE_ENABLE_CLIENT_ERROR_REPORTING: \$\{\{ vars\.VITE_ENABLE_CLIENT_ERROR_REPORTING \}\}/,
   );
+});
+
+test('the code deploy and publisher image both carry the checkout commit into the build', () => {
+  const directBuild = step('Build the web app against the generated snapshot');
+  assert.match(directBuild, /EVENT_BUILD_COMMIT: \$\{\{ github\.sha \}\}/);
+  const imageBuild = step('Build and push the site-publisher image');
+  assert.match(imageBuild, /--build-arg EVENT_BUILD_COMMIT="\$GITHUB_SHA"/);
+  const dockerfile = fs.readFileSync(path.join(__dirname, '../publisher/Dockerfile'), 'utf8');
+  assert.match(dockerfile, /^ARG EVENT_BUILD_COMMIT\r?\nENV EVENT_BUILD_COMMIT=\$\{EVENT_BUILD_COMMIT\}$/m);
+});
+
+test('the public build version contains only the full commit and is served without caching', () => {
+  const commit = '0123456789abcdef'.repeat(2) + '01234567';
+  const assets = [];
+  const context = {
+    emitFile: (asset) => assets.push(asset),
+    error: (message) => { throw new Error(message); },
+  };
+  buildVersion(commit).generateBundle.call(context);
+  assert.deepEqual(assets, [{ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ commit })}\n` }]);
+  const config = require('../firebase.json');
+  assert.deepEqual(config.hosting.headers.find(({ source }) => source === '/version.json')?.headers,
+    [{ key: 'Cache-Control', value: 'no-store' }]);
+
+  assets.length = 0;
+  buildVersion(undefined).generateBundle.call(context);
+  assert.throws(() => buildVersion(`${commit}\n`).generateBundle.call(context), /must be a full Git commit SHA/);
+  assert.throws(() => buildVersion('0123456').generateBundle.call(context), /must be a full Git commit SHA/);
+  assert.deepEqual(assets, []);
 });
 
 // A fresh deployment, and every ordinary code deploy, never runs the

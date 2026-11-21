@@ -54,4 +54,8 @@ COPY . .
 RUN chown -R node:node /app
 USER node
 
+# Keep the source commit with the image for later CMS-triggered builds.
+ARG EVENT_BUILD_COMMIT
+ENV EVENT_BUILD_COMMIT=${EVENT_BUILD_COMMIT}
+
 ENTRYPOINT ["node", "scripts/publish-site.cjs"]

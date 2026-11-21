@@ -15,6 +15,7 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolveGeneratedDir } from './generatedDir.js';
+import { buildVersion } from './buildVersion.js';
 import { criticalFontTags } from './criticalFonts.js';
 import { snapshotHtml } from './snapshotHtml.js';
 import { specimenBoundary } from './specimenBoundary.js';
@@ -97,7 +98,7 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       order: 'pre',
       handler: () => criticalFontTags(readFileSync(path.join(generatedDir, 'theme.css'), 'utf8')),
     },
-  }, nonBlockingEntry(), snapshotHtml(), specimenBoundary()],
+  }, nonBlockingEntry(), snapshotHtml(), specimenBoundary(), buildVersion(process.env.EVENT_BUILD_COMMIT)],
   // `shared` is a linked workspace package whose ESM entries re-export CJS
   // sources; linked deps skip prebundling by default, which would break the
   // dev server's CJS interop. Builds and vitest handle it either way.
