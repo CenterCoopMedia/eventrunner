@@ -478,6 +478,15 @@ test('every face a live switch can reach is declared, whatever the build-time pr
     const set = FONT_SETS[setId];
     assert.ok(set, `${setId} is a bundled set`);
     assert.ok(declared.has(set.family), `${set.family} is declared, so a live switch to it renders`);
+    const adjustedFaces = [...css.matchAll(/@font-face \{([^}]+)\}/g)]
+      .map(([, body]) => body)
+      .filter((body) => body.includes(`font-family: '${setId} fallback';`));
+    assert.ok(adjustedFaces.length, `${setId} has an adjusted local fallback`);
+    for (const face of adjustedFaces) {
+      assert.match(face, /src: local\(/);
+      assert.match(face, /size-adjust: [\d.]+%;/);
+      assert.doesNotMatch(face, /url\(/);
+    }
   }
   // Including the families a document could never have named at build time.
   assert.match(css, /src: url\('\/fonts\/overpass-latin\.woff2'\)/);
