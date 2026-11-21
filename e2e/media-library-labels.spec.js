@@ -21,7 +21,7 @@ test('a narrow image picker shows the full title and filename', async ({ page })
     const primaryLogo = page.getByRole('textbox', { name: 'Primary logo' });
     await primaryLogo.locator('..').getByRole('button', { name: 'Choose or upload…' }).click();
     const dialog = page.getByRole('dialog', { name: 'Choose an image', exact: true });
-    const tile = dialog.getByRole('button', { pressed: false, name: title });
+    const tile = dialog.getByRole('button', { name: filename });
     for (const profile of [{ width: 320 }, { width: 720, rootSize: 32 }]) {
       await setReflowProfile(page, profile);
       await expectTextFits(tile.getByText(title, { exact: true }));
