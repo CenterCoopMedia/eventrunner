@@ -237,8 +237,10 @@
 /* Title bands and work share one bounded grid; prose keeps its own measure. */
 .admin-stone { --font-heading: var(--admin-font-ui); }
 .admin-stone, .admin-pending-notice { max-inline-size: var(--admin-canvas-max); }
-/* The resizable client preview needs the available workspace beside its editor. */
-.admin-stone:has(.admin-branding-workspace) { max-inline-size: none; }
+/* Lists, dashboards and the page and content editors use the whole workspace
+   (admin/screenWidth.js); plain forms keep the bound. The resizable client
+   preview needs the available workspace beside its editor. */
+.admin-stone[data-screen-width='wide'], .admin-stone:has(.admin-branding-workspace) { max-inline-size: none; }
 :where(.admin-prose, .admin-stone p,
 .admin-editor-disclosure__description) { max-inline-size: var(--admin-measure-text); }
 .admin-version-records-table :is(th, time) { white-space: nowrap; }

@@ -65,6 +65,7 @@
 import './adminWorkspace.css';
 import { Suspense, createContext, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
+import { adminScreenWidth } from './screenWidth.js';
 import useAccountViews from '../hooks/useAccountViews.js';
 import RoleSwitcher from '../components/RoleSwitcher.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -873,7 +874,7 @@ function AdminDesk() {
             up by the stone's top padding and would slide over it. */}
         <PendingChangesBanner />
         <AdminOfflineNotice />
-        <div className="admin-stone w-full">
+        <div className="admin-stone w-full" data-screen-width={adminScreenWidth(pathname)}>
           {/* The tour is the one thing in the stone before the page:
               `.admin-tour` (index.css) keeps room under it for the title
               band's pull, so the band lands below it, never over it. */}
