@@ -666,13 +666,17 @@ function createDeliveryWebhookHandler({ db, provider, now = Date.now, log = cons
         if (Math.abs(age) < UNMATCHED_RETRY_MS) waiting += 1;
         continue;
       }
-      const ref = snap.docs[0].ref;
+      const { ref } = snap.docs[0];
+      const row = snap.docs[0].data();
+      // Postmark uses the same message ID for To and Cc callbacks. The audit
+      // row shows delivery status for its To address.
+      if (typeof row.to !== 'string' || typeof event.recipient !== 'string'
+          || row.to.trim().toLowerCase() !== event.recipient.trim().toLowerCase()) continue;
       // A provider-side opt-out from an announcement (a Postmark broadcast
       // stream with Postmark unsubscribe handling, issue #490) becomes the
       // application's suppression record too, so the next audience leaves
       // the address out. Transactional rows never write one.
-      if (event.type === 'suppressed' && typeof event.recipient === 'string'
-          && snap.docs[0].data?.()?.source === 'announcement') {
+      if (event.type === 'suppressed' && row.source === 'announcement') {
         const { recordSuppression, suppressionIdFor } = require('../announcements/suppression.cjs');
         try {
           await recordSuppression({ db, id: suppressionIdFor(event.recipient), via: 'provider' });
