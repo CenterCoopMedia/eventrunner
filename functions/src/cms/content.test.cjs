@@ -1723,6 +1723,22 @@ test('an organization update is judged on the merged record', async () => {
   assert.equal(broken.read('cmsOrganizations_drafts', 'example-fund').description, ORG.description);
 });
 
+test('an organization tier update keeps the latest draft description and visibility', async () => {
+  const db = makeFakeDb({
+    'cmsOrganizations/example-fund': { ...ORG, visible: true, revision: 1 },
+    'cmsOrganizations_drafts/example-fund': {
+      ...ORG, description: 'Supports the travel and access grants.', visible: false, status: 'dirty',
+    },
+  });
+  const res = await updateOrganization(db, 'example-fund', { tier: 'supporting' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsOrganizations_drafts', 'example-fund');
+  assert.equal(draft.tier, 'supporting');
+  assert.equal(draft.description, 'Supports the travel and access grants.');
+  assert.equal(draft.visible, false);
+  assert.equal(db.read('cmsOrganizations', 'example-fund').tier, ORG.tier);
+});
+
 test('an organization order sent as a string, or a website that is not http(s), is refused', async () => {
   const db = makeFakeDb();
   let res = await createOrganization(db, 'example-fund', { ...ORG, order: '3' });

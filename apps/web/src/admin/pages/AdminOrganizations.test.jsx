@@ -342,7 +342,7 @@ describe('the organization editor', () => {
     fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields.name).toBe(DRAFTS[0].name);
+    expect(bodyOf(0)).toEqual({ collection: 'cmsOrganizations', docId: 'tide-media', fields: {} });
   });
 
   it('keeps public details, placement, and logo in separate cards with every control reachable', async () => {
@@ -502,13 +502,44 @@ describe('the organization editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsUpdateContent');
-    expect(bodyOf(0)).toMatchObject({
+    expect(bodyOf(0)).toEqual({
       collection: 'cmsOrganizations',
       docId: 'tide-media',
       visible: false,
-      fields: { name: 'Tide Media Collective' },
+      fields: {},
     });
-    expect(bodyOf(0).fields.order).toBeUndefined();
+  });
+
+  it('sends only local edits when a teammate saves a newer organization draft', async () => {
+    await renderAt('/admin/organizations/tide-media');
+    await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
+    const opened = { ...DRAFTS[0], description: 'Original description.' };
+    pushOrganizations(LIVE, [opened]);
+    expect(await screen.findByDisplayValue('Original description.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'supporting' } });
+
+    const teammate = { ...opened, description: 'Newer description.', visible: false };
+    pushOrganizations(LIVE, [teammate]);
+    expect(screen.getByLabelText('Description')).toHaveValue('Newer description.');
+    expect(screen.getByLabelText('Show on the sponsors page')).not.toBeChecked();
+    expect(screen.getByLabelText('Tier')).toHaveValue('supporting');
+    fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await screen.findByText('Draft saved. It is not live until you publish it.');
+    expect(endpointOf(0)).toBe('cmsUpdateContent');
+    expect(bodyOf(0)).toEqual({ collection: 'cmsOrganizations', docId: 'tide-media', fields: { tier: 'supporting' } });
+
+    // The unrelated description update arrives before the echo of our tier save.
+    pushOrganizations(LIVE, [{ ...teammate, description: 'Another description.' }]);
+    expect(screen.getByLabelText('Tier')).toHaveValue('supporting');
+    expect(screen.getByLabelText('Description')).toHaveValue('Another description.');
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: '' } });
+    fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1)).toEqual({ collection: 'cmsOrganizations', docId: 'tide-media', fields: { description: null } });
   });
 
   // Codex review on #281: the two listeners report in no fixed order. A
@@ -524,9 +555,10 @@ describe('the organization editor', () => {
     expect(await screen.findByDisplayValue('Tide Media Collective')).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
+    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'supporting' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields.name).toBe('Tide Media Collective');
+    expect(bodyOf(0).fields).toEqual({ tier: 'supporting' });
   });
 
   it('stays closed and says why when the drafts listener fails before it reports', async () => {
@@ -647,8 +679,13 @@ describe('organization representatives', () => {
     // Stated in place; the toast only repeats it.
     const applied = await screen.findAllByText('Edit applied to the draft. Publish to show it on the site.');
     expect(applied.some((node) => node.getAttribute('role') === 'status')).toBe(true);
-    // The form now holds the applied text, so the next save keeps it.
+    // The form adopts the text the server has already saved.
     expect(screen.getByLabelText('Description')).toHaveValue('A newsroom for the whole coast.');
+    fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
+    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'supporting' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).fields).toEqual({ tier: 'supporting' });
   });
 
   // Codex review on #540: the server may apply a newer edit than the one
