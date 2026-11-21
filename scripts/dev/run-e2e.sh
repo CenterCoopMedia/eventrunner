@@ -20,9 +20,13 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
-mkdir -p e2e/.tmp
-LOG="$PWD/e2e/.tmp/emulator.log"
-MAIL="$PWD/e2e/.tmp/mail.jsonl"
+ARTIFACTS="$PWD/e2e/.tmp"
+if [[ "${PLAYWRIGHT_TEXT_SETTINGS:-}" == true ]]; then
+  ARTIFACTS="$ARTIFACTS/text-settings"
+fi
+mkdir -p "$ARTIFACTS"
+LOG="$ARTIFACTS/emulator.log"
+MAIL="$ARTIFACTS/mail.jsonl"
 rm -f "$LOG"
 # Truncate into existence before the emulators start, so that a spec finding
 # no file at all is unambiguous evidence of a wiring problem rather than of

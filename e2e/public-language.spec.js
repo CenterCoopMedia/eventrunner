@@ -1,8 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { settingsTag, test } from './browser-text-settings.mjs';
 import { adminDb } from './helpers.mjs';
-import { REFLOW_PROFILES, expectControlFits, expectNoOverlap, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
+import { expectControlFits, expectNoOverlap, expectPageFits, expectTextFits } from './reflow.mjs';
 
 const route = '/language-test';
 const session = {
@@ -169,6 +170,9 @@ test('the hosted phone and desktop reader marks mixed language and retains keybo
   await expect(links.getByRole('link', { name: 'Unsafe destination' })).toHaveCount(0);
   await links.getByRole('link', { name: 'Open the guide' }).click();
   await expect(page).toHaveURL(/topic=data&lang=es#section-language-links$/);
+});
+
+test('sign-in validation remains readable and returns focus to submit', settingsTag, async ({ page, checkReflow }) => {
   await page.goto('/signin?lang=es');
   await expect(page.getByRole('heading', { name: 'Iniciar sesión', level: 1 })).toBeVisible();
   await expect(page.getByLabel('Correo electrónico', { exact: true })).toBeVisible();
@@ -180,57 +184,53 @@ test('the hosted phone and desktop reader marks mixed language and retains keybo
   await expect(page.locator('#signin-email-error')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(sendCode).toBeFocused();
-  for (const profile of REFLOW_PROFILES) {
-    await test.step(`Sign-in validation at ${profile.name}`, async () => {
-      await setReflowProfile(page, profile);
-      await expectTextFits(validation);
-      await expectTextFits(page.getByText('Correo electrónico', { exact: true }));
-      await expectControlFits(sendCode);
-      await expectTextFits(sendCode);
-      await expectNoOverlap(validation, sendCode);
-      await expectPageFits(page);
-    });
-  }
+  await checkReflow(validation, async ({ minimumTarget }) => {
+    await expectTextFits(validation);
+    await expectTextFits(page.getByText('Correo electrónico', { exact: true }));
+    await expectControlFits(sendCode, minimumTarget);
+    await expectTextFits(sendCode);
+    await expectNoOverlap(validation, sendCode);
+    await expectPageFits(page);
+  }, sendCode);
 });
 
 test.describe('public reflow with touch targets', () => {
   test.use({ hasTouch: true, reducedMotion: 'reduce' });
 
-  test('home keeps the hero, header navigation and footer readable', async ({ page }) => {
+  test('home keeps the hero, header navigation and footer readable', settingsTag, async ({ page, checkReflow }) => {
     await page.goto('/?lang=en');
+    await expect(page.locator('article[data-cms-content-source="live"]')).toBeVisible();
     const hero = page.locator('.event-hero__title');
     const mainNav = page.getByRole('navigation', { name: 'Main', exact: true });
     const menu = page.getByRole('button', { name: 'Menu', exact: true });
     const schedule = mainNav.locator('a[href="/schedule"], a[href^="/schedule?"]');
     const footer = page.getByRole('contentinfo').locator('.footer-link').first();
     await expect(hero).toBeVisible();
+    await expect(page.locator('.logo-wall > li').first()).toBeVisible();
 
-    for (const profile of REFLOW_PROFILES) {
-      await test.step(profile.name, async () => {
-        await setReflowProfile(page, profile);
-        await expectPageFits(page);
-        await expectTextFits(hero);
-        // Link lists in the footer use the documented 24px exception.
-        await expectControlFits(footer, 24);
-        await expectTextFits(footer);
-        if (profile.width === 320) {
-          await expectControlFits(menu);
-          await menu.press('Enter');
-          await expect(menu).toHaveAttribute('aria-expanded', 'true');
-        }
-        await expectControlFits(schedule);
-        await expectTextFits(schedule);
-        await expectPageFits(page);
-        if (profile.width === 320) {
-          await schedule.press('Escape');
-          await expect(menu).toHaveAttribute('aria-expanded', 'false');
-          await expect(menu).toBeFocused();
-        }
-      });
-    }
+    await checkReflow(hero, async ({ compact, minimumTarget }) => {
+      await expectPageFits(page);
+      await expectTextFits(hero);
+      // Link lists in the footer use the documented 24px exception.
+      await expectControlFits(footer, 24);
+      await expectTextFits(footer);
+      if (compact) {
+        await expectControlFits(menu, minimumTarget);
+        await menu.press('Enter');
+        await expect(menu).toHaveAttribute('aria-expanded', 'true');
+      }
+      await expectControlFits(schedule, minimumTarget);
+      await expectTextFits(schedule);
+      await expectPageFits(page);
+      if (compact) {
+        await schedule.press('Escape');
+        await expect(menu).toHaveAttribute('aria-expanded', 'false');
+        await expect(menu).toBeFocused();
+      }
+    }, footer);
   });
 
-  test('schedule keeps session titles, search and filters reachable', async ({ page }) => {
+  test('schedule keeps session titles, search and filters reachable', settingsTag, async ({ page, checkReflow }) => {
     await page.goto('/schedule?lang=en');
     const search = page.getByRole('searchbox', { name: 'Search this day', exact: true });
     const filters = page.getByRole('button', { name: 'Filters', exact: true });
@@ -238,48 +238,42 @@ test.describe('public reflow with touch targets', () => {
     const title = page.getByRole('heading', { name: session.title, exact: true });
     await expect(title).toBeVisible();
 
-    for (const profile of REFLOW_PROFILES) {
-      await test.step(profile.name, async () => {
-        await setReflowProfile(page, profile);
-        await expectTextFits(title);
-        await expectControlFits(search);
-        await expectPageFits(page);
-        if (profile.width === 320) {
-          await expectControlFits(filters);
-          await expectNoOverlap(search, filters);
-          await filters.press('Enter');
-          await expect(filters).toHaveAttribute('aria-expanded', 'true');
-        }
-        await expect(facets).toBeVisible();
-        await expectTextFits(facets.getByText('Format', { exact: true }));
-        await expectPageFits(page);
-        if (profile.width === 320) {
-          const format = facets.getByRole('group', { name: 'Format', exact: true });
-          await format.getByRole('checkbox', { name: /^Workshop \(\d+\)$/ }).press('Escape');
-          await expect(filters).toBeFocused();
-          await expect(facets).toBeHidden();
-        }
-      });
-    }
+    await checkReflow(title, async ({ compact, minimumTarget }) => {
+      await expectTextFits(title);
+      await expectControlFits(search, minimumTarget);
+      await expectPageFits(page);
+      if (compact) {
+        await expectControlFits(filters, minimumTarget);
+        await expectNoOverlap(search, filters);
+        await filters.press('Enter');
+        await expect(filters).toHaveAttribute('aria-expanded', 'true');
+      }
+      await expect(facets).toBeVisible();
+      await expectTextFits(facets.getByText('Format', { exact: true }));
+      await expectPageFits(page);
+      if (compact) {
+        const format = facets.getByRole('group', { name: 'Format', exact: true });
+        await format.getByRole('checkbox', { name: /^Workshop \(\d+\)$/ }).press('Escape');
+        await expect(filters).toBeFocused();
+        await expect(facets).toBeHidden();
+      }
+    }, search);
   });
 
-  test('published session detail keeps the heading, description and share control readable', async ({ page }) => {
+  test('published session detail keeps the heading, description and share control readable', settingsTag, async ({ page, checkReflow }) => {
     await page.goto(`/schedule/${session.id}?lang=en`);
     const heading = page.getByRole('heading', { name: session.title, level: 1, exact: true });
     const description = page.getByText(session.description, { exact: true });
     const share = page.getByRole('button', { name: /^(Share session|Copy session link)$/ });
     await expect(heading).toBeVisible();
-    for (const profile of REFLOW_PROFILES) {
-      await test.step(profile.name, async () => {
-        await setReflowProfile(page, profile);
-        await expectTextFits(heading);
-        await expectTextFits(description);
-        await expectControlFits(share);
-        await expectTextFits(share);
-        await expectNoOverlap(description, share);
-        await expectPageFits(page);
-      });
-    }
+    await checkReflow(description, async ({ minimumTarget }) => {
+      await expectTextFits(heading);
+      await expectTextFits(description);
+      await expectControlFits(share, minimumTarget);
+      await expectTextFits(share);
+      await expectNoOverlap(description, share);
+      await expectPageFits(page);
+    }, share);
   });
 });
 

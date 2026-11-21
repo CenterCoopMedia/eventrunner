@@ -17,6 +17,8 @@ import { defineConfig, devices } from '@playwright/test';
 const APP_URL = process.env.E2E_APP_URL || 'http://127.0.0.1:5173';
 const PROJECT_ID = process.env.EVENT_FIREBASE_PROJECT_ID || 'demo-run-of-show';
 const REGION = process.env.EVENT_FIREBASE_REGION || 'us-central1';
+const textSettings = process.env.PLAYWRIGHT_TEXT_SETTINGS === 'true';
+const consoleOnly = process.env.PLAYWRIGHT_CONSOLE_ONLY === 'true';
 
 // The dev server the webServer block below launches has to bind the SAME
 // host/port that baseURL/webServer.url (both derived from APP_URL) probe
@@ -58,7 +60,12 @@ function shellQuote(value) {
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: process.env.PLAYWRIGHT_CONSOLE_ONLY === 'true' ? '**/console-*.spec.js' : undefined,
+  testMatch: textSettings ? [
+    '**/public-language.spec.js', '**/complete-registration.spec.js',
+    '**/admin-nav-layout.spec.js', '**/console-action-feedback.spec.js',
+  ] : consoleOnly ? '**/console-*.spec.js' : undefined,
+  grep: textSettings ? /@browser-text-settings/ : undefined,
+  outputDir: textSettings ? 'test-results/browser-text-settings' : 'test-results',
   // The four journeys share one seeded emulator project (config/bootstrap,
   // the demo fixture's speakers/sessions) — running spec files in parallel
   // would race writes to that shared state, so the whole suite is serial.
@@ -68,16 +75,21 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI
-    ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
+    ? [['list'], ['html', { open: 'never', outputFolder: textSettings ? 'playwright-text-settings-report' : 'playwright-report' }]]
     : 'list',
   globalSetup: './e2e/global-setup.mjs',
   use: {
     baseURL: APP_URL,
     launchOptions: { chromiumSandbox: true },
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
+    // The focused report captures layout states explicitly after any sign-in.
+    trace: textSettings ? 'off' : 'retain-on-failure',
+    screenshot: textSettings ? 'off' : 'only-on-failure',
   },
-  projects: [
+  projects: textSettings ? [
+    { name: 'chromium-page-zoom', use: { channel: 'chrome', textSettings: 'chrome-zoom' } },
+    { name: 'chromium-android-text', use: { ...devices['Pixel 7'], channel: 'chrome', textSettings: 'android-text', reducedMotion: 'reduce' } },
+    { name: 'webkit-iphone-text', use: { ...devices['iPhone 15'], textSettings: 'webkit-text', reducedMotion: 'reduce' } },
+  ] : [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {

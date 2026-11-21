@@ -412,7 +412,8 @@ jobs:
     name: ${{ needs.changes.outputs.e2eConsoleOnly == 'true' && 'Console E2E on emulators' || format('E2E on emulators (shard {0} of 3)', matrix.shard) }}
     needs: changes
     if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.local != 'true'
-    runs-on: ubuntu-latest
+    # The pinned Playwright WebKit build supports Ubuntu 24.04.
+    runs-on: ${{ matrix.shard == 1 && needs.changes.outputs.e2eConsoleOnly != 'true' && 'ubuntu-24.04' || 'ubuntu-latest' }}
     # Full e2e uses three runners, each with its own emulator suite. Console
     # specs fit on one runner. The gate reads the result of the whole matrix.
     strategy:
@@ -458,15 +459,17 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('node_modules/@playwright/test/package.json') }}
-      - name: Install Playwright Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - name: Prepare Playwright package sources
+        if: steps.playwright-cache.outputs.cache-hit != 'true' || (matrix.shard == 1 && needs.changes.outputs.e2eConsoleOnly != 'true')
         run: |
-          # Chromium does not need the Google Chrome apt source the runner ships, and its index is sometimes out of sync, which fails apt-get update.
+          # The Google Chrome package index on the runner can be out of sync.
           grep -rl 'dl.google.com' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true
           sudo rm -f /etc/apt/sources.list.d/*google*
           sudo sed -i '/dl\.google\.com/d' /etc/apt/sources.list 2>/dev/null || true
           grep -r 'dl.google.com' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null && echo "google source still present" && exit 1 || true
-          npx playwright install --with-deps chromium
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
       - name: Cache Firebase emulators
         uses: actions/cache@v4
         with:
@@ -474,20 +477,43 @@ jobs:
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: firebase-emulators-${{ runner.os }}-
       - name: Install the pinned Chromium sandbox helper
+        id: chromium_sandbox
         run: |
           helper="$(node -e "const path = require('node:path'); console.log(path.join(path.dirname(require('@playwright/test').chromium.executablePath()), 'chrome_sandbox'))")"
           test -f "$helper"
           sudo install -o root -g root -m 4755 "$helper" "$CHROME_DEVEL_SANDBOX"
           test -u "$CHROME_DEVEL_SANDBOX"
+      - name: Cache Playwright WebKit
+        if: matrix.shard == 1 && needs.changes.outputs.e2eConsoleOnly != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/playwright-webkit
+          key: playwright-webkit-${{ runner.os }}-${{ hashFiles('node_modules/@playwright/test/package.json') }}
+      - name: Install WebKit and its dependencies
+        if: matrix.shard == 1 && needs.changes.outputs.e2eConsoleOnly != 'true'
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-webkit
+        run: npx playwright install --with-deps webkit
+      - name: Check native zoom and phone text settings
+        id: text_settings
+        if: matrix.shard == 1 && needs.changes.outputs.e2eConsoleOnly != 'true'
+        env:
+          CHROME_DEVEL_SANDBOX: /opt/google/chrome/chrome-sandbox
+          PLAYWRIGHT_TEXT_SETTINGS: "true"
+          PLAYWRIGHT_SHARD: ""
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-webkit
+        run: bash scripts/dev/run-e2e.sh
+      - name: Upload browser text settings evidence
+        if: ${{ !cancelled() && (steps.text_settings.outcome == 'success' || steps.text_settings.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-text-settings
+          path: playwright-text-settings-report/
+          retention-days: 7
       - name: Run e2e tests
         id: e2e_journeys
-        # Invoke the script directly rather than through `npm run test:e2e`
-        # (which is just this same script — see package.json) so local and
-        # CI share exactly one invocation path, with nothing to drift: the
-        # captured-mail log every OTP/invite journey reads only exists
-        # because scripts/dev/run-e2e.sh tees `emulators:exec`'s output to
-        # it before Playwright starts. Reimplementing the emulators:exec
-        # call here instead would silently drop that tee.
+        if: ${{ !cancelled() && steps.chromium_sandbox.outcome == 'success' }}
+        # Use the same emulator wrapper as npm run test:e2e for captured mail.
         run: bash scripts/dev/run-e2e.sh
       - name: Build the public demo for visual evidence
         id: demo_builds

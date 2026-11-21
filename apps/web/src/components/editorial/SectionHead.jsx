@@ -70,7 +70,7 @@ export default function SectionHead({
           tabIndex={tabIndex}
           className={
             isFolioHead
-              ? 'folio whitespace-nowrap font-medium'
+              ? 'folio wrap-anywhere font-medium'
               : 'font-heading text-h2 font-semibold text-text-primary'
           }
         >

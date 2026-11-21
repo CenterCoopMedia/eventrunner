@@ -2,11 +2,12 @@
 // and the Branding editor and preview share the row by a bar the reader
 // moves. Each is checked by keyboard, in a real browser, at real widths.
 /* global document, getComputedStyle */
-import { test, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { settingsTag, test } from './browser-text-settings.mjs';
 import { ADMIN_EMAIL, signIn } from './helpers.mjs';
-import { REFLOW_PROFILES, expectControlFits, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
+import { expectControlFits, expectPageFits, expectTextFits } from './reflow.mjs';
 
 const pageWidth = (page) =>
   page.evaluate(() => ({
@@ -108,53 +109,55 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }) 
   await expect(page.getByRole('tooltip')).toHaveCount(0);
 });
 
-test('the phone menu uses a compact named icon and keeps the current destination visible', async ({ page }) => {
+test('the phone menu uses a compact named icon and keeps the current destination visible', settingsTag, async ({ page, checkReflow, textSettings }) => {
   test.setTimeout(120_000);
-  await page.setViewportSize({ width: 320, height: 800 });
+  if (!textSettings) await page.setViewportSize({ width: 320, height: 800 });
   await signIn(page, ADMIN_EMAIL);
   await page.goto('/admin/pages');
-  await expect(page.getByRole('heading', { name: 'Pages', level: 1 })).toBeVisible();
+  const heading = page.getByRole('heading', { name: 'Pages', level: 1 });
+  await expect(heading).toBeVisible();
   const endTour = page.getByRole('button', { name: 'End tour', exact: true });
   if (await endTour.isVisible()) await endTour.click();
   const summary = page.locator('details.admin-mobile-docket > summary');
-  await expect(summary).toHaveAccessibleName('Open menu');
-  await expect(summary).toContainText('Pages');
-  await expect(summary.locator('svg')).toBeVisible();
-  expect((await summary.boundingBox()).height).toBeGreaterThanOrEqual(44);
-  await page.screenshot({ path: await evidencePath('navigation-320.png'), animations: 'disabled' });
-  await summary.click();
-  await expect(summary).toHaveAccessibleName('Close menu');
-  await expect(page.locator('#admin-content')).toHaveAttribute('inert');
-  const dimensions = await pageWidth(page);
-  expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
-  await page.screenshot({ path: await evidencePath('navigation-menu-320.png'), animations: 'disabled' });
-  await page.keyboard.press('Escape');
-  await expect(summary).toHaveAccessibleName('Open menu');
-  await expect(summary).toBeFocused();
-
-  for (const profile of REFLOW_PROFILES) {
-    await test.step(profile.name, async () => {
-      await setReflowProfile(page, profile);
-      await expectPageFits(page);
-      await expectTextFits(page.getByRole('heading', { name: 'Pages', level: 1 }));
-      await expectControlFits(summary);
-      await expectTextFits(summary);
-      await summary.press('Enter');
-      await expect(summary).toHaveAccessibleName('Close menu');
-      await expect(page.locator('#admin-content')).toHaveAttribute('inert');
-      const nav = page.getByRole('navigation', { name: 'Admin sections' });
-      const operations = nav.getByRole('button', { name: 'Operations', exact: true });
-      await expectControlFits(operations);
-      if (await operations.getAttribute('aria-expanded') === 'false') await operations.press('Enter');
-      const feedback = nav.getByRole('link', { name: 'Feedback', exact: true });
-      await expectControlFits(feedback);
-      await expectTextFits(feedback);
-      await expectPageFits(page);
-      await feedback.press('Escape');
-      await expect(summary).toHaveAccessibleName('Open menu');
-      await expect(summary).toBeFocused();
-    });
+  if (!textSettings) {
+    await expect(summary).toHaveAccessibleName('Open menu');
+    await expect(summary).toContainText('Pages');
+    await expect(summary.locator('svg')).toBeVisible();
+    expect((await summary.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await page.screenshot({ path: await evidencePath('navigation-320.png'), animations: 'disabled' });
+    await summary.click();
+    await expect(summary).toHaveAccessibleName('Close menu');
+    await expect(page.locator('#admin-content')).toHaveAttribute('inert');
+    const dimensions = await pageWidth(page);
+    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
+    await page.screenshot({ path: await evidencePath('navigation-menu-320.png'), animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await expect(summary).toHaveAccessibleName('Open menu');
+    await expect(summary).toBeFocused();
   }
+
+  await checkReflow(heading, async ({ minimumTarget }) => {
+    await expectPageFits(page);
+    await expectTextFits(heading);
+    await expect(summary).toHaveAccessibleName('Open menu');
+    await expect(summary).toContainText('Pages');
+    await expectControlFits(summary, minimumTarget);
+    await expectTextFits(summary);
+    await summary.press('Enter');
+    await expect(summary).toHaveAccessibleName('Close menu');
+    await expect(page.locator('#admin-content')).toHaveAttribute('inert');
+    const nav = page.getByRole('navigation', { name: 'Admin sections' });
+    const operations = nav.getByRole('button', { name: 'Operations', exact: true });
+    await expectControlFits(operations, minimumTarget);
+    if (await operations.getAttribute('aria-expanded') === 'false') await operations.press('Enter');
+    const feedback = nav.getByRole('link', { name: 'Feedback', exact: true });
+    await expectControlFits(feedback, minimumTarget);
+    await expectTextFits(feedback);
+    await expectPageFits(page);
+    await feedback.press('Escape');
+    await expect(summary).toHaveAccessibleName('Open menu');
+    await expect(summary).toBeFocused();
+  }, summary);
 });
 
 test('the Branding bar resizes the panes by keyboard, keeps the frame width, and stacks on a phone', async ({ page }) => {

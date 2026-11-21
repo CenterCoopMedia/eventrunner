@@ -2,8 +2,9 @@
 // delayed HTTP outcomes. All external requests are blocked by the fixture.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { test, expect } from '@playwright/test';
-import { REFLOW_PROFILES, expectControlFits, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
+import { expect } from '@playwright/test';
+import { settingsTag, test } from './browser-text-settings.mjs';
+import { expectControlFits, expectPageFits, expectTextFits } from './reflow.mjs';
 
 const ROOT = process.cwd();
 const FIXTURE = path.join(ROOT, 'e2e/fixtures/console-feedback');
@@ -106,7 +107,7 @@ async function capture(page, name, width) {
   await page.screenshot({ path: path.join(EVIDENCE, `console-feedback-${name}-${width}.png`) });
 }
 
-test('the guided setup reflows and all eight steps remain reachable by keyboard', async ({ page }) => {
+test('guided setup keeps its controls readable and keyboard accessible', settingsTag, async ({ page, checkReflow, textSettings }, info) => {
   const current = application();
   const longName = 'Regional Community News and Public Information Collaborative';
   const longAddress = 'https://regionalcommunitynewsandpublicinformationcollaborative.example.test';
@@ -144,7 +145,8 @@ test('the guided setup reflows and all eight steps remain reachable by keyboard'
   await expect(organization).toHaveAttribute('aria-invalid', 'true');
   await expect(organization).toBeFocused();
 
-  for (const [index, layout] of layouts.entries()) {
+  const checkedLayouts = textSettings ? layouts.slice(0, 1) : layouts;
+  for (const [index, layout] of checkedLayouts.entries()) {
     await test.step(`Setup step ${index + 1}: ${layout.title}`, async () => {
       await expect(page).toHaveURL(new RegExp(`/${layout.path}(?:\\?|$)`));
       const heading = body.getByRole('heading', { name: layout.title, level: 1, exact: true });
@@ -152,18 +154,15 @@ test('the guided setup reflows and all eight steps remain reachable by keyboard'
       if (layout.ready) await expect(layout.ready).toBeVisible();
       const control = index < layouts.length - 1 ? next : body.getByRole('button', { name: 'Accept agreement' });
       if (layout.text) {
-        for (const profile of REFLOW_PROFILES) {
-          await test.step(profile.name, async () => {
-            await setReflowProfile(page, profile);
-            await expectTextFits(heading);
-            if (layout.path === 'web-address') await expect(layout.text).toHaveText('community-gathering.eventrunner.org is available.');
-            await expectTextFits(layout.text);
-            await expectPageFits(page);
-            if (layout.path === 'event') await expectControlFits(page.getByLabel('Time zone', { exact: true }));
-            await expectControlFits(control);
-            await expectTextFits(control);
-          });
-        }
+        await checkReflow(heading, async ({ minimumTarget }) => {
+          await expectTextFits(heading);
+          if (layout.path === 'web-address') await expect(layout.text).toHaveText('community-gathering.eventrunner.org is available.');
+          await expectTextFits(layout.text);
+          await expectPageFits(page);
+          if (layout.path === 'event') await expectControlFits(page.getByLabel('Time zone', { exact: true }), minimumTarget);
+          await expectControlFits(control, minimumTarget);
+          await expectTextFits(control);
+        }, control);
       }
       if (index === 0) {
         await body.getByRole('link', { name: 'Close setup' }).focus();
@@ -178,8 +177,11 @@ test('the guided setup reflows and all eight steps remain reachable by keyboard'
           await expect(pending).toHaveText('Saving.');
           await expectTextFits(pending);
           await expect(next).toBeDisabled();
-          await expectControlFits(next);
+          await expectControlFits(next, textSettings === 'chrome-zoom' ? 24 : 44);
           await expectPageFits(page);
+        } catch (error) {
+          if (textSettings) await info.attach('Organization pending save', { body: await page.screenshot(), contentType: 'image/png' });
+          throw error;
         } finally {
           saved.resolve();
         }
