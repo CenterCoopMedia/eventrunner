@@ -78,6 +78,7 @@
     "logWebVitals",
     "listSystemErrors",
     "resolveSystemErrors",
+    "getSystemError",
     "saveLiveUpdate",
     "deleteLiveUpdate",
     "saveAnnouncement",
