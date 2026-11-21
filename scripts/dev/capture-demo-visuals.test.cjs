@@ -50,15 +50,18 @@ test('each preview immediately follows its ordinary capture and URL stays a loca
   assert.equal(captureUrl(local, matrix[1]), `${local}/eventrunner/demo/?style=newsroom&mode=light#/schedule`);
 });
 
-test('CLI requires a full base SHA and its built demo for PRs and makes manual after-only plans explicit', async () => {
+test('CLI requires the built base demo for pull requests and merge groups and allows manual after-only plans', async () => {
   const { parseArgs } = await load();
   assert.equal(parseArgs(['--plan'], {}).base, null);
   assert.equal(parseArgs(['--plan'], {}).after, path.resolve(__dirname, '../../docs/demo'));
   assert.equal(parseArgs(['--plan', '--base', sourceSha, '--before', '/tmp/before'], {}).base, sourceSha);
-  const ci = parseArgs(['--out', '/tmp/evidence'], { GITHUB_EVENT_NAME: 'pull_request', DEMO_VISUAL_BASE_SHA: sourceSha, DEMO_VISUAL_BEFORE_DIR: '/tmp/before' });
-  assert.deepEqual([ci.base, ci.before], [sourceSha, '/tmp/before']);
+  for (const eventName of ['pull_request', 'merge_group']) {
+    const env = { GITHUB_EVENT_NAME: eventName };
+    const ci = parseArgs(['--out', '/tmp/evidence'], { ...env, DEMO_VISUAL_BASE_SHA: sourceSha, DEMO_VISUAL_BEFORE_DIR: '/tmp/before' });
+    assert.deepEqual([ci.base, ci.before], [sourceSha, '/tmp/before']);
+    assert.throws(() => parseArgs(['--plan'], env), /requires its base SHA/);
+  }
   assert.equal(parseArgs(['--plan', '--after', '/tmp/after'], {}).after, '/tmp/after');
-  assert.throws(() => parseArgs(['--plan'], { GITHUB_EVENT_NAME: 'pull_request' }), /requires its base SHA/);
   assert.throws(() => parseArgs(['--plan', '--base', sourceSha], {}), /--base requires --before/);
   assert.throws(() => parseArgs(['--plan', '--before', '/tmp/before'], {}), /--before requires --base/);
   for (const base of ['main', '--upload-pack=bad', 'aaaa', `${sourceSha}:docs/demo`]) {
@@ -205,9 +208,10 @@ test('CI builds both demos, captures after emulator journeys, uploads only publi
   assert.ok(e2e.indexOf('Capture public demo visual evidence') > e2e.indexOf('Build the public demo for visual evidence'));
   assert.match(builds, /node scripts\/build-demo\.cjs/);
   assert.match(builds, /node scripts\/dev\/build-demo-at\.cjs --rev "\$DEMO_VISUAL_BASE_SHA" --out "\$DEMO_VISUAL_BEFORE_DIR"/);
-  assert.match(capture, /DEMO_VISUAL_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \}\}/);
+  assert.match(builds, /DEMO_VISUAL_BASE_SHA: \$\{\{ env\.GITHUB_BASE_SHA \}\}/);
+  assert.match(capture, /DEMO_VISUAL_BASE_SHA: \$\{\{ env\.GITHUB_BASE_SHA \}\}/);
   assert.match(builds, /DEMO_VISUAL_BEFORE_DIR: \$\{\{ runner.temp \}\}\/demo-before/);
-  assert.match(capture, /DEMO_VISUAL_BEFORE_DIR: \$\{\{ github.event.pull_request.base.sha && format\('\{0\}\/demo-before', runner.temp\) \|\| '' \}\}/);
+  assert.match(capture, /DEMO_VISUAL_BEFORE_DIR: \$\{\{ env\.GITHUB_BASE_SHA && format\('\{0\}\/demo-before', runner.temp\) \|\| '' \}\}/);
   assert.match(capture, /path: test-results\/demo-visual-evidence\//);
   assert.match(capture, /retention-days: 7/);
   assert.doesNotMatch(builds + capture, /secrets\.|permissions:|deploy/);
