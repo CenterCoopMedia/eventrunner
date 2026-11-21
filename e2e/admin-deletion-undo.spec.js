@@ -1,11 +1,12 @@
 // Real delete/restore endpoints and emulator records; browser proof runs in CI.
 /* global getComputedStyle */
 import fs from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
-import store from '../functions/src/cms/store.cjs';
 import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
 
+const store = createRequire(import.meta.url)('../functions/src/cms/store.cjs');
 const actor = { uid: 'undo-fixture', email: 'undo-fixture@example.test' };
 let records;
 let extraPaths;

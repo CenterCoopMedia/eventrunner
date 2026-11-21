@@ -13,13 +13,14 @@
 // The same edit then has a history (issue #195): the admin's version
 // history page, in a signed-in browser, reads the publish back as a
 // version with its time, its account, and the one field it changed.
+import { createRequire } from 'node:module';
 import { test, expect } from '@playwright/test';
-import hostingConfig from '../firebase.json';
 import seed from '../scripts/lib/seed.cjs';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
 import { editorialId } from '../apps/web/src/admin/editorialId.js';
 import { RETRY_DELAY_MS } from '../apps/web/src/lib/retrySubscription.js';
 
+const hostingConfig = createRequire(import.meta.url)('../firebase.json');
 const CONTENT_TIMEOUT_MS = RETRY_DELAY_MS + 15_000;
 const { defaultPages } = seed;
 

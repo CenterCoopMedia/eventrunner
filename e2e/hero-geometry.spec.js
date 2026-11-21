@@ -35,11 +35,32 @@ async function measureHero(page) {
   return page.evaluate(() => {
     const hero = document.querySelector('.event-hero');
     const copy = hero.querySelector('.event-hero__copy');
+    const title = copy.querySelector('.event-hero__title');
     const art = hero.querySelector('.event-hero__art');
     const figure = hero.querySelector('.event-hero__figure');
     const boxes = [];
     const brokenWords = [];
+    const titleSplits = [];
     const range = document.createRange();
+
+    function breakOffsets(node, match) {
+      const offsets = [];
+      let offset = match.index;
+      let previousLine;
+      for (const letter of match[0]) {
+        range.setStart(node, offset);
+        range.setEnd(node, offset + letter.length);
+        const rect = range.getBoundingClientRect();
+        if (rect.width > 0) {
+          const line = Math.round(rect.top);
+          if (previousLine !== undefined && line !== previousLine) offsets.push(offset);
+          previousLine = line;
+        }
+        offset += letter.length;
+      }
+      return offsets.join(',');
+    }
+
     const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (!node.textContent.trim()) continue;
@@ -47,12 +68,30 @@ async function measureHero(page) {
       for (const rect of range.getClientRects()) {
         if (rect.width > 0) boxes.push({ text: node.textContent.trim().slice(0, 40), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
       }
-      // A word whose letters land on two lines was broken inside the word.
+      if (node.parentElement.closest('a, button')) continue;
       for (const match of node.textContent.matchAll(/\S+/g)) {
         range.setStart(node, match.index);
         range.setEnd(node, match.index + match[0].length);
         const lines = new Set([...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)));
-        if (lines.size > 1 && !node.parentElement.closest('a, button')) brokenWords.push(match[0]);
+        if (lines.size <= 1) continue;
+        if (title?.contains(node)) titleSplits.push({ node, match, offsets: breakOffsets(node, match) });
+        else brokenWords.push(match[0]);
+      }
+    }
+
+    // The title allows dictionary hyphenation. Compare the same text and
+    // width with arbitrary breaks disabled to identify those splits.
+    if (titleSplits.length) {
+      const style = title.getAttribute('style');
+      title.style.overflowWrap = 'normal';
+      title.style.wordBreak = 'normal';
+      try {
+        for (const { node, match, offsets } of titleSplits) {
+          if (!offsets || offsets !== breakOffsets(node, match)) brokenWords.push(match[0]);
+        }
+      } finally {
+        if (style === null) title.removeAttribute('style');
+        else title.setAttribute('style', style);
       }
     }
     const controls = [];
