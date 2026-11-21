@@ -64,6 +64,7 @@ describe('authoritative order status and attendee confirmation', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
       expect(reads).toHaveLength(3);
       expect(reads[1].signal.aborted).toBe(true);
+      expect(screen.queryByRole('heading', { name: 'We are confirming your order' })).toBeNull();
     } finally {
       vi.useRealTimers();
     }

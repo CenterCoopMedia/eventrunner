@@ -229,10 +229,16 @@ export default function CompleteRegistration() {
         user, ticketId: target.ticketId, account: target.account, formRevision, answers: checked.answers, language,
       });
       if (saveRef.current !== attempt) return;
-      const answers = result?.answers ?? checked.answers;
+      // A connection can drop after the response headers. The API client
+      // returns an empty object when it cannot parse a successful response.
+      if (result?.formRevision !== formRevision || !result.answers || typeof result.answers !== 'object' || Array.isArray(result.answers)) {
+        setSaveUnconfirmed(true);
+        return;
+      }
+      const { answers } = result;
       // Keep the questions as answered, as the stored record does, so Review
       // still reads this answer if the form changes later on this page.
-      data.setSaved(target.id, { answers, formRevision: result?.formRevision ?? formRevision, questions: answeredQuestions(form, answers) });
+      data.setSaved(target.id, { answers, formRevision, questions: answeredQuestions(form, answers) });
       setErrors((previous) => ({ ...previous, [target.id]: {} }));
       setNotice('');
       if (currentStep.current === stepSlug) navigate(hrefFor(steps[current + 1]));

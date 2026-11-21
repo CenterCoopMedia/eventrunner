@@ -83,6 +83,10 @@ describe.each(CASES)('$name loading feedback', (page) => {
     if (page.name === 'tickets') {
       expect(status).toHaveTextContent('This is taking longer than a minute.');
       expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+    } else if (page.name === 'order') {
+      expect(status).toHaveTextContent('We don’t know your order status yet.');
+      expect(screen.getByRole('button', { name: 'Check again' })).toBeVisible();
+      expect(region).toHaveAttribute('aria-busy', 'false');
     } else {
       expect(status.textContent).toBe('We haven’t received a result after a minute. You can keep waiting.');
     }

@@ -45,7 +45,10 @@ export default function TicketStatus() {
   const error = failure?.key === key ? failure.error : null;
   const { stage, clock } = useLoadingStage({ active: busy, phase: `${key}:${refresh}` });
   const stalled = busy && stage === 'prolonged';
-  const checkAgain = () => setRefresh((value) => value + 1);
+  function checkAgain() {
+    setLoaded(null);
+    setRefresh((value) => value + 1);
+  }
   const complete = order && COMPLETE.has(order.status) && order.paymentStatus === 'succeeded';
   const terminal = order && TERMINAL.has(order.status);
   const needsReview = order?.status === 'exception';
@@ -123,9 +126,9 @@ export default function TicketStatus() {
     <article className="ticket-print-page min-w-0 space-y-lg text-body text-text-primary">
       {heading}
       {error ? <div className="space-y-sm no-print"><p role="alert" className="text-danger">{error.message}</p><button type="button" className={secondaryActionClass} onClick={() => setRefresh((value) => value + 1)}>Retry order status</button>{error.status === 404 && requestId && stored?.requestId === requestId ? <><p>No order is recorded for this saved request. If another tab is still submitting it, let that request finish before choosing tickets again.</p><button type="button" className={secondaryActionClass} onClick={startAnother}>Return to ticket selection</button></> : null}</div> : null}
-      <LoadingStateView active={stalled || (!order && !error)} label="Loading your order…" rows={0}
+      {stalled || (!order && !error) ? <LoadingStateView label="Loading your order…" rows={0}
         stage={stage} clock={clock} recover recoveryMessage="We don’t know your order status yet."
-        retryLabel="Check again" onRetry={checkAgain} />
+        retryLabel="Check again" onRetry={checkAgain} /> : null}
       <section aria-label="Order status content" aria-busy={!stalled && (busy || (!order && !error))} className="space-y-lg">
       {order && !stalled ? <>
         <section className="space-y-sm" aria-labelledby="payment-status-heading">

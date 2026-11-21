@@ -136,6 +136,21 @@ describe('CompleteRegistration', () => {
     expect(screen.getByRole('heading', { name: 'Ticket: Student for Bo Lee' })).toBeVisible();
   });
 
+  it('keeps the account answers when the save response lacks its receipt', async () => {
+    provider = 'none';
+    saveMock.mockResolvedValueOnce({});
+    renderAt('/registration/answers-1');
+    const organization = await screen.findByLabelText('Organization (required)');
+    fireEvent.change(organization, { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
+    expect(await screen.findByText(/We don’t know whether your answers were saved/)).toBeVisible();
+    expect(organization).toHaveValue('Acme');
+    expect(screen.getByRole('link', { name: /View saved answers/ })).toHaveAttribute('href', '/registration/review');
+    expect(screen.queryByRole('link', { name: /Check my order/ })).toBeNull();
+    fireEvent.submit(organization.closest('form'));
+    expect(saveMock).toHaveBeenCalledTimes(1);
+  });
+
   it('has one step per valid ticket, checks before saving, then saves and moves on', async () => {
     records.t2 = { answers: { organization: 'Bo Co' }, formRevision: 2 };
     renderAt();
