@@ -291,7 +291,7 @@ async function reserve({ db, speakerId, batchId, items, actor, nowMs, also = nul
       const claim = await tx.get(db.collection('email_claims').doc(claimIdForOnceKey(onceKeyFor(speakerId, state.lastBatchId))));
       const settled = claim.exists
         ? {
-          lastStatus: 'sent',
+          lastStatus: 'uncertain',
           lastSentAt: new Date(attempt),
           lastSentBy: state.lastAttemptBy ?? null,
           lastItems: Array.isArray(state.lastAttemptItems) ? state.lastAttemptItems : [],

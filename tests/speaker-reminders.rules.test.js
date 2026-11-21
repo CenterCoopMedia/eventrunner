@@ -301,7 +301,7 @@ describe('send', () => {
     expect(retryRow.details).toMatchObject({ sent: ['ben'], alreadySent: ['ada'] });
   });
 
-  it('a send left "sending" whose mail reached the email core counts as a reminder', async () => {
+  it('an interrupted reminder with a claim stays uncertain and keeps the cooldown', async () => {
     const old = 'batch-old-0000001';
     await db.collection('speaker_reminders').doc('ada').set({
       speakerId: 'ada', lastBatchId: old, lastStatus: 'sending', lastAttemptAt: new Date(T0), lastAttemptItems: ['headshot'],
@@ -312,12 +312,12 @@ describe('send', () => {
     expect(res.body.skipped).toEqual([expect.objectContaining({ speakerId: 'ada', reason: 'recent' })]);
     expect(outbox).toHaveLength(0);
     const state = (await db.collection('speaker_reminders').doc('ada').get()).data();
-    expect(state).toMatchObject({ lastStatus: 'sent', lastBatchId: old, lastItems: ['headshot'] });
+    expect(state).toMatchObject({ lastStatus: 'uncertain', lastBatchId: old, lastItems: ['headshot'] });
     const list = await call({ action: 'list' }, { now: later });
     expect(list.body.speakers.find((r) => r.id === 'ada').lastRemindedAt).toBe(new Date(T0).toISOString());
-    // A replay of the old batch reports the mail as sent.
     const replay = await call({ action: 'send', speakerIds: ['ada'], batchId: old, confirmCount: 1 }, { now: later });
-    expect(replay.body.alreadySent.map((r) => r.speakerId)).toEqual(['ada']);
+    expect(replay.body.uncertain.map((r) => r.speakerId)).toEqual(['ada']);
+    expect(replay.body.alreadySent).toEqual([]);
     expect(outbox).toHaveLength(0);
   });
 
