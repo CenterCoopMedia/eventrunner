@@ -22,7 +22,7 @@ import { StepHeading, StepList, StepPager, resolveStep, useStepHeadingFocus } fr
 import { focusFirstError } from '../components/forms/publicForm.jsx';
 import RegistrationQuestionFields from '../components/registration/RegistrationQuestionFields.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
-import { saveRegistrationAnswers } from '../lib/registrationAnswersApi.js';
+import { readOwnAnswers, saveRegistrationAnswers } from '../lib/registrationAnswersApi.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import useLoadingStage from '../lib/useLoadingStage.js';
 import { useRegistrationTargets } from '../lib/useRegistrationTargets.js';
@@ -92,20 +92,28 @@ export default function CompleteRegistration() {
   const [failure, setFailure] = useState('');
   const [closed, setClosed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveUnconfirmed, setSaveUnconfirmed] = useState(false);
+  const [saveUnconfirmed, setSaveUnconfirmed] = useState(null);
+  const [checkRead, setCheckRead] = useState(null);
+  const [checkNotice, setCheckNotice] = useState('');
   const [errorTick, setErrorTick] = useState(0);
   const formRef = useRef(null);
   const saveRef = useRef(null);
+  const checkRef = useRef(null);
   const currentStep = useRef(stepSlug);
   currentStep.current = stepSlug;
   const { stage: saveStage } = useLoadingStage({ active: saving, action: true, report: false });
-  const saveUnknown = saveUnconfirmed || (saving && saveStage === 'prolonged');
+  const saveUnknown = saveUnconfirmed ?? (saving && saveStage === 'prolonged' ? saveRef.current : null);
   const form = pinnedForm ?? data.form;
 
   useEffect(() => {
     setSaving(false);
-    setSaveUnconfirmed(false);
-    return () => { saveRef.current = null; };
+    setSaveUnconfirmed(null);
+    setCheckRead(null);
+    setCheckNotice('');
+    return () => {
+      saveRef.current = null;
+      checkRef.current = null;
+    };
   }, [user?.uid]);
 
   useEffect(() => {
@@ -214,17 +222,66 @@ export default function CompleteRegistration() {
     setErrorTick((value) => value + 1);
   }
 
+  function clearAnswerCheck() {
+    checkRef.current = null;
+    setCheckRead(null);
+    setCheckNotice('');
+  }
+
+  function acceptSaved(attempt, answers) {
+    saveRef.current = null;
+    setSaving(false);
+    setSaveUnconfirmed(null);
+    clearAnswerCheck();
+    const { target, formRevision, submittedForm, submittedStep, next } = attempt;
+    // Keep the questions as answered even if the live form has changed.
+    data.setSaved(target.id, { answers, formRevision, questions: answeredQuestions(submittedForm, answers) });
+    setErrors((previous) => ({ ...previous, [target.id]: {} }));
+    setNotice('');
+    if (currentStep.current === submittedStep) navigate(next);
+  }
+
+  async function checkSavedAnswers() {
+    if (!saveUnknown) return;
+    const read = {};
+    checkRef.current = read;
+    setCheckRead(read);
+    setCheckNotice('');
+    const attempt = saveUnknown;
+    try {
+      const record = await readOwnAnswers({ ticketId: attempt.target.ticketId, uid: user.uid, serverOnly: true });
+      if (checkRef.current !== read) return;
+      const checked = checkAnswers(record?.answers, attempt.submittedForm);
+      if (record?.answers && record.formRevision === attempt.formRevision && checked.ok
+          && JSON.stringify(checked.answers) === JSON.stringify(attempt.answers)) {
+        acceptSaved(attempt, checked.answers);
+      } else {
+        setCheckNotice('The saved answers don’t match these entries yet. You can check again.');
+      }
+    } catch {
+      if (checkRef.current === read) setCheckNotice('The saved answers could not be checked. You can check again.');
+    } finally {
+      if (checkRef.current === read) {
+        checkRef.current = null;
+        setCheckRead(null);
+      }
+    }
+  }
+
   async function goNext() {
     if (saveRef.current || saveUnconfirmed || review) return;
     const { target } = step;
     setFailure('');
     const checked = checkAnswers(pick(valuesFor(target), form), form);
     if (!checked.ok) { showErrors(target, checked.errors); return; }
-    const attempt = {};
+    const formRevision = readRegistrationForm(form).revision;
+    const attempt = {
+      target, formRevision, answers: checked.answers, submittedForm: form,
+      submittedStep: stepSlug, next: hrefFor(steps[current + 1]),
+    };
     saveRef.current = attempt;
     setSaving(true);
     try {
-      const formRevision = readRegistrationForm(form).revision;
       const result = await saveRegistrationAnswers({
         user, ticketId: target.ticketId, account: target.account, formRevision, answers: checked.answers, language,
       });
@@ -232,21 +289,18 @@ export default function CompleteRegistration() {
       // A connection can drop after the response headers. The API client
       // returns an empty object when it cannot parse a successful response.
       if (result?.formRevision !== formRevision || !result.answers || typeof result.answers !== 'object' || Array.isArray(result.answers)) {
-        setSaveUnconfirmed(true);
+        setSaveUnconfirmed(attempt);
         return;
       }
-      const { answers } = result;
-      // Keep the questions as answered, as the stored record does, so Review
-      // still reads this answer if the form changes later on this page.
-      data.setSaved(target.id, { answers, formRevision, questions: answeredQuestions(form, answers) });
-      setErrors((previous) => ({ ...previous, [target.id]: {} }));
-      setNotice('');
-      if (currentStep.current === stepSlug) navigate(hrefFor(steps[current + 1]));
+      acceptSaved(attempt, result.answers);
     } catch (error) {
       if (saveRef.current !== attempt) return;
       if (error?.code === 'network' || error?.status >= 500) {
-        setSaveUnconfirmed(true);
-      } else if (error?.code === 'form-changed') {
+        setSaveUnconfirmed(attempt);
+        return;
+      }
+      clearAnswerCheck();
+      if (error?.code === 'form-changed') {
         setNotice(FORM_CHANGED_NOTE);
         setFormStale(true);
       } else if (error?.code === 'registration-closed') {
@@ -275,8 +329,13 @@ export default function CompleteRegistration() {
           {saveUnknown ? (
             <div className="space-y-xs">
               <p role="status" className={noteClass}>We don’t know whether your answers were saved. Your entries are still on this page.</p>
-              <Link to="/registration/review" target="_blank" rel="noopener" className={secondaryActionClass}>View saved answers (opens in a new tab)</Link>
-              {targets.some((target) => target.ticketId) ? (
+              {checkNotice ? <p role="status">{checkNotice}</p> : null}
+              {checkRead ? (
+                <LoadingState label="Checking your saved answers…" rows={0} phase={checkRead} recover onRetry={checkSavedAnswers} />
+              ) : (
+                <button type="button" className={secondaryActionClass} onClick={checkSavedAnswers}>Check saved answers</button>
+              )}
+              {saveUnknown.target.ticketId ? (
                 <Link to="/tickets/status" target="_blank" rel="noopener" className={secondaryActionClass}>Check my order (opens in a new tab)</Link>
               ) : null}
             </div>

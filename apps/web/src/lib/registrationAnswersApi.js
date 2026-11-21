@@ -2,7 +2,7 @@
 // saveTicketAnswers, which checks them against the live form; reads come
 // straight from `ticket_answers`, which the rules open to the record's own
 // account.
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { callAdminEndpoint } from '../admin/adminApi.js';
 import { db } from '../firebase.js';
 
@@ -42,10 +42,11 @@ export function saveRegistrationAnswers({ user, ticketId, account, formRevision,
  * record's uid, so a record that does not exist yet is refused rather than
  * empty; a refusal reads as not answered.
  */
-export async function readOwnAnswers({ ticketId, uid }) {
+export async function readOwnAnswers({ ticketId, uid, serverOnly = false }) {
   const id = ticketId || accountRecordId(uid);
   try {
-    const snapshot = await getDoc(doc(db, 'ticket_answers', id));
+    const read = serverOnly ? getDocFromServer : getDoc;
+    const snapshot = await read(doc(db, 'ticket_answers', id));
     return snapshot.exists() ? snapshot.data() : null;
   } catch (error) {
     if (error?.code === 'permission-denied') return null;

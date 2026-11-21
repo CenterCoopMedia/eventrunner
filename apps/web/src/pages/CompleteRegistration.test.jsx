@@ -124,7 +124,7 @@ describe('CompleteRegistration', () => {
       expect(screen.getByText(/We don’t know whether your answers were saved/)).toBeVisible();
       expect(organization).toHaveValue('Acme');
       expect(screen.getByLabelText('Yes')).toBeChecked();
-      expect(screen.getByRole('link', { name: /View saved answers/ })).toHaveAttribute('href', '/registration/review');
+      expect(screen.getByRole('button', { name: 'Check saved answers' })).toBeVisible();
       expect(screen.getByRole('link', { name: /Check my order/ })).toHaveAttribute('target', '_blank');
       expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
       fireEvent.submit(organization.closest('form'));
@@ -145,9 +145,17 @@ describe('CompleteRegistration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
     expect(await screen.findByText(/We don’t know whether your answers were saved/)).toBeVisible();
     expect(organization).toHaveValue('Acme');
-    expect(screen.getByRole('link', { name: /View saved answers/ })).toHaveAttribute('href', '/registration/review');
     expect(screen.queryByRole('link', { name: /Check my order/ })).toBeNull();
+    records['account-u1'] = { answers: { organization: 'Earlier entry' }, formRevision: 2 };
+    fireEvent.click(screen.getByRole('button', { name: 'Check saved answers' }));
+    expect(await screen.findByText(/The saved answers don’t match these entries yet/)).toBeVisible();
+    expect(organization).toHaveValue('Acme');
     fireEvent.submit(organization.closest('form'));
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    records['account-u1'] = { answers: { organization: 'Acme' }, formRevision: 2 };
+    fireEvent.click(screen.getByRole('button', { name: 'Check saved answers' }));
+    expect(await screen.findByRole('heading', { name: 'Review' })).toBeVisible();
+    expect(screen.getByText('Acme')).toBeVisible();
     expect(saveMock).toHaveBeenCalledTimes(1);
   });
 
