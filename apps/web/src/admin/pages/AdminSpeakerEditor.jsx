@@ -187,7 +187,7 @@ export default function AdminSpeakerEditor({ mode }) {
   const unsaved = savedForm !== null && (
     Object.keys(EMPTY).some((field) => form[field] !== savedForm[field]) || photoBusy
   );
-  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving || photoBusy });
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: action !== null || photoBusy });
 
   useEffect(() => {
     if (mode !== 'edit' || !speaker || saving) return;

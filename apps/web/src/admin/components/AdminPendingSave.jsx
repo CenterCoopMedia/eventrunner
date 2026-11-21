@@ -16,7 +16,7 @@ export function useAdminSaveState(idle) {
   }
 
   function begin(next) {
-    if (current.current !== idle || lostReply.current) return false;
+    if (current.current !== idle || lostReply.current || navigator.onLine === false) return false;
     set(next);
     return true;
   }
@@ -47,7 +47,7 @@ export default function AdminPendingSave({ busy, to, unconfirmed = false }) {
   if (!late && !unconfirmed) return null;
   return (
     <Notice tone="caution" message={unconfirmed
-      ? 'The save result is unknown. Check the saved changes before submitting again. '
+      ? 'The save result is unknown. This editor is holding the draft so you can compare it with the saved version. '
       : 'The save result is unknown. Keep this tab open for the original response. '}>
       <SavedChangesLink to={to} />
     </Notice>
