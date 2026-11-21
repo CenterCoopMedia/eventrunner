@@ -61,8 +61,8 @@ describe('LeadImage display sizes', () => {
 
   it('resolves a picked path to the bucket and offers the sizes at real widths', async () => {
     render(<LeadImage block={PICKED} />);
+    await waitFor(() => expect(screen.getByAltText(BLOCK.alt)).toHaveAttribute('srcset'));
     const img = screen.getByAltText(BLOCK.alt);
-    await waitFor(() => expect(img).toHaveAttribute('srcset'));
     expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
     expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
     expect(img.getAttribute('srcset')).toContain(
@@ -76,9 +76,8 @@ describe('LeadImage display sizes', () => {
 
   it('falls back to the original when a size fails to load', async () => {
     render(<LeadImage block={PICKED} />);
-    const img = screen.getByAltText(BLOCK.alt);
-    await waitFor(() => expect(img).toHaveAttribute('srcset'));
-    fireEvent.error(img);
+    await waitFor(() => expect(screen.getByAltText(BLOCK.alt)).toHaveAttribute('srcset'));
+    fireEvent.error(screen.getByAltText(BLOCK.alt));
     expect(screen.getByAltText(BLOCK.alt)).not.toHaveAttribute('srcset');
     expect(screen.getByAltText(BLOCK.alt).getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
   });

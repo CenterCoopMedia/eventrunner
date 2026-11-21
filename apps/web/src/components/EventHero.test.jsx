@@ -24,8 +24,8 @@ describe('EventHero artwork', () => {
 
   it.each([false, true])('preserves picked artwork and its caption with compact=%s', async (compact) => {
     render(<EventHero name="Summit" compact={compact} image={{ ...IMAGE, caption: 'The registration hall.' }} />);
+    await waitFor(() => expect(screen.getByAltText(IMAGE.alt)).toHaveAttribute('srcset'));
     const img = screen.getByAltText(IMAGE.alt);
-    await waitFor(() => expect(img).toHaveAttribute('srcset'));
     expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
     expect(img.getAttribute('srcset')).toContain(
       `${encodeURIComponent(`cms-images/a1b2c3/_sizes/${TEST_GENERATION}/1920.webp`)}?alt=media 1920w`,
