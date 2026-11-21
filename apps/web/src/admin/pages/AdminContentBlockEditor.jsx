@@ -133,7 +133,7 @@ function linkTargetWarning(blockTypeId, fieldId, value, features, pageRows) {
 }
 
 /** One control per registry field, chosen by the field's declared type. */
-function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, pageRows, fixedHero, newMapBlockHref }) {
+function BlockValueFields({ blockTypeId, values, onChange, onNormalize, errorFor, features, pageRows, fixedHero, newMapBlockHref }) {
   const fields = valueFieldsOf(blockTypeId);
   if (!blockTypeFor(blockTypeId)) {
     return (
@@ -192,6 +192,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
                   label={label}
                   value={value}
                   onChange={(next) => onChange(field.id, next)}
+                  onNormalize={(stored, normalized) => onNormalize(field.id, stored, normalized)}
                   error={error}
                   required={field.required}
                   newMapBlockHref={newMapBlockHref}
@@ -553,6 +554,23 @@ export default function AdminContentBlockEditor({ mode }) {
     });
   }
 
+  function normalizeRichText(name, stored, normalized, language) {
+    const normalize = (form) => {
+      if (!form || form.blockType !== content.blockType) return form;
+      const values = language ? form.translations?.[language] : form.values;
+      if (values?.[name] !== stored) return form;
+      const updated = { ...values, [name]: normalized };
+      return language
+        ? { ...form, translations: { ...form.translations, [language]: updated } }
+        : { ...form, values: updated };
+    };
+    // Use the editor's normalized value on both sides of the dirty check.
+    // The raw-value check preserves a saved baseline when an edited value
+    // is loaded again, for example after switching between block types.
+    setSavedEdit(normalize);
+    setContent(normalize);
+  }
+
   async function save({ publish }) {
     const textDraftsAtSave = { ...textDraftsRef.current };
     setError(null);
@@ -749,6 +767,7 @@ export default function AdminContentBlockEditor({ mode }) {
         blockTypeId={content.blockType}
         values={content.values}
         onChange={changeValue}
+        onNormalize={normalizeRichText}
         errorFor={errorFor}
         features={features}
         pageRows={pagesLoading ? null : pageRows}
@@ -767,6 +786,7 @@ export default function AdminContentBlockEditor({ mode }) {
       ) : null}
       <ContentTranslations kind="block" record={{ ...content.values, blockType: content.blockType, translations: content.translations }}
         onChange={(translations) => setContent((current) => ({ ...current, translations }))}
+        onNormalize={normalizeRichText}
         labels={Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)]))}
         errorFor={errorFor} />
     </Panel>
