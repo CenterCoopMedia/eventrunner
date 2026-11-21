@@ -125,7 +125,7 @@ export function ReorderControls({
   }
 
   return (
-    <div className="relative flex shrink-0 items-center gap-2xs" data-reorder-block="">
+    <div className="relative flex max-w-full shrink-0 flex-wrap items-center gap-2xs" data-reorder-block="">
       <button
         type="button"
         draggable={!disabled}
