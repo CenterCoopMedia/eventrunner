@@ -44,6 +44,29 @@ describe('DeferredPage', () => {
     expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
   });
 
+  it('replaces a stalled route placeholder and renders the page if the import finishes later', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let finish;
+    const Route = lazy(() => new Promise((resolve) => { finish = () => resolve({ default: () => <h1>Schedule</h1> }); }));
+    const view = render(<DeferredPage component={Route} label="schedule" shape="schedule" recover />);
+    try {
+      const status = screen.getByRole('status');
+      act(() => vi.advanceTimersByTime(59_999));
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+      expect(status).toBeVisible();
+      expect(status).toHaveTextContent('This is taking longer than a minute.');
+      expect(view.container.querySelector('.loading-state__placeholder')).toBeNull();
+      await act(async () => finish());
+      expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it('drops an abandoned route clock and paints a fast replacement without a ring', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     let abandoned;

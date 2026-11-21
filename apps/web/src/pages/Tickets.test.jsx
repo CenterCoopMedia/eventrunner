@@ -117,10 +117,10 @@ describe('attendee ticket selection', () => {
       act(() => vi.advanceTimersByTime(9000));
       expect(status.textContent).toBe('This is taking longer than usual. We’re still waiting for a response.');
       act(() => vi.advanceTimersByTime(49_999));
-      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
       act(() => vi.advanceTimersByTime(1));
-      expect(status).toHaveTextContent('We haven’t received a result after a minute.');
-      fireEvent.click(screen.getByRole('button', { name: 'Try loading again' }));
+      expect(status).toHaveTextContent('This is taking longer than a minute.');
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
       expect(reads).toHaveLength(2);
       expect(reads[0].signal.aborted).toBe(true);
       expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
@@ -134,6 +134,26 @@ describe('attendee ticket selection', () => {
       expect(screen.getByRole('button', { name: 'Resume existing checkout' })).toBeInTheDocument();
       expect(checkoutCalls()).toHaveLength(0);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps ticket selection gated while the registration questions are still unknown', async () => {
+    state.form = undefined;
+    vi.useFakeTimers();
+    let view;
+    try {
+      await act(async () => { view = mount(); });
+      expect(await screen.findByText('Loading registration questions…')).toBeVisible();
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+      expect(screen.queryByLabelText('Quantity — General admission')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Continue to Stripe' })).toBeNull();
+      await act(async () => state.pushForm(FORM));
+      expect(await screen.findByLabelText('Quantity — General admission')).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    } finally {
+      view?.unmount();
       vi.useRealTimers();
     }
   });
@@ -382,7 +402,7 @@ describe('attendee ticket selection', () => {
       expect(screen.queryByLabelText('Quantity — General admission')).not.toBeInTheDocument();
       vi.useFakeTimers();
       act(() => vi.advanceTimersByTime(60_000));
-      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Try (loading )?again$/ })).not.toBeInTheDocument();
       expect(checkoutCalls()).toHaveLength(1);
       vi.useRealTimers();
       fireEvent.click(screen.getByRole('button', { name: 'Resume existing checkout' }));

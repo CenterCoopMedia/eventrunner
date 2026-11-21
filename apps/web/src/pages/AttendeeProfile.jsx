@@ -20,6 +20,7 @@ import { RETRY_DELAY_MS } from '../lib/retrySubscription.js';
 import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
+import { reloadPage } from '../lib/pageReload.js';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import ProfilePhoto from '../components/media/ProfilePhoto.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
@@ -84,7 +85,7 @@ export default function AttendeeProfile() {
     );
   }
 
-  if (state.status === 'loading') return <LoadingState label="Loading profile…" />;
+  if (state.status === 'loading') return <LoadingState label="Loading profile…" phase={uid} recover onRetry={reloadPage} />;
 
   if (state.status === 'unavailable') {
     return (
