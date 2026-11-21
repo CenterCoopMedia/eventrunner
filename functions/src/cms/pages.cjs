@@ -3,7 +3,7 @@
 /**
  * Pages-as-data admin endpoints (spec §5.2, §8.4, issue #13).
  *
- *   cmsSavePage   POST { page } — validate the cmsPages doc shape and write
+ *   cmsSavePage   POST { page, expectedRevision } — validate and write
  *                 the DRAFT revision only (cmsPages_drafts, status 'dirty');
  *                 refuses to flip systemPage true -> false so the delete
  *                 guard below cannot be laundered via save -> publish;
@@ -38,7 +38,7 @@ const { PAGE_TEMPLATE_IDS, isKnownPageTemplate } = require('./pageTemplates.cjs'
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { PAGE_PATH_SEGMENT_RE, SYSTEM_PAGE_ROUTES, isReservedPathSegment } = require('shared/routing');
-const { builtInSectionBlockTypes, isNavigationLink, navigationLinkUrl } = require('shared/page');
+const { builtInSectionBlockTypes, isNavigationLink, navigationLinkUrl, pageEditRevision } = require('shared/page');
 const { collectionVariantErrors } = require('shared/contentLanguages');
 
 const PAGES_COLLECTION = 'cmsPages';
@@ -343,14 +343,14 @@ async function writeAdminLog({ db, store, now, log }, { action, docPath, uid, em
   }
 }
 
-async function finishPageSave(context, res, gate, id) {
+async function finishPageSave(context, res, gate, id, revision) {
   await writeAdminLog(context, {
     action: 'cmsSavePage',
     docPath: `${PAGES_DRAFTS}/${id}`,
     uid: gate.uid,
     email: gate.email,
   });
-  return res.status(200).json({ id, status: 'dirty' });
+  return res.status(200).json({ id, status: 'dirty', ...(revision === undefined ? {} : { revision }) });
 }
 
 async function saveNavigationLinkEdit(context, res, gate, edit) {
@@ -421,109 +421,61 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
     if (!verdict.ok) return badRequest(res, `Invalid page: ${verdict.errors.join('; ')}`);
     const navigationLink = isNavigationLink(page);
 
-    // systemPage may never be flipped true -> false: cmsDeletePage refuses to
-    // delete a system page, and letting a draft edit clear the flag would let
-    // save -> publish -> delete launder one into deletability (stranding its
-    // dedicated React route, §5.2). Checked against BOTH revisions, same as
-    // the delete guard.
-    const creating = req.body?.create === true;
-    if (page.systemPage === false) {
-      let revisions;
-      try {
-        const [draftSnap, liveSnap] = await Promise.all([
-          db.collection(PAGES_DRAFTS).doc(page.id).get(),
-          db.collection(PAGES_COLLECTION).doc(page.id).get(),
-        ]);
-        revisions = [draftSnap, liveSnap].filter((snapshot) => snapshot.exists).map((snapshot) => snapshot.data());
-      } catch (err) {
-        log.error('cmsSavePage systemPage check failed', err);
-        return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
-      }
-      if (revisions.some((revision) => revision.systemPage === true)) {
-        return forbidden(res, 'systemPage: a system page cannot be changed into a regular page.');
-      }
-      if (revisions.some((revision) => isNavigationLink(revision) !== navigationLink)) {
-        if (creating) return sendError(res, 409, 'already-exists', `id: '${page.id}' already belongs to a page or navigation link`);
-        return forbidden(res, 'A page and a navigation link must use separate records.');
-      }
-    }
-
-    // A SYSTEM PAGE'S PATH IS ITS MOUNTED ROUTE, AND THE ROUTE IS IN CODE.
-    // The React route a system page renders through is declared in
-    // apps/web/src/App.jsx; the document only describes it. So an edit that
-    // moves `path` off that route does not move the page — it strands the
-    // document: /schedule keeps serving the schedule, and the doc claiming
-    // /agenda now describes a route nothing mounts. Every consumer that
-    // addresses a system page by path (metadata, the sitemap, the catch-all
-    // renderer) then disagrees with the router. Refuse the edit instead, and
-    // say which value stands.
-    if (page.systemPage === true) {
-      let storedPath;
-      try {
-        const [draftSnap, liveSnap] = await Promise.all([
-          db.collection(PAGES_DRAFTS).doc(page.id).get(),
-          db.collection(PAGES_COLLECTION).doc(page.id).get(),
-        ]);
-        if ([draftSnap, liveSnap].some((snapshot) => snapshot.exists && isNavigationLink(snapshot.data()))) {
-          return forbidden(res, 'A navigation link cannot become a system page.');
-        }
-        // Live first: it is the path the public site is actually serving.
-        // The draft stands in only before a first publish.
-        storedPath = (liveSnap.exists && liveSnap.data().path)
-          || (draftSnap.exists && draftSnap.data().path)
-          || null;
-      } catch (err) {
-        log.error('cmsSavePage system path check failed', err);
-        return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
-      }
-      // No stored path is a page being created, or one written before the
-      // field existed — there is nothing to drift from, so nothing to refuse.
-      if (storedPath && storedPath !== page.path) {
-        return forbidden(
-          res,
-          `path: a system page keeps the route it is mounted at; '${storedPath}' cannot be changed.`,
-        );
-      }
-    }
-
-    // Path uniqueness (issue #52): Firestore has no unique index, so this is
-    // an application-level check — scan both revisions for any OTHER page
-    // id already claiming this exact path. Draft AND live are checked: a
-    // collision with an unpublished draft is just as real to an admin about
-    // to save as one already live.
-    if (!navigationLink) {
-      try {
-        const [draftPathSnap, livePathSnap] = await Promise.all([
-          db.collection(PAGES_DRAFTS).where('path', '==', page.path).get(),
-          db.collection(PAGES_COLLECTION).where('path', '==', page.path).get(),
-        ]);
-        const collision = [...draftPathSnap.docs, ...livePathSnap.docs].find((doc) => doc.id !== page.id);
-        if (collision) {
-          return badRequest(res, `path: '${page.path}' is already used by page '${collision.id}'`);
-        }
-      } catch (err) {
-        log.error('cmsSavePage path uniqueness check failed', err);
-        return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
-      }
-    }
-
-    // `create: true` is a new page. The store then refuses an existing draft
-    // and an existing live doc, so two creators cannot overwrite one id.
-    // An edit omits the flag and keeps the upsert path.
+    const creating = req.body.create === true;
+    const expectedRevision = req.body.expectedRevision;
     try {
-      // The store strips reserved publish-model keys (visible/status/
-      // revision/...) from `fields` itself; visible rides separately.
-      await store.writeDraft({
-        db,
-        collection: PAGES_COLLECTION,
-        docId: page.id,
-        fields: navigationLink ? { ...page, label: page.label.trim(), url: navigationLinkUrl(page.url) } : page,
-        visible: page.visible,
-        actor: { uid: gate.uid, email: gate.email },
-        now,
-        createOnly: creating,
-        rejectLive: creating,
+      const result = await db.runTransaction(async (tx) => {
+        const drafts = db.collection(PAGES_DRAFTS);
+        const live = db.collection(PAGES_COLLECTION);
+        const [draftSnap, liveSnap] = await tx.getAll(drafts.doc(page.id), live.doc(page.id));
+        const draft = draftSnap.data();
+        const published = liveSnap.data();
+        const currentRevision = pageEditRevision(draft, published);
+        if (creating ? expectedRevision !== null : currentRevision === null || expectedRevision !== currentRevision) {
+          return { status: 409, code: 'page-revision-conflict', message: 'This page changed. Load the latest version before saving.' };
+        }
+
+        const revisions = [draft, published].filter(Boolean);
+        if (page.systemPage === false) {
+          if (revisions.some((revision) => revision.systemPage === true)) {
+            return { status: 403, code: 'forbidden', message: 'systemPage: a system page cannot be changed into a regular page.' };
+          }
+          if (revisions.some((revision) => isNavigationLink(revision) !== navigationLink)) {
+            if (creating) return { status: 409, code: 'already-exists', message: `id: '${page.id}' already belongs to a page or navigation link` };
+            return { status: 403, code: 'forbidden', message: 'A page and a navigation link must use separate records.' };
+          }
+        } else {
+          if (revisions.some(isNavigationLink)) {
+            return { status: 403, code: 'forbidden', message: 'A navigation link cannot become a system page.' };
+          }
+          // The published path identifies the mounted route. A draft supplies
+          // it only before the first publish.
+          const storedPath = published?.path || draft?.path;
+          if (storedPath && storedPath !== page.path) {
+            return { status: 403, code: 'forbidden', message: `path: a system page keeps the route it is mounted at; '${storedPath}' cannot be changed.` };
+          }
+        }
+
+        if (!navigationLink) {
+          const [draftPaths, livePaths] = await Promise.all([
+            tx.get(drafts.where('path', '==', page.path)),
+            tx.get(live.where('path', '==', page.path)),
+          ]);
+          const collision = [...draftPaths.docs, ...livePaths.docs].find((doc) => doc.id !== page.id);
+          if (collision) {
+            return { status: 400, code: 'bad-request', message: `path: '${page.path}' is already used by page '${collision.id}'` };
+          }
+        }
+
+        return store.writeDraft({
+          db, tx, collection: PAGES_COLLECTION, docId: page.id,
+          fields: navigationLink ? { ...page, label: page.label.trim(), url: navigationLinkUrl(page.url) } : page,
+          visible: page.visible, actor: { uid: gate.uid, email: gate.email }, now,
+          createOnly: creating, rejectLive: creating,
+        });
       });
+      if (result.code) return sendError(res, result.status, result.code, result.message);
+      return finishPageSave(context, res, gate, page.id, result.draftRevision);
     } catch (err) {
       if (creating && isAlreadyExistsError(err)) {
         return sendError(res, 409, 'already-exists', `id: '${page.id}' already belongs to a page`);
@@ -531,7 +483,6 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
       log.error('cmsSavePage draft write failed', err);
       return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
     }
-    return finishPageSave(context, res, gate, page.id);
   };
 }
 

@@ -8,11 +8,18 @@
 // and its `_drafts` sibling (a non-admin's listener simply errors, which is
 // the fail-soft path below). Errors do not blank the UI — the caller keeps
 // its last-known rows and the retry wrapper re-attaches a fresh listener.
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, startAfter, where } from 'firebase/firestore';
+import { collection, doc, getDocFromServer, getDocs, limit, onSnapshot, orderBy, query, startAfter, where } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { subscribeWithRetry } from '../lib/retrySubscription.js';
 
 const VERSION_PAGE_SIZE = 25;
+
+export async function readAdminPage(id) {
+  const draft = await getDocFromServer(doc(db, 'cmsPages_drafts', id));
+  if (draft.exists()) return { id, draft: { id, ...draft.data() }, live: null };
+  const live = await getDocFromServer(doc(db, 'cmsPages', id));
+  return live.exists() ? { id, draft: null, live: { id, ...live.data() } } : null;
+}
 
 /** Bound each read; a docPath-only cursor skips older versions already represented. */
 export async function readAdminVersions(name, cursor = null) {

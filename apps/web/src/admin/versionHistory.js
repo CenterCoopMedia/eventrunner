@@ -132,6 +132,7 @@ const NOT_CONTENT = Object.freeze([
   'status',
   'revision',
   'basedOnRevision',
+  'draftRevision',
   'updatedAt',
   'updatedBy',
   'publishedAt',
@@ -167,14 +168,14 @@ export function pageIdForSection(rows, sectionId) {
  * deletions. A deleted content block also needs its owning page id because
  * cmsCreateContent enforces that page's section rules atomically.
  */
-export function restoreRequestFor(collection, docId, entry, current, { pageId = null } = {}) {
+export function restoreRequestFor(collection, docId, entry, current, { pageId = null, expectedRevision = null } = {}) {
   const snapshot = withoutSeedFields(entry?.fields);
   const fields = collection === 'cmsTimeline'
     ? Object.fromEntries(Object.entries(snapshot).filter(([key]) => TIMELINE_FIELDS.includes(key)))
     : snapshot;
   const visible = entry?.visible !== false;
   if (collection === 'cmsPages') {
-    return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible }, ...(!current ? { create: true } : {}) } };
+    return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible }, expectedRevision, ...(!current ? { create: true } : {}) } };
   }
   if (collection === 'cmsUpdates') {
     // A deleted update has a tombstone. restore tells the save to clear

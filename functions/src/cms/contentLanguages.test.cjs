@@ -7,6 +7,7 @@ const { createSavePageHandler, validatePageDoc } = require('./pages.cjs');
 const { createCmsCreateContentHandler, createCmsUpdateContentHandler, createGetSiteContentHandler,
   DELETE_FIELD_SENTINEL } = require('./content.cjs');
 const { publicContentDoc } = require('shared/seed');
+const { pageEditRevision } = require('shared/page');
 const { resolveContentVariant } = require('shared/contentLanguages');
 const { emitSiteContent, emitPagesData, emitScheduleData } = require('../../../scripts/lib/emit.cjs');
 
@@ -43,7 +44,9 @@ async function save(deps, entry, fields, create = false) {
   const res = response();
   const req = { method: 'POST', headers: { authorization: 'Bearer synthetic' } };
   if (entry.collection === 'cmsPages') {
-    req.body = { page: fields };
+    const draft = deps.db.read('cmsPages_drafts', entry.id);
+    const live = deps.db.read('cmsPages', entry.id);
+    req.body = { page: fields, create, expectedRevision: pageEditRevision(draft, live) };
     await createSavePageHandler(deps)(req, res);
   } else {
     req.body = { collection: entry.collection, docId: entry.id, section: 'hero', field: 'body',

@@ -25,6 +25,7 @@ import HelpTooltip from '../components/HelpTooltip.jsx';
 // heading.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { pageEditRevision } from 'shared/page';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import AdminPageHeader, {
@@ -251,7 +252,10 @@ export default function AdminVersionHistory() {
       choice.id === 'cmsContent' && !row
         ? pageIdForSection(pages.rows, entry?.fields?.section)
         : null;
-    return restoreRequestFor(choice.id, docId, entry, row?.current ?? null, { pageId });
+    return restoreRequestFor(choice.id, docId, entry, row?.current ?? null, {
+      pageId,
+      expectedRevision: choice.id === 'cmsPages' ? pageEditRevision(row?.draft, row?.live) : null,
+    });
   }
 
   function openRestore(revision) {
