@@ -310,17 +310,16 @@ describe('the invoice editor', () => {
     expect(invoiceCalls().find((body) => body.action === 'saveDraft')).toMatchObject({ expectedRevision: STORED.revision });
     expect(screen.getByRole('button', { name: 'Issue this invoice' })).toBeInTheDocument();
 
-    answers.get = () => response({ error: { code: 'unavailable', message: 'The invoice is temporarily unavailable.' } }, 503);
-    fireEvent.click(screen.getByRole('button', { name: 'Reload the saved invoice' }));
-    await screen.findByText('The invoice is temporarily unavailable. Your edits are still here.');
-    expect(screen.getByLabelText('Name to bill')).toHaveValue(STORED.billTo.name);
-
-    answers.get = () => response({ invoice: stored });
     fireEvent.click(screen.getByRole('button', { name: 'Reload the saved invoice' }));
     await screen.findByRole('heading', { level: 1, name: 'Draft for Updated Press' });
     expect(screen.getByText('Reloaded the saved invoice. Your unsaved changes were discarded.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Issue this invoice' })).toBeNull();
+    const oldConfirmation = screen.queryByRole('button', { name: 'Issue this invoice' });
+    if (oldConfirmation) {
+      fireEvent.click(oldConfirmation);
+      await screen.findByRole('heading', { level: 1, name: 'INV-0005' });
+    }
     expect(invoiceCalls().filter((body) => body.action === 'issue')).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Issue this invoice' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
     await screen.findByText(/The next number is INV-0005\./);
@@ -329,6 +328,21 @@ describe('the invoice editor', () => {
     expect(invoiceCalls().filter((body) => body.action === 'issue')).toEqual([
       { action: 'issue', invoiceId: STORED.id, expectedRevision: stored.revision },
     ]);
+  });
+
+  it('keeps an unsaved invoice and allows retry when the reload fails', async () => {
+    answers.get = { invoice: STORED };
+    answers.saveDraft = () => response({ error: { code: 'conflict', message: 'The invoice changed since you opened it.' } }, 409);
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Keep these notes.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const reload = await screen.findByRole('button', { name: 'Reload the saved invoice' });
+    answers.get = () => response({ error: { code: 'unavailable', message: 'The invoice is temporarily unavailable.' } }, 503);
+    fireEvent.click(reload);
+    await screen.findByText('The invoice is temporarily unavailable. Your edits are still here.');
+    expect(screen.getByLabelText('Notes')).toHaveValue('Keep these notes.');
+    expect(reload).toBeEnabled();
   });
 
   it('opens an invoice that is not a draft read-only', async () => {
