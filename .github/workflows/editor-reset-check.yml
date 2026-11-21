@@ -26,9 +26,13 @@ jobs:
         run: >-
           git restore --source=e61c13fc67fcbdb5887cc5039e729c4e28af164e --
           apps/web/src/admin/AdminApp.jsx
+          apps/web/src/admin/components/AttendeeReminderSchedule.jsx
+          apps/web/src/admin/components/PitchCallSettings.jsx
+          apps/web/src/admin/components/PitchFormOptions.jsx
           apps/web/src/admin/pages/AdminBranding.jsx
           apps/web/src/admin/pages/AdminInvoiceEditor.jsx
           apps/web/src/admin/pages/AdminRegistrationForm.jsx
+          apps/web/src/admin/pages/AdminReminderSchedules.jsx
           apps/web/src/admin/pages/AdminUpdateEditor.jsx
       - run: npm run prepare:functions
       - run: npm ci
@@ -38,6 +42,8 @@ jobs:
           src/admin/pages/AdminBranding.test.jsx
           src/admin/pages/AdminInvoices.test.jsx
           src/admin/pages/AdminRegistrationForm.test.jsx
+          src/admin/pages/AdminReminderSchedules.test.jsx
+          src/admin/pages/AdminSessionPitches.deadline.test.jsx
           src/admin/pages/AdminSpeakers.test.jsx
           src/admin/pages/AdminUpdates.test.jsx
-          -t 'reverts to the saved theme and clears errors|requires a new confirmation|stops a save when someone else saved first|discards the previous profile|loads the created update again'
+          -t 'reverts to the saved theme and clears errors|requires a new confirmation|stops a save when someone else saved first|discards the previous profile|loads the created update again|clears validation from replaced speaker|clears errors from discarded call settings|clears a save error when a newer'
