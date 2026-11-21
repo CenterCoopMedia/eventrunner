@@ -331,21 +331,69 @@ platform endpoint or admit another account through it.
 ### Add deauthorization to an existing Connect destination
 
 Deploy the Console receiver and the routed sites' ticketing webhook code
-before changing Stripe. In the sandbox platform's Workbench, open the existing
-**Connected accounts** snapshot destination at
-`https://us-central1-<rehearsal-console-project>.cloudfunctions.net/stripeConnectWebhook`.
-Add `account.application.deauthorized` to its selected events. Keep the URL,
-signing secret, and other event types.
+before changing Stripe. The receiver records the disconnection and returns 200
+for `account.application.deauthorized` (`console/functions/src/stripeWebhooks.cjs`).
 
-Read back the destination's scope, mode, URL, and selected events. Disconnect
-a disposable Connect test account in Stripe. In Workbench, verify the event
-received HTTP 200 from the rehearsal Console. Check that its application now
-shows Stripe as disconnected. A test event never goes to a live site.
+Event Runner has no sandbox platform or rehearsal Console with this receiver,
+so the change is made once on the live platform. This block reads the live
+restricted key from Console Secret Manager on stdin; the key never enters argv,
+a file or output. It requires exactly one endpoint, the live Console
+`stripeConnectWebhook` URL, enabled, live mode and Connect, with the event not
+yet selected. The update sends only `enabled_events`: the existing list plus the
+one event. It then reads the endpoint back and requires exactly one added event
+and every other field unchanged. On any other difference it restores the
+original list at once and exits 2. It prints endpoint IDs only by their last
+four characters.
 
-Repeat the event selection and readback in the live platform's Workbench at
-`https://us-central1-<live-console-project>.cloudfunctions.net/stripeConnectWebhook`.
-Use a naturally occurring deauthorization for live delivery proof. Keep the
-direct test payment destinations on the client sites unchanged. [Stripe Connect webhook documentation](https://docs.stripe.com/connect/webhooks?accounts-namespace=v1)
+```sh
+gcloud secrets versions access latest --secret=CONSOLE_STRIPE_SECRET_KEY --project="$CONSOLE_PROJECT_ID" | CONSOLE_PROJECT_ID="$CONSOLE_PROJECT_ID" node --input-type=module -e '
+let key = ""; for await (const chunk of process.stdin) key += chunk; key = key.trim();
+const URL_EXPECTED = `https://us-central1-${process.env.CONSOLE_PROJECT_ID}.cloudfunctions.net/stripeConnectWebhook`;
+const ADD = "account.application.deauthorized";
+const api = async (method, path, body) => {
+  const r = await fetch(`https://api.stripe.com/v1/${path}`, { method, body, headers: { Authorization: `Bearer ${key}`, ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) } });
+  const j = await r.json();
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${j?.error?.type} ${j?.error?.code}`);
+  return j;
+};
+const view = e => ({ id: "..." + e.id.slice(-4), url: e.url, status: e.status, livemode: e.livemode, connect: !!e.application, api_version: e.api_version, events: [...e.enabled_events].sort() });
+const enc = events => events.map(e => `enabled_events[]=${encodeURIComponent(e)}`).join("&");
+const rest = e => { const { enabled_events, ...r } = e; return JSON.stringify(Object.keys(r).sort().map(k => [k, r[k]])); };
+const list = await api("GET", "webhook_endpoints?limit=100");
+if (list.has_more || list.data.length !== 1 || list.data[0].url !== URL_EXPECTED) throw new Error("unexpected endpoint set");
+const id = list.data[0].id;
+const before = await api("GET", `webhook_endpoints/${id}`);
+console.log("BEFORE", JSON.stringify(view(before)));
+if (before.status !== "enabled" || before.livemode !== true || !before.application || before.enabled_events.includes(ADD)) throw new Error("before check failed");
+await api("POST", `webhook_endpoints/${id}`, enc([...before.enabled_events, ADD]));
+const after = await api("GET", `webhook_endpoints/${id}`);
+console.log("AFTER", JSON.stringify(view(after)));
+const added = after.enabled_events.filter(e => !before.enabled_events.includes(e));
+const removed = before.enabled_events.filter(e => !after.enabled_events.includes(e));
+console.log("DIFF", JSON.stringify({ added, removed, other_fields_identical: rest(before) === rest(after) }));
+if (rest(before) !== rest(after) || removed.length || added.length !== 1 || added[0] !== ADD) {
+  await api("POST", `webhook_endpoints/${id}`, enc(before.enabled_events));
+  console.log("ROLLED BACK", JSON.stringify(view(await api("GET", `webhook_endpoints/${id}`))));
+  process.exit(2);
+}
+console.log("OK", new Date().toISOString());
+'
+```
+
+Stop on a nonzero exit. To undo the change, send one update to the same
+endpoint with only `enabled_events[]` set to the BEFORE list, using the same
+stdin key method, and read it back.
+
+No test event can prove live delivery. Use the first naturally occurring
+deauthorization: confirm in Stripe that it received HTTP 200 from the Console,
+and that the client's application shows Stripe as disconnected. Keep the
+direct test payment destinations on the client sites unchanged.
+
+November 21, 2026 receipt: the block above ran against the live platform at
+19:29:41 UTC on Console commit `76a5d490`. The single Connect endpoint went from
+16 to 17 selected events; the only addition was
+`account.application.deauthorized`, and every other field was identical.
+Live delivery proof is pending. [Stripe Connect webhook documentation](https://docs.stripe.com/connect/webhooks?accounts-namespace=v1)
 
 ### Partial setup containment
 
