@@ -920,6 +920,56 @@ for (const backend of backends) {
     assert.equal(retry.body.recipientCount, 2);
   });
 
+  t('postmark: a resumed send records an unreadable claim as uncertain without another send', async () => {
+    const h = await harness({
+      backend,
+      providerKind: 'postmark',
+      postmarkStream: STREAM(),
+      batchAnswer: (body) => ({
+        status: 200,
+        json: body.map((entry) => (entry.To === 'ada@example.org'
+          ? { ErrorCode: 406, Message: 'Inactive recipient' }
+          : { ErrorCode: 0, MessageID: 'pm-ben' })),
+      }),
+    });
+    // Lose the chunk progress after the provider answered and the claims were saved.
+    const realTransaction = h.db.runTransaction.bind(h.db);
+    let transactions = 0;
+    h.db.runTransaction = (fn) => {
+      transactions += 1;
+      return transactions === 2 ? Promise.reject(new Error('deadline exceeded')) : realTransaction(fn);
+    };
+    const { preview, sent } = await previewAndSend(h);
+    const { sendId } = preview.body;
+    assert.equal(sent.status, 500);
+    const failedClaim = (await docsOf(h.db, 'email_claims')).find((claim) => claim.failure);
+    assert.ok(failedClaim, 'the provider refusal was saved on its claim');
+
+    const realCollection = h.db.collection.bind(h.db);
+    h.db.collection = (name) => {
+      const col = realCollection(name);
+      if (name !== 'email_claims') return col;
+      return {
+        doc(id) {
+          const ref = col.doc(id);
+          if (id === failedClaim.id) {
+            ref.get = async () => { throw new Error('UNAVAILABLE: claim read failed'); };
+          }
+          return ref;
+        },
+      };
+    };
+    await h.db.collection('announcement_sends').doc(sendId).update({ lease: null });
+    const resumed = await call(h.send, { body: { sendId } });
+    assert.equal(resumed.status, 200, JSON.stringify(resumed.body));
+    assert.deepEqual(resumed.body.send.counts, { sent: 0, failed: 0, uncertain: 1, skipped: 1, suppressed: 0 });
+    assert.equal(resumed.body.send.retryCount, 0);
+    const history = await call(h.list);
+    assert.deepEqual(history.body.sends.find((send) => send.id === sendId).counts, resumed.body.send.counts);
+    assert.equal(h.fetchCalls().filter((call) => call.url.endsWith('/email/batch')).length, 1);
+    assert.equal((await docsOf(h.db, 'sent_emails')).length, 2);
+  });
+
   t('postmark: a recipient the provider refuses for good is not offered for a retry', async () => {
     const h = await harness({
       backend,
