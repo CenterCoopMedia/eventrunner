@@ -753,7 +753,7 @@ describe('registration questions in the ticket stepper', () => {
     expect(fields[0]).toHaveAttribute('aria-invalid', 'true');
     expect(fields[1]).not.toHaveAttribute('aria-invalid', 'true');
     expect(fields[2]).toHaveAttribute('aria-invalid', 'true');
-    expect(fields[0]).toHaveFocus();
+    await waitFor(() => expect(screen.getAllByLabelText('Organization (required)')[0]).toHaveFocus());
     expect(screen.getByRole('heading', { name: 'Answer the registration questions' })).toBeInTheDocument();
     expect(screen.queryByText(/lines\.0\.attendees/)).not.toBeInTheDocument();
     expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
