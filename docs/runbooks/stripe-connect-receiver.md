@@ -407,7 +407,10 @@ To undo the change, first run the read-only check. Only if its `rest_sha256`
 equals BEFORE and its events are exactly BEFORE plus
 `account.application.deauthorized`, send one update to the same endpoint with
 only `enabled_events[]` set to the BEFORE list, using the same stdin key method,
-and run the read-only check again.
+and run the read-only check again. Run the undo only as one named coordinator
+task with one operator; no other operator edits this endpoint during it. Stripe
+has no conditional update for webhook endpoints, so this single-operator rule is
+the control.
 
 No test event can prove live delivery. Use the first naturally occurring
 deauthorization. Confirm in Stripe that it received HTTP 200 from the Console,
