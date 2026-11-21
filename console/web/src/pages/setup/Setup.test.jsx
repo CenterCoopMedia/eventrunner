@@ -1,9 +1,12 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { useNavigate } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callApi } from '../../api.js';
 import { application, callsTo, emptyAnswers, serveApi } from '../../test/application.js';
+import { renderPage } from '../../test/renderPage.jsx';
 import { renderSetup } from '../../test/setupPage.jsx';
 import { keepAnswer, readKeptAnswer } from '../../setup/keptAnswers.js';
+import Setup from './Setup.jsx';
 
 vi.mock('../../api.js', () => ({ callApi: vi.fn() }));
 
@@ -65,6 +68,8 @@ describe('Setup', () => {
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken-name' } });
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     fireEvent.change(await screen.findByLabelText('Event name'), { target: { value: 'Saved event edit' } });
+    await act(async () => window.dispatchEvent(new Event('pagehide')));
+    expect(screen.getByText('Saved.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
     expect(await screen.findByLabelText('Name')).toHaveValue('taken-name');
     expect(screen.getByRole('button', { name: 'Use kept answer' })).toBeInTheDocument();
@@ -179,6 +184,89 @@ describe('Setup', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
+  });
+
+  it.each([{ failsOnce: false, outcome: 'succeeds' }, { failsOnce: true, outcome: 'fails' }])('keeps both edits after browser Back when the first save $outcome', async ({ failsOnce }) => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    let failEvent = failsOnce;
+    serveApi({ saveApplicationStep: (body) => {
+      if (body.step === 'event' && failEvent) {
+        failEvent = false;
+        throw new Error('Offline');
+      }
+      return { step: body.step, saved: true, errors: {} };
+    } });
+    function HistoryBack() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate(-1)}>Browser Back</button>;
+    }
+    renderPage(<><HistoryBack /><Setup /></>, {
+      path: '/organizations/o1/applications/a1/organization', route: '/organizations/:orgId/applications/:appId/:step',
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Next: Your event' }));
+    const eventName = await screen.findByLabelText('Event name');
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(eventName, { target: { value: 'Edited event' } });
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Browser Back' })));
+      expect(callsTo('saveApplicationStep')).toHaveLength(0);
+
+      fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Edited organization' } });
+      act(() => window.dispatchEvent(new Event('pagehide')));
+      expect(readKeptAnswer(scope, 'event')?.answers.name).toBe('Edited event');
+      expect(readKeptAnswer(scope, 'organization')?.answers.name).toBe('Edited organization');
+      await act(async () => {});
+
+      const saves = () => callsTo('saveApplicationStep').map(({ step, answers }) => [step, answers.name]);
+      expect(saves()).toEqual([
+        ['event', 'Edited event'], ['organization', 'Edited organization'],
+      ]);
+      if (failsOnce) {
+        expect(screen.getByText('Not saved. Offline')).toBeInTheDocument();
+        expect(readKeptAnswer(scope, 'event')?.answers.name).toBe('Edited event');
+        const warning = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(warning);
+        expect(warning.defaultPrevented).toBe(true);
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save again' })));
+        expect(saves()).toEqual([
+          ['event', 'Edited event'], ['organization', 'Edited organization'], ['event', 'Edited event'],
+        ]);
+      }
+      expect(screen.getByText('Saved.')).toBeInTheDocument();
+      expect(readKeptAnswer(scope, 'event')).toBeNull();
+      expect(readKeptAnswer(scope, 'organization')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('saves a pending answer to its original request after opening another request', async () => {
+    const first = application();
+    const second = application({ id: 'a2', answers: {
+      ...first.answers, organization: { ...first.answers.organization, name: 'Another organization' },
+    } });
+    serveApi({ getApplication: ({ appId }) => ({ application: appId === 'a1' ? first : second }) });
+    function OpenAnotherRequest() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate('/organizations/o1/applications/a2/organization')}>Open another request</button>;
+    }
+    renderPage(<><OpenAnotherRequest /><Setup /></>, {
+      path: '/organizations/o1/applications/a1/organization', route: '/organizations/:orgId/applications/:appId/:step',
+    });
+    const organizationName = await screen.findByLabelText('Organization name');
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(organizationName, { target: { value: 'First request edit' } });
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open another request' })));
+      expect(screen.getByLabelText('Organization name')).toHaveValue('Another organization');
+      expect(callsTo('saveApplicationStep')).toMatchObject([
+        { orgId: 'o1', appId: 'a1', step: 'organization', answers: { name: 'First request edit' } },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each(['your organization', 'your event', 'your web address', 'your team', 'tickets', 'email'])('returns from editing %s without saving when nothing changed', async (title) => {

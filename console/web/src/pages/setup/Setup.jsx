@@ -82,6 +82,11 @@ function StepErrorFocus({ showAll, visit }) {
 export default function Setup() {
   const { user, signOut } = useAuth();
   const { orgId, appId, step: stepPath } = useParams();
+  const requestKey = JSON.stringify([user?.uid, orgId, appId]);
+  return <SetupRequest key={requestKey} user={user} signOut={signOut} orgId={orgId} appId={appId} stepPath={stepPath} />;
+}
+
+function SetupRequest({ user, signOut, orgId, appId, stepPath }) {
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -110,6 +115,7 @@ export default function Setup() {
   const scope = { userId: user?.uid, orgId, appId };
   const { queue, flush, keepForSignIn, status: saveStatus, error: saveError, failure, signingOut } = useAutosave({
     scope,
+    activeStep: step?.id,
     save: (value, options) => callApi('saveApplicationStep', { orgId, appId, step: value.step, answers: value.answers }, options),
     onResult: (result) => {
       const others = refusedNow.current.filter((id) => id !== result.step);
