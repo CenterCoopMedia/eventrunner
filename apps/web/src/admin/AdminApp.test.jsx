@@ -82,6 +82,10 @@ let pendingProbe = null;
 // When set, the TIER probe hangs while the drafts probe answers at once —
 // the window in which admin-ness is known but the tier is not.
 let pendingOperatorProbe = null;
+// When set, Firestore cannot reach the server: getDocs resolves an empty
+// snapshot from the memory cache (metadata.fromCache true) for any account,
+// as the SDK does offline (issue #1318).
+let serverUnreachable = false;
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, name) => ({ name })),
   doc: vi.fn(() => ({})),
@@ -95,6 +99,7 @@ vi.mock('firebase/firestore', () => ({
   where: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn((ref) => {
+    if (serverUnreachable) return Promise.resolve({ docs: [], metadata: { fromCache: true } });
     if (ref?.name === 'admin_logs') {
       if (pendingOperatorProbe) {
         return new Promise((resolve, reject) => {
@@ -103,7 +108,7 @@ vi.mock('firebase/firestore', () => ({
       }
       if (operatorProbeError) return Promise.reject(operatorProbeError);
       return operatorProbeShouldSucceed
-        ? Promise.resolve({ docs: [] })
+        ? Promise.resolve({ docs: [], metadata: { fromCache: false } })
         : Promise.reject(permissionDenied());
     }
     if (pendingProbe) {
@@ -112,7 +117,7 @@ vi.mock('firebase/firestore', () => ({
       });
     }
     return adminProbeShouldSucceed
-      ? Promise.resolve({ docs: [] })
+      ? Promise.resolve({ docs: [], metadata: { fromCache: false } })
       : Promise.reject(permissionDenied());
   }),
 }));
@@ -176,6 +181,7 @@ beforeEach(() => {
   operatorProbeError = null;
   pendingProbe = null;
   pendingOperatorProbe = null;
+  serverUnreachable = false;
   adminCall.mockReset();
   adminCall.mockImplementation((name) => Promise.resolve(name === 'getEventStats' ? STATS : {}));
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
@@ -206,7 +212,7 @@ describe('admin route gating', () => {
       act(() => vi.advanceTimersByTime(200));
       expect(stage('Checking your access…')).toHaveAttribute('data-loading-stage', 'active');
       act(() => vi.advanceTimersByTime(9_000));
-      await act(async () => pendingProbe.resolve({ docs: [] }));
+      await act(async () => pendingProbe.resolve({ docs: [], metadata: { fromCache: false } }));
       expect(stage('Loading overview…')).toHaveAttribute('data-loading-stage', 'slow');
       await act(async () => { overviewRenderPending = null; finishOverview(); });
       expect(screen.getByRole('heading', { name: 'Overview', exact: true })).toBeInTheDocument();
@@ -348,7 +354,7 @@ describe('admin route gating', () => {
     expect(screen.getByText('Checking your access…', { selector: '.loading-status__label' })).toBeInTheDocument();
 
     await act(async () => {
-      pendingProbe.resolve({ docs: [] });
+      pendingProbe.resolve({ docs: [], metadata: { fromCache: false } });
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -380,10 +386,52 @@ describe('admin route gating', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Check again' })));
     expect(screen.getByText('Checking your access…', { selector: '.loading-status__label' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
-    await act(async () => pendingProbe.resolve({ docs: [] }));
+    await act(async () => pendingProbe.resolve({ docs: [], metadata: { fromCache: false } }));
 
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Speakers', exact: true })).toBeInTheDocument();
+  });
+
+  // Issue #1318: offline, the probe's getDocs answers an empty cache
+  // snapshot for admin and non-admin alike. That answer is a failed check,
+  // never the shell; the server's answer, once it arrives, decides.
+  it.each([
+    ['an organizer', true],
+    ['a signed-in account that is not an admin', false],
+  ])('shows the failed check, not the shell, to %s while the server is unreachable', async (_who, isAdmin) => {
+    adminProbeShouldSucceed = isAdmin;
+    serverUnreachable = true;
+    await renderAt('/admin');
+
+    expect(screen.getByRole('heading', { name: 'We could not check your admin access' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'You don’t have admin access' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Overview', exact: true })).not.toBeInTheDocument();
+
+    serverUnreachable = false;
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Check again' })));
+
+    if (isAdmin) {
+      expect(await screen.findByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+    } else {
+      expect(await screen.findByRole('heading', { name: 'You don’t have admin access' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
+    }
+  });
+
+  it('keeps the shell for an admin the server confirmed earlier when a later check cannot reach it', async () => {
+    operatorProbeError = Object.assign(new Error('unavailable'), { code: 'unavailable' });
+    await renderAt('/admin/branding');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+
+    serverUnreachable = true;
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Check again' })));
+
+    expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'We could not check your admin access' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
   });
 
   it('does not gate the public site behind the admin routes', async () => {
@@ -558,7 +606,7 @@ describe('admin route gating', () => {
     expect(screen.queryByText('Staff')).toBeNull();
 
     await act(async () => {
-      pendingOperatorProbe.resolve({ docs: [] });
+      pendingOperatorProbe.resolve({ docs: [], metadata: { fromCache: false } });
       await Promise.resolve();
       await Promise.resolve();
     });

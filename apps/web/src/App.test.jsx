@@ -99,7 +99,7 @@ vi.mock('firebase/firestore', () => ({
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() =>
     adminProbeShouldSucceed
-      ? Promise.resolve({ docs: [] })
+      ? Promise.resolve({ docs: [], metadata: { fromCache: false } })
       : Promise.reject(new Error('permission denied')),
   ),
   // Record ancillary public listeners too: announcements and bookmark counts

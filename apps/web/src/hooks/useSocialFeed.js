@@ -64,16 +64,17 @@ function accountGrant(profile, profileConfirmed) {
  */
 export function feedAccess({
   demo = IS_DEMO, sources, available, features, uid,
-  profile, profileStatus, profileConfirmed, adminStatus, adminConfirmed,
+  profile, profileStatus, profileConfirmed, adminStatus, adminCheckFailed,
 }) {
   if (demo || !uid) return 'closed';
   if (sources?.features !== 'live' || available?.features !== true) return 'closed';
   if (features?.socialFeed !== true || features?.attendeeDirectory !== true) return 'closed';
   // A grant counts only once the server confirmed it: a cached account
-  // document or admin probe can predate a revocation.
-  const staffGrant = adminStatus === 'admin' && adminConfirmed === true;
+  // document can predate a revocation. The admin status is always the
+  // server's answer (AuthContext); a failed admin check is not a denial.
+  const staffGrant = adminStatus === 'admin';
   if (accountGrant(profile, profileConfirmed) || staffGrant) return 'open';
-  if (profileStatus !== 'ready' || profileConfirmed !== true || adminStatus !== 'denied') return 'checking';
+  if (profileStatus !== 'ready' || profileConfirmed !== true || adminStatus !== 'denied' || adminCheckFailed) return 'checking';
   return 'denied';
 }
 
@@ -96,10 +97,10 @@ export function own(state, key, fallback) {
  */
 export function useSocialAccess() {
   const { features, sources, available, featuresStatus } = useEventConfig();
-  const { user, adminStatus, adminConfirmed, loading } = useAuth();
+  const { user, adminStatus, adminCheckFailed, loading } = useAuth();
   const { uid, profile, status: profileStatus, profileConfirmed } = useProfile();
   const input = {
-    sources, available, features, uid, profile, profileStatus, profileConfirmed, adminStatus, adminConfirmed,
+    sources, available, features, uid, profile, profileStatus, profileConfirmed, adminStatus, adminCheckFailed,
   };
   const access = feedAccess(input);
   const featuresClosed = featuresStatus === 'gone'
