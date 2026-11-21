@@ -40,7 +40,7 @@ export function LoadingStateView({
         data-loading-stage={active ? stage : undefined}
         data-loading-shape={active ? layout : undefined}
       >
-        <LoadingStatus label={label} stage={stage} figure={figure} still={still} clock={clock} announce={announce} active={active} completion={completion}
+        <LoadingStatus label={label} stage={stage} figure={figure} still={still} clock={clock} announce={announce} active={active && !showPlaceholder} completion={completion}
           stalledMessage={stalled ? text('This is taking longer than a minute. Check your connection and try again.', 'Esto está tardando más de un minuto. Comprueba tu conexión e inténtalo de nuevo.') : undefined} />
         {retryAvailable ? (
           <div className={stalled ? 'mt-sm' : 'loading-state__actions mt-sm'}>
@@ -71,13 +71,13 @@ export function LoadingStateView({
 }
 
 /** Retry is available only when a caller supplies an explicit, safe request. */
-export default function LoadingState({ onRetry, routeAttempt, active = true, phase, completion, ...props }) {
-  const { stage, clock, restart } = useLoadingStage({ active, routeAttempt, phase });
+export default function LoadingState({ onRetry, routeAttempt, active = true, phase, completion, placeholder, ...props }) {
+  const { stage, clock, restart } = useLoadingStage({ active, routeAttempt, phase, report: !placeholder });
   const retry = typeof onRetry === 'function' ? () => {
     onRetry();
     restart();
   } : undefined;
   // Completion uses the same live region that was present before the read.
   // An empty completion lets the caller's existing alert announce a failure.
-  return <LoadingStateView {...props} stage={stage} clock={clock} onRetry={retry} active={active} completion={completion} />;
+  return <LoadingStateView {...props} stage={stage} clock={clock} onRetry={retry} active={active} completion={completion} placeholder={placeholder} />;
 }
