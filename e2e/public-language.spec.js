@@ -255,7 +255,7 @@ test.describe('public reflow with touch targets', () => {
         await expectPageFits(page);
         if (profile.width === 320) {
           const format = facets.getByRole('group', { name: 'Format', exact: true });
-          await format.getByRole('checkbox', { name: /^Workshop\s*\(/i }).press('Escape');
+          await format.getByRole('checkbox', { name: /^Workshop \(\d+\)$/ }).press('Escape');
           await expect(filters).toBeFocused();
           await expect(facets).toBeHidden();
         }
