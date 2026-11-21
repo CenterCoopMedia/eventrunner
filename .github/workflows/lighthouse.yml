@@ -72,7 +72,7 @@ jobs:
       - name: Build the demo at the root path
         if: steps.inputs.outputs.measure == 'true'
         run: node scripts/build-demo.cjs --base / --out .lighthouse-site
-      - name: Collect three mobile runs per route
+      - name: Collect mobile runs per route
         if: steps.inputs.outputs.measure == 'true'
         run: npm exec --yes --ignore-scripts --package=@lhci/cli@0.16.1 -- lhci collect --config=scripts/ci/lighthouserc.cjs
       - name: Summarize route medians
