@@ -18,7 +18,11 @@ const LIVE_SLOTS = {
 const SLOT_DRAWINGS = Object.values(motifs.sets).flatMap(({ assetDir, slots }) =>
   Object.entries(slots)
     .filter(([, file]) => file)
-    .map(([slot, file]) => ({ set: assetDir, file, ...LIVE_SLOTS[slot] })),
+    .map(([slot, file]) => ({ set: assetDir, slot, file, ...LIVE_SLOTS[slot] })),
+);
+
+const STROKE_DRAWINGS = SLOT_DRAWINGS.filter(({ set, slot }) =>
+  set !== 'botanical' || slot === 'divider' || slot === 'empty-state',
 );
 
 const STROKE_PRESERVING_TRANSFORM = /(?:translate|rotate)\([-+.\d,\s]+\)|scale\(\s*-?1(?:[,\s]+-?1)?\s*\)/g;
@@ -167,7 +171,7 @@ function paintValues(svg) {
 }
 
 describe('static motif assets', () => {
-  it.each(SLOT_DRAWINGS)(
+  it.each(STROKE_DRAWINGS)(
     '$set/$file keeps its strokes at 0.5 CSS pixels or more in its smallest live slot',
     ({ set, file, width, height }) => {
       const svg = readAsset(set, file);

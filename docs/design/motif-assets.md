@@ -23,4 +23,4 @@ Motifs are small interface drawings, not full-size illustrations. Author each fi
 
 The held-up figure is two files per set: The body, and the part that moves. Draw both on the same 32 × 32 viewBox so they stack, as solid silhouettes with no strokes, filled with `currentColor`. A silhouette has no stroke width to measure, so the measure is its ink: Rendered at 32px, every visible pixel must sit beside a solid one, which rejects any part thinner than about a pixel. Blunt fine points rather than letting them fade. Record the moving part's pivot and swing in `design/tokens/motifs.json`. The generator inlines both files as data URIs, so a stalled load never fetches them.
 
-`motifAssets.test.js` checks stroke size and inherited ink for every registered static drawing at these slot sizes. It also checks the ink and silhouettes of the wait drawings.
+`motifAssets.test.js` checks inherited ink for every registered static drawing. At these slot sizes, it checks stroke widths for the Fauna and Cartographic sets and the Botanical divider and empty-state drawing. It also checks the ink and silhouettes of the wait drawings.

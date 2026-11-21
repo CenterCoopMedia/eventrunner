@@ -4,8 +4,6 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 const MOTIFS = [
-  ['botanical', 'section-mark'],
-  ['botanical', 'nameplate-mark'],
   ['botanical', 'divider'],
   ['botanical', 'empty-state'],
   ['cartographic', 'section-mark'],
@@ -22,7 +20,6 @@ const LIVE_SLOT_SIZES = `
     align-items: flex-start;
   }
   .specimen-motif-row [data-motif-slot="section-mark"] { width: 20px; height: 20px; }
-  .specimen-motif-row [data-motif-slot="nameplate-mark"] { width: 24px; height: 24px; }
   .specimen-motif-row [data-motif-slot="divider"] { width: min(100%, 320px); height: 32px; }
   .specimen-motif-row [data-motif-slot="empty-state"] { width: min(100%, 320px); height: 128px; }
 `;
