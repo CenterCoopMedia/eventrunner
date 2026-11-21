@@ -316,6 +316,7 @@ export default function ContentPage() {
     .filter(({ section }) => !isTitleRepeatingSection(section, page))
     .map(({ section }) => ({ id: `section-${section.id}`, label: section.label, language: section.publicLanguage }));
 
+  const clearFilterLabel = text('Clear filter', 'Quitar filtro');
   const clearFilter = () => {
     setQuery('');
     // Clear the settled status at once, the same way the pathname-change
@@ -375,7 +376,7 @@ export default function ContentPage() {
               className={`${quietActionClass} mt-2xs`}
               onClick={clearFilter}
             >
-              Clear filter
+              {clearFilterLabel}
             </button>
           ) : null}
           <SectionIndexNav sections={indexSections} />
@@ -393,11 +394,14 @@ export default function ContentPage() {
         />
       ) : baseSections.length > 0 && filteredSections.length === 0 ? (
         <EmptyState
-          title="Nothing matches that filter"
-          description="Try a different word, or clear the filter to see the whole page."
+          title={text('Nothing matches that filter', 'El filtro no encontró resultados')}
+          description={text(
+            'Try a different word, or clear the filter to see the whole page.',
+            'Prueba otra palabra o quita el filtro para ver toda la página.',
+          )}
           action={
             <button type="button" className={primaryActionClass} onClick={clearFilter}>
-              Clear filter
+              {clearFilterLabel}
             </button>
           }
         />

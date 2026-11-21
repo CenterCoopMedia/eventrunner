@@ -501,8 +501,8 @@ describe('ContentPage — search and section index on long pages', () => {
     textBlock('ls_end', 'note', 'Zzyzx, a word that appears nowhere else on this page.'),
   ];
 
-  function renderLongSectionsPage() {
-    renderAt('/long-sections');
+  function renderLongSectionsPage(search = '') {
+    renderAt(`${LONG_SECTIONS_PAGE.path}${search}`);
     pushPage(LONG_SECTIONS_PAGE);
     pushContent(LONG_SECTIONS_BLOCKS);
   }
@@ -1054,6 +1054,27 @@ describe('ContentPage — search and section index on long pages', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
     expect(filter).toHaveValue('');
     expect(document.activeElement).toBe(filter);
+  });
+
+  it('explains an empty filter result and offers both clear actions in Spanish', async () => {
+    renderLongSectionsPage('?lang=es');
+    act(() => configSubscriptions.get('event')({
+      ...eventConfig,
+      contentLanguages: { default: 'en', available: ['en', 'es'] },
+    }));
+
+    const filter = await screen.findByRole('searchbox', { name: 'Filtrar por palabra clave' });
+    fireEvent.change(filter, { target: { value: 'Zzyzx' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro' }));
+    expect(filter).toHaveValue('');
+    expect(filter).toHaveFocus();
+
+    fireEvent.change(filter, { target: { value: 'no-coincide' } });
+    expect(screen.getByRole('heading', { name: 'El filtro no encontró resultados' })).toBeInTheDocument();
+    expect(screen.getByText('Prueba otra palabra o quita el filtro para ver toda la página.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro' }));
+    expect(screen.getByRole('heading', { name: 'Closing' })).toBeInTheDocument();
+    expect(filter).toHaveFocus();
   });
 
   it('settles the announced status text about 300ms after typing stops, not on every keystroke', async () => {
