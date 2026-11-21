@@ -40,7 +40,7 @@ describe('admin offline outcome', () => {
   it('states the connection requirement on a cold offline mount, without adopting cached content', () => {
     online = false;
     render(<ContentView />);
-    expect(screen.getByRole('status')).toHaveTextContent('You’re offline. Connect to finish loading saved content.');
+    expect(screen.getByRole('status')).toHaveTextContent('You’re offline. Reconnect to load saved content or submit changes.');
     expect(screen.getByText('Waiting for saved content')).toBeInTheDocument();
     expect(screen.getByLabelText('Saved content')).toBeDisabled();
     expect(screen.getByLabelText('Saved content')).toHaveValue('');

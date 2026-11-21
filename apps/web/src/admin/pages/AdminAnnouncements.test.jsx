@@ -122,6 +122,28 @@ describe('AdminAnnouncements', () => {
     await waitFor(() => expect(call).toHaveBeenCalledTimes(1));
   });
 
+  it('keeps an offline draft available to save after reconnecting', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      call.mockResolvedValueOnce({ id: 'a1' });
+      renderPage();
+      act(() => report([]));
+      const message = screen.getByRole('textbox', { name: 'Message' });
+      fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
+      const save = screen.getByRole('button', { name: 'Save' });
+      fireEvent.click(save);
+      expect(call).not.toHaveBeenCalled();
+      expect(message).toHaveValue('Use the east entrance.');
+
+      online.mockReturnValue(true);
+      fireEvent.click(save);
+      await waitFor(() => expect(message).toHaveValue(''));
+      expect(call).toHaveBeenCalledTimes(1);
+    } finally {
+      online.mockRestore();
+    }
+  });
+
   it('keeps both drafts mounted while switching between site banners and email', () => {
     renderPage();
     act(() => report([]));

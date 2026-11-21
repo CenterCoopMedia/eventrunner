@@ -148,7 +148,7 @@ export default function AdminSessionEditor({ mode }) {
   const unsaved = savedForm !== null && (
     Boolean(availableChoice) || editorSnapshot(form) !== editorSnapshot(savedForm)
   );
-  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving });
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: action !== null });
 
   useEffect(() => {
     if (mode !== 'edit' || adoptedRef.current === currentId || !ready || !row) return;
