@@ -101,7 +101,7 @@ function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.n
     let stage = 'connection-state';
     try {
       // Keep routes available for retries and payment delivery. The site owns its checkout state.
-      const found = deauthorized && await require('./connections.cjs').recordStripeDeauthorization(db, event);
+      const found = deauthorized && await require('./connections.cjs').recordStripeDeauthorization(db, event, now());
       stage = 'route-read';
       const route = event.livemode
         ? (await db.collection(STRIPE_ROUTE_COLLECTION).doc(event.account).get()).data() : null;

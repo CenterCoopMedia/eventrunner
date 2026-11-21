@@ -5,7 +5,7 @@ const { createHash } = require('node:crypto');
 const { test } = require('node:test');
 const {
   STATE_TTL_MS, chooseEventbriteEvent, completeConnection, connectionSecretId, deleteStoredConnection, disconnectAccount,
-  listEventbriteEvents, readStoredConnection, retryTokenDeletions, startConnection,
+  listEventbriteEvents, readStoredConnection, recordStripeDeauthorization, retryTokenDeletions, startConnection,
 } = require('./connections.cjs');
 const { getApplication } = require('./applications.cjs');
 const { acceptAgreement } = require('./agreementAcceptance.cjs');
@@ -146,6 +146,48 @@ test('completing stores the state in Firestore and the token only in Secret Mana
   const { connected, displayName, livemode } = stored(db).stripe;
   assert.deepEqual({ connected, displayName, livemode }, { connected: true, displayName: 'NC Local', livemode: true });
   assert.deepEqual(privateRow(db).stripe, { accountId: 'acct_new', connectedBy: 'ana', livemode: true });
+});
+
+test('deauthorization keeps a pending credential write fenced and cannot restore it as connected', async () => {
+  const previous = { accountId: 'acct_previous', connectedBy: 'ana', livemode: true };
+  const { db, secrets, stripe, deps } = setup({
+    application: { connections: { stripe: stripeConnection() } },
+    accounts: { stripe: previous },
+  });
+  const writing = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const writeSecret = secrets.writeSecret.bind(secrets);
+  let firstWrite = true;
+  secrets.writeSecret = async (...args) => {
+    if (firstWrite) {
+      firstWrite = false;
+      writing.resolve();
+      await release.promise;
+    }
+    return writeSecret(...args);
+  };
+  const firstState = await start(deps);
+  const rejected = assert.rejects(complete(deps, { state: firstState }), { code: 'connection-failed' });
+  try {
+    await writing.promise;
+    await recordStripeDeauthorization(db, { account: 'acct_new', livemode: true, created: Math.floor(NOW / 1000) }, NOW);
+    assert.equal(liveConnection(stored(db), 'stripe'), null);
+    const anotherState = await start(deps);
+    await assert.rejects(complete(deps, { state: anotherState }), { code: 'connection-busy' });
+  } finally {
+    release.resolve();
+    await rejected;
+  }
+
+  assert.equal(liveConnection(stored(db), 'stripe'), null);
+  assert.deepEqual(privateRow(db).stripe, previous);
+  assert.deepEqual(stripe.revoked, []);
+  stripe.answer = { ...stripeAnswer('acct_replacement'), token: 'replacement-token-fixture' };
+  const finalState = await start(deps);
+  assert.equal((await complete(deps, { state: finalState })).body.connected, true);
+  assert.deepEqual(stripe.revoked, ['acct_previous']);
+  assert.equal(privateRow(db).stripe.accountId, 'acct_replacement');
+  assert.equal(secrets.store.get('connection-stripe-a1'), stripe.answer.token);
 });
 
 test('no token reaches a response, a Firestore write or a log, through the HTTP wrapper', async () => {

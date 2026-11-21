@@ -229,7 +229,7 @@ function withoutProvider(connections, provider) {
 }
 
 /** Stripe already revoked the token. Clear matching Console state without touching secrets. */
-async function recordStripeDeauthorization(db, { account, livemode, created }) {
+async function recordStripeDeauthorization(db, { account, livemode, created }, now) {
   const accounts = db.collection(ACCOUNT_COLLECTION).where('stripe.accountId', '==', account);
   return db.runTransaction(async (tx) => {
     const matches = (await tx.get(accounts)).docs.filter((doc) => doc.data().stripe.livemode === livemode);
@@ -240,10 +240,18 @@ async function recordStripeDeauthorization(db, { account, livemode, created }) {
       const { connections } = app.data();
       const connection = connections?.stripe;
       if (!connection) continue;
-      const changedAt = connection.change
-        ? toMillis(connection.change.until) - CHANGE_MS : toMillis(connection.connectedAt);
+      const change = connection.change;
+      const leaseUntil = toMillis(change?.until);
+      const changedAt = change ? leaseUntil - CHANGE_MS : toMillis(connection.connectedAt);
       // Stripe retries out of order and reports event times in whole seconds.
       if (Math.floor(changedAt / 1000) > created) continue;
+      if (leaseUntil > now) {
+        // An outstanding Secret Manager write can still finish. Keep it fenced.
+        if (!change.revoked) tx.update(app.ref, { connections: {
+          ...connections, stripe: { ...connection, change: { ...change, revoked: true } },
+        } });
+        continue;
+      }
       tx.update(app.ref, { connections: withoutProvider(connections, 'stripe') });
       tx.set(matches[index].ref, withoutProvider(matches[index].data(), 'stripe'));
     }
@@ -267,12 +275,21 @@ function changingState(data, provider, at, id) {
 const holdsChange = (data, provider, changeId) => data.connections?.[provider]?.change?.id === changeId;
 
 /** End this call's change, leaving `connection`, or no state when it is null. */
-async function finishChange({ db }, { orgId, appId, provider, changeId, connection }) {
-  await db.runTransaction(async (tx) => {
+async function finishChange({ db }, { orgId, appId, provider, changeId, connection, previousAccount }) {
+  return db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
     if (!holdsChange(data, provider, changeId)) throw new Error('lost the connection change');
+    const revoked = data.connections[provider].change.revoked === true;
+    if (revoked) {
+      const privateRef = accountsRef(db, appId);
+      const accounts = accountsOf(await tx.get(privateRef));
+      const restAccounts = withoutProvider(accounts, provider);
+      const keepPrevious = previousAccount && previousAccount.accountId !== accounts[provider]?.accountId;
+      tx.set(privateRef, keepPrevious ? { ...restAccounts, [provider]: previousAccount } : restAccounts);
+    }
     const rest = withoutProvider(data.connections, provider);
-    tx.update(ref, { connections: connection ? { ...rest, [provider]: connection } : rest });
+    tx.update(ref, { connections: connection && !revoked ? { ...rest, [provider]: connection } : rest });
+    return !revoked;
   });
 }
 
@@ -290,9 +307,10 @@ async function endAfterFailure({ db, now = Date.now, log = console }, { orgId, a
       if (!holdsChange(data, provider, changeId)) return;
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
       const restAccounts = withoutProvider(accounts, provider);
-      const change = { id: changeId, until: new Date(now() + CHANGE_MS) };
+      const change = { ...data.connections[provider].change, until: new Date(now() + CHANGE_MS) };
+      const keepPrevious = previous.account && (!change.revoked || previous.account.accountId !== accounts[provider]?.accountId);
       tx.update(ref, { connections: { ...data.connections, [provider]: { connected: false, change } } });
-      tx.set(accountsRef(db, appId), previous.account ? { ...restAccounts, [provider]: previous.account } : restAccounts);
+      tx.set(accountsRef(db, appId), keepPrevious ? { ...restAccounts, [provider]: previous.account } : restAccounts);
     });
   } catch (err) {
     // The change mark is left, which is not live and runs out.
@@ -408,10 +426,11 @@ async function completeConnection(deps, { body, user }) {
   }
 
   try {
-    await finishChange(deps, { orgId, appId, provider, changeId, connection });
+    if (!(await finishChange(deps, { orgId, appId, provider, changeId, connection, previousAccount: previous.account }))) {
+      throw new Error('Stripe ended the connection while the credential was being stored.');
+    }
   } catch (err) {
-    // The token is stored and the connection is not live, which is safe: the
-    // private row names the account, so connecting again or a delete tidies up.
+    // The token was stored, but the Console did not confirm a live connection.
     throw failure(502, 'connection-failed', failedToConnect(provider), err);
   }
 
