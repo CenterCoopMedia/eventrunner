@@ -156,7 +156,7 @@ export default function AdminTimelineList() {
       ) : null}
 
       {loading ? (
-        <AdminLoadingState label="Loading timeline…" />
+        <AdminLoadingState recover label="Loading timeline…" />
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title="No timeline entries yet"

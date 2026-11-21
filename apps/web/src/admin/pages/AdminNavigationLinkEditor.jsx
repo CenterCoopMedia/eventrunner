@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -26,7 +27,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
   const [baseline] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [kind, setKind] = useState(navigationLinkUrl(initial.url).startsWith('https://') ? 'external' : 'internal');
-  const [busy, setBusy] = useState(null);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
   const [error, setError] = useState('');
   const saved = useRef(false);
   const rejectedIds = useRef(new Set());
@@ -47,7 +48,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
       return;
     }
     setError('');
-    setBusy('save');
+    if (!beginSave('save')) return;
     const page = creating
       ? assignPageIds({ ...draft, url, order: nextStoredOrder(rows) }, { pageIds: [...rows.map((row) => row.id), ...rejectedIds.current] })
       : { ...draft, url };
@@ -66,6 +67,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
       showToast('Navigation link saved as a draft.');
       navigate(PAGES_PATH);
     } catch (failure) {
+      if (captureUnconfirmed(failure)) return;
       if (creating && failure?.status === 409) {
         rejectedIds.current.add(page.id);
         setError('That link ID was already taken. Save again to use a new one.');
@@ -98,11 +100,12 @@ function NavigationLinkForm({ initial, rows, creating }) {
 
   return <>
     <form className="flex flex-col gap-md" onSubmit={save} inert={leave.pending ? '' : undefined}>
+      <AdminPendingSave busy={busy === 'save'} to={PAGES_PATH} unconfirmed={unconfirmedSave} />
       <AdminPageHeader title={creating ? 'Add a navigation link' : 'Edit navigation link'}
         description="This link joins the Pages list. Set its position there and publish it with your other page drafts."
         actions={<>
           <Link to={PAGES_PATH} className={secondaryButtonClass}>Back to Pages</Link>
-          <button type="submit" className={primaryButtonClass} disabled={busy !== null}>{busy === 'save' ? 'Saving…' : 'Save draft'}</button>
+          <button type="submit" className={primaryButtonClass} disabled={busy !== null || unconfirmedSave}>{busy === 'save' ? 'Saving…' : 'Save draft'}</button>
         </>} />
       {error ? <Notice tone="error" message={error} /> : null}
       <Panel>
@@ -151,7 +154,7 @@ export default function AdminNavigationLinkEditor() {
   const { rows, ready, loading } = useAdminPages({ includeNavigationLinks: true });
   const creating = linkId === 'new';
   const existing = rows.find((row) => row.id === linkId)?.current;
-  if (loading) return <AdminLoadingState label="Loading navigation links…" />;
+  if (loading) return <AdminLoadingState recover label="Loading navigation links…" />;
   if (!ready || (!creating && !isNavigationLink(existing))) {
     return <AdminEmptyState title="Navigation link unavailable" action={<Link to={PAGES_PATH}>Back to Pages</Link>} />;
   }

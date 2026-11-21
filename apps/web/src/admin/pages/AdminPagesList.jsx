@@ -12,6 +12,7 @@
 // opacity — instantly under reduced motion.
 //
 // A move stays in this list until the organizer publishes the menu order.
+import AdminPendingSave from '../components/AdminPendingSave.jsx';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
@@ -302,6 +303,7 @@ export default function AdminPagesList() {
 
   return (
     <div ref={frameRef} className="flex flex-col gap-md">
+      <AdminPendingSave busy={savingOrder || publishing !== null} />
       <AdminPageHeader help="Manage page names, web addresses and structure. Edit their text and images under Content."
         title="Pages"
         identifiers={`${pageCount} page${pageCount === 1 ? '' : 's'}${linkCount ? ` · ${linkCount} navigation link${linkCount === 1 ? '' : 's'}` : ''}`}
@@ -361,7 +363,7 @@ export default function AdminPagesList() {
       ) : null}
 
       {loading ? (
-        <AdminLoadingState label="Loading pages…" />
+        <AdminLoadingState recover label="Loading pages…" />
       ) : ordered.length === 0 ? (
         <AdminEmptyState
           title="No pages yet"

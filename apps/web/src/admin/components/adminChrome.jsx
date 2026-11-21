@@ -17,12 +17,14 @@
 // state is always a word — set in a badge whose tinted ground and ink agree
 // with the word, and never colour alone (§8.1).
 import { useId } from 'react';
+import { Link } from 'react-router';
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
 import LoadingStatus from '../../components/LoadingStatus.jsx';
 import HelpTooltip from './HelpTooltip.jsx';
 import useLoadingStage from '../../lib/useLoadingStage.js';
 import useAdminHeaderPadding from './useAdminHeaderPadding.js';
 import { useCommandRecent } from '../commandMenuRecents.js';
+import { Notice, linkButtonClass, secondaryButtonClass } from './formControls.jsx';
 import './adminLoading.css';
 import './actionFeedback.css';
 
@@ -126,10 +128,22 @@ export function AdminEmptyState({ title, description, action = null }) {
  * pending. It is decorative, static under reduced motion, and unmounts
  * with the loading state (brief §2.2, asynchronous-work amendment).
  *
- * @param {{ label: string, routeAttempt?: object }} props
+ * @param {{ label: string, routeAttempt?: object, recover?: boolean, onRetry?: () => void, quiet?: boolean }} props
  */
-export function AdminLoadingState({ label, routeAttempt }) {
-  const { stage, clock } = useLoadingStage({ routeAttempt });
+export function AdminLoadingState({ label, routeAttempt, recover = false, onRetry, quiet = false }) {
+  const { stage, clock, restart } = useLoadingStage({ routeAttempt });
+  if ((recover || onRetry) && (stage === 'slow' || stage === 'prolonged')) {
+    return (
+      <Notice tone="caution" message="Loading is taking longer than usual. ">
+        {onRetry ? (
+          <button type="button" className={secondaryButtonClass} onClick={() => { restart(); onRetry(); }}>Try again</button>
+        ) : (
+          <Link to="." target="_blank" rel="noopener noreferrer" className={linkButtonClass}>Try again in a new tab</Link>
+        )}
+      </Notice>
+    );
+  }
+  if (quiet) return null;
   return (
     <div className="admin-loading-state py-md text-admin-sm text-admin-ink-secondary">
       <LoadingStatus label={label} stage={stage} figure="ring" clock={clock} />

@@ -1,3 +1,4 @@
+import AdminPendingSave from '../components/AdminPendingSave.jsx';
 import { plannerMessage } from '../plannerErrors.js';
 import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 import { useState } from 'react';
@@ -88,6 +89,7 @@ export default function AdminSessionsList() {
 
   return (
     <div className="flex flex-col gap-md">
+      <AdminPendingSave busy={publishing !== null} />
       <AdminPageHeader help="Review sessions by event day and open a session to edit its schedule details."
         title="Sessions"
         identifiers={`${rows.length} session${rows.length === 1 ? '' : 's'}`}
@@ -134,7 +136,7 @@ export default function AdminSessionsList() {
       ) : null}
 
       {loading ? (
-        <AdminLoadingState label="Loading sessions…" />
+        <AdminLoadingState recover label="Loading sessions…" />
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title="No sessions yet"

@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
 import PlannerSwitch from '../components/PlannerSwitch.jsx';
@@ -105,8 +106,8 @@ export default function AdminOrganizationEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [action, setAction] = useState(null);
-  const saving = action !== null;
+  const { action: action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
@@ -208,7 +209,7 @@ export default function AdminOrganizationEditor({ mode }) {
       setFocusRequest((count) => count + 1);
       return;
     }
-    setAction(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -249,6 +250,7 @@ export default function AdminOrganizationEditor({ mode }) {
         if (creating) showToast('Organization draft saved.', { announce: false });
       }
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(plannerError(err));
     } finally {
@@ -283,7 +285,7 @@ export default function AdminOrganizationEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading organization…" />;
+    return <AdminLoadingState recover label="Loading organization…" />;
   }
   if (mode === 'edit' && createdId !== docId && !row) {
     return (
@@ -296,7 +298,7 @@ export default function AdminOrganizationEditor({ mode }) {
   }
 
   if (mode === 'edit' && adoptedRef.current !== docId) {
-    return <AdminLoadingState label="Loading organization…" />;
+    return <AdminLoadingState recover label="Loading organization…" />;
   }
 
   const tiers = tiersInUse(rows);
@@ -364,6 +366,7 @@ export default function AdminOrganizationEditor({ mode }) {
           }
         />
 
+        <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={creating ? '/admin/organizations' : '.'} unconfirmed={unconfirmedSave} />
         <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
         <div className="admin-editor-layout admin-editor-layout--organization">

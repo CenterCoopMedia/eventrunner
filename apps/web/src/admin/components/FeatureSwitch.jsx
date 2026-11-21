@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import AdminPendingSave, { useAdminSaveState } from './AdminPendingSave.jsx';
+import { AdminLoadingState } from './adminChrome.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -11,8 +13,7 @@ export default function FeatureSwitch({ featureKeys }) {
   const { isOperator } = useAuth();
   const { features, liveFeatures, sources } = useEventConfig();
   const call = useAdminApi();
-  const pending = useRef(false);
-  const [saving, setSaving] = useState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed } = useAdminSaveState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [awaiting, setAwaiting] = useState(null);
@@ -23,9 +24,7 @@ export default function FeatureSwitch({ featureKeys }) {
   }, [features, awaiting]);
 
   async function change(featureKey, checked) {
-    if (!isOperator || !ready || pending.current || awaiting) return;
-    pending.current = true;
-    setSaving(true);
+    if (!isOperator || !ready || awaiting || !beginSave(true)) return;
     setError('');
     setSaved('');
     try {
@@ -38,9 +37,9 @@ export default function FeatureSwitch({ featureKeys }) {
       setAwaiting({ key: featureKey, enabled: checked });
       setSaved(`${FEATURE_CHOICES[featureKey].label} setting saved.`);
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(settingsConflict(err, { [`features.${featureKey}`]: FEATURE_CHOICES[featureKey].label })?.message ?? err.message);
     } finally {
-      pending.current = false;
       setSaving(false);
     }
   }
@@ -58,7 +57,7 @@ export default function FeatureSwitch({ featureKeys }) {
             label={label}
             checked={enabled}
             onChange={(checked) => change(key, checked)}
-            disabled={!ready || saving || Boolean(awaiting)}
+            disabled={!ready || saving || unconfirmed || Boolean(awaiting)}
             aria-busy={saving || undefined}
             hint={saving ? 'Saving the setting…' : !ready || awaiting ? 'Waiting for the current settings…' : 'Changes save immediately.'}
           />
@@ -66,6 +65,8 @@ export default function FeatureSwitch({ featureKeys }) {
           <p key={key} className="text-admin-sm text-admin-ink-secondary">{label}: {enabled ? 'On' : 'Off'}. Only an operator can change this setting.</p>
         );
       })}
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmed} to="/admin/features" />
+      {isOperator && (!ready || awaiting) ? <AdminLoadingState recover quiet label="Loading the current settings…" /> : null}
       {error ? <Notice tone="error" message={error} /> : null}
       {saved ? <SaveStatus message={saved} /> : null}
     </div>

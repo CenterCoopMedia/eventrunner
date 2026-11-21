@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import HelpTooltip from '../components/HelpTooltip.jsx';
 // Badge configuration (issue #14), wired to updateBadges.
 //
@@ -59,7 +60,7 @@ export default function AdminBadgeSettings() {
 
   const [categories, setCategories] = useState(() => toForm(badges));
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
   const [status, setStatus] = useSavedMessage(categories);
   const errorRef = useRef(null);
   // Keyed on CONFIG/BADGES' own readiness (never the aggregate `source`):
@@ -94,7 +95,7 @@ export default function AdminBadgeSettings() {
   async function submit(event) {
     event.preventDefault();
     if (saving) return;
-    setSaving(true);
+    if (!beginSave(true)) return;
     setError(null);
     setStatus('');
     try {
@@ -106,6 +107,7 @@ export default function AdminBadgeSettings() {
       setStatus('Saved. Attendees see the new set immediately.');
       showToast('Badges saved.', { announce: false });
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(err);
     } finally {
       setSaving(false);
@@ -119,7 +121,7 @@ export default function AdminBadgeSettings() {
         description="The badge set attendees pick from, grouped into categories with a cap on how many each attendee may choose."
         identifiers={`${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
         actions={
-          <button type="submit" className={primaryButtonClass} aria-disabled={saving || undefined} aria-busy={saving || undefined}>
+          <button type="submit" className={primaryButtonClass} aria-disabled={saving || unconfirmedSave || undefined} aria-busy={saving || undefined}>
             <BusyLabel busy={saving} pending="Saving the badges…">Save badges</BusyLabel>
           </button>
         }
@@ -127,6 +129,7 @@ export default function AdminBadgeSettings() {
 
       <FeatureSwitch featureKeys={['badges', 'customBadges']} />
 
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} />
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 

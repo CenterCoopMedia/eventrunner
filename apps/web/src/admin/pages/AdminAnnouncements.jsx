@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ANNOUNCEMENT_LEVELS, announcementTimeMs } from 'shared/announcement';
@@ -68,7 +69,7 @@ export default function AdminAnnouncements() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [channel, setChannel] = useState('banners');
   const channelRefs = useRef({});
@@ -136,7 +137,7 @@ export default function AdminAnnouncements() {
   async function submit(event) {
     event.preventDefault();
     if (saving) return;
-    setSaving(true);
+    if (!beginSave(true)) return;
     setError(null);
     try {
       const hasLink = form.linkUrl.trim() !== '' || form.linkLabel.trim() !== '';
@@ -153,6 +154,7 @@ export default function AdminAnnouncements() {
       showToast(editingId ? 'Announcement saved.' : 'Announcement created.');
       cancelEdit();
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(err);
     } finally {
       setSaving(false);
@@ -212,10 +214,12 @@ export default function AdminAnnouncements() {
           description="Banners appear on your site between the start and end times. A banner that starts now appears as soon as you save."
         >
           <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}>
+            <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} />
             <ServerErrorSummary error={error ? { message: communicationsError(error, "The announcement could not be saved. Check the message and dates, then try again.") } : null} />
             <TextAreaField help="Write the short announcement attendees should see in the site banner."
               label="Message"
               value={form.message}
+              disabled={saving}
               maxLength={500}
               required
               onChange={(message) => setForm((current) => ({ ...current, message }))}
@@ -223,6 +227,7 @@ export default function AdminAnnouncements() {
             <SelectField help="Choose how prominently this banner should appear on the site."
               label="Priority"
               value={form.level}
+              disabled={saving}
               options={[{ value: 'info', label: 'Notice' }, { value: 'urgent', label: 'Urgent' }]}
               onChange={(level) => setForm((current) => ({ ...current, level }))}
             />
@@ -231,6 +236,7 @@ export default function AdminAnnouncements() {
                 label="Starts"
                 type="datetime-local"
                 value={form.startsAt}
+                disabled={saving}
                 required
                 onChange={(startsAt) => setForm((current) => ({ ...current, startsAt }))}
               />
@@ -238,6 +244,7 @@ export default function AdminAnnouncements() {
                 label="Ends"
                 type="datetime-local"
                 value={form.endsAt}
+                disabled={saving}
                 required
                 onChange={(endsAt) => setForm((current) => ({ ...current, endsAt }))}
               />
@@ -247,22 +254,24 @@ export default function AdminAnnouncements() {
                 label="Link (optional)"
                 type="url"
                 value={form.linkUrl}
+                disabled={saving}
                 placeholder="https://example.org/details"
                 onChange={(linkUrl) => setForm((current) => ({ ...current, linkUrl }))}
               />
               <TextField help="Use a short phrase that tells attendees where the banner link goes."
                 label="Link text (optional)"
                 value={form.linkLabel}
+                disabled={saving}
                 maxLength={80}
                 onChange={(linkLabel) => setForm((current) => ({ ...current, linkLabel }))}
               />
             </div>
             <div className="flex flex-wrap gap-xs">
-              <button type="submit" className={primaryButtonClass} aria-disabled={saving || undefined} aria-busy={saving || undefined}>
+              <button type="submit" className={primaryButtonClass} aria-disabled={saving || unconfirmedSave || undefined} aria-busy={saving || undefined}>
                 <BusyLabel busy={saving} pending="Saving the announcement…">Save</BusyLabel>
               </button>
               {editingId ? (
-                <button type="button" className={secondaryButtonClass} onClick={cancelEdit}>Cancel</button>
+                <button type="button" className={secondaryButtonClass} disabled={saving} onClick={cancelEdit}>Cancel</button>
               ) : null}
             </div>
           </form>
@@ -270,7 +279,7 @@ export default function AdminAnnouncements() {
 
         {listError ? <Notice tone="caution" message="Announcements could not be updated. Check your connection; the list will retry." /> : null}
         {rows === null ? (
-          <AdminLoadingState label="Loading announcements…" />
+          <AdminLoadingState recover label="Loading announcements…" />
         ) : ordered.length === 0 ? (
           <AdminEmptyState title="No announcements yet" description="Add a banner to share news with attendees." action={<button type="button" className={secondaryButtonClass} onClick={focusMessage}>Add banner</button>} />
         ) : (
@@ -289,7 +298,7 @@ export default function AdminAnnouncements() {
                       <p className="mt-3xs text-admin-base text-admin-ink">{row.message}</p>
                     </div>
                     <div className="flex shrink-0 gap-xs">
-                      <AdminIconControl className={ghostButtonClass} onClick={() => startEdit(row)} label="Edit" icon="edit" />
+                      <AdminIconControl className={ghostButtonClass} onClick={() => startEdit(row)} disabled={saving} label="Edit" icon="edit" />
                       <DestructiveConfirm
                         trigger="Remove"
                         triggerIcon="remove"
@@ -297,7 +306,7 @@ export default function AdminAnnouncements() {
                         confirmLabel="Remove this announcement"
                         busyLabel="Removing…"
                         busy={deletingId === row.id}
-                        disabled={deletingId === row.id}
+                        disabled={saving || deletingId === row.id}
                         consequence="The announcement disappears from the public site."
                         permanence="This cannot be undone."
                         onConfirm={() => remove(row.id)}

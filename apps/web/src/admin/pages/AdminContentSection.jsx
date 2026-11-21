@@ -4,6 +4,7 @@
 // (set in Pages) — offered only when the section allows at least one block
 // type, and disabled once the section is at its cap, same guardrail
 // AdminPageEditor's block picker applies to defaultBlocks.
+import AdminPendingSave from '../components/AdminPendingSave.jsx';
 import { sectionBlockTypes } from 'shared/page';
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -174,7 +175,7 @@ export default function AdminContentSection() {
   }
 
   if ((pagesLoading || contentLoading) && !section) {
-    return <AdminLoadingState label="Loading section…" />;
+    return <AdminLoadingState recover label="Loading section…" />;
   }
   if (!pagesLoading && (!page || !section)) {
     return (
@@ -256,6 +257,7 @@ export default function AdminContentSection() {
 
   return (
     <div ref={frameRef} className="flex flex-col gap-md">
+      <AdminPendingSave busy={savingOrder || busy?.action === 'publish'} />
       <AdminPageHeader help="Add, edit and reorder the content blocks in this page section."
         title={section?.label || sectionId}
         identifiers={<>
@@ -304,7 +306,7 @@ export default function AdminContentSection() {
       ) : null}
 
       {homeFooterSection ? (
-        <Suspense fallback={<AdminLoadingState label="Loading footer pages…" />}>
+        <Suspense fallback={<AdminLoadingState recover label="Loading footer pages…" />}>
           <FooterPagesEditor
             pageRows={pageRows}
             ready={pagesReady}

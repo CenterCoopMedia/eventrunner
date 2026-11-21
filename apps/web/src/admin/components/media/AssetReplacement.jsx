@@ -1,3 +1,5 @@
+import AdminPendingSave from '../AdminPendingSave.jsx';
+import { AdminLoadingState } from '../adminChrome.jsx';
 import { useEffect, useRef, useState } from 'react';
 import AssetImage from '../../../components/media/AssetImage.jsx';
 import BusyLabel from '../../../components/BusyLabel.jsx';
@@ -106,8 +108,9 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
         onClose: () => setChoosing(false), returnFocusRef: chooserButton,
         onSelect: (next) => { setReplacement(next); setChoosing(false); },
       }) : null}
+      <AdminPendingSave busy={busy} to="/admin/media" />
       {error ? <Notice tone="error" message={error} /> : null}
-      {!result && !places && !error ? <p role="status">Checking the places that use this image…</p> : null}
+      {!result && !places && !error ? <AdminLoadingState label="Checking the places that use this image…" onRetry={reviewRemaining} /> : null}
       {!places && error ? <button type="button" className={secondaryButtonClass} onClick={reviewRemaining}>Retry usage check</button> : null}
       {places?.length === 0 ? <p>No image placements currently use this file.</p> : null}
       {!result && places?.length > 0 ? (
