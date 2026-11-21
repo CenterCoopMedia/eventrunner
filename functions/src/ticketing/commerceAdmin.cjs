@@ -436,7 +436,10 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
           requireOrder(await tx.get(db.collection(ORDERS).doc(orderId)), provider);
           audit(tx, logRef, { action: 'reconciliation-requested', actor, now, orderId });
         });
-        await provider.reconcileOrder(orderId);
+        const reconciliation = await provider.reconcileOrder(orderId);
+        if (reconciliation.complete !== true) {
+          fail(409, 'order-refresh-incomplete', 'The payment check did not finish. Refresh the order again.');
+        }
         result = await readOrderDetail({ ...deps, orderId });
       } else if (action === 'resend') {
         const orderId = idOf(body.orderId, 'Order');

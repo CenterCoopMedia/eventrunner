@@ -125,6 +125,31 @@ test('order reads redact attempt/session credentials and isolate account/event/m
   }
 });
 
+test('refresh reports an incomplete payment check and returns current details on retry', async () => {
+  const orderId = 'order-1';
+  const db = dbFor();
+  let reconciliation = { complete: false, retryWithoutAttempt: true, tickets: [] };
+  const handler = admin(db, {
+    provider: { ...provider, async reconcileOrder(id) {
+      assert.equal(id, orderId);
+      return reconciliation;
+    } },
+  });
+  const body = { action: 'reconcile', orderId };
+
+  const incomplete = await call(handler, body);
+  assert.equal(incomplete.statusCode, 409);
+  assert.equal(incomplete.body.error.code, 'order-refresh-incomplete');
+  assert.match(incomplete.body.error.message, /Refresh the order again/);
+
+  await db.collection('ticket_orders').doc(orderId).update({ refundStatus: 'pending' });
+  reconciliation = { complete: true, tickets: [] };
+  const refreshed = await call(handler, body);
+  assert.equal(refreshed.statusCode, 200);
+  assert.equal(refreshed.body.order.refundStatus, 'pending');
+  assert.equal(refreshed.body.tickets.length, 2);
+});
+
 test('cancellation requires confirmation, preserves money and capacity, and records an atomic audit', async () => {
   const db = dbFor();
   const body = { action: 'cancelTickets', orderId: 'order-1', ticketIds: ['ticket-1'], reason: 'Attendee requested cancellation.' };
