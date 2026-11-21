@@ -57,6 +57,13 @@ import { reloadPage } from '../lib/pageReload.js';
 
 const AuthContext = createContext(null);
 
+// Firebase reports the first auth state only after its own startup, and that
+// startup has no overall time limit: on a phone it loads Google's auth iframe
+// script first, and it waits on IndexedDB, which can stop answering (issue
+// 1357). After this wait the sign-in page offers its options and a retry.
+// The check itself goes on, and its answer replaces that view when it comes.
+const SIGN_IN_WAIT_MS = 15_000;
+
 /**
  * Error shape every OTP endpoint failure is normalized to. `code` mirrors the
  * server's error.code ('rate-limited', 'invalid-code', …) plus 'network' for
@@ -65,8 +72,9 @@ const AuthContext = createContext(null);
  * CORS-readable).
  */
 export class OtpRequestError extends Error {
-  constructor({ code, message, status, retryAfterSeconds = null }) {
+  constructor({ code, message, status, retryAfterSeconds = null, spanish = null }) {
     super(message);
+    this.spanish = spanish;
     this.name = 'OtpRequestError';
     this.code = code;
     this.status = status;
@@ -74,11 +82,42 @@ export class OtpRequestError extends Error {
   }
 }
 
+// Every sign-in action waits for the Firebase module and then for its auth
+// startup, and neither has a time limit (issue 1357). Wait for both at most
+// SIGN_IN_WAIT_MS together, then fail with a reload message. The App Check
+// header uses the same wait but falls back to no header (see postJson). Verification
+// calls this before the code is sent for checking, so a stalled page does not
+// use up the emailed code.
+function withinSignInWait(promise) {
+  let timer;
+  const stalled = new Promise((resolve, reject) => {
+    timer = setTimeout(() => reject(new OtpRequestError({
+      code: 'auth-not-ready',
+      status: 0,
+      message: 'Sign-in is not ready on this page. Reload the page and try again.',
+      spanish: 'El inicio de sesión no está listo en esta página. Vuelve a cargar la página e inténtalo de nuevo.',
+    })), SIGN_IN_WAIT_MS);
+  });
+  return Promise.race([promise, stalled]).finally(() => clearTimeout(timer));
+}
+
+function startedFirebase() {
+  return withinSignInWait(loadFirebase().then(async (sdk) => {
+    await sdk.auth.authStateReady();
+    return sdk;
+  }));
+}
+
 async function postJson(name, body) {
   let response;
   // Empty unless App Check is configured for this deployment; the server
   // only requires it when EVENT_APP_CHECK_ENFORCED is on (issue #45).
-  const attestation = await appCheckHeaders();
+  // A token that is slow to arrive gets the same fallback as a failed one:
+  // the request goes without attestation and the server applies its policy.
+  const attestation = await withinSignInWait(appCheckHeaders()).catch((error) => {
+    console.warn('App Check is slow; sending the request unattested.', error);
+    return {};
+  });
   try {
     response = await fetch(`${functionsOrigin()}/${name}`, {
       method: 'POST',
@@ -143,6 +182,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [switchingAccount, setSwitchingAccount] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const [authWaitEnded, setAuthWaitEnded] = useState(false);
   const retryAuth = useCallback(() => globalThis.location.reload(), []);
   // Refreshing checks the same user again. A failed check returns to loading
   // while it retries. The Access page keeps the current verdict until the
@@ -177,6 +217,15 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }), () => setAuthError('Sign-in could not load. Reload this page to try again.'));
   }, []);
+
+  // Only the sign-in page reads authStalled. A protected page keeps waiting
+  // for Firebase's answer, so this timeout never reads as signed out.
+  useEffect(() => {
+    if (!loading) return undefined;
+    const timer = window.setTimeout(() => setAuthWaitEnded(true), SIGN_IN_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
+  const authStalled = loading && authWaitEnded;
 
   // Admin probes (see module comment). Run once per signed-in user, and
   // again on refreshAdminStatus. A permission-denied answer on the first
@@ -268,12 +317,24 @@ export function AuthProvider({ children }) {
     };
   }, [awaitingServer]);
 
+  // The popup must open inside the click that asked for it, or the browser
+  // blocks it. A click while auth startup is still running waits for startup
+  // (bounded) and then asks for a new click instead of opening the popup late.
   const signInWithGoogle = useCallback(
     async () => {
+      if (loading) {
+        await startedFirebase();
+        throw new OtpRequestError({
+          code: 'auth-ready-now',
+          status: 0,
+          message: 'Sign-in is ready now. Select Continue with Google again.',
+          spanish: 'El inicio de sesión ya está listo. Vuelve a seleccionar Continuar con Google.',
+        });
+      }
       const { auth, signInWithPopup, GoogleAuthProvider } = await loadFirebase();
       return signInWithPopup(auth, new GoogleAuthProvider());
     },
-    [],
+    [loading],
   );
 
   // Step 1 of the emailed-code flow. Resolves { challengeId,
@@ -287,7 +348,7 @@ export function AuthProvider({ children }) {
   // Step 2: one failure shape for every miss (no oracle), then the custom
   // token signs the browser in.
   const verifyOtpCode = useCallback(async ({ challengeId, email, code }) => {
-    const { auth, signInWithCustomToken } = await loadFirebase();
+    const { auth, signInWithCustomToken } = await startedFirebase();
     const requestUser = auth.currentUser;
     const { token } = await postJson('verifyOtpCode', {
       challengeId,
@@ -330,6 +391,7 @@ export function AuthProvider({ children }) {
       adminCheckFailed,
       adminTier,
       loading,
+      authStalled,
       authError,
       retryAuth,
       refreshAdminStatus,
@@ -346,6 +408,7 @@ export function AuthProvider({ children }) {
       adminCheckFailed,
       adminTier,
       loading,
+      authStalled,
       authError,
       retryAuth,
       refreshAdminStatus,

@@ -147,6 +147,31 @@ test.describe('public wait results', () => {
     await expect(busy.getByRole('button', { name: 'Sign out' })).toBeVisible();
   });
 
+  test('sign-in offers its options when the check runs long, and the late answer still wins', async ({ page }) => {
+    // Issue 1357: Firebase's first auth state has no time limit. A held
+    // account lookup keeps it open past the sign-in page's wait.
+    const stalled = 'We could not confirm your sign-in yet. You can sign in below or try again.';
+    await useClientSnapshot(page);
+    await signInFixture(page, uid);
+    await page.clock.install();
+    const auth = await holdRequest(page, (url) => url.pathname.endsWith('/accounts:lookup'),
+      (request) => request.method() === 'POST');
+    await page.goto('/signin');
+    const busy = page.getByRole('region', { name: 'Sign-in options' });
+    await expectStages(page, 'Checking your sign-in…', busy);
+    await auth.seen;
+    await page.clock.fastForward(5000);
+    await expect(busy).toHaveAttribute('aria-busy', 'false');
+    await expectSpokenStatus(statusLine(page, stalled), stalled);
+    await expect(busy.getByLabel('Email address')).toBeVisible();
+    await expect(busy.getByRole('button', { name: 'Try again' })).toBeVisible();
+    await expect(busy.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
+    auth.release();
+    await expectSpokenStatus(statusLine(page, 'You are signed in.'), 'You are signed in.');
+    await expect(busy.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(busy.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+  });
+
   test('sign-in announces its options after a held SDK load', async ({ page }) => {
     await useClientSnapshot(page);
     await page.clock.install();

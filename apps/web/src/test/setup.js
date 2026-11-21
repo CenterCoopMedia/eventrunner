@@ -18,7 +18,8 @@ if (!presetRemapsLoaded()) registerPresetRemaps(PRESET_REMAPS);
 // vi.mocked(...) on the 'firebase/auth' / 'firebase/firestore' imports.
 vi.mock('@/firebase.js', () => ({
   app: {},
-  auth: {},
+  // Firebase's startup has finished in every test unless a test says otherwise.
+  auth: { authStateReady: async () => {} },
   db: {},
   // App Check is unconfigured in a credential-free test run, which is also
   // its production default: no site key, no attestation header.

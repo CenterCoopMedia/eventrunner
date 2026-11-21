@@ -26,7 +26,7 @@ import LoadingState from '../components/LoadingState.jsx';
 
 export default function Login() {
   const { text, localize } = usePublicLanguage();
-  const { user, loading, signOut, authError, retryAuth } = useAuth();
+  const { user, loading, authStalled, signOut, authError, retryAuth } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { eventConfig } = useEventConfig();
@@ -34,7 +34,21 @@ export default function Login() {
   const returnPath = adminReturnPath(location.state?.from);
   const [reauthenticateUid, setReauthenticateUid] = useState(null);
   const panelOnly = (readOnlyDemo && !returnPath) || authError;
-  const checkingSignIn = !panelOnly && loading;
+  const checkingSignIn = !panelOnly && loading && !authStalled;
+  // The check ran past SIGN_IN_WAIT_MS (issue 1357). Offer the options and a
+  // reload; Firebase's answer still replaces this view when it arrives.
+  const stalled = !panelOnly && loading && authStalled;
+  // LoadingState announces only the end of an active wait, so the answer
+  // that arrives after the stalled view gets its own status line.
+  const [waitedPastLimit, setWaitedPastLimit] = useState(false);
+  if (stalled && !waitedPastLimit) setWaitedPastLimit(true);
+  const lateResult = waitedPastLimit && !loading && !panelOnly
+    ? (user ? text('You are signed in.', 'Iniciaste sesión.') : text('Sign-in options are ready.', 'Las opciones de inicio de sesión están listas.'))
+    : '';
+  const stalledNotice = text(
+    'We could not confirm your sign-in yet. You can sign in below or try again.',
+    'Aún no pudimos confirmar tu inicio de sesión. Puedes iniciar sesión abajo o intentarlo de nuevo.',
+  );
 
   function renderSignInContent() {
     if (panelOnly) return <div className="mt-lg"><SignInPanel /></div>;
@@ -66,6 +80,14 @@ export default function Login() {
     );
     return (
       <>
+        {stalled ? (
+          <div className="mt-lg space-y-sm border-hairline border-rule-hairline bg-surface-alt p-md">
+            <p className="text-text-primary">{stalledNotice}</p>
+            <button type="button" onClick={retryAuth} className={secondaryButtonClass}>
+              {text('Try again', 'Intentar de nuevo')}
+            </button>
+          </div>
+        ) : null}
         <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
           {readOnlyDemo
             ? text('Use the Google account for your admin email. This demo does not send email codes.', 'Usa la cuenta de Google de tu correo de administración. Esta demostración no envía códigos por correo.')
@@ -87,12 +109,13 @@ export default function Login() {
       <LoadingState
         active={checkingSignIn}
         label={text('Checking your sign-in…', 'Comprobando el inicio de sesión…')}
-        completion={panelOnly ? '' : user
+        completion={panelOnly ? '' : stalled ? stalledNotice : user
           ? text('You are signed in.', 'Iniciaste sesión.')
           : text('Sign-in options are ready.', 'Las opciones de inicio de sesión están listas.')}
         rows={0}
         onRetry={retryAuth}
       />
+      {waitedPastLimit ? <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{lateResult}</p> : null}
       <section aria-label={text('Sign-in options', 'Opciones de inicio de sesión')} aria-busy={checkingSignIn}>
         {renderSignInContent()}
       </section>

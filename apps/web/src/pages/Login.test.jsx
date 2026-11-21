@@ -8,7 +8,7 @@ import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import App from '../App.jsx';
 import EventRouter from '../EventRouter.jsx';
 import { functionsOrigin } from '../lib/firebaseSettings.js';
-import { appCheckHeaders } from '../firebase.js';
+import { appCheckHeaders, auth } from '../firebase.js';
 
 // Exercise the existing OTP suite as an ordinary deployed client. The
 // committed snapshot is now explicitly a read-only historical fixture.
@@ -173,7 +173,7 @@ describe('emailed-code sign-in', () => {
         }),
       );
     });
-    expect(signInWithCustomToken).toHaveBeenCalledWith({}, 'custom-token-abc');
+    expect(signInWithCustomToken).toHaveBeenCalledWith(auth, 'custom-token-abc');
 
     // Success navigates to the home page — assert on content that only the
     // home page renders (the login page's own "Sign in" h1 would otherwise
