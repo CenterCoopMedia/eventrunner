@@ -5,6 +5,7 @@
 // requireAdmin and firestore.rules are the enforcement):
 //   • auth still loading → a loading state, never a flash of denial;
 //   • signed out        → redirect to /signin, remembering where they were;
+//   • access check fails → explain the failed check and let the user retry;
 //   • signed in, not an admin → a plain denial, no retry affordance.
 // "Admin" is exactly what AuthContext's admin probe reports: a read of an
 // admin-only drafts collection, decided by firestore.rules isAdmin(), which
@@ -20,6 +21,7 @@ import { clearReloadFlag } from '../lib/chunkReload.js';
 import { RouteLoadingContext, RouteLoadingReady, useRouteLoadingAttempt } from '../lib/routeLoading.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
+import { secondaryButtonClass } from './components/formControls.jsx';
 import AdminLayout, { AdminRecoveryReadyContext } from './AdminLayout.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
@@ -148,7 +150,7 @@ function AdminPageBoundary() {
 }
 
 export function AdminGate({ children }) {
-  const { user, adminStatus, loading } = useAuth();
+  const { user, adminStatus, adminCheckFailed, loading, refreshAdminStatus } = useAuth();
   const location = useLocation();
   const checkingAccess = loading || (user && adminStatus === 'unknown');
   const routeAttempt = useRouteLoadingAttempt(!checkingAccess && (!user || adminStatus !== 'admin'));
@@ -182,10 +184,18 @@ export function AdminGate({ children }) {
     return (
       <div className="admin-room min-h-screen min-h-svh bg-admin-ground font-admin-ui text-admin-ink">
         <div className="w-full px-md py-lg">
-          <AdminEmptyState
-            title="You don’t have admin access"
-            description="This area is limited to the event’s administrators. If you think that’s wrong, ask an organizer to add your address to the admin list."
-          />
+          {adminCheckFailed ? (
+            <AdminEmptyState
+              title="We could not check your admin access"
+              description="Check your connection and try again."
+              action={<button type="button" className={secondaryButtonClass} onClick={refreshAdminStatus}>Check again</button>}
+            />
+          ) : (
+            <AdminEmptyState
+              title="You don’t have admin access"
+              description="This area is limited to the event’s administrators. If you think that’s wrong, ask an organizer to add your address to the admin list."
+            />
+          )}
         </div>
       </div>
     );

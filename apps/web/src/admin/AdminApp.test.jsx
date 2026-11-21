@@ -288,6 +288,7 @@ describe('admin route gating', () => {
     expect(
       screen.getByRole('heading', { name: 'You don’t have admin access' }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
   });
 
@@ -358,13 +359,31 @@ describe('admin route gating', () => {
     pendingProbe = true;
     await renderAt('/admin/pages');
     await act(async () => {
-      pendingProbe.reject(new Error('permission denied'));
+      pendingProbe.reject(permissionDenied());
       await Promise.resolve();
       await Promise.resolve();
     });
     expect(
       screen.getByRole('heading', { name: 'You don’t have admin access' }),
     ).toBeInTheDocument();
+  });
+
+  it('lets a signed-in organizer retry a failed access check on the same page', async () => {
+    pendingProbe = true;
+    await renderAt('/admin/speakers');
+    await act(async () => pendingProbe.reject(Object.assign(new Error('offline'), { code: 'unavailable' })));
+
+    expect(screen.getByRole('heading', { name: 'We could not check your admin access' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'You don’t have admin access' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Check again' })));
+    expect(screen.getByText('Checking your access…', { selector: '.loading-status__label' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
+    await act(async () => pendingProbe.resolve({ docs: [] }));
+
+    expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Speakers', exact: true })).toBeInTheDocument();
   });
 
   it('does not gate the public site behind the admin routes', async () => {

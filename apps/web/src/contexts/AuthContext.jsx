@@ -139,15 +139,14 @@ export function AuthProvider({ children }) {
   // transient failure must not make an operator staff for the session, so
   // it is left unknown, the rail says so and offers a retry, and no section
   // is refused on a guess (the server decides regardless).
-  const [verdict, setVerdict] = useState({ user: null, status: 'unknown', tier: null, confirmed: false });
+  const [verdict, setVerdict] = useState(null);
   const [loading, setLoading] = useState(true);
   const [switchingAccount, setSwitchingAccount] = useState(false);
   const [authError, setAuthError] = useState(null);
   const retryAuth = useCallback(() => globalThis.location.reload(), []);
-  // Bumped by refreshAdminStatus: the probes run again for the same user,
-  // keeping the current verdict until the new one lands. The Access page
-  // asks for this after an operator changes their OWN standing, so the rail
-  // and the route refusal follow at once rather than on the next sign-in.
+  // Refreshing checks the same user again. A failed check returns to loading
+  // while it retries. The Access page keeps the current verdict until the
+  // new one lands after an operator changes their own standing.
   const [probeRun, setProbeRun] = useState(0);
 
   useEffect(() => {
@@ -204,7 +203,13 @@ export function AuthProvider({ children }) {
       if (isAnyAdmin) {
         tier = logs === 'ok' || logs === 'ok-cached' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
       }
-      setVerdict({ user, status: isAnyAdmin ? 'admin' : 'denied', tier, confirmed: drafts === 'ok' });
+      setVerdict({
+        user,
+        status: isAnyAdmin ? 'admin' : 'denied',
+        tier,
+        confirmed: drafts === 'ok',
+        checkFailed: drafts === 'error',
+      });
     })();
     return () => {
       cancelled = true;
@@ -212,11 +217,13 @@ export function AuthProvider({ children }) {
   }, [user, probeRun]);
 
   const refreshAdminStatus = useCallback(() => {
+    setVerdict((current) => current?.checkFailed ? null : current);
     setProbeRun((run) => run + 1);
   }, []);
 
-  const ownVerdict = user && verdict.user === user ? verdict : null;
+  const ownVerdict = user && verdict?.user === user ? verdict : null;
   const adminStatus = !user ? 'denied' : ownVerdict ? ownVerdict.status : 'unknown';
+  const adminCheckFailed = ownVerdict?.checkFailed === true;
   const adminTier = ownVerdict?.status === 'admin' ? ownVerdict.tier : null;
   const isAdmin = adminStatus === 'admin';
   const isOperator = adminTier === 'operator';
@@ -300,6 +307,7 @@ export function AuthProvider({ children }) {
       isAdmin,
       isOperator,
       adminStatus,
+      adminCheckFailed,
       adminTier,
       adminConfirmed,
       loading,
@@ -317,6 +325,7 @@ export function AuthProvider({ children }) {
       isAdmin,
       isOperator,
       adminStatus,
+      adminCheckFailed,
       adminTier,
       loading,
       authError,
