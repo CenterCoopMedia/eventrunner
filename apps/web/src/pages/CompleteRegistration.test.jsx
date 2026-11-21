@@ -84,23 +84,22 @@ describe('CompleteRegistration', () => {
 
   it('reattaches a stalled question read without treating it as an empty form', async () => {
     currentForm = undefined;
-    vi.useFakeTimers();
-    let view;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let retry;
     try {
-      view = renderAt();
+      renderAt();
       expect(screen.getByText('Loading your registration…')).toBeVisible();
       act(() => vi.advanceTimersByTime(60_000));
-      const retry = screen.getByRole('button', { name: 'Try again' });
+      retry = screen.getByRole('button', { name: 'Try again' });
       expect(screen.queryByRole('heading', { name: 'Nothing to answer' })).toBeNull();
       expect(screen.queryByRole('heading', { name: 'You need a ticket first' })).toBeNull();
-      currentForm = FORM;
-      await act(async () => fireEvent.click(retry));
-      expect(await screen.findByRole('heading', { name: 'Ticket: General for Ada Lovelace' })).toBeVisible();
-      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     } finally {
-      view?.unmount();
       vi.useRealTimers();
     }
+    currentForm = FORM;
+    fireEvent.click(retry);
+    expect(await screen.findByRole('heading', { name: 'Ticket: General for Ada Lovelace' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
   it('explains a ticket is needed when the account holds none', async () => {

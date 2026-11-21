@@ -58,13 +58,12 @@ describe('DeferredPage', () => {
       expect(status).toBeVisible();
       expect(status).toHaveTextContent('This is taking longer than a minute.');
       expect(view.container.querySelector('.loading-state__placeholder')).toBeNull();
-      await act(async () => finish());
-      expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeVisible();
-      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     } finally {
-      view.unmount();
       vi.useRealTimers();
     }
+    await act(async () => finish());
+    expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
   it('drops an abandoned route clock and paints a fast replacement without a ring', async () => {

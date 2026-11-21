@@ -140,22 +140,20 @@ describe('attendee ticket selection', () => {
 
   it('keeps ticket selection gated while the registration questions are still unknown', async () => {
     state.form = undefined;
-    vi.useFakeTimers();
-    let view;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     try {
-      await act(async () => { view = mount(); });
-      expect(await screen.findByText('Loading registration questions…')).toBeVisible();
+      await act(async () => { mount(); });
+      expect(screen.getByText('Loading registration questions…')).toBeVisible();
       act(() => vi.advanceTimersByTime(60_000));
       expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
       expect(screen.queryByLabelText('Quantity — General admission')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Continue to Stripe' })).toBeNull();
-      await act(async () => state.pushForm(FORM));
-      expect(await screen.findByLabelText('Quantity — General admission')).toBeVisible();
-      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     } finally {
-      view?.unmount();
       vi.useRealTimers();
     }
+    act(() => state.pushForm(FORM));
+    expect(await screen.findByLabelText('Quantity — General admission')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
   it('clears a failed catalog wait and names the current work until registration is ready', async () => {
