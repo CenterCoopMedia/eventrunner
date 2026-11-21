@@ -2127,6 +2127,27 @@
     .site-header-identity-row .nameplate__meta,
     .site-header-dateline { display: none; }
     .site-header-treatment .historical-demo-logo { max-inline-size: 100%; }
+    /* A banner-shaped logo fills the width left of Menu, 1.5rem to 4rem
+       tall, so its small text can be read (#1342). The image keeps its
+       proportions in its box, so a small file scales up too. Square and
+       tall logos keep the mark size. */
+    .site-header-treatment :has(> .site-logo--banner) { inline-size: 100%; }
+    .site-logo.site-logo--banner {
+      inline-size: 100%;
+      block-size: auto;
+      min-block-size: 1.5rem;
+      max-block-size: 4rem;
+      max-inline-size: 100%;
+      object-position: left center;
+    }
+    /* The banner's item grows into the row and takes at least half of
+       it, so actions that share the row wrap below instead of squeezing
+       the logo. */
+    .site-header-treatment :is(.site-header-identity, .site-masthead__identity, .nameplate__name):has(.site-logo--banner) {
+      flex: 1 1 50%;
+    }
+    /* Menu centres on the banner rather than on its bottom edge. */
+    .site-header-identity-row:has(.site-logo--banner) > * { align-self: center; }
     .demo-toolbar > p { flex-basis: 100%; }
     .demo-toolbar > button { flex: 1 1 auto; }
 

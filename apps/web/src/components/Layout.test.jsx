@@ -372,6 +372,23 @@ describe('Layout header logo, issue 1167', () => {
     expect(headerLogo(missing.container)).toBeNull();
     expect(missing.container.querySelector('.site-header-title').className).not.toContain('sr-only');
   });
+
+  // #1342: a logo at least twice as wide as tall runs as a banner on phones.
+  it.each([
+    [1250, 500, true],
+    [960, 192, true],
+    [399, 200, false],
+    [400, 400, false],
+  ])('marks a %ix%i logo as a banner: %s', (naturalWidth, naturalHeight, banner) => {
+    const { container } = renderShell({ primary: PRIMARY });
+    const img = headerLogo(container);
+    Object.defineProperties(img, {
+      naturalWidth: { value: naturalWidth },
+      naturalHeight: { value: naturalHeight },
+    });
+    fireEvent.load(img);
+    expect(headerLogo(container).classList.contains('site-logo--banner')).toBe(banner);
+  });
 });
 
 describe('Layout footer logo switch, issue 1167', () => {
