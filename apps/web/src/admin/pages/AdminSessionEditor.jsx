@@ -275,6 +275,10 @@ export default function AdminSessionEditor({ mode }) {
     let stage = 'save';
     try {
       const fields = sessionFields(nextForm);
+      // Keep translation edits saved by another organizer after this form opened.
+      if (!creating && editorSnapshot(nextForm.translations) === editorSnapshot(savedForm?.translations)) {
+        delete fields.translations;
+      }
       // An unrelated edit must preserve speaker links added or removed since this form opened.
       if (creating || editorSnapshot(nextForm.speakerIds) !== editorSnapshot(savedForm?.speakerIds)) {
         fields.speakerIds = nextForm.speakerIds;
