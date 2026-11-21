@@ -86,7 +86,7 @@ vi.mock('firebase/firestore', () => ({
   getDocs: vi.fn((ref) =>
     staff && ref?.name === 'admin_logs'
       ? Promise.reject(Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }))
-      : Promise.resolve({ docs: [] }),
+      : Promise.resolve({ docs: [], metadata: { fromCache: false } }),
   ),
 }));
 

@@ -71,7 +71,7 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(() => ({})),
   where: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
-  getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  getDocs: vi.fn(() => Promise.resolve({ docs: [], metadata: { fromCache: false } })),
   // The stress fixture puts real session rows on the schedule, and a session
   // row subscribes to its own reaction counts. Without this the frame's
   // Schedule page throws inside the preview rather than rendering.

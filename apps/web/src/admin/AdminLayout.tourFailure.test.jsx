@@ -43,7 +43,7 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: vi.fn(() => () => {}),
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
-  getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  getDocs: vi.fn(() => Promise.resolve({ docs: [], metadata: { fromCache: false } })),
 }));
 // The chunk that will not load.
 vi.mock('./components/AdminTour.jsx', () => {

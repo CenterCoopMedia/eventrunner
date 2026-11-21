@@ -65,7 +65,7 @@ beforeEach(() => {
   });
   vi.mocked(signInWithCustomToken).mockReset();
   vi.mocked(firebaseSignOut).mockImplementation(async () => publishAuth(null));
-  vi.mocked(getDocs).mockReset().mockResolvedValue({ docs: [] });
+  vi.mocked(getDocs).mockReset().mockResolvedValue({ docs: [], metadata: { fromCache: false } });
 });
 
 afterEach(() => {
@@ -112,7 +112,7 @@ describe('same-account OTP credential refresh', () => {
     await waitFor(() => expect(screen.getByLabelText('OTP result')).toHaveTextContent('complete: existing-attendee'));
     expect(screen.getByLabelText('Account')).toHaveTextContent('existing-attendee: verified');
     expect(screen.getByLabelText('Admin access')).toHaveTextContent('unknown: none');
-    await act(async () => drafts.resolve({ docs: [] }));
+    await act(async () => drafts.resolve({ docs: [], metadata: { fromCache: false } }));
     expect(screen.getByLabelText('Admin access')).toHaveTextContent('unknown: none');
     await act(async () => logs.reject(Object.assign(new Error('Not allowed.'), { code: 'permission-denied' })));
     expect(screen.getByLabelText('Admin access')).toHaveTextContent('admin: staff');

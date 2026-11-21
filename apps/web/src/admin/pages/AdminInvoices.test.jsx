@@ -44,7 +44,7 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: vi.fn(() => () => {}),
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
-  getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  getDocs: vi.fn(() => Promise.resolve({ docs: [], metadata: { fromCache: false } })),
 }));
 
 import App from '../../App.jsx';

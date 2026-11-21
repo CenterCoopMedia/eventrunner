@@ -38,7 +38,7 @@ vi.mock('firebase/firestore', () => ({
   limit: vi.fn(() => ({})),
   getDocs: vi.fn((ref) => (ref?.name === 'admin_logs' && tier.value === 'staff'
     ? Promise.reject(Object.assign(new Error('denied'), { code: 'permission-denied' }))
-    : Promise.resolve({ docs: [] }))),
+    : Promise.resolve({ docs: [], metadata: { fromCache: false } }))),
 }));
 
 import App from '../../App.jsx';

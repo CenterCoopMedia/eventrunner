@@ -76,7 +76,7 @@ vi.mock('firebase/firestore', () => ({
   limit: vi.fn(() => ({})),
   getDocs: vi.fn((ref) => (ref?.name === 'admin_logs' && !operatorProbeShouldSucceed
     ? Promise.reject(new Error('permission denied'))
-    : Promise.resolve({ docs: [] }))),
+    : Promise.resolve({ docs: [], metadata: { fromCache: false } }))),
 }));
 afterEach(() => {
   operatorProbeShouldSucceed = true;

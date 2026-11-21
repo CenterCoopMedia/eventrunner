@@ -182,14 +182,22 @@ export function AuthProvider({ children }) {
   // again on refreshAdminStatus. A permission-denied answer on the first
   // means "not an admin", and on the second "an admin, but not an
   // operator"; any other failure of the second leaves the tier unknown.
+  //
+  // Only the server's answer counts (issue #1318). With the server
+  // unreachable, getDocs resolves from the local cache, and an empty cache
+  // answer looks like an allowed read. A cache answer is therefore a failed
+  // check: the gate shows "We could not check your admin access" with a
+  // retry, never the shell. The one exception is an admin this page session
+  // already confirmed with the server: a failed recheck keeps that verdict,
+  // so a network blip mid-session does not close the shell, and asks the
+  // server again until it answers (see the retry effect below). The server
+  // still refuses every admin call it does not authorize.
   useEffect(() => {
     if (!user) return undefined;
     let cancelled = false;
     const probe = (name) => loadFirebase().then(({ db, getDocs, query, collection, limit }) =>
       getDocs(query(collection(db, name), limit(1)))).then(
-        // A cache answer still counts for the admin shell, as before; it is
-        // recorded so a consumer that needs the server's word can tell.
-        (snapshot) => (snapshot?.metadata?.fromCache === false ? 'ok' : 'ok-cached'),
+        (snapshot) => (snapshot?.metadata?.fromCache === false ? 'ok' : 'error'),
         (err) => (err?.code === 'permission-denied' ? 'denied' : 'error'),
       );
     (async () => {
@@ -198,17 +206,22 @@ export function AuthProvider({ children }) {
         probe('admin_logs'),
       ]);
       if (cancelled) return;
-      const isAnyAdmin = drafts === 'ok' || drafts === 'ok-cached';
+      if (drafts === 'error') {
+        setVerdict((current) => (current?.user === user && current.status === 'admin'
+          ? { ...current, recheckPending: true }
+          : { user, status: 'denied', tier: null, checkFailed: true }));
+        return;
+      }
+      const isAnyAdmin = drafts === 'ok';
       let tier = null;
       if (isAnyAdmin) {
-        tier = logs === 'ok' || logs === 'ok-cached' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
+        tier = logs === 'ok' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
       }
       setVerdict({
         user,
         status: isAnyAdmin ? 'admin' : 'denied',
         tier,
-        confirmed: drafts === 'ok',
-        checkFailed: drafts === 'error',
+        checkFailed: false,
       });
     })();
     return () => {
@@ -227,18 +240,15 @@ export function AuthProvider({ children }) {
   const adminTier = ownVerdict?.status === 'admin' ? ownVerdict.tier : null;
   const isAdmin = adminStatus === 'admin';
   const isOperator = adminTier === 'operator';
-  // An admin verdict the server returned, not a local cache answer. The
-  // private attendee feed (issue #788) opens on a staff grant only then.
-  const adminConfirmed = isAdmin && ownVerdict?.confirmed === true;
 
-  // A cached admin answer is never replaced by the probe effect alone, so
-  // a staff reader who opened the app offline would wait on the feed
-  // forever. Ask the server again when the browser reconnects, and every
-  // 30 s as a backstop, until it confirms. The cached verdict stays in
-  // place meanwhile; nothing that needs confirmation opens on it.
-  const awaitingServerVerdict = isAdmin && !adminConfirmed;
+  // A failed check, or a recheck that could not reach the server, is never
+  // replaced by the probe effect alone: a staff reader who opened the app
+  // offline would wait forever, and a kept admin verdict would outlive a
+  // revocation. Ask the server again when the browser reconnects, and every
+  // 30 s as a backstop, until it answers. "Check again" asks at once.
+  const awaitingServer = adminCheckFailed || ownVerdict?.recheckPending === true;
   useEffect(() => {
-    if (!awaitingServerVerdict) return undefined;
+    if (!awaitingServer) return undefined;
     const retry = () => setProbeRun((run) => run + 1);
     window.addEventListener('online', retry);
     const timer = window.setInterval(retry, 30_000);
@@ -246,7 +256,7 @@ export function AuthProvider({ children }) {
       window.removeEventListener('online', retry);
       window.clearInterval(timer);
     };
-  }, [awaitingServerVerdict]);
+  }, [awaitingServer]);
 
   const signInWithGoogle = useCallback(
     async () => {
@@ -309,7 +319,6 @@ export function AuthProvider({ children }) {
       adminStatus,
       adminCheckFailed,
       adminTier,
-      adminConfirmed,
       loading,
       authError,
       retryAuth,
@@ -320,7 +329,6 @@ export function AuthProvider({ children }) {
       signOut,
     }),
     [
-      adminConfirmed,
       user,
       isAdmin,
       isOperator,
