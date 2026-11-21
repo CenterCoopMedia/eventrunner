@@ -64,6 +64,22 @@ test('commerce roles are live, verified, and financial/catalog operations requir
   assert.equal((await call(admin(db), { action: 'orders' }, 'operator')).statusCode, 403);
 });
 
+test('the admin catalog reports a recorded Stripe disconnect to staff', async () => {
+  const published = catalog({ published: true });
+  const db = dbFor({ 'ticket_catalog/current': published });
+  const handler = admin(db);
+  const body = { action: 'catalog' };
+  assert.equal((await call(handler, body)).body.connectionEnded, false);
+
+  await db.collection('ticket_catalog').doc('connection').set({ ended: true, at: NOW });
+  const response = await call(handler, body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.connectionEnded, true);
+  assert.deepEqual(response.body.catalog, published);
+  assert.equal(response.body.inventory.sold, 2);
+  assert.equal((await call(handler, body, 'stranger')).statusCode, 403);
+});
+
 test('a promo redemption report counts completed tickets by historical type and buyer across pages', async () => {
   const discounted = { ...order, promo: { code: 'EARLY', discountedSeats: 2 },
     lines: [

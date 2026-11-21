@@ -10,8 +10,8 @@ import { Notice, TextAreaField, fieldLabelClass, primaryButtonClass, secondaryBu
 import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
 import { encodeScreenshots, newReportSubmissionKey, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 import AdminScreenshotField from './AdminScreenshotField.jsx';
+import { CONSOLE_ORIGIN } from '../consoleOrigin.js';
 
-const CONSOLE_ORIGIN = (import.meta.env.VITE_CONSOLE_ORIGIN || 'https://console.eventrunner.org').replace(/\/+$/, '');
 const KINDS = [
   { value: 'bug', label: 'Something is broken' },
   { value: 'suggestion', label: 'An idea or a change' },

@@ -8,7 +8,7 @@ const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
 const { internals: { safeDocId, TICKETS } } = require('./index.cjs');
 const { listPromoCodes, savePromoCode, deletePromoCode, promoRef, releasedPromoUse } = require('./promoCodes.cjs');
-const { ORDERS, CATALOG, INVENTORY, CommerceError, normalizeInventory, inventoryTransitionPatch } = require('./stripeCommerce.cjs');
+const { ORDERS, CATALOG, CONNECTION, INVENTORY, CommerceError, normalizeInventory, inventoryTransitionPatch } = require('./stripeCommerce.cjs');
 const { internals: { scopeMatches } } = require('./providers/stripe.cjs');
 
 const AUDIT = 'admin_logs';
@@ -122,11 +122,13 @@ async function readOrderDetail({ db, provider, orderId }) {
 }
 
 async function readCatalog({ db, provider }) {
-  const [catalogSnap, inventorySnap] = await Promise.all([
-    db.collection(CATALOG).doc('current').get(), db.collection(INVENTORY).doc('current').get(),
-  ]);
+  const [catalogSnap, inventorySnap, connectionSnap] = await db.getAll(
+    db.collection(CATALOG).doc('current'), db.collection(INVENTORY).doc('current'),
+    db.collection(CATALOG).doc(CONNECTION),
+  );
   return {
     provider: provider.name, mode: provider.livemode ? 'live' : 'test',
+    connectionEnded: connectionSnap.data()?.ended === true,
     catalog: catalogSnap.exists ? catalogSnap.data() : null,
     inventory: inventorySnap.exists ? inventorySnap.data() : { eventId: provider.externalEventId, held: 0, sold: 0, types: {} },
   };
