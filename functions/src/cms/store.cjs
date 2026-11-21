@@ -156,10 +156,12 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
 
   let basedOnRevision = null;
   let priorVisible = true;
+  let priorOrder;
   if (draftSnap.exists) {
     const prior = draftSnap.data();
     basedOnRevision = typeof prior.basedOnRevision === 'number' ? prior.basedOnRevision : null;
     priorVisible = isVisible(prior);
+    priorOrder = prior.order;
   } else {
     const liveSnap = await tx.get(db.collection(collection).doc(docId));
     // A brand-new page must not fork a draft from a live doc that already
@@ -171,11 +173,14 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
       const live = liveSnap.data();
       basedOnRevision = typeof live.revision === 'number' ? live.revision : null;
       priorVisible = isVisible(live);
+      priorOrder = live.order;
     }
   }
 
   const payload = {
     ...contentFieldsOf(fields),
+    // A page editor may have opened before someone published a new menu order.
+    ...(collection === 'cmsPages' && Number.isFinite(priorOrder) ? { order: priorOrder } : {}),
     visible: typeof visible === 'boolean' ? visible : priorVisible,
     status: 'dirty',
     basedOnRevision,

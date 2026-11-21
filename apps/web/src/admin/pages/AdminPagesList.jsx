@@ -11,13 +11,13 @@
 // beside it, and a successful publish resolves the tint away over 160ms on
 // opacity — instantly under reduced motion.
 //
-// Issue #448: the row order is the navigation order. A move stays in this
-// list until Save draft. Publish stays its own action.
-import { useEffect, useRef, useState } from 'react';
+// A move stays in this list until the organizer publishes the menu order.
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { isNavigationLink, isPublicPage, pageFeatureGate } from 'shared/page';
-import { buildNavItems } from '../../lib/siteNavigation.js';
+import { buildNavEntries, TOP_MENU_SIZE } from '../../lib/siteNavigation.js';
+import BusyLabel from '../../components/BusyLabel.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { featureLabel } from '../featureChoices.js';
@@ -27,8 +27,7 @@ import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
 import usePublishRun from '../usePublishRun.js';
 import PublishRunProgress from '../components/PublishRunProgress.jsx';
-import { toEditablePage, toPagePayload } from '../pageDoc.js';
-import { orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
+import { storedOrder, useDraftOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import AdminIconControl from '../components/AdminIconControl.jsx';
 import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
@@ -45,7 +44,6 @@ import {
 } from '../components/formControls.jsx';
 import {
   OrderAnnouncement,
-  OrderDraftButtons,
   ReorderControls,
   bindReorderDrop,
   useRowDrag,
@@ -160,13 +158,23 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features, vis
   );
 }
 
+function menuLabel(row) {
+  const page = row.live ?? row.current;
+  const label = String(page?.label ?? '');
+  return isNavigationLink(page) ? label.trim() : label;
+}
+
 export default function AdminPagesList() {
-  const { rows, loading, error } = useAdminPages({ includeNavigationLinks: true });
+  const { rows, ready, loading, error } = useAdminPages({ includeNavigationLinks: true });
   const call = useAdminApi();
   const { publish, run } = usePublishRun(call);
   const { showToast } = useToast();
   const { features } = useEventConfig();
-  const draft = useDraftOrder(rows);
+  // The public menu breaks ties by label. Draft labels must not move a live page.
+  const menuRows = useMemo(() => [...rows].sort((a, b) => (
+    storedOrder(a) - storedOrder(b) || menuLabel(a).localeCompare(menuLabel(b))
+  )), [rows]);
+  const draft = useDraftOrder(menuRows);
   const [publishing, setPublishing] = useState(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -192,8 +200,14 @@ export default function AdminPagesList() {
   const ordered = draft.rows;
   const linkCount = rows.filter((row) => isNavigationLink(row.current)).length;
   const pageCount = rows.length - linkCount;
-  const visibleLinks = new Set(buildNavItems(rows.map((row) => row.live), features).map((item) => item.key));
+  // Use published labels, paths and visibility while previewing the order in this list.
+  const menu = buildNavEntries(ordered.map((row, order) => row.live && { ...row.live, order }), features);
+  const visibleLinks = new Set(menu.map(({ item }) => item.key));
+  const lastTopMenuId = menu.length > TOP_MENU_SIZE ? menu[TOP_MENU_SIZE - 1].id : null;
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
+  const menuOrderPending = draft.dirty || rows.some(({ live, draft: savedDraft }) => (
+    live && Number.isFinite(savedDraft?.order) && savedDraft.order !== live.order
+  ));
 
   function moveRow(from, to) {
     if (savingOrder || publishing !== null) return false;
@@ -209,23 +223,25 @@ export default function AdminPagesList() {
     setSpoken('');
   }
 
-  async function saveOrder() {
-    if (publishing !== null) return;
-    const writes = ordersToWrite(ordered);
+  async function publishOrder() {
+    if (savingOrder || publishing !== null || !ready || error) return;
     setSavingOrder(true);
     setNotice(null);
-    const failed = await saveOrderWrites(
-      writes,
-      async ({ row, order }) => {
-        const page = toEditablePage({ ...row.current, id: row.id, order });
-        await call('cmsSavePage', { page: toPagePayload(page) });
-      },
-      (row) => row.current?.label || 'Untitled page',
-    );
-    const verdict = orderSaveMessage(failed);
-    setNotice(verdict);
-    showToast(verdict.message, verdict.tone === 'ok' ? { announce: false } : { tone: 'error', announce: false });
-    setSavingOrder(false);
+    try {
+      await publish({ menuOrder: ordered.map((row) => row.id) });
+      setNotice({ tone: 'ok', message: 'Menu order published. Page drafts stay unpublished.' });
+    } catch (err) {
+      const recovery = {
+        'menu-list-changed': 'The page list changed. Check the list, then publish the menu order again.',
+        'menu-too-large': 'This menu has too many changes to publish together. Contact support for help.',
+      };
+      const message = recovery[err?.code] ?? contentError(err, {
+        fallback: 'The menu order could not be confirmed. Check the page list before trying again.',
+      }).message;
+      setNotice({ tone: 'error', message });
+    } finally {
+      setSavingOrder(false);
+    }
   }
 
   async function publishAll() {
@@ -291,13 +307,17 @@ export default function AdminPagesList() {
         identifiers={`${pageCount} page${pageCount === 1 ? '' : 's'}${linkCount ? ` · ${linkCount} navigation link${linkCount === 1 ? '' : 's'}` : ''}`}
         actions={
           <>
-            <OrderDraftButtons
-              dirty={draft.dirty}
-              saving={savingOrder}
-              saveDisabled={publishing !== null}
-              onSave={saveOrder}
-              onCancel={cancelOrder}
-            />
+            {draft.dirty ? (
+              <button type="button" className={secondaryButtonClass} onClick={cancelOrder} disabled={savingOrder}>
+                Cancel
+              </button>
+            ) : null}
+            {menuOrderPending || savingOrder ? (
+              <button type="button" className={secondaryButtonClass} onClick={publishOrder}
+                disabled={!ready || Boolean(error) || savingOrder || publishing !== null} aria-busy={savingOrder || undefined}>
+                <BusyLabel busy={savingOrder} pending="Publishing the menu order…">Publish menu order</BusyLabel>
+              </button>
+            ) : null}
             {resume && !draft.dirty ? (
               <button
                 type="button"
@@ -359,17 +379,23 @@ export default function AdminPagesList() {
               work, and striping is the tell of a default table. */}
           <ul>
             {ordered.map((row, index) => (
-              <PageRow
-                key={row.id}
-                row={row}
-                index={index}
-                count={ordered.length}
-                moveRow={moveRow}
-                disabled={savingOrder || publishing !== null}
-                resolved={resolvedIds.has(row.id)}
-                features={features}
-                visibleLinks={visibleLinks}
-              />
+              <Fragment key={row.id}>
+                <PageRow
+                  row={row}
+                  index={index}
+                  count={ordered.length}
+                  moveRow={moveRow}
+                  disabled={savingOrder || publishing !== null}
+                  resolved={resolvedIds.has(row.id)}
+                  features={features}
+                  visibleLinks={visibleLinks}
+                />
+                {row.id === lastTopMenuId ? (
+                  <li role="presentation" className="border-t-admin-strong border-admin-rule-hairline px-md py-xs">
+                    <p className={fieldHintClass}>On wide screens with a top menu, visible pages and links below this line appear under More.</p>
+                  </li>
+                ) : null}
+              </Fragment>
             ))}
           </ul>
         </Panel>

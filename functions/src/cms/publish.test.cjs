@@ -9,6 +9,7 @@ const {
   createUpdatePublishStatusHandler,
 } = require('./publish.cjs');
 const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
+const { writeDraft } = require('./store.cjs');
 
 // requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
 // #186 review: it fails closed on an absent document), so every fake this
@@ -80,6 +81,66 @@ test('publish endpoints: 401 no token, 403 non-admin, 405 non-POST', async () =>
 });
 
 // --- cmsPublish -----------------------------------------------------------------
+
+test('menu order changes only positions, even if a page editor saves with an older order', async () => {
+  const livePage = { label: 'Public page', order: 0, visible: true, revision: 4 };
+  const liveLink = { label: 'Link', order: 1, visible: true, url: 'https://example.org' };
+  const draftPage = { label: 'Unpublished label', order: 0, visible: false, status: 'dirty', basedOnRevision: 4 };
+  const draftOnly = { label: 'Future page', order: 2, visible: true, status: 'dirty' };
+  const db = makeFakeDb({
+    'cmsPages/page': livePage, 'cmsPages/link': liveLink,
+    'cmsPages_drafts/page': draftPage, 'cmsPages_drafts/future': draftOnly,
+    'config/event': { comingSoon: true },
+  });
+  const handler = createCmsPublishHandler({ ...deps(db), env: {} });
+  const res = fakeRes();
+  const body = { menuOrder: ['link', 'future', 'page'], requestId: REQUEST_ID };
+  await handler(req({ body }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.read('cmsPages', 'page'), { ...livePage, order: 2 });
+  assert.deepEqual(db.read('cmsPages', 'link'), { ...liveLink, order: 0 });
+  assert.deepEqual(db.read('cmsPages_drafts', 'page'), { ...draftPage, order: 2 });
+  assert.deepEqual(db.read('cmsPages_drafts', 'future'), { ...draftOnly, order: 1 });
+  assert.equal(db.read('cmsPages', 'future'), undefined);
+  assert.equal(db.read('cmsPages_drafts', 'link'), undefined);
+  assert.equal(db.read('config', 'event').comingSoon, true);
+  assert.equal(db.read('cmsPublishQueue', REQUEST_ID).menuOrder, true);
+  assert.equal(db.ids('cmsVersionHistory').length, 0);
+
+  const writes = db.writes.length;
+  const duplicate = fakeRes();
+  await handler(req({ body }), duplicate);
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(db.writes.length, writes);
+
+  await writeDraft({ db, collection: 'cmsPages', docId: 'page', fields: { label: 'Newer edit', order: 0 }, actor: ADMIN, now });
+  assert.equal(db.read('cmsPages_drafts', 'page').order, 2);
+  assert.equal(db.read('cmsPages_drafts', 'page').label, 'Newer edit');
+});
+
+test('menu order refuses an incomplete list before changing any page', async () => {
+  const db = makeFakeDb({ 'cmsPages/first': { order: 0 }, 'cmsPages_drafts/new-page': { order: 1 } });
+  const res = fakeRes();
+  await createCmsPublishHandler({ ...deps(db), env: {} })(
+    req({ body: { menuOrder: ['first'], requestId: REQUEST_ID } }), res,
+  );
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'menu-list-changed');
+  assert.equal(db.writes.length, 0);
+});
+
+test('menu order logs changes to draft-only pages without starting a public publish', async () => {
+  const db = makeFakeDb({ 'cmsPages_drafts/first': { order: 0 }, 'cmsPages_drafts/second': { order: 1 } });
+  const res = fakeRes();
+  await createCmsPublishHandler({ ...deps(db), env: {} })(
+    req({ body: { menuOrder: ['second', 'first'], requestId: REQUEST_ID } }), res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsPages_drafts', 'second').order, 0);
+  assert.equal(db.ids('cmsPages').length, 0);
+  assert.equal(db.ids('cmsPublishQueue').length, 0);
+  assert.equal(db.read('admin_logs', db.ids('admin_logs')[0]).docPath, 'cmsPages_drafts');
+});
 
 test('cmsPublish { collection, docIds } publishes, marks the queue row done, and logs', async () => {
   const db = makeFakeDb({

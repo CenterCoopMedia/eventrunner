@@ -261,12 +261,12 @@ describe('page list', () => {
     expect(within(press).queryByText('Visible')).toBeNull();
   });
 
-  it('saves a moved page order as drafts and does not publish', async () => {
+  it('publishes a moved menu order in one request', async () => {
     liveDocs = [
       { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [] },
       { id: 'scholarships', label: 'Scholarships', path: '/scholarships', order: 1, visible: true, sections: [] },
     ];
-    fetch.mockResolvedValue(okResponse({ status: 'dirty' }));
+    fetch.mockResolvedValue(okResponse({ status: 'done' }));
     await renderAt('/admin/pages');
     const up = await screen.findByRole('button', { name: 'Move FAQ up' });
     expect(up).toBeDisabled();
@@ -283,16 +283,27 @@ describe('page list', () => {
     expect(row.className).toContain('bg-admin-action-soft');
     fireEvent.click(screen.getByRole('button', { name: 'Move Scholarships up' }));
     expect(screen.getByText('Scholarships moved to position 1 of 2')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect([0, 1].map((index) => [bodyOf(index).page.id, bodyOf(index).page.order, bodyOf(index).create])).toEqual([
-      ['scholarships', 0, undefined],
-      ['faq', 1, undefined],
-    ]);
-    expect(fetch.mock.calls.some((call) => String(call[0]).includes('cmsPublish'))).toBe(false);
-    await waitFor(() => {
-      expect(screen.getAllByText('Draft order saved. It is not public until you publish.').length).toBeGreaterThan(0);
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish menu order' }));
+    expect(await screen.findByText('Menu order published. Page drafts stay unpublished.')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(urlOf(0)).toMatch(/\/cmsPublish$/);
+    expect(bodyOf(0)).toEqual({ menuOrder: ['scholarships', 'faq'], requestId: expect.any(String) });
+  });
+
+  it('marks the top menu after five published visible entries and moves the line with the order', async () => {
+    const page = (id, label, order, visible = true) => ({ id, label, path: `/${id}`, order, visible, sections: [] });
+    liveDocs = [
+      page('faq', 'FAQ', 0), page('hidden', 'Hidden page', 2, false), page('parking', 'Parking', 3),
+      page('visit', 'Visit', 4), page('food', 'Food', 5), page('zzz-help', 'Help', 6),
+      { id: 'venue-link', label: 'Venue link', url: 'https://example.org/venue', order: 6, visible: true, systemPage: false },
+    ];
+    draftDocs = [{ ...page('printed-map', 'Printed map', 1), status: 'dirty' }];
+    await renderAt('/admin/pages');
+    const line = screen.getByText(/appear under More/).closest('li');
+    expect(line.previousElementSibling).toHaveTextContent('Help');
+    fireEvent.click(screen.getByRole('button', { name: 'Move Venue link up' }));
+    expect(screen.getByText(/appear under More/).closest('li').previousElementSibling).toHaveTextContent('Venue link');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('asks before leaving a page list with an unsaved move, and cancel restores the order', async () => {

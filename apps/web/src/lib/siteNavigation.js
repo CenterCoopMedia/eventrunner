@@ -61,6 +61,7 @@ import { leadsToNoPublicPage, switchedOffSectionFor } from './linkTargets.js';
  * is the navigation's own way of saying it.
  */
 export const SYSTEM_PAGES = SYSTEM_PAGE_ROUTES;
+export const TOP_MENU_SIZE = 5;
 
 /** @param {unknown} v @returns {boolean} */
 function isNonEmptyString(v) {
@@ -117,7 +118,7 @@ export function navItemFor(page, features, pages) {
 }
 
 /**
- * The navigation, in reading order.
+ * The navigation, in reading order, with each item's source page id.
  *
  * Sorted by `order`, then by label so two pages that share a number (or
  * carry none) still land in a stable, human order rather than in whatever
@@ -125,19 +126,18 @@ export function navItemFor(page, features, pages) {
  *
  * @param {Array<object>|null|undefined} pages cmsPages documents
  * @param {object|null|undefined} features config/features
- * @returns {Array<{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }>}
+ * @returns {Array<{ id: string, order: number, item: object }>}
  */
-export function buildNavItems(pages, features) {
+export function buildNavEntries(pages, features) {
   const seen = new Set();
   return (pages ?? [])
-    .map((page) => ({ order: page?.order, item: navItemFor(page, features, pages) }))
+    .map((page) => ({ id: page?.id, order: page?.order, item: navItemFor(page, features, pages) }))
     .filter((entry) => entry.item !== null)
     .sort(
       (a, b) =>
         (a.order ?? 0) - (b.order ?? 0) || a.item.label.localeCompare(b.item.label),
     )
-    .map((entry) => entry.item)
-    .filter((item) => {
+    .filter(({ item }) => {
       // Two documents can resolve to one route: a duplicate path written
       // straight into Firestore, or two docs claiming the same system id.
       // Render the first in reading order; a repeated link is noise a reader
@@ -147,4 +147,8 @@ export function buildNavItems(pages, features) {
       seen.add(key);
       return true;
     });
+}
+
+export function buildNavItems(pages, features) {
+  return buildNavEntries(pages, features).map(({ item }) => item);
 }

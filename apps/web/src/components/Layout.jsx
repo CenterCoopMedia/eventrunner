@@ -72,7 +72,7 @@ import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { PublicLink as Link, PublicNavLink as NavLink } from './PublicLink.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { statedPageLayout } from '../lib/pageLayout.js';
-import { buildNavItems } from '../lib/siteNavigation.js';
+import { buildNavItems, TOP_MENU_SIZE } from '../lib/siteNavigation.js';
 import { brandingSrc, uploadedBrandingSrc } from '../lib/mediaSource.js';
 import useAccountViews from '../hooks/useAccountViews.js';
 import BackToTop from './BackToTop.jsx';
@@ -441,8 +441,8 @@ export default function Layout() {
     features,
     pages,
   });
-  const primaryNavItems = compactHeader || navPlacement === 'side' ? navItems : navItems.slice(0, 5);
-  const moreNavItems = compactHeader || navPlacement === 'side' ? [] : navItems.slice(5);
+  const primaryNavItems = compactHeader || navPlacement === 'side' ? navItems : navItems.slice(0, TOP_MENU_SIZE);
+  const moreNavItems = compactHeader || navPlacement === 'side' ? [] : navItems.slice(TOP_MENU_SIZE);
   const accountInHeader = navPlacement === 'side' && !compactHeader;
   const moreIsActive = moreNavItems.some((item) => !item.custom && matchPath({ path: item.to, end: item.end }, pathname));
 
