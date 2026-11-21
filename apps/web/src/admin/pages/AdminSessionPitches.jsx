@@ -99,7 +99,7 @@ export default function AdminSessionPitches() {
                           {row.submitted ? <StatusBadge tone="neutral">Edited by staff</StatusBadge> : null}
                           {row.conversion ? <StatusBadge tone="neutral">Drafts created</StatusBadge> : null}
                         </div>
-                        <p className={`mt-3xs truncate ${rowMetaClass}`}>{detailOf(row) || '—'}</p>
+                        <p className={`mt-3xs ${rowMetaClass}`}>{detailOf(row) || '—'}</p>
                         <PitchSourceMarkers row={row} />
                       </div>
                       <Link to={row.id} className={linkButtonClass} aria-label={`Review ${row.title}`}>Review</Link>
