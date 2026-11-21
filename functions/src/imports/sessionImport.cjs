@@ -324,8 +324,8 @@ async function allocateId({ db, tx, input, claimed }) {
     if (!existing) return { ok: true, id, matched: false, note };
     if (n === 1) {
       const sameTitle = lower(existing.title) === lower(input.values.title);
-      const dayMapped = Object.prototype.hasOwnProperty.call(input.values, 'dayId');
-      const sameDay = !dayMapped || input.values.dayId === existing.dayId;
+      const dayId = input.values.dayId;
+      const sameDay = dayId != null && dayId === existing.dayId;
       if (sameTitle && sameDay && !(await linked(id))) return { ok: true, id, matched: true };
       note = `A session with the ID "${id}" already exists. This row makes a new session. If it is the same session, map a session ID column with "${id}".`;
     }
