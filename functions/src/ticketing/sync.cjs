@@ -115,15 +115,19 @@ function normalizeTicket(record, providerName, eventId = null) {
   };
 }
 
-function ticketAccessFieldsForUpdate(current, ticket, unmappedCsvFields) {
+function ticketForUpdate(current, ticket, unmappedCsvFields) {
   const sameScope = current.provider === ticket.provider && (current.eventId ?? null) === ticket.eventId;
-  const keepClass = sameScope && unmappedCsvFields.includes('ticketClassId');
-  const keepStatus = sameScope && unmappedCsvFields.includes('status') && TICKET_STATUSES.includes(current.status);
-  const terminal = (status) => TICKET_TERMINAL_STATUSES.includes(status);
-  return {
-    ...(keepClass ? { ticketClassId: current.ticketClassId ?? null } : {}),
-    status: keepStatus || (terminal(current.status) && !terminal(ticket.status)) ? current.status : ticket.status,
-  };
+  const updated = { ...ticket };
+  if (sameScope) {
+    for (const field of unmappedCsvFields) {
+      if (field === 'status' && !TICKET_STATUSES.includes(current.status)) continue;
+      if (Object.hasOwn(current, field)) updated[field] = current[field];
+    }
+  }
+  if (TICKET_TERMINAL_STATUSES.includes(current.status) && !TICKET_TERMINAL_STATUSES.includes(updated.status)) {
+    updated.status = current.status;
+  }
+  return updated;
 }
 
 /**
@@ -142,8 +146,8 @@ function ticketAccessFieldsForUpdate(current, ticket, unmappedCsvFields) {
  * cannot restore access or hold ticket-derived revocation. Check inside
  * the transaction so a racing terminal write also survives a retry.
  *
- * @param {{ db: object, ticket: object, now?: () => Date, unmappedCsvFields?: string[] }} deps
- * @returns {Promise<{ action: 'created'|'updated' }>}
+ * @param {{ db: object, ticket: object, now?: () => Date, respectDemoPolicy?: boolean, unmappedCsvFields?: string[] }} deps
+ * @returns {Promise<{ action: 'created'|'updated', ticket: object } | { action: 'blocked' }>}
  */
 async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPolicy = false, unmappedCsvFields = [] }) {
   const ref = db.collection(TICKETS).doc(ticket.externalId);
@@ -160,11 +164,11 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
         createdAt: at,
         updatedAt: at,
       });
-      return { action: 'created' };
+      return { action: 'created', ticket };
     }
-    const accessFields = ticketAccessFieldsForUpdate(snap.data(), ticket, unmappedCsvFields);
-    tx.set(ref, { ...ticket, ...accessFields, updatedAt: at }, { merge: true });
-    return { action: 'updated' };
+    const updated = ticketForUpdate(snap.data(), ticket, unmappedCsvFields);
+    tx.set(ref, { ...updated, updatedAt: at }, { merge: true });
+    return { action: 'updated', ticket: updated };
   });
 }
 
@@ -173,10 +177,10 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
  * skipped, never guessed at.
  *
  * @param {{ db: object, tickets: object[], providerName: string, eventId?: string|null,
- *           now?: () => Date, log?: Pick<Console,'warn'>, unmappedCsvFields?: string[] }} deps
+ *           now?: () => Date, log?: Pick<Console,'warn'> }} deps
  * @returns {Promise<{ created: number, updated: number, skipped: number }>}
  */
-async function upsertTickets({ db, tickets, providerName, eventId = null, now = () => new Date(), log = console, respectDemoPolicy = false, unmappedCsvFields }) {
+async function upsertTickets({ db, tickets, providerName, eventId = null, now = () => new Date(), log = console, respectDemoPolicy = false }) {
   let created = 0;
   let updated = 0;
   let skipped = 0;
@@ -187,7 +191,7 @@ async function upsertTickets({ db, tickets, providerName, eventId = null, now = 
       log.warn('ticketing: skipped a ticket with no usable externalId');
       continue;
     }
-    const { action } = await upsertTicket({ db, ticket: normalized, now, respectDemoPolicy, unmappedCsvFields });
+    const { action } = await upsertTicket({ db, ticket: normalized, now, respectDemoPolicy });
     if (action === 'blocked') return { created, updated, skipped, blocked: true };
     if (action === 'created') created += 1;
     else updated += 1;
@@ -592,7 +596,7 @@ module.exports = {
   createTicketingSyncHandler,
   upsertTicket,
   upsertTickets,
-  ticketAccessFieldsForUpdate,
+  ticketForUpdate,
   get handlers() {
     return buildHandlers();
   },

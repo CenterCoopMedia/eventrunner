@@ -310,7 +310,7 @@ function StatusCard({ status, error, onRefresh, busy, call }) {
   );
 }
 
-function MappingForm({ headers, mapping, onChange }) {
+function MappingForm({ headers, mapping, onChange, disabled }) {
   const options = [{ value: '', label: 'Not in this file' }, ...headers.map((h) => ({ value: h, label: MAPPING_FIELDS.find((field) => field.id === h)?.label || h }))];
   return (
     <div className="planner-fields grid grid-cols-1 gap-sm sm:grid-cols-2">
@@ -319,11 +319,39 @@ function MappingForm({ headers, mapping, onChange }) {
           key={field.id}
           label={field.required ? `${field.label} (required)` : field.label}
           value={mapping[field.id] ?? ''}
+          disabled={disabled}
           onChange={(value) => onChange({ ...mapping, [field.id]: value })}
           options={options}
         />
       ))}
     </div>
+  );
+}
+
+function PreviewTicketDetails({ row }) {
+  const fields = [
+    ['Ticket reference', row.externalId],
+    ['Order reference', row.orderId],
+    ['First name', row.firstName],
+    ['Last name', row.lastName],
+    ['Ticket type', row.ticketClass],
+    ['Ticket type ID', row.ticketClassId],
+    ['Status', row.status && ticketStatusLabel(row.status)],
+    ['Purchase date', row.purchasedAt],
+    ['Quantity', row.quantity],
+  ];
+  return (
+    <details>
+      <summary className="cursor-pointer">Ticket details</summary>
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-sm gap-y-3xs py-xs">
+        {fields.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt>{label}</dt>
+            <dd className="break-words font-admin-data text-admin-ink-data">{value ?? '—'}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -346,7 +374,7 @@ function PreviewTable({ preview }) {
               <GalleyHead>Result</GalleyHead>
 
               <GalleyHead>Email</GalleyHead>
-              <GalleyHead>Reason</GalleyHead>
+              <GalleyHead>Details</GalleyHead>
             </tr>
           </thead>
           <tbody>
@@ -360,7 +388,11 @@ function PreviewTable({ preview }) {
                 </td>
 
                 <td className="px-sm py-xs font-admin-data text-admin-ink-data">{row.email ?? '—'}</td>
-                <td className="px-sm py-xs text-admin-ink-secondary">{(row.reasons ?? []).join('; ') || '—'}</td>
+                <td className="px-sm py-xs text-admin-ink-secondary">
+                  {row.verdict === 'create' || row.verdict === 'update'
+                    ? <PreviewTicketDetails row={row} />
+                    : (row.reasons ?? []).join('; ') || '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -441,7 +473,7 @@ function ImportPanel({ call, onImported }) {
       setParsed(null);
       onImported();
     } catch (err) {
-      setNotice({ kind: 'error', message: plannerMessage(err?.message ?? 'The import did not finish. Nothing changed. Try again.') });
+      setNotice({ kind: 'error', message: plannerMessage(err?.message ?? 'The import did not finish. Try again.') });
     } finally {
       setBusy(false);
     }
@@ -461,6 +493,7 @@ function ImportPanel({ call, onImported }) {
             id="ticketing-csv-file"
             type="file"
             accept=".csv,text/csv"
+            disabled={busy}
             onChange={chooseFile}
             className={inputClass}
           />
@@ -473,7 +506,10 @@ function ImportPanel({ call, onImported }) {
 
         {parsed ? (
           <>
-            <MappingForm headers={parsed.headers} mapping={mapping} onChange={setMapping} />
+            <MappingForm headers={parsed.headers} mapping={mapping} disabled={busy} onChange={(next) => {
+              setMapping(next);
+              setPreview(null);
+            }} />
             <div className="flex flex-wrap gap-xs">
               <button
                 type="button"
