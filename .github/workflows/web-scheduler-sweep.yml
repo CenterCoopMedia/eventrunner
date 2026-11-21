@@ -1,0 +1,34 @@
+name: Web scheduler sweep
+
+on:
+  push:
+    branches: [ofj-ertestgap1-sweep]
+
+permissions:
+  contents: read
+
+jobs:
+  web-scheduler-sweep:
+    name: Web scheduler sweep (shard ${{ matrix.shard }} of 2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.5"
+          cache: npm
+      - run: npm run prepare:functions
+      - run: npm ci
+      - run: node .github/web-scheduler-sweep.cjs
+      - name: Run instrumented web unit tests
+        run: npm run test -w apps/web -- --shard=${{ matrix.shard }}/2 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/web-tests.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-tests-${{ matrix.shard }}
+          path: ${{ runner.temp }}/web-tests.json
+          retention-days: 7
