@@ -398,6 +398,11 @@
    Compact, named utility icons leave the destination names room to breathe. */
 .admin-mobile-docket:not([open]) > .admin-mobile-docket__content,
 .admin-mobile-docket__content[hidden], .admin-docket-group[hidden] { display: none; }
+.admin-rail[data-phone-reflow] .admin-rail__job > p { @apply line-clamp-3; }
+.admin-rail[data-phone-reflow='stacked'] .admin-rail__job { flex-basis: 100%; }
+.admin-rail[data-phone-reflow='stacked'] .admin-rail__job > p { flex: 1; line-height: var(--admin-leading-tight); }
+.admin-rail[data-phone-reflow='stacked'] .admin-mobile-docket { margin-inline-start: auto; max-inline-size: 100%; }
+.admin-rail[data-phone-reflow='stacked'] .admin-mobile-docket > summary { height: auto; min-height: 56px; }
 .admin-docket-group-toggle {
   display: flex; align-items: center; gap: var(--space-xs); width: 100%;
   min-height: var(--admin-control-height); padding: var(--space-2xs) var(--space-sm);
