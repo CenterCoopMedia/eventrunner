@@ -2127,22 +2127,23 @@
     .site-header-identity-row .nameplate__meta,
     .site-header-dateline { display: none; }
     .site-header-treatment .historical-demo-logo { max-inline-size: 100%; }
-    /* A banner-shaped logo fills the width left of Menu, up to 4rem tall,
-       so its small text can be read (#1342). It never draws smaller than
-       the mark size it has on wider screens, and the image keeps its
+    /* A banner-shaped logo fills the width left of Menu, 1.5rem to 4rem
+       tall, so its small text can be read (#1342). The image keeps its
        proportions in its box, so a small file scales up too. Square and
        tall logos keep the mark size. */
-    :has(> .site-logo--banner) { inline-size: 100%; }
+    .site-header-treatment :has(> .site-logo--banner) { inline-size: 100%; }
     .site-logo.site-logo--banner {
       inline-size: 100%;
       block-size: auto;
-      min-inline-size: min(calc(1.5rem * var(--logo-ratio)), 10rem);
+      min-block-size: 1.5rem;
       max-block-size: 4rem;
       max-inline-size: 100%;
       object-position: left center;
     }
-    .site-logo--masthead.site-logo--banner {
-      min-inline-size: min(calc(2.5rem * var(--logo-ratio)), 14rem);
+    /* The banner takes at least half the row, so actions that share it
+       wrap below instead of squeezing the logo. */
+    .site-header-treatment :is(.site-header-identity, .site-masthead__identity):has(.site-logo--banner) {
+      flex-basis: 50%;
     }
     /* Menu centres on the banner rather than on its bottom edge. */
     .site-header-identity-row:has(.site-logo--banner) > * { align-self: center; }

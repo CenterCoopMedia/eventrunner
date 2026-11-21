@@ -382,8 +382,8 @@ export default function Layout() {
   const [markFailed, setMarkFailed] = useState(false);
   // The address that failed, so a newly published logo gets its own try.
   const [failedLogo, setFailedLogo] = useState(null);
-  // A loaded logo at least twice as wide as tall, with its width-to-height
-  // ratio. On phones it runs as a banner beside Menu (#1342).
+  // The address of a loaded logo at least twice as wide as tall. On phones
+  // it runs as a banner across the free width beside Menu (#1342).
   const [bannerLogo, setBannerLogo] = useState(null);
   const [failedFooterLogo, setFailedFooterLogo] = useState(null);
   // A runtime config/event doc can replace `legal` wholesale (shallow
@@ -423,7 +423,6 @@ export default function Layout() {
   const historicalDemo = readOnlyDemo && eventConfig.shortName === 'NC Local';
   const headerShowsLogo = !historicalDemo && headerLogo !== 'name'
     && Boolean(uploadedPrimary) && failedLogo !== uploadedPrimary;
-  const bannerRatio = bannerLogo?.src === uploadedPrimary ? bannerLogo.ratio : null;
 
   // The navigation IS the page list (lib/siteNavigation.js). Every visible
   // page document becomes a link, in its own `order`, with system pages
@@ -635,13 +634,11 @@ export default function Layout() {
                 <img
                   src={uploadedPrimary}
                   alt=""
-                  className={`site-logo ${headerVariant === 'masthead' ? 'site-logo--masthead' : ''}${bannerRatio ? ' site-logo--banner' : ''}`}
-                  style={bannerRatio ? { '--logo-ratio': bannerRatio } : undefined}
+                  className={`site-logo ${headerVariant === 'masthead' ? 'site-logo--masthead' : ''}${bannerLogo === uploadedPrimary ? ' site-logo--banner' : ''}`}
                   height={markSize.px}
                   onLoad={(event) => {
                     const { naturalWidth, naturalHeight } = event.currentTarget;
-                    const ratio = naturalHeight > 0 ? naturalWidth / naturalHeight : 0;
-                    setBannerLogo(ratio >= 2 ? { src: uploadedPrimary, ratio } : null);
+                    setBannerLogo(naturalHeight > 0 && naturalWidth >= 2 * naturalHeight ? uploadedPrimary : null);
                   }}
                   onError={() => setFailedLogo(uploadedPrimary)}
                 />
