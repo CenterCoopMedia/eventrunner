@@ -67,20 +67,26 @@ export default function AdminOverview() {
   // The press guard lives in a ref, not in state: a second press in the same
   // tick must see the first one's request already running.
   const busyRef = useRef(false);
+  const request = useRef(0);
 
-  const refresh = useCallback(async () => {
-    if (busyRef.current) return;
+  const refresh = useCallback(async (retry = false) => {
+    if (busyRef.current && !retry) return;
+    const id = ++request.current;
     busyRef.current = true;
     setBusy(true);
+    setError(null);
     try {
       const next = await call('getEventStats', {});
+      if (request.current !== id) return;
       setStats(next);
       setError(null);
     } catch {
-      setError(new Error('The event figures could not be loaded. Refresh to try again.'));
+      if (request.current === id) setError(new Error('The event figures could not be loaded. Refresh to try again.'));
     } finally {
-      busyRef.current = false;
-      setBusy(false);
+      if (request.current === id) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   }, [call]);
 
@@ -100,7 +106,7 @@ export default function AdminOverview() {
           <>
             <AdminIconControl
               className={secondaryButtonClass}
-              onClick={refresh}
+              onClick={() => refresh()}
               aria-busy={busy || undefined}
               aria-disabled={busy || undefined}
               busy={busy}
@@ -112,7 +118,9 @@ export default function AdminOverview() {
         }
       />
 
-      {!stats && !error ? <AdminLoadingState label="Loading the event figures…" /> : null}
+      {busy && (stats || !error) ? (
+        <AdminLoadingState label="Loading the event figures…" quiet={Boolean(stats)} onRetry={() => refresh(true)} />
+      ) : null}
       {!stats && error ? <Notice tone="error" message={error.message} /> : null}
       {stats && error ? (
         <Notice

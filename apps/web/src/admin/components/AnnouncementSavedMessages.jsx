@@ -17,6 +17,7 @@ import HelpTooltip from './HelpTooltip.jsx';
 //
 // Nothing here previews, sends, or changes the site.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import AdminPendingSave, { useAdminSaveState } from './AdminPendingSave.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import AdminIconControl from './AdminIconControl.jsx';
@@ -70,7 +71,7 @@ export default function AnnouncementSavedMessages({
   const [list, setList] = useState(null); // { messages, max }
   const [listError, setListError] = useState(null);
   const [name, setName] = useState('');
-  const [busy, setBusy] = useState(null); // 'save' | 'update' | `load:${id}` | `rename:${id}` | `remove:${id}`
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(null);
   const [error, setError] = useState(null);
   // The one open question: { kind: 'replace'|'rename'|'remove', id, name }.
   const [question, setQuestion] = useState(null);
@@ -82,17 +83,21 @@ export default function AnnouncementSavedMessages({
   const questionRef = useRef(null);
   const renameRef = useRef(null);
   const controls = useRef(new Map());
+  const listRead = useRef(0);
 
   const loadList = useCallback(async () => {
+    const id = ++listRead.current;
+    setListError(null);
     try {
       const response = await call('announcementMessages', { action: 'list' });
+      if (id !== listRead.current) return;
       setList({
         messages: Array.isArray(response?.messages) ? response.messages : [],
         max: Number.isInteger(response?.max) ? response.max : null,
       });
       setListError(null);
     } catch (err) {
-      setListError(err);
+      if (id === listRead.current) setListError(err);
     }
   }, [call]);
 
@@ -123,8 +128,7 @@ export default function AnnouncementSavedMessages({
   };
 
   async function save(id) {
-    if (busy) return;
-    setBusy(id ? 'update' : 'save');
+    if (!beginSave(id ? 'update' : 'save')) return;
     setError(null);
     try {
       const response = await call('announcementMessages', {
@@ -137,8 +141,9 @@ export default function AnnouncementSavedMessages({
       setName(saved.name);
       onSaved({ id: saved.id, name: saved.name });
       showToast(`Saved "${saved.name}".`);
-      await loadList();
+      loadList();
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(err);
     } finally {
       setBusy(null);
@@ -182,7 +187,7 @@ export default function AnnouncementSavedMessages({
     event.preventDefault();
     if (busy) return;
     const { id } = question;
-    setBusy(`rename:${id}`);
+    if (!beginSave(`rename:${id}`)) return;
     setError(null);
     try {
       const response = await call('announcementMessages', { action: 'rename', id, name: newName });
@@ -196,6 +201,7 @@ export default function AnnouncementSavedMessages({
       setQuestion(null);
       setFocus({ id, control: 'rename' });
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(err);
     } finally {
       setBusy(null);
@@ -223,6 +229,7 @@ export default function AnnouncementSavedMessages({
 
   const messages = list?.messages ?? [];
   const full = list?.max != null && messages.length >= list.max;
+  const saving = busy === 'save' || busy === 'update' || Boolean(busy?.startsWith('rename:'));
 
   return (
     <div ref={wrapRef}>
@@ -231,6 +238,7 @@ export default function AnnouncementSavedMessages({
         description="Save messages you send often and reuse them in a new email."
       >
         <div className="flex flex-col gap-sm">
+          <AdminPendingSave busy={saving} unconfirmed={unconfirmed} offline={offline} />
           <ServerErrorSummary error={error ? { message: communicationsError(error, 'The message could not be saved. Check the message and try again.') } : null} errorRef={errorRef} title="This message was not saved" />
           {loaded ? (
             <p className="text-admin-sm text-admin-ink">
@@ -248,7 +256,7 @@ export default function AnnouncementSavedMessages({
               type="button"
               className={secondaryButtonClass}
               aria-busy={busy === 'save' ? 'true' : undefined}
-              aria-disabled={busy || full ? 'true' : undefined}
+              aria-disabled={busy || unconfirmed || full ? 'true' : undefined}
               onClick={() => { if (!full) save(null); }}
             >
               <BusyLabel busy={busy === 'save'} pending="Saving the new message…">Save new message</BusyLabel>
@@ -258,7 +266,7 @@ export default function AnnouncementSavedMessages({
                 type="button"
                 className={secondaryButtonClass}
                 aria-busy={busy === 'update' ? 'true' : undefined}
-                aria-disabled={busy ? 'true' : undefined}
+                aria-disabled={busy || unconfirmed ? 'true' : undefined}
                 onClick={() => save(loaded.id)}
               >
                 <BusyLabel busy={busy === 'update'} pending="Saving the message…">Save changes</BusyLabel>
@@ -272,7 +280,7 @@ export default function AnnouncementSavedMessages({
             />
           ) : null}
 
-          {list === null && !listError ? <AdminLoadingState label="Loading the saved messages…" /> : null}
+          {list === null && !listError ? <AdminLoadingState label="Loading the saved messages…" onRetry={loadList} /> : null}
           {listError ? <Notice tone="error" message={communicationsError(listError, 'Saved messages could not be loaded. Refresh the page to try again.')} /> : null}
           {list && messages.length === 0 ? (
             <p className="text-admin-sm text-admin-ink-secondary">No saved messages yet. Write a message, name it, then save it.</p>

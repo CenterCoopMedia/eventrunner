@@ -14,6 +14,7 @@
 // The picture and the content blocks an update may carry are not edited
 // here. They go back to the server unchanged on every save
 // (admin/updatesDoc.js toUpdatePayload).
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { UPDATE_CATEGORY_MAX, validUpdateCategory } from 'shared/update';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -110,8 +111,8 @@ export default function AdminUpdateEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [action, setAction] = useState(null);
-  const saving = action !== null;
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
+  const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   // The id this form created, once its first save lands. The route then
@@ -182,7 +183,7 @@ export default function AdminUpdateEditor({ mode }) {
       setFocusRequest((count) => count + 1);
       return;
     }
-    setAction(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -209,6 +210,7 @@ export default function AdminUpdateEditor({ mode }) {
         navigate(`${UPDATES_ROOT}/${encodeURIComponent(id)}`, { replace: true });
       }
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       if (stage === 'publish') {
         setErrorTitle('The draft is saved, and it is not published');
         if (mode === 'create') {
@@ -271,7 +273,7 @@ export default function AdminUpdateEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading update…" />;
+    return <AdminLoadingState recover label="Loading update…" />;
   }
 
   return (
@@ -325,6 +327,7 @@ export default function AdminUpdateEditor({ mode }) {
 
       <FeatureSwitch featureKeys={['updates']} />
 
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/updates' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
       <Panel help="Write the news and date attendees should see on the Updates page." title="Public update">

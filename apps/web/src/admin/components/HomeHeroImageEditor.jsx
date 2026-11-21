@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from './AdminPendingSave.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { isDrawable } from '../../contexts/ContentContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -26,10 +27,9 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   const [edit, setEdit] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [savedField, setSavedField] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(false);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('');
-  const pending = useRef(false);
   const observedImage = useRef(null);
   const errorRef = useRef(null);
   const values = edit ?? toEditableContent(image?.current, 'image').values;
@@ -70,7 +70,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   }
 
   async function save(publish) {
-    if (pending.current || unavailable || disabled) return;
+    if (busy || unavailable || disabled) return;
     setError(null);
     setStatus('');
     const cleanValues = { ...values, url: values.url.trim(), alt: values.alt.trim() };
@@ -84,8 +84,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
       setError({ message: 'Choose a picture and describe it first.', fieldErrors, clientValidation: true });
       return;
     }
-    pending.current = true;
-    setBusy(true);
+    if (!beginSave(true)) return;
     const existingField = image?.current?.field ?? savedField;
     const field = existingField ?? uniqueEditorialId('image', blocks.map((row) => row.current.field));
     let draftSaved = false;
@@ -111,9 +110,9 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
       if (!verdict.ok) throw new Error(verdict.message);
       setStatus(verdict.message);
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(draftSaved ? { ...err, message: `The image draft is saved, but it was not published. ${err.message}` } : err);
     } finally {
-      pending.current = false;
       setBusy(false);
     }
   }
@@ -152,10 +151,10 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
         ) : null}
         <ImagePlacementPreview image={{ ...values, descriptionOverride: image?.current?.descriptionOverride }} hero="home" eventName={eventConfig.name} />
         <div className="flex flex-wrap gap-xs">
-          <button type="button" className={secondaryButtonClass} onClick={() => save(false)}>
+          <button type="button" className={secondaryButtonClass} disabled={unconfirmed} onClick={() => save(false)}>
             <BusyLabel busy={busy} pending="Saving the draft…">Save draft</BusyLabel>
           </button>
-          <button type="button" className={primaryButtonClass} onClick={() => save(true)}>
+          <button type="button" className={primaryButtonClass} disabled={unconfirmed} onClick={() => save(true)}>
             Publish
           </button>
         </div>
@@ -165,6 +164,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
         : full
           ? `The top of your home page is full (${maxBlocks} items). Remove one to add a picture.`
           : 'This home page has no place for a picture at the top.'} /> : null}
+      <AdminPendingSave busy={busy} unconfirmed={unconfirmed} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The image was not saved or published" />
       <EditorActionFeedback status={status} error={error} />
     </Panel>

@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
 // /admin/registration-form: the questions each attendee answers (ADR 0008
@@ -69,7 +70,7 @@ export default function AdminRegistrationForm() {
   const [live, setLive] = useState(undefined);
   const [listError, setListError] = useState(null);
   const [draft, setDraft] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState('');
   const errorRef = useRef(null);
@@ -88,7 +89,7 @@ export default function AdminRegistrationForm() {
 
   if (live === undefined || draft === null) return listError
     ? <Notice tone="caution" message="The registration form did not load. Check your connection. Reconnecting…" />
-    : <AdminLoadingState label="Loading the registration form…" />;
+    : <AdminLoadingState recover label="Loading the registration form…" />;
 
   const liveRevision = readRegistrationForm(live).revision;
   const conflict = liveRevision !== draft.revision;
@@ -119,12 +120,18 @@ export default function AdminRegistrationForm() {
     if (busy || conflict) return;
     const checked = validateRegistrationForm(form);
     if (!checked.ok) { setError(clientError(checked.errors)); return; }
-    setBusy(true); setError(null); setResult('');
+    if (!beginSave(true)) return;
+    setError(null);
+    setResult('');
     try {
       const response = await call('updateRegistrationForm', { expectedRevision: draft.revision, form: checked.form });
       setDraft((previous) => ({ ...previous, revision: response.revision }));
       setResult('Registration form saved.');
-    } catch (err) { setError(plannerError(err)); } finally { setBusy(false); }
+    } catch (err) {
+      if (!captureUnconfirmed(err)) setError(plannerError(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -134,16 +141,17 @@ export default function AdminRegistrationForm() {
         description="The questions each attendee answers when they register. Phone numbers, diet and access answers are private to staff."
         // The editor form is named here: the preview sits outside it, so Enter
         // in a preview answer can never save the form.
-        actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}><BusyLabel busy={busy} pending="Saving the registration form…">Save</BusyLabel></button>}
+        actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || unconfirmedSave || conflict || !dirty}><BusyLabel busy={busy} pending="Saving the registration form…">Save</BusyLabel></button>}
       />
       <p className={fieldHintClass}>For Stripe tickets, attendees answer the Registration form questions at checkout after you publish tickets; other attendees answer on Complete your registration.</p>
       {listError ? <Notice tone="caution" message="The saved form did not load. Trying again…" /> : null}
       {conflict ? (
         <div className="flex flex-col gap-xs">
           <Notice tone="caution" message="Someone saved the registration form after you opened it. Your unsaved changes are still below. Load the current version to continue." />
-          <div><button type="button" className={secondaryButtonClass} onClick={() => { setDraft(toDraft(live)); setError(null); setResult('Current version loaded.'); }}>Load the current version</button></div>
+          <div><button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => { setDraft(toDraft(live)); setError(null); setResult('Current version loaded.'); }}>Load the current version</button></div>
         </div>
       ) : null}
+      <AdminPendingSave busy={busy} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The form could not be saved" />
       {result ? <SaveStatus message={result} /> : null}
 

@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
@@ -172,8 +173,8 @@ export default function AdminSpeakerEditor({ mode }) {
   }));
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [action, setAction] = useState(null);
-  const saving = action !== null;
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
+  const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const [deleteBlocked, setDeleteBlocked] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -186,7 +187,7 @@ export default function AdminSpeakerEditor({ mode }) {
   const unsaved = savedForm !== null && (
     Object.keys(EMPTY).some((field) => form[field] !== savedForm[field]) || photoBusy
   );
-  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving || photoBusy });
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: action !== null || photoBusy });
 
   useEffect(() => {
     if (mode !== 'edit' || !speaker || saving) return;
@@ -238,7 +239,7 @@ export default function AdminSpeakerEditor({ mode }) {
 
   async function submit(event) {
     event.preventDefault();
-    setAction('draft');
+    if (!beginSave('draft')) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -265,6 +266,7 @@ export default function AdminSpeakerEditor({ mode }) {
         setStatus('Saved. The public directory updates within moments.');
       }
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(plannerError(err));
     } finally {
       setAction(null);
@@ -297,7 +299,7 @@ export default function AdminSpeakerEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && loading) return <AdminLoadingState label="Loading speaker…" />;
+  if (mode === 'edit' && loading) return <AdminLoadingState recover label="Loading speaker…" />;
   if (mode === 'edit' && !speaker && speakers.length >= 0 && !loading) {
     return (
       <AdminEmptyState
@@ -334,6 +336,7 @@ export default function AdminSpeakerEditor({ mode }) {
         }
       />
 
+      <AdminPendingSave busy={action === 'draft'} to={mode === 'create' ? '/admin/speakers' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog

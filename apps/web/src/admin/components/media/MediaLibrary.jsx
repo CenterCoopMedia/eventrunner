@@ -114,7 +114,7 @@ export default function MediaLibrary({
       ) : null}
       {notice ? <Notice tone="ok" message={notice} /> : null}
 
-      {loading ? <AdminLoadingState label="Loading the media library…" /> : null}
+      {loading ? <AdminLoadingState recover label="Loading the media library…" /> : null}
 
       {!loading && !error && visible.length === 0 ? (
         <AdminEmptyState

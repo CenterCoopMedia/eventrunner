@@ -17,6 +17,7 @@
 //     text and the form never sends them for staff.
 //   • Current values come from EventConfigContext, whose onSnapshot listener
 //     also delivers the saved result back — no reload, nothing optimistic.
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { senderDomainVerified } from 'shared/readiness';
 import { getEventPhase } from 'shared/config';
@@ -318,7 +319,7 @@ export default function AdminEventSettings() {
 
   const [form, setForm] = useState(() => toForm(eventConfig));
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [status, setStatus] = useSavedMessage(toPayload(form, payloadOptions));
   const [liveSessions, setLiveSessions] = useState([]);
   const [draftSessions, setDraftSessions] = useState([]);
@@ -505,7 +506,7 @@ export default function AdminEventSettings() {
       window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
-    setSaving(true);
+    if (!beginSave(true)) return;
     setError(null);
     setStatus('');
     // What this save sends, so the rows can be marked saved with these
@@ -540,6 +541,7 @@ export default function AdminEventSettings() {
       // The line above is the record and it announces; the bar repeats it.
       showToast('Event settings saved.', { announce: false });
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(err);
     } finally {
       setSaving(false);
@@ -568,7 +570,7 @@ export default function AdminEventSettings() {
           <button
             type="submit"
             className={primaryButtonClass}
-            aria-disabled={saving || undefined}
+            aria-disabled={saving || unconfirmedSave || undefined}
             aria-busy={saving || undefined}
           >
             <BusyLabel busy={saving} pending="Saving event settings…">Save event settings</BusyLabel>
@@ -576,6 +578,7 @@ export default function AdminEventSettings() {
         }
       />
 
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 

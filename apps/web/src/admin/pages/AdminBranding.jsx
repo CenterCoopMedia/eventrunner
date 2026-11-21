@@ -43,6 +43,7 @@
 // Logo/asset slots are unchanged: config/theme.logos holds PATHS into the
 // Storage bucket, and each slot is an ImagePicker over the `branding/`
 // namespace. Whatever is in `logos` is carried through every save verbatim.
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import {
@@ -458,7 +459,7 @@ export default function AdminBranding() {
 
   const [form, setForm] = useState(() => toForm(theme));
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [heroEdit, setHeroEdit] = useState({ dirty: false, busy: false });
   const leaveGuard = useUnsavedNavigation(heroEdit.dirty || heroEdit.busy, { blocked: saving || heroEdit.busy });
   const [status, setStatus] = useState('');
@@ -580,7 +581,7 @@ export default function AdminBranding() {
 
   async function submit(event) {
     event.preventDefault();
-    setSaving(true);
+    if (!beginSave(true)) return;
     setError(null);
     setStatus('');
     try {
@@ -588,6 +589,7 @@ export default function AdminBranding() {
       setStatus('Published. The public site restyles live — no deploy needed.');
       showToast('Theme published.');
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(err);
     } finally {
       setSaving(false);
@@ -620,7 +622,7 @@ export default function AdminBranding() {
         )}
         actions={
           <>
-            <button type="submit" className={primaryButtonClass} disabled={saving}>
+            <button type="submit" className={primaryButtonClass} disabled={saving || unconfirmedSave}>
               {saving ? 'Publishing…' : 'Publish the theme'}
             </button>
             <button
@@ -635,6 +637,7 @@ export default function AdminBranding() {
         }
       />
 
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The theme was not published" />
       {status ? <SaveStatus message={status} /> : null}
       {contrastFailures.length > 0 ? (

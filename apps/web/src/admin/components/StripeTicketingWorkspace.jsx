@@ -57,7 +57,7 @@ export default function StripeTicketingWorkspace({ call, chargesEnabled }) {
   if (!data) return error ? <div className="space-y-sm">
     <Notice tone="error" message={error} />
     <button type="button" className={secondaryButtonClass} onClick={() => { setError(''); bump(); }}>Retry Stripe ticketing</button>
-  </div> : <AdminLoadingState label="Loading Stripe ticketing…" />;
+  </div> : <AdminLoadingState label="Loading Stripe ticketing…" onRetry={bump} />;
   const { catalog, connectionEnded } = data;
   const now = Date.now();
   const hasEnded = (sales) => sales.salesEndAt && Date.parse(sales.salesEndAt) <= now;
