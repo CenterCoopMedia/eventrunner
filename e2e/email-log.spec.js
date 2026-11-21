@@ -18,6 +18,7 @@ import {
 
 const PROBE_TO = 'preview-probe@example.test';
 const PIXEL_HOST = 'pixel.example.test';
+const PIXEL_URL = `https://${PIXEL_HOST}/open.png`;
 const LINK_HOST = 'link-probe.example.test';
 const BLOCK = 'display:block;width:320px;height:90px';
 
@@ -111,7 +112,7 @@ test.describe.serial('the email log', () => {
         '<p id="probe">Script did not run.</p>',
         '<script>document.getElementById("probe").textContent = "Script ran.";</script>',
         '<img src="missing.png" alt="" onerror="document.getElementById(\'probe\').textContent = \'Handler ran.\'">',
-        `<img src="https://${PIXEL_HOST}/open.png" alt="">`,
+        `<img src="${PIXEL_URL}" alt="">`,
         `<p><a href="https://${PIXEL_HOST}/read">Read online</a></p>`,
       ].join(''),
       text: 'Script did not run.',
@@ -135,8 +136,14 @@ test.describe.serial('the email log', () => {
     page.on('request', (request) => network.push({ kind: 'request', method: request.method(), url: request.url() }));
     page.on('requestfailed', (request) => network.push({ kind: 'failed', url: request.url(), reason: request.failure()?.errorText }));
     page.on('response', (response) => network.push({ kind: 'response', url: response.url() }));
-    const consoleLines = [];
-    page.on('console', (message) => consoleLines.push(message.text()));
+    const pixelRequests = [];
+    await page.route(PIXEL_URL, async (route) => {
+      pixelRequests.push(route.request().url());
+      await route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>',
+      });
+    });
 
     // The button names its next action, so it is found by both of its names.
     const preview = row.getByRole('button', { name: /^(Preview|Hide preview)$/ });
@@ -178,11 +185,7 @@ test.describe.serial('the email log', () => {
     expect(network.filter((entry) => fromBody(entry) && entry.kind === 'response')).toEqual([]);
     expect(network.filter((entry) => entry.url.endsWith('/read'))).toEqual([]);
     expect(network.filter(({ kind, method, url }) => kind === 'request' && method === 'POST' && /\/getSentEmail$/.test(url))).toHaveLength(1);
-    // Chromium says why: the sandbox refused the script and the handler, and
-    // the policy refused the images.
-    const said = consoleLines.join('\n');
-    expect(said).toContain("Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed");
-    expect(said).toContain(`Refused to load the image 'https://${PIXEL_HOST}/open.png'`);
+    expect(pixelRequests).toEqual([]);
 
     // The read is on the record, by path and actor only.
     const logs = await adminDb().collection('admin_logs')
@@ -190,6 +193,13 @@ test.describe.serial('the email log', () => {
     expect(logs.size).toBe(1);
     expect(logs.docs[0].data()).toMatchObject({ action: 'view-sent-email', email: ADMIN_EMAIL });
     expect(JSON.stringify(logs.docs[0].data())).not.toContain(PROBE_TO);
+
+    // Allow just the synthetic pixel in the same sandbox. The route must see
+    // the request and serve the image if the preview policy lets it through.
+    const permissiveSrcdoc = srcdoc.replace('img-src data:', `img-src data: ${PIXEL_URL}`);
+    await frameElement.evaluate((element, value) => { element.srcdoc = value; }, permissiveSrcdoc);
+    await expect(frame.locator(`img[src="${PIXEL_URL}"]`)).toHaveJSProperty('naturalWidth', 1);
+    expect(pixelRequests).toEqual([PIXEL_URL]);
   });
 
   test('no stored body can bring a link back: a click sends no request and the frame stays on the message', async ({ page }) => {

@@ -127,16 +127,20 @@ test('an applicant reaches setup without review chunks, with focus after a delay
 test('an unavailable route keeps the shell and reloads successfully when the chunk returns', async ({ page }, testInfo) => {
   const team = chunk('/pages/Team.jsx');
   const scripts = observeScripts(page);
+  const documents = [];
+  const organizationPath = `/organizations/${ORG.id}`;
   let available = false;
   await page.route('**/*', async (route) => {
-    const url = new URL(route.request().url());
+    const request = route.request();
+    const url = new URL(request.url());
     if (url.origin !== origin) return route.abort();
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents.push(url.pathname);
     if (url.pathname.startsWith('/api/')) return api(route);
     if (url.pathname === team && !available) return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Synthetic missing module' });
     return route.continue();
   });
   try {
-    await page.goto(`${origin}/organizations/${ORG.id}`);
+    await page.goto(`${origin}${organizationPath}`);
     await page.getByRole('link', { name: 'Team', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'This page did not load' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
@@ -146,11 +150,14 @@ test('an unavailable route keeps the shell and reloads successfully when the chu
     await page.getByRole('link', { name: ORG.name, exact: true }).click();
     await page.getByRole('link', { name: 'Team', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'This page did not load' })).toBeVisible();
+    expect(scripts).toContainEqual({ path: team, status: 404 });
+    expect(documents).toEqual([organizationPath]);
     available = true;
     await page.getByRole('button', { name: 'Reload page' }).click();
     await expect(page.getByRole('heading', { name: 'Team', exact: true })).toBeVisible();
-    expect(scripts.filter((entry) => entry.path === team).map((entry) => entry.status)).toEqual([404, 200]);
+    expect(documents).toEqual([organizationPath, `${organizationPath}/team`]);
+    expect(scripts).toContainEqual({ path: team, status: 200 });
   } finally {
-    await testInfo.attach('console-reload-network', { body: JSON.stringify(scripts, null, 2), contentType: 'application/json' });
+    await testInfo.attach('console-reload-network', { body: JSON.stringify({ documents, scripts }, null, 2), contentType: 'application/json' });
   }
 });
