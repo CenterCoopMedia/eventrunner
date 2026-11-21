@@ -2,8 +2,9 @@
 // admin routes. The two listeners (adminSource.js) and fetch are mocked, so
 // every endpoint call is read off the wire the page would send.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router';
+import { Link, MemoryRouter, useLocation } from 'react-router';
 
 const adminSubscriptions = new Map();
 const adminErrors = new Map();
@@ -63,13 +64,14 @@ function LocationProbe() {
   return null;
 }
 
-async function renderAt(path) {
+async function renderAt(path, children = null) {
   render(
     <MemoryRouter
       initialEntries={[path]}
     >
       <App />
       <LocationProbe />
+      {children}
     </MemoryRouter>,
   );
   await waitFor(() => {
@@ -582,6 +584,34 @@ describe('the update editor', () => {
     pushUpdates([], []);
     expect(await screen.findByRole('heading', { name: 'No such update' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save', exact: true })).toBeNull();
+  });
+
+  it('loads the created update again after viewing another update', async () => {
+    function RecordLinks() {
+      const { pathname } = useLocation();
+      const [created, setCreated] = useState(null);
+      return pathname === '/admin/updates/published'
+        ? <Link to={created}>Return to created update</Link>
+        : <Link to="/admin/updates/published" onClick={() => setCreated(pathname)}>Open the published update</Link>;
+    }
+    await renderAt('/admin/updates/new/update', <RecordLinks />);
+    await screen.findByRole('heading', { level: 1, name: 'New update' });
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Room change' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'The clinic moves to Room B.' } });
+    fetch.mockImplementation(async (_url, init) => response({ id: JSON.parse(init.body).id, status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await screen.findByText('Draft saved. It is not live until you publish it.', { selector: '[role="status"]' });
+    const { id } = bodyOf(callsTo('cmsSaveUpdate')[0]);
+    await waitFor(() => expect(currentPath).toBe(`/admin/updates/${id}`));
+    const saved = { ...NEVER_PUBLISHED, id, title: 'Room change', body: 'The clinic moves to Room B.' };
+    pushUpdates([PUBLISHED], [saved]);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Open the published update' }));
+    await screen.findByRole('heading', { level: 1, name: PUBLISHED.title });
+    expect(screen.queryByText('Draft saved. It is not live until you publish it.', { selector: '[role="status"]' })).toBeNull();
+    fireEvent.click(screen.getByRole('link', { name: 'Return to created update' }));
+    await screen.findByRole('heading', { level: 1, name: 'Room change' });
+    expect(screen.getByLabelText('Text')).toHaveValue(saved.body);
   });
 
   it('closes the form when a loaded update is deleted, so a save cannot write it back', async () => {

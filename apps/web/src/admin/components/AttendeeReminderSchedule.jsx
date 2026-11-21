@@ -164,19 +164,28 @@ export default function AttendeeReminderSchedule({ call }) {
     setResult((current) => ({ tone, message, seq: (current?.seq ?? 0) + 1 }));
   }, []);
 
+  const apply = useCallback((next) => {
+    setData(next);
+    setForm(formFrom(next));
+    setOffsetsProblem(null);
+    setWordingProblems({ subject: null, message: null });
+    setPreview(null);
+    formRevision.current += 1;
+    previewRevision.current = null;
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const next = await call('reminderSchedules', { action: 'get', schedule: 'attendees' });
-      setData(next);
-      setForm(formFrom(next));
+      apply(next);
       setLoadError(null);
     } catch (err) {
       setLoadError(communicationsError(err, 'The schedule could not be loaded. Try again.'));
     } finally {
       setLoading(false);
     }
-  }, [call]);
+  }, [apply, call]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -208,11 +217,6 @@ export default function AttendeeReminderSchedule({ call }) {
     setForm({ ...form, ...patch });
     setPreview(null);
     setResult(null);
-  }
-
-  function apply(next) {
-    setData(next);
-    setForm(formFrom(next));
   }
 
   async function run(kind, request, onDone) {
@@ -259,7 +263,6 @@ export default function AttendeeReminderSchedule({ call }) {
       draft: { subject: form.subject.trim().replaceAll('[Days until event]', '{{days_until}}'), message: form.message.trim().replaceAll('[Days until event]', '{{days_until}}') },
     }, (next) => {
       apply(next);
-      setPreview(null);
       const paused = next.state === 'paused' && data.state === 'on';
       show(paused ? 'caution' : 'ok', paused
         ? 'Attendee settings saved. The schedule is paused until you preview and approve it again.'
@@ -295,7 +298,6 @@ export default function AttendeeReminderSchedule({ call }) {
       factsVersion: preview.factsVersion,
     }, (next) => {
       apply(next);
-      setPreview(null);
       show('ok', 'Approved. Scheduled attendee reminders are on.');
     });
   }

@@ -287,6 +287,64 @@ describe('the invoice editor', () => {
     expect(screen.getByLabelText('Notes')).toHaveValue('Saved before the answer was lost.');
   });
 
+  it('requires a new confirmation after reloading a draft with a newer revision', async () => {
+    let stored = STORED;
+    answers.get = () => response({ invoice: stored });
+    answers.settings = { ...SETTINGS, nextNumber: 'INV-0004' };
+    const conflict = () => response({ error: { code: 'conflict', message: 'The invoice changed since you opened it. Reload it before saving.' } }, 409);
+    answers.saveDraft = ({ expectedRevision }) => expectedRevision === stored.revision
+      ? response({ invoice: stored })
+      : conflict();
+    answers.issue = ({ expectedRevision }) => expectedRevision === stored.revision
+      ? response({ invoice: { ...stored, number: 'INV-0005', status: 'issued', revision: expectedRevision + 1 } })
+      : conflict();
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
+    await screen.findByText(/The next number is INV-0004\./);
+    stored = { ...STORED, revision: STORED.revision + 1, billTo: { ...STORED.billTo, name: 'Updated Press' } };
+    answers.settings = { ...SETTINGS, nextNumber: 'INV-0005' };
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('The invoice changed since you opened it. Reload it before saving.');
+    expect(invoiceCalls().find((body) => body.action === 'saveDraft')).toMatchObject({ expectedRevision: STORED.revision });
+    expect(screen.getByRole('button', { name: 'Issue this invoice' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reload the saved invoice' }));
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Updated Press' });
+    expect(screen.getByText('Reloaded the saved invoice. Your unsaved changes were discarded.')).toBeInTheDocument();
+    const oldConfirmation = screen.queryByRole('button', { name: 'Issue this invoice' });
+    if (oldConfirmation) {
+      fireEvent.click(oldConfirmation);
+      await screen.findByRole('heading', { level: 1, name: 'INV-0005' });
+    }
+    expect(invoiceCalls().filter((body) => body.action === 'issue')).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Issue this invoice' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
+    await screen.findByText(/The next number is INV-0005\./);
+    fireEvent.click(screen.getByRole('button', { name: 'Issue this invoice' }));
+    await screen.findByRole('heading', { level: 1, name: 'INV-0005' });
+    expect(invoiceCalls().filter((body) => body.action === 'issue')).toEqual([
+      { action: 'issue', invoiceId: STORED.id, expectedRevision: stored.revision },
+    ]);
+  });
+
+  it('keeps an unsaved invoice and allows retry when the reload fails', async () => {
+    answers.get = { invoice: STORED };
+    answers.saveDraft = () => response({ error: { code: 'conflict', message: 'The invoice changed since you opened it.' } }, 409);
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Keep these notes.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const reload = await screen.findByRole('button', { name: 'Reload the saved invoice' });
+    answers.get = () => response({ error: { code: 'unavailable', message: 'The invoice is temporarily unavailable.' } }, 503);
+    fireEvent.click(reload);
+    await screen.findByText('The invoice is temporarily unavailable. Your edits are still here.');
+    expect(screen.getByLabelText('Notes')).toHaveValue('Keep these notes.');
+    expect(reload).toBeEnabled();
+  });
+
   it('opens an invoice that is not a draft read-only', async () => {
     answers.get = { invoice: { ...STORED, status: 'issued', number: 'INV-0001' } };
     await renderAt(`/admin/invoices/${STORED.id}`);
