@@ -153,7 +153,9 @@ test('published dimensions preserve the responsive column width and the chosen p
   );
   // Serve exact source dimensions independently of the asynchronous Storage trigger.
   for (const [object, imageWidth, imageHeight] of [[asset.path, width, height], [copyPath, 320, 240]]) {
-    const body = await sharp({ create: { width: imageWidth, height: imageHeight, channels: 3, background: '#777' } }).webp().toBuffer();
+    const body = await sharp({
+      create: { width: imageWidth, height: imageHeight, channels: 3, background: { r: 119, g: 119, b: 119 } },
+    }).webp().toBuffer();
     await routeObject(object, (route) => route.fulfill({ contentType: 'image/webp', body }));
   }
   let manifestGate;
