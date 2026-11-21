@@ -224,7 +224,7 @@ export function TextAreaField({
   );
 }
 
-/** A labelled <select> over `options: [{ value, label }]`. */
+/** A labelled <select> over `options: [{ value, label, lang? }]`. */
 export function SelectField({
   label,
   value,
@@ -262,7 +262,7 @@ export function SelectField({
         {...rest}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} lang={option.lang}>
             {option.label}
           </option>
         ))}

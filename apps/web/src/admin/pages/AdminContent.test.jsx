@@ -431,12 +431,15 @@ describe('content browsing', () => {
     act(() => adminSubscriptions.get('cmsPages_drafts')([SCHOLARSHIPS_PAGE]));
     const recovery = await screen.findByRole('region', { name: 'Not on any page' });
     expect(within(recovery).getByText('Bring a notebook.')).toBeInTheDocument();
+    expect(within(recovery).getByText('Hidden')).toBeInTheDocument();
+    expect(within(recovery).queryByText(/^Live/)).not.toBeInTheDocument();
     expect(within(recovery).queryByText('Keep this here.')).not.toBeInTheDocument();
     expect(within(recovery).queryByText('Our event heading')).not.toBeInTheDocument();
     fireEvent.click(within(recovery).getByRole('button', { name: 'Move to section…' }));
     const submit = within(recovery).getByRole('button', { name: 'Move and publish' });
     expect(submit).toBeDisabled();
-    expect(within(recovery).getByText('This moves the published block. Its saved changes stay in a draft.')).toBeInTheDocument();
+    expect(within(recovery).getByRole('button', { name: 'Move as draft' })).toBeDisabled();
+    expect(within(recovery).getByText('Publishing now moves the published version. Its saved changes stay in a draft.')).toBeInTheDocument();
 
     const target = '/admin/content/scholarships/intro';
     fireEvent.change(within(recovery).getByRole('combobox', { name: 'Destination section' }), { target: { value: target } });
@@ -455,7 +458,47 @@ describe('content browsing', () => {
       adminSubscriptions.get('cmsContent_drafts')([{ ...orphanDraft, id: 'intro__body', section: 'intro' }]);
     });
     expect(screen.queryByRole('region', { name: 'Not on any page' })).not.toBeInTheDocument();
-    expect(screen.getByText('Moved “Bring a notebook.” and published the block.', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('Moved “', { exact: false })).toHaveTextContent('Moved “Bring a notebook.” and published the block.');
+  });
+
+  it('moves recovered content as a draft and opens it in the normal section editor', async () => {
+    const locale = vi.spyOn(navigator, 'language', 'get').mockReturnValue('es-MX');
+    const orphan = { ...BODY_BLOCK_DRAFT, id: 'removed__body', section: 'removed', status: undefined };
+    const moved = { ...BODY_BLOCK_DRAFT, basedOnRevision: null };
+    sources.cmsPages = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [orphan];
+    const target = '/admin/content/scholarships/intro';
+    fetch.mockResolvedValueOnce(okResponse({ docId: moved.id, status: 'dirty' }));
+
+    try {
+      await renderAt('/admin/content');
+      const recovery = within(await screen.findByRole('region', { name: 'Sin página asignada' }));
+      expect(recovery.getByText('Oculto')).toBeInTheDocument();
+      fireEvent.click(recovery.getByRole('button', { name: 'Mover a una sección…' }));
+      fireEvent.change(recovery.getByRole('combobox', { name: 'Sección de destino' }), { target: { value: target } });
+      expect(recovery.getByRole('button', { name: 'Mover y publicar' })).toBeEnabled();
+      fireEvent.click(recovery.getByRole('button', { name: 'Mover como borrador' }));
+      const open = await screen.findByRole('link', { name: 'Abrir Scholarships · Intro' });
+      expect(open.closest('[role="status"]')).toHaveTextContent('Se movió «Scholarships open in spring.» como borrador.');
+      expect(recovery.getByRole('option', { name: 'Scholarships · Intro' })).toHaveAttribute('lang', '');
+      expect(urlOf(0)).toMatch(/\/cmsMoveContentAsDraft$/);
+      expect(bodyOf(0)).toEqual({ docId: orphan.id, pageId: 'scholarships', section: 'intro' });
+
+      sources.cmsContent = [];
+      sources.cmsContent_drafts = [moved];
+      act(() => {
+        adminSubscriptions.get('cmsContent')([]);
+        adminSubscriptions.get('cmsContent_drafts')([moved]);
+      });
+      expect(screen.queryByRole('region', { name: 'Sin página asignada' })).not.toBeInTheDocument();
+      fireEvent.click(open);
+      const link = await screen.findByRole('link', { name: 'Scholarships open in spring.' });
+      const row = within(link.closest('li'));
+      expect(row.getByText('Draft', { selector: '[data-record-state]' })).toBeInTheDocument();
+      expect(row.getByRole('button', { name: 'Publish' })).toBeEnabled();
+    } finally {
+      locale.mockRestore();
+    }
   });
 
   it('offers Home destinations only when the section has a place that displays the block', async () => {
