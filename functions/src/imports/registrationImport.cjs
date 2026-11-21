@@ -199,6 +199,14 @@ async function planRow({ db, tx, input, key, context, now }) {
       reasons: ['email: this ticket is claimed by an account, so its email cannot change by import. Change it on the attendee record.'],
     };
   }
+  // The other fields in the row belong to the address in the file.
+  const recipientEmail = cell(patch.email ?? current.email).toLowerCase();
+  if (recipientEmail !== values.email) {
+    return {
+      verdict: 'error', docId: id, label,
+      reasons: ['email: this row names a different address from the ticket. Check the ticket ID and email address.'],
+    };
+  }
   // A new email on an unclaimed ticket is a new person: answers given for
   // the first one never pass to them (as commerceAdmin correctAttendee).
   // The hold is replaced by this row's own answers, or removed.
