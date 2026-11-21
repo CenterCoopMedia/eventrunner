@@ -68,7 +68,7 @@ describe('admin offline outcome', () => {
       connection(false);
       streams.get('cmsContent_drafts')([], { fromCache: true });
     });
-    expect(screen.getByRole('status')).toHaveTextContent('content already loaded stays visible');
+    expect(screen.getByRole('status')).toHaveTextContent(/content already loaded stays visible/i);
     expect(screen.getByLabelText('Saved content')).toBeEnabled();
     expect(screen.getByLabelText('Saved content')).toHaveValue('Confirmed draft');
   });

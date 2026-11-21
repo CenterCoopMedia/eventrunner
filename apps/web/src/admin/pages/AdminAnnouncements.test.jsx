@@ -26,6 +26,14 @@ function renderPage() {
   return render(<MemoryRouter initialEntries={['/admin/announcements']}><AdminAnnouncements /></MemoryRouter>);
 }
 
+function enterBanner() {
+  const message = screen.getByRole('textbox', { name: 'Message' });
+  fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
+  fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '2026-10-02T09:00' } });
+  fireEvent.change(screen.getByLabelText('Ends'), { target: { value: '2026-10-02T11:00' } });
+  return message;
+}
+
 describe('AdminAnnouncements', () => {
   beforeEach(() => call.mockReset());
   afterEach(() => vi.useRealTimers());
@@ -88,8 +96,7 @@ describe('AdminAnnouncements', () => {
     call.mockImplementationOnce(() => new Promise((resolve) => { reply = resolve; }));
     renderPage();
     act(() => report([]));
-    const message = screen.getByRole('textbox', { name: 'Message' });
-    fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
+    const message = enterBanner();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await act(async () => vi.advanceTimersByTimeAsync(LATE_AFTER));
 
@@ -110,8 +117,7 @@ describe('AdminAnnouncements', () => {
     call.mockRejectedValueOnce({ code: 'network', status: 0 });
     renderPage();
     act(() => report([]));
-    const message = screen.getByRole('textbox', { name: 'Message' });
-    fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
+    const message = enterBanner();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await screen.findByText(/the save result is unknown/i);
@@ -128,8 +134,7 @@ describe('AdminAnnouncements', () => {
       call.mockResolvedValueOnce({ id: 'a1' });
       renderPage();
       act(() => report([]));
-      const message = screen.getByRole('textbox', { name: 'Message' });
-      fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
+      const message = enterBanner();
       const save = screen.getByRole('button', { name: 'Save' });
       fireEvent.click(save);
       expect(screen.getByText(/the save was held while you were offline/i)).toBeVisible();
