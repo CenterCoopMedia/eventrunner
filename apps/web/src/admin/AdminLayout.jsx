@@ -545,6 +545,7 @@ function AdminDesk() {
   const [mobileDocketOpen, setMobileDocketOpen] = useState(
     () => typeof window === 'undefined' || typeof window.matchMedia !== 'function',
   );
+  const [phoneNameClipped, setPhoneNameClipped] = useState(false);
   const markSrc = brandingSrc(theme?.logos?.mark ?? theme?.logos?.primary);
   // An unknown tier (the probe failed for a reason other than
   // permission-denied) draws the sections every admin holds and refuses
@@ -563,6 +564,7 @@ function AdminDesk() {
   const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed);
   const railHidden = wide && railCollapsed;
   const railRef = useRef(null);
+  const eventNameRef = useRef(null);
   const railToggleRef = useRef(null);
   const toggleRail = () => {
     const next = !railCollapsed;
@@ -640,20 +642,39 @@ function AdminDesk() {
     setTour((run) => (run !== null && run > 0 ? run : readTourDone(uid) || onSetup ? null : 0));
   }, [uid, onSetup]);
   useLayoutEffect(() => {
-    if (wide || !mobileDocketOpen) return undefined;
+    if (wide) return undefined;
     const rail = railRef.current;
-    // The fixed sheet starts below the bar even when the event name wraps.
+    const name = eventNameRef.current;
     const measure = () => {
-      rail.style.setProperty('--admin-phone-bar-height', `${rail.getBoundingClientRect().height}px`);
+      // Enlarged text needs a clamp and can need a separate Menu row.
+      const rootSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+      if (rootSize > 16) {
+        rail.dataset.phoneReflow = window.innerWidth < 19 * rootSize ? 'stacked' : 'clamped';
+      } else {
+        delete rail.dataset.phoneReflow;
+      }
+      if (mobileDocketOpen) {
+        // Glyphs can extend a few pixels beyond a line box without losing a line.
+        const halfLine = parseFloat(window.getComputedStyle(name).lineHeight) / 2;
+        setPhoneNameClipped(rootSize > 16 && name.scrollHeight - name.clientHeight > halfLine);
+        // The fixed sheet starts below the bar even when the event name wraps.
+        rail.style.setProperty('--admin-phone-bar-height', `${rail.getBoundingClientRect().height}px`);
+      }
     };
     measure();
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    let frame;
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(measure);
+    }) : null;
     observer?.observe(rail);
     return () => {
       observer?.disconnect();
+      window.cancelAnimationFrame(frame);
+      delete rail.dataset.phoneReflow;
       rail.style.removeProperty('--admin-phone-bar-height');
     };
-  }, [wide, mobileDocketOpen]);
+  }, [wide, mobileDocketOpen, eventConfig.shortName]);
   useEffect(() => {
     if (wide || !mobileDocketOpen) return undefined;
     // The sheet owns the phone viewport while it is open. Lock the document
@@ -717,7 +738,9 @@ function AdminDesk() {
             </span>
           ) : null}
           <p
+            ref={eventNameRef}
             className={`min-w-0 wrap-anywhere text-admin-base font-bold text-admin-rail-ink${railHidden ? ' sr-only' : ''}`}
+            title={eventConfig.shortName}
           >
             {eventConfig.shortName}
           </p>
@@ -761,6 +784,11 @@ function AdminDesk() {
             id="admin-docket"
             hidden={railHidden}
             className="admin-mobile-docket__content fixed inset-x-0 bottom-0 top-[var(--admin-phone-bar-height,3.5rem)] z-40 min-h-0 overflow-y-auto overscroll-contain bg-admin-rail-ground lg:static lg:z-auto lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-visible">
+            {!wide && mobileDocketOpen && phoneNameClipped ? (
+              <p tabIndex={0} className="max-h-[22dvh] overflow-y-auto wrap-anywhere px-md pt-xs text-admin-xs">
+                {eventConfig.shortName}
+              </p>
+            ) : null}
             <div className="px-md py-xs lg:px-xs">
               <button type="button" className={`${railButtonClass} w-full justify-between`} onClick={openCommands}>
                 Find work <span aria-hidden="true" className="font-admin-data text-admin-xs">{/Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘K' : 'Ctrl+K'}</span>
