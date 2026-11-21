@@ -517,24 +517,30 @@ function createTicketingCheckInHandler({ db, provider, auth, getConfig, now = ()
         const order = parent.exists ? parent.data() : null;
         if (!scopeMatches(order, provider) || !order.ticketIds?.includes(ticketId)) return { result: 'invalid', ticket: null };
         const account = ticket.claimedByUid ? await tx.get(db.collection('users').doc(ticket.claimedByUid)) : null;
-        const dto = publicTicket(ticket, ticketId);
+        const reviewedTicket = (value) => ({
+          ...publicTicket(value, ticketId), confirmationVersion: confirmationVersion(ref.path, value),
+        });
+        const dto = reviewedTicket(ticket);
         if (undo) {
+          requireConfirmation(body.expectedVersion, ref.path, ticket);
           if (!ticket.checkedInAt) return { result: 'corrected', unchanged: true, ticket: dto };
-          tx.update(ref, { checkedInAt: null, checkedInByUid: null, updatedAt: now() });
+          const patch = { checkedInAt: null, checkedInByUid: null, updatedAt: now() };
+          tx.update(ref, patch);
           audit(tx, logRef, { action: 'check-in-corrected', actor, now, orderId: ticket.orderId, ticketIds: [ticketId], reason });
-          return { result: 'corrected', ticket: { ...dto, checkedInAt: null } };
+          return { result: 'corrected', ticket: reviewedTicket({ ...ticket, ...patch }) };
         }
         if (ticket.status !== 'valid' || !isOrderFulfilled(order) ||
             (account?.exists && account.data().registrationStatus === 'revoked')) return { result: 'invalid', ticket: dto };
         if (ticket.checkedInAt) return { result: 'already_checked_in', ticket: dto };
         const checkedInAt = now();
-        tx.update(ref, { checkedInAt, checkedInByUid: actor.uid, updatedAt: checkedInAt });
+        const patch = { checkedInAt, checkedInByUid: actor.uid, updatedAt: checkedInAt };
+        tx.update(ref, patch);
         audit(tx, logRef, { action: 'checked-in', actor, now, orderId: ticket.orderId, ticketIds: [ticketId] });
-        return { result: 'checked_in', ticket: { ...dto, checkedInAt: iso(checkedInAt) } };
+        return { result: 'checked_in', ticket: reviewedTicket({ ...ticket, ...patch }) };
       });
       return res.status(200).json(result);
     } catch (error) {
-      if (ORGANIZER_ERRORS.has(error)) return sendError(res, error.status, error.code, error.message);
+      if (ORGANIZER_ERRORS.has(error) || error instanceof ConfirmationConflict) return sendError(res, error.status, error.code, error.message);
       log.error('ticket check-in failed', { code: error?.code || 'internal' });
       return sendError(res, 503, 'unavailable', 'Check-in could not be confirmed. Check the ticket again.');
     }

@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Feedback inbox (spec §9 "Feedback inbox", issue #28): a public bug/feedback
  * submission endpoint, hardened the same way telemetry/clientErrors.cjs
@@ -361,16 +363,22 @@ function createUpdateFeedbackStatusHandler({ db, auth, getConfig, now = Date.now
     }
 
     const ref = db.collection(FEEDBACK_COLLECTION).doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) return notFound(res, 'Feedback not found.');
-
     const at = new Date(now());
+    let found;
     try {
-      await ref.update({ status, reviewedAt: at, reviewedBy: gate.email });
+      found = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return false;
+        requireConfirmation(req.body.expectedVersion, ref.path, snap.data());
+        tx.update(ref, { status, reviewedAt: at, reviewedBy: gate.email });
+        return true;
+      });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('updateFeedbackStatus failed', err);
       return internal(res, 'The feedback status could not be updated. Keep this page open and contact support for help.');
     }
+    if (!found) return notFound(res, 'Feedback not found.');
     await logAdminAction({
       db,
       action: 'updateFeedbackStatus',

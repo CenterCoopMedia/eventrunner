@@ -1,5 +1,7 @@
 'use strict';
 
+const { ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Speaker mail wording (issue #204): staff change the words of the speaker
  * invitation (`speaker.invite`) and the acceptance confirmation
@@ -98,7 +100,7 @@ async function saveTemplateAction({ db, now, log, actor, body }) {
 
 async function resetTemplateAction({ db, now, log, actor, body }) {
   const id = readTemplateId(body);
-  return { template: await resetWording({ db, id, actor, now, log }) };
+  return { template: await resetWording({ db, id, actor, now, log, expectedVersion: body.expectedVersion }) };
 }
 
 const ACTION_HANDLERS = {
@@ -123,7 +125,7 @@ function createSpeakerMailTemplatesHandler({ db, auth, getConfig, now = Date.now
       const result = await ACTION_HANDLERS[action]({ db, getConfig, now, log, actor, body: req.body });
       res.status(200).json(result);
     } catch (err) {
-      if (err instanceof WordingError) return sendError(res, err.status, err.code, err.message);
+      if (err instanceof WordingError || err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error(`speakerMailTemplates ${action} failed`, err);
       return internal(res, 'The wording request could not be completed. Try again.');
     }

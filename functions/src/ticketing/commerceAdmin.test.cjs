@@ -256,6 +256,24 @@ test('check-in correction is operator-only, explicit, and audited', async () => 
   assert.equal((await db.collection('admin_logs').get()).docs[0].data().action, 'ticketing.check-in-corrected');
 });
 
+test('check-in correction refuses a new scan under the confirmed ticket ID', async () => {
+  const db = dbFor({ 'tickets/ticket-1': { ...ticket, checkedInAt: NOW } });
+  const handler = checkIn(db);
+  const scan = { action: 'checkIn', ticketId: 'ticket-1' };
+  const undo = { action: 'undo', ticketId: scan.ticketId, reason: 'Scanned the wrong ticket.', confirmed: true };
+  const original = (await call(handler, scan)).body.ticket.confirmationVersion;
+  const checkedInAt = new Date(NOW.getTime() + 1000);
+  await db.collection('tickets').doc('ticket-1').update({ checkedInAt });
+  const before = db.writes.length;
+  const stale = await call(handler, { ...undo, expectedVersion: original }, 'operator');
+  assert.equal(stale.statusCode, 409);
+  assert.equal(db.writes.length, before);
+  assert.deepEqual(db.read('tickets', 'ticket-1').checkedInAt, checkedInAt);
+  const expectedVersion = (await call(handler, scan)).body.ticket.confirmationVersion;
+  assert.equal((await call(handler, { ...undo, expectedVersion }, 'operator')).statusCode, 200);
+  assert.equal(db.read('tickets', 'ticket-1').checkedInAt, null);
+});
+
 test('staff cannot cancel a used ticket and demos cannot mutate admission', async () => {
   const body = { action: 'cancelTickets', orderId: 'order-1', ticketIds: ['ticket-1'], reason: 'Requested', confirmed: true };
   const used = dbFor({ 'tickets/ticket-1': { ...ticket, checkedInAt: NOW } });

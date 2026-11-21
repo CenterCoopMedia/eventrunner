@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * removeUserCustomBadge — an admin removes one free-text custom badge from
  * an attendee's account (issue #176).
@@ -49,7 +51,7 @@ function normalizedBadgeLabel(value) {
  * @returns {Promise<{ ok: boolean, status?: number, code?: string,
  *                     message?: string, removed?: string, customBadges?: string[] }>}
  */
-async function applyRemoveCustomBadge({ db, uid, badge }) {
+async function applyRemoveCustomBadge({ db, uid, badge, expectedVersion }) {
   return db.runTransaction(async (tx) => {
     const ref = db.collection(USERS).doc(uid);
     const snap = await tx.get(ref);
@@ -57,6 +59,7 @@ async function applyRemoveCustomBadge({ db, uid, badge }) {
       return { ok: false, status: 404, code: 'not-found', message: 'No such account.' };
     }
     const stored = Array.isArray(snap.data()?.customBadges) ? snap.data().customBadges : [];
+    requireConfirmation(expectedVersion, ref.path, stored);
     const requestedLabel = normalizedBadgeLabel(badge);
     const removed = stored.find((entry) => normalizedBadgeLabel(entry) === requestedLabel);
     if (removed === undefined) {
@@ -91,8 +94,9 @@ function createRemoveUserCustomBadgeHandler({ db, auth, getConfig, now = () => n
 
     let result;
     try {
-      result = await applyRemoveCustomBadge({ db, uid, badge });
+      result = await applyRemoveCustomBadge({ db, uid, badge, expectedVersion: req.body?.expectedVersion });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('removeUserCustomBadge failed', err);
       return internal(res, 'The custom badge could not be removed. Keep this page open and contact support for help.');
     }

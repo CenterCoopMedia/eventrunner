@@ -220,6 +220,21 @@ test('the server builds the Checkout Session from the frozen invoice, never from
   assert.equal(env.audits()[0].details.sessionId, 'cs_test_0001');
 });
 
+test('a stale card link confirmation makes no checkout or reservation', async () => {
+  const env = setup();
+  const invoice = (await env.call({ action: 'get', invoiceId: ID })).body.invoice;
+  await env.db.collection('invoices').doc(ID).update({ revision: invoice.revision + 1 });
+  const before = env.db.writes.length;
+  const body = { action: 'createPayLink', invoiceId: ID };
+  const stale = await env.call({ ...body, expectedRevision: invoice.revision });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(env.db.writes.length, before);
+  assert.deepEqual(env.fake.calls.create, []);
+  assert.equal((await env.call({ ...body, expectedRevision: invoice.revision + 1 })).statusCode, 200);
+  assert.equal(env.fake.calls.create.length, 1);
+});
+
 test('a second press answers the same open link and asks Stripe for nothing', async () => {
   const env = setup();
   const first = await env.call({ action: 'createPayLink', invoiceId: ID });

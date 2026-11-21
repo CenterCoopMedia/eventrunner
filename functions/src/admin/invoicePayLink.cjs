@@ -320,6 +320,10 @@ async function createPayLink({ db, actor, body, now, getPayments, log }) {
     const snap = await tx.get(ref);
     if (!snap.exists) fail(404, 'not-found', 'Invoice not found. It may have been deleted.');
     const stored = snap.data();
+    const revision = Number.isSafeInteger(stored.revision) && stored.revision >= 0 ? stored.revision : 0;
+    if (body.expectedRevision !== undefined && body.expectedRevision !== revision) {
+      fail(409, 'stale-confirmation', 'The invoice changed. Reload it before creating a payment link.');
+    }
     const refusal = linkRefusal(stored);
     if (refusal) fail(...refusal);
     // A card payment the invoice did not expect may mean a page it does not
