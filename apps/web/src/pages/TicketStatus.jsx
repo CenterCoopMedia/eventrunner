@@ -114,6 +114,7 @@ export default function TicketStatus() {
   const checkoutUrl = safeCheckoutUrl(order?.checkoutUrl);
   const canRecoverCheckout = order?.canRecoverCheckout === true;
   const hasCheckoutAction = Boolean(checkoutUrl) || canRecoverCheckout;
+  const failedClosedCheckout = order?.paymentStatus === 'failed' && !hasCheckoutAction;
   return (
     <article className="ticket-print-page min-w-0 space-y-lg text-body text-text-primary">
       {heading}
@@ -133,6 +134,7 @@ export default function TicketStatus() {
           {order.refundStatus && order.refundStatus !== 'none' ? <p>A refund status describes the payment. Each ticket below shows whether it still grants admission.</p> : null}
           {!complete && !terminal && !needsReview && !refunded ? <div className="space-y-sm no-print">
             {order.paymentStatus === 'failed' && checkoutUrl ? <p>Your latest payment attempt failed. The existing checkout can still accept a new payment attempt. Use the same checkout to try again.</p> : null}
+            {failedClosedCheckout ? <p>Your latest payment attempt failed. Contact the organizers before trying to pay again.</p> : null}
             <p>Closing Stripe or returning here does not cancel its payment session. If you have already paid, allow confirmation to finish. Do not submit another payment to speed it up.</p>
             {hasCheckoutAction && order.expiresAt ? <p>Checkout expires {formatTicketTime(order.expiresAt, eventConfig.timezone)}.</p> : null}
             <div className="flex flex-wrap gap-sm">
@@ -147,7 +149,9 @@ export default function TicketStatus() {
         <section className="space-y-sm no-print">
           <p>Stripe’s payment receipt and this event’s ticket confirmation serve different purposes. Contact the organizers about ticket assignments, cancellations, or refund policy.</p>
           <Link to="/tickets/mine" className={secondaryActionClass}>View tickets assigned to you</Link>
-          {complete || terminal || refunded ? <button type="button" className={secondaryActionClass} onClick={startAnother}>Choose tickets for a new order</button> : (
+          {complete || terminal || refunded ? (
+            <button type="button" className={secondaryActionClass} onClick={startAnother}>Choose tickets for a new order</button>
+          ) : !needsReview && !failedClosedCheckout && (
             <p>{hasCheckoutAction ? 'Finish this checkout or wait for its confirmed expiry before starting another order.' : 'Wait for this order to be confirmed before starting another order.'} Contact the organizers if it remains unresolved.</p>
           )}
         </section>

@@ -97,6 +97,15 @@ describe('authoritative order status and attendee confirmation', () => {
     expect(screen.queryByRole('button', { name: 'Start a separate order' })).not.toBeInTheDocument();
     expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(0);
   });
+  it('directs the buyer to the organizers when payment failed and the checkout has closed', async () => {
+    ticketingRequest.mockResolvedValue({
+      ...ORDER, status: 'pending', paymentStatus: 'failed', checkoutUrl: null, canRecoverCheckout: false, tickets: [],
+    });
+    render(surface());
+    expect(await screen.findByText('Your latest payment attempt failed. Contact the organizers before trying to pay again.')).toBeInTheDocument();
+    expect(screen.queryByText(/Wait for this order to be confirmed/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Recover existing checkout' })).not.toBeInTheDocument();
+  });
   it('recovers a pending order by its owner-scoped reference on a different device', async () => {
     ticketingRequest.mockResolvedValue({ ...ORDER, status: 'pending', paymentStatus: 'pending', tickets: [], checkoutUrl: null, canRecoverCheckout: true });
     render(surface());
