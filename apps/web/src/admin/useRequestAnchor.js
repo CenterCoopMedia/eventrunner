@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { scrollToElement } from '../lib/scrollToTop.js';
 
-/** The inbox rows arrive after the link opens. Focus the requested row once. */
+/** Land at the start of the requested inbox row when it arrives. */
 export function useRequestAnchor(id, rows) {
   const focused = useRef(null);
   useEffect(() => {
@@ -8,7 +9,8 @@ export function useRequestAnchor(id, rows) {
     const row = document.getElementById(`request-${id}`);
     if (row) {
       focused.current = id;
-      row.focus();
+      scrollToElement(row);
+      row.focus({ preventScroll: true });
     }
   }, [id, rows]);
 }
