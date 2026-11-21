@@ -31,6 +31,8 @@ export default function ImageBlock({ block }) {
   const sizes = width ? `(max-width: ${width}px) 100vw, ${width}px` : '100vw';
   // The live content overlay can replace a block while retaining its upload path.
   const dimensions = sources.path ? imageDimensions[sources.path] : undefined;
+  // Uploads wider than the smallest copy used the srcset slot as their natural width.
+  const fillsSlot = dimensions?.width > small;
   const image = (
     <img
       lang={block.publicLanguage}
@@ -42,7 +44,7 @@ export default function ImageBlock({ block }) {
       width={dimensions?.width}
       height={dimensions?.height}
       loading="lazy"
-      className={`h-auto max-w-full rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08] ${alignmentClass}`}
+      className={`h-auto max-w-full rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08] ${alignmentClass}${fillsSlot ? ' w-full' : ''}`}
       style={sources.pending ? {
         visibility: 'hidden',
         aspectRatio: dimensions ? `${dimensions.width} / ${dimensions.height}` : undefined,
@@ -54,7 +56,10 @@ export default function ImageBlock({ block }) {
       placement={block}
       assetPath={sources.path}
       className={hasLayout ? `w-fit max-w-full wrap-anywhere ${alignmentClass}` : undefined}
-      style={width ? { maxWidth: `min(100%, ${width}px)` } : undefined}
+      style={width || fillsSlot ? {
+        width: fillsSlot ? '100%' : undefined,
+        maxWidth: width ? `min(100%, ${width}px)` : undefined,
+      } : undefined}
     >
       {image}
     </ImageFigure>

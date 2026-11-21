@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
+import { FieldValue } from 'firebase-admin/firestore';
 import sharp from 'sharp';
 import { ADMIN_EMAIL, adminAuth, adminDb, adminIdToken, callFunction, ensureUser } from './helpers.mjs';
 
@@ -90,13 +91,38 @@ async function saveLibraryText() {
   expect(updated.status).toBe(200);
 }
 
-test('a published photo reserves its responsive height before its manifest arrives', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 844 });
+async function addPhotoDimensions(page, dimensions) {
   await page.route('**/src/generated/siteContent.js*', async (route) => {
     const response = await route.fetch();
     const snapshot = JSON.stringify({ [asset.path]: dimensions });
     await route.fulfill({ response, body: `${await response.text()}\nObject.assign(imageDimensions, ${snapshot});\n` });
   });
+}
+
+async function measurePhoto(image, pending = false) {
+  let geometry;
+  // The live block and caption chunk can replace the snapshot's image.
+  await expect.poll(async () => {
+    geometry = await image.evaluateAll(([node], pending) => {
+      if (!node) return null;
+      if (pending) {
+        if (globalThis.getComputedStyle(node).visibility !== 'hidden') return null;
+      } else if (!node.complete || node.naturalWidth === 0) {
+        node.scrollIntoView({ block: 'nearest' });
+        return null;
+      }
+      const { width, height, x } = node.getBoundingClientRect();
+      const column = node.closest('.space-y-lg').getBoundingClientRect();
+      return { width, height, offset: x - column.x, columnWidth: column.width };
+    }, pending);
+    return geometry?.width ?? 0;
+  }).toBeGreaterThan(0);
+  return geometry;
+}
+
+test('a published photo reserves its responsive height before its manifest arrives', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await addPhotoDimensions(page, dimensions);
   const manifestPath = `${path.posix.dirname(asset.path)}/_sizes/manifest.json`;
   const { promise: manifestGate, resolve: releaseManifest } = Promise.withResolvers();
   await page.route((url) => decodeURIComponent(url.pathname).endsWith(`/o/${manifestPath}`), async (route) => {
@@ -107,17 +133,82 @@ test('a published photo reserves its responsive height before its manifest arriv
   let reserved;
   try {
     await page.goto(`/${pageId}`, { waitUntil: 'domcontentloaded' });
-    await expect(image).toHaveCSS('visibility', 'hidden');
-    reserved = await image.evaluate((node) => node.getBoundingClientRect().toJSON());
-    expect(reserved.width).toBeGreaterThan(0);
+    reserved = await measurePhoto(image, true);
     expect(reserved.width).toBeLessThan(dimensions.width);
     expect(reserved.height).toBeCloseTo(reserved.width * dimensions.height / dimensions.width, 0);
   } finally {
     releaseManifest();
   }
-  await image.scrollIntoViewIfNeeded();
-  await expect.poll(() => image.evaluate((node) => node.naturalWidth)).toBeGreaterThan(0);
-  expect((await image.boundingBox()).height).toBeCloseTo(reserved.height, 0);
+  expect((await measurePhoto(image)).height).toBeCloseTo(reserved.height, 0);
+});
+
+test('published dimensions preserve the responsive column width and the chosen photo sizes', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const width = 600;
+  const height = 450;
+  const sizesDir = `${path.posix.dirname(asset.path)}/_sizes`;
+  const copyPath = `${sizesDir}/1/320.webp`;
+  const routeObject = (object, handler) => page.route(
+    (url) => decodeURIComponent(url.pathname).endsWith(`/o/${object}`), handler,
+  );
+  // Serve exact source dimensions independently of the asynchronous Storage trigger.
+  for (const [object, imageWidth, imageHeight] of [[asset.path, width, height], [copyPath, 320, 240]]) {
+    const body = await sharp({ create: { width: imageWidth, height: imageHeight, channels: 3, background: '#777' } }).webp().toBuffer();
+    await routeObject(object, (route) => route.fulfill({ contentType: 'image/webp', body }));
+  }
+  let manifestGate;
+  await routeObject(`${sizesDir}/manifest.json`, async (route) => {
+    await manifestGate;
+    await route.fulfill({
+      headers: { 'access-control-allow-origin': '*' },
+      json: {
+        status: 'ready', source: asset.path, sourceGeneration: '1', width, height,
+        sizes: [{ target: 320, width: 320, path: copyPath }],
+      },
+    });
+  });
+  const image = page.locator(`img[alt="${alt}"]`);
+  await page.goto(`/${pageId}`, { waitUntil: 'domcontentloaded' });
+  await expect(image).toHaveAttribute('sizes', '100vw');
+  await expect(image).not.toHaveAttribute('width');
+  const before = await measurePhoto(image);
+  expect(before.columnWidth).toBeGreaterThan(width);
+  expect(before.width).toBeCloseTo(before.columnWidth, 0);
+
+  const { promise, resolve: releaseManifest } = Promise.withResolvers();
+  manifestGate = promise;
+  let reserved;
+  try {
+    await addPhotoDimensions(page, { width, height });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    reserved = await measurePhoto(image, true);
+    expect(reserved.width).toBeCloseTo(before.width, 0);
+    expect(reserved.height).toBeCloseTo(before.width * height / width, 0);
+  } finally {
+    releaseManifest();
+  }
+  const loaded = await measurePhoto(image);
+  expect(loaded.width).toBeCloseTo(reserved.width, 0);
+  expect(loaded.height).toBeCloseTo(reserved.height, 0);
+
+  // Widen the real content column so the Large and Full caps differ.
+  await page.setViewportSize({ width: 2200, height: 900 });
+  await page.addStyleTag({ content: 'main.stage { --stage-max: 2200px; }' });
+  try {
+    for (const [size, cap, alignment, offset] of [
+      ['small', 320, 'left', 0], ['medium', 640, 'center', 0.5],
+      ['large', 1280, 'right', 1], ['full', 1920, 'center', 0.5],
+    ]) {
+      await blockRef().update({ size, alignment });
+      await expect(image).toHaveAttribute('sizes', `(max-width: ${cap}px) 100vw, ${cap}px`);
+      const photo = await measurePhoto(image);
+      expect(photo.columnWidth).toBeGreaterThan(cap);
+      expect(photo.width).toBeCloseTo(cap, 0);
+      expect(photo.offset).toBeCloseTo((photo.columnWidth - cap) * offset, 0);
+    }
+  } finally {
+    await blockRef().update({ size: FieldValue.delete(), alignment: FieldValue.delete() });
+  }
 });
 
 test('library text follows an open non-home image and fits inside its overlay', async ({ page }) => {
