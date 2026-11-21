@@ -4,20 +4,17 @@ import { clearKeptAnswer, keepAnswer, readKeptAnswer, removeKeptAnswer } from '.
 // The masthead waits for the mounted setup's save before signing out.
 export const SetupSaveContext = createContext(null);
 
-function keepUnsaved(entry, latest) {
-  keepAnswer(entry.scope, entry.value);
-  // A response can arrive after a newer answer was copied on page hide.
-  // Keep both steps, or let the newer value win when they share a key.
-  if (latest && latest !== entry) keepAnswer(latest.scope, latest.value);
+function keepUnsaved(entries) {
+  for (const { scope, value } of entries.values()) keepAnswer(scope, value);
 }
 
 /**
  * Save as the client types (ADR 0007 §3). `queue(value)` waits `delay` ms
  * for the typing to stop, then calls `save(value)`. Saves run one at a
- * time, so an older answer never lands after a newer one, and only the
- * latest queued value is sent. `flush()` sends a waiting value now; the
- * stepper calls it before it moves to another step. A waiting value is
- * also sent when the page closes the step.
+ * time, so an older answer never lands after a newer one. A new value
+ * replaces a waiting value for the same step. The stepper calls `flush()`
+ * to send waiting values before moving to another step. Waiting
+ * values are also sent when the page closes.
  *
  * A value whose save fails stays waiting, unless a newer value replaced
  * it, so the next flush sends it again. `flush()` resolves to true when
@@ -27,12 +24,11 @@ function keepUnsaved(entry, latest) {
  * `status` is 'idle', 'waiting', 'saving', 'saved', 'unsaved' (the server
  * kept the old answer, for example a taken name) or 'error'.
  */
-export function useAutosave({ save, onResult, scope, delay = 800 }) {
-  const [status, setStatus] = useState('idle');
-  const [error, setError] = useState('');
-  const [failure, setFailure] = useState(null);
-  const pending = useRef(undefined);
-  const latest = useRef(undefined);
+export function useAutosave({ save, onResult, scope, activeStep, delay = 800 }) {
+  const [outcome, setOutcome] = useState({ status: 'idle', error: '', failure: null, refused: [] });
+  const { error, failure } = outcome;
+  const status = outcome.status === 'saved' && outcome.refused.includes(activeStep) ? 'unsaved' : outcome.status;
+  const latest = useRef(new Map());
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
   const signOut = useContext(SetupSaveContext);
@@ -46,76 +42,85 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
     onResultRef.current = onResult;
   });
 
+  const updateStatus = useCallback(() => {
+    const entries = [...latest.current.values()];
+    const failed = entries.find((entry) => entry.state === 'error');
+    const state = ['error', 'waiting', 'saving']
+      .find((state) => entries.some((entry) => entry.state === state));
+    setOutcome({
+      status: state ?? 'saved',
+      error: failed?.error ?? '',
+      failure: failed?.failure ?? null,
+      refused: entries.filter(({ state }) => state === 'unsaved').map(({ value }) => value.step),
+    });
+  }, []);
+
   const flush = useCallback((options = {}) => {
     clearTimeout(timer.current);
     timer.current = null;
-    if (pending.current === undefined) return chain.current;
-    const entry = pending.current;
-    const { value, scope: savedScope } = entry;
-    pending.current = undefined;
-    setStatus('saving');
+    const pending = [...latest.current.values()].filter(({ state }) => state === 'waiting' || state === 'error');
+    if (pending.length === 0) return chain.current;
+    for (const entry of pending) entry.state = 'saving';
+    updateStatus();
     chain.current = chain.current.then(async () => {
-      try {
-        const result = await saveRef.current(value, options);
-        setError('');
-        setFailure(null);
-        if (result?.saved === false) keepUnsaved(entry, latest.current);
-        else {
-          if (latest.current === entry) {
+      for (const entry of pending) {
+        const { value, scope: savedScope } = entry;
+        if (latest.current.get(value.step) !== entry) continue;
+        try {
+          const result = await saveRef.current(value, options);
+          onResultRef.current?.(result, value);
+          const current = latest.current.get(value.step);
+          if (result?.saved === false) {
+            entry.state = 'unsaved';
+            if (current) keepAnswer(current.scope, current.value);
+          } else if (current === entry) {
             clearKeptAnswer(savedScope, value.step);
-            latest.current = undefined;
-          } else removeKeptAnswer(savedScope, value);
+            latest.current.delete(value.step);
+          } else {
+            removeKeptAnswer(savedScope, value);
+          }
+        } catch (err) {
+          entry.state = 'error';
+          entry.error = err.message;
+          entry.failure = { status: err.status ?? 0, code: err.code ?? 'network' };
+          const current = latest.current.get(value.step);
+          if (current) keepAnswer(current.scope, current.value);
         }
-        // A newer value queued during this save is still waiting: say so,
-        // not 'saved', until its own save lands.
-        if (pending.current !== undefined) setStatus('waiting');
-        else if (latest.current && latest.current !== entry) setStatus('saving');
-        else setStatus(result && result.saved === false ? 'unsaved' : 'saved');
-        onResultRef.current?.(result, value);
-        return true;
-      } catch (err) {
-        keepUnsaved(entry, latest.current);
-        if (latest.current === entry && pending.current === undefined) pending.current = entry;
-        setError(err.message);
-        setFailure({ status: err.status ?? 0, code: err.code ?? 'network' });
-        setStatus('error');
-        return false;
+        updateStatus();
       }
+      return ![...latest.current.values()].some(({ state }) => state === 'error');
     });
     return chain.current;
-  }, []);
+  }, [updateStatus]);
 
   const queue = useCallback((value) => {
-    pending.current = { value, scope: scopeRef.current };
-    latest.current = pending.current;
+    latest.current.set(value.step, { value, scope: scopeRef.current, state: 'waiting' });
     clearTimeout(timer.current);
     timer.current = setTimeout(flush, delay);
-    setStatus('waiting');
-  }, [flush, delay]);
+    updateStatus();
+  }, [flush, delay, updateStatus]);
 
   const keepForSignIn = useCallback(() => {
     clearTimeout(timer.current);
     timer.current = null;
-    if (latest.current) {
-      const { scope: savedScope, value } = latest.current;
+    for (const { scope: savedScope, value } of latest.current.values()) {
       keepAnswer(savedScope, value);
       if (JSON.stringify(readKeptAnswer(savedScope, value.step)) !== JSON.stringify(value)) return false;
     }
     // Authentication is about to end. Recovery reopens the copy explicitly,
     // without an unmount retry against the signed-out session.
-    pending.current = undefined;
-    latest.current = undefined;
+    latest.current.clear();
     return true;
   }, []);
 
   useEffect(() => {
     const beforeUnload = (event) => {
-      if (latest.current) keepAnswer(latest.current.scope, latest.current.value);
+      keepUnsaved(latest.current);
       event.preventDefault();
       event.returnValue = '';
     };
     const preserve = () => {
-      if (latest.current) keepAnswer(latest.current.scope, latest.current.value);
+      keepUnsaved(latest.current);
       // Save and token lookup may outlive this page; the copy comes first.
       flush({ keepalive: true });
     };
@@ -136,18 +141,18 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
     if (!beforeSignOut) return;
     beforeSignOut.current = async () => {
       const finished = await flush();
-      if (!finished || pending.current !== undefined) return false;
+      if (!finished || [...latest.current.values()].some(({ state }) => state !== 'unsaved')) return false;
       // A completed refusal (such as a taken name) must not trap the reader
       // in setup. Explicit sign-out discards their copies after auth exits;
       // stop unmount cleanup from writing the refused answer back then.
-      latest.current = undefined;
+      latest.current.clear();
       return true;
     };
     return () => { beforeSignOut.current = null; };
   }, [beforeSignOut, flush]);
 
   useEffect(() => () => {
-    if (latest.current) keepAnswer(latest.current.scope, latest.current.value);
+    keepUnsaved(latest.current);
     flush();
   }, [flush]);
 
