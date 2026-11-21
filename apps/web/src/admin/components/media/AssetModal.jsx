@@ -111,7 +111,7 @@ export default function AssetModal({
   const [title, setTitle] = useState(asset.title ?? '');
   const [caption, setCaption] = useState(asset.caption ?? '');
   const [credit, setCredit] = useState(asset.credit ?? '');
-  const savedText = useRef({ caption, credit });
+  const savedText = useRef({ alt, title, caption, credit });
   const [references, setReferences] = useState(null);
   const [usageError, setUsageError] = useState(false);
   const [scanAttempt, setScanAttempt] = useState(0);
@@ -148,20 +148,21 @@ export default function AssetModal({
   async function save(event) {
     event.preventDefault();
     if (pending.current || locked) return;
-    pending.current = true;
-    setAction('save');
+    const text = { alt: alt.trim(), title: title.trim(), caption: caption.trim(), credit: credit.trim() };
+    const patch = Object.fromEntries(
+      Object.entries(text).filter(([field, value]) => value !== savedText.current[field].trim()),
+    );
     setSaveError(null);
     setDeleteError(null);
+    if (Object.keys(patch).length === 0) {
+      setStatus('No changes to save.');
+      return;
+    }
+    pending.current = true;
+    setAction('save');
     setStatus('');
     try {
-      const text = { caption: caption.trim(), credit: credit.trim() };
-      await updateMetadata({
-        assetId: asset.id,
-        alt: alt.trim(),
-        title: title.trim(),
-        ...(text.caption !== savedText.current.caption ? { caption: text.caption } : {}),
-        ...(text.credit !== savedText.current.credit ? { credit: text.credit } : {}),
-      });
+      await updateMetadata({ assetId: asset.id, ...patch });
       savedText.current = text;
       setStatus('Description saved.');
     } catch (err) {

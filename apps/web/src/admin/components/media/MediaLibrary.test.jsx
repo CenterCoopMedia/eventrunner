@@ -216,12 +216,11 @@ describe('the delete-with-usage-warning flow', () => {
       expect(call).toHaveBeenCalledWith('mediaUpdateMetadata', {
         assetId: HERO.id,
         alt: 'A wide shot',
-        title: 'Hero',
       }),
     );
   });
 
-  it('saves a caption and credit, then clears a caption without overwriting the credit', async () => {
+  it('saves caption and credit edits and leaves other saved details alone', async () => {
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
     const caption = await screen.findByLabelText('Caption (optional)');
@@ -229,15 +228,16 @@ describe('the delete-with-usage-warning flow', () => {
     fireEvent.change(screen.getByLabelText('Credit (optional)'), { target: { value: 'Dana Lee' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Description saved.')).toBeVisible();
-    expect(call).toHaveBeenLastCalledWith('mediaUpdateMetadata', expect.objectContaining({
+    expect(call).toHaveBeenLastCalledWith('mediaUpdateMetadata', {
       assetId: HERO.id, caption: 'At the venue', credit: 'Dana Lee',
-    }));
+    });
     fireEvent.change(caption, { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Description saved.')).toBeVisible();
-    const [, request] = call.mock.lastCall;
-    expect(request.caption).toBe('');
-    expect(request).not.toHaveProperty('credit');
+    expect(call).toHaveBeenLastCalledWith('mediaUpdateMetadata', { assetId: HERO.id, caption: '' });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByText('No changes to save.')).toBeVisible();
+    expect(call.mock.calls.filter(([name]) => name === 'mediaUpdateMetadata')).toHaveLength(2);
   });
 });
 
@@ -519,6 +519,7 @@ describe('the Branding drawer for staff', () => {
     const { unmount } = render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
     await screen.findByText('This file is not used in your event.');
+    fireEvent.change(screen.getByLabelText('Image description'), { target: { value: 'An edited description' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Only your site manager can change branding files.')).toBeInTheDocument();
     expect(screen.queryByText('branding: operator access required')).toBeNull();
