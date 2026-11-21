@@ -229,17 +229,27 @@ export function AuthProvider({ children }) {
     };
   }, [user, probeRun]);
 
-  const refreshAdminStatus = useCallback(() => {
-    setVerdict((current) => current?.checkFailed ? null : current);
-    setProbeRun((run) => run + 1);
-  }, []);
-
   const ownVerdict = user && verdict?.user === user ? verdict : null;
   const adminStatus = !user ? 'denied' : ownVerdict ? ownVerdict.status : 'unknown';
   const adminCheckFailed = ownVerdict?.checkFailed === true;
   const adminTier = ownVerdict?.status === 'admin' ? ownVerdict.tier : null;
   const isAdmin = adminStatus === 'admin';
   const isOperator = adminTier === 'operator';
+
+  // After a failed check, "Check again" first restarts the SDK's network so
+  // the probe asks the server now instead of the cache (issue #1329; see
+  // reconnectFirestore). Only from the failed-check screen: an admin inside
+  // the shell keeps its connection. A failed restart still runs the probe,
+  // which fails closed as before.
+  const refreshAdminStatus = useCallback(async () => {
+    if (adminCheckFailed) {
+      setVerdict((current) => current?.checkFailed ? null : current);
+      try {
+        await (await loadFirebase()).reconnectFirestore();
+      } catch { /* The probe below decides. */ }
+    }
+    setProbeRun((run) => run + 1);
+  }, [adminCheckFailed]);
 
   // A failed check, or a recheck that could not reach the server, is never
   // replaced by the probe effect alone: a staff reader who opened the app

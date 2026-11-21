@@ -10,6 +10,7 @@ import {
   disableNetwork,
 } from 'firebase/firestore';
 import { IS_DEMO } from './lib/demoMode.js';
+import { restartFirestoreNetwork } from './lib/firestoreNetwork.js';
 import { mountedProjectId } from './lib/eventBrowserState.js';
 import { useEmulators, appCheckSiteKey } from './lib/firebaseSettings.js';
 
@@ -50,6 +51,12 @@ if (IS_DEMO) {
     // Nothing to fall back to and nothing to report: the demo renders from
     // the snapshot whether or not the SDK acknowledged going offline.
   });
+}
+
+// "Check again" after a failed admin access check (issue #1329). The demo
+// stays offline.
+export function reconnectFirestore() {
+  return IS_DEMO ? Promise.resolve() : restartFirestoreNetwork(db);
 }
 
 if (useEmulators) {
