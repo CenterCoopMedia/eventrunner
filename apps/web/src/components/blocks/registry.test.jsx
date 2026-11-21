@@ -95,6 +95,13 @@ describe('block renderer registry', () => {
     );
   });
 
+  it('links to the published map when its street address is blank', async () => {
+    const map = { ...SAMPLE_BLOCKS.map, label: 'Map of the convention center', address: ' ' };
+    render(<BlockRenderer block={map} />);
+    expect(await screen.findByTitle(map.label)).toHaveAttribute('src', map.embedUrl);
+    expect(screen.getByRole('link', { name: 'Open in Google Maps' })).toHaveAttribute('href', map.embedUrl);
+  });
+
   it('renders nothing for an invalid, unlabeled or starter map', async () => {
     const { map } = SAMPLE_BLOCKS;
     const { container, rerender } = render(<BlockRenderer block={map} />);
