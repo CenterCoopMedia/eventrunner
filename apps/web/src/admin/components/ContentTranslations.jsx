@@ -10,7 +10,7 @@ const LABELS = { label: 'Label', title: 'Heading', description: 'Description', v
   question: 'Question', answer: 'Answer', benefits: 'Benefits' };
 
 /** Paired content uses the same Save draft / Publish actions as its source. */
-export default function ContentTranslations({ kind, record, onChange, labels = {}, errorFor }) {
+export default function ContentTranslations({ kind, record, onChange, onNormalize, labels = {}, errorFor }) {
   const fields = variantFields(kind, record);
   if (!fields.length) return null;
   const spanish = record.translations?.es ?? {};
@@ -33,7 +33,8 @@ export default function ContentTranslations({ kind, record, onChange, labels = {
           };
           if (rich.includes(field)) return (
             <Suspense key={field} fallback={<p role="status">Loading formatted text editor…</p>}>
-              <RichTextEditor {...props} help="Enter the reviewed Spanish wording. Leave unfinished text in the draft until it is ready to publish." />
+              <RichTextEditor {...props} onNormalize={(stored, normalized) => onNormalize?.(field, stored, normalized, 'es')}
+                help="Enter the reviewed Spanish wording. Leave unfinished text in the draft until it is ready to publish." />
             </Suspense>
           );
           return field === 'description' || field === 'text'

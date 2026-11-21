@@ -11,6 +11,8 @@ import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import Quill from 'quill/core.js';
+import RichTextBlock from '../../components/blocks/RichTextBlock.jsx';
 
 // A live config/features document, when a test sets one. Null leaves the
 // build snapshot's flags in place.
@@ -101,6 +103,30 @@ const HOME_PAGE = {
 
 function okResponse(body = {}) {
   return { ok: true, status: 200, json: async () => body };
+}
+
+// November 13 demo seed (c9803afa, details__hub), after the move sanitizer
+// adds rel. The older formatting fixture uses its link and the sanitizer's
+// supported line break spelling from functions/src/cms/richText.test.cjs.
+const SEED_LINK = '<a href="https://nclocal.org/hub/" rel="noopener noreferrer">Explore The Hub</a>';
+const SEED_BODY = 'for newsroom resources, an ecosystem newsletter and convenings.';
+const LEGACY_TEXT = `<p>${SEED_LINK}   ${SEED_BODY}</p>`;
+const CLEAN_TEXT = `<p>${SEED_LINK} ${SEED_BODY}</p>`;
+const LEGACY_LINE_BREAK = `<p>${SEED_LINK}<br>${SEED_BODY}</p>`;
+const CLEAN_LINE_BREAK = `<p>${SEED_LINK}</p><p>${SEED_BODY}</p>`;
+
+function restoreTextDraft(value) {
+  pagesLive = [{ ...HOME_PAGE, sections: [{ ...HOME_PAGE.sections[0], id: 'intro', allowedBlocks: ['richtext'] }] }];
+  contentDrafts = [{ id: 'intro__hub', section: 'intro', field: 'hub', blockType: 'richtext', value, visible: true, status: 'dirty' }];
+  return renderAt('/admin/content/home/intro/hub');
+}
+
+function expectCleanEditor() {
+  expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  const event = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(false);
+  expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsUpdateContent'))).toBe(false);
 }
 
 async function renderAt(path, { strict = false } = {}) {
@@ -441,6 +467,52 @@ describe('AdminContentBlockEditor value fields', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
     expect(JSON.parse(call[1].body).fields.value).toBe('<p><strong>Formatted</strong> body</p>');
+  });
+
+  it('opens a restored Text draft clean, guards a real edit, and clears the guard after undo', async () => {
+    Range.prototype.getBoundingClientRect ??= () => new DOMRect();
+    await restoreTextDraft(LEGACY_TEXT);
+    const editor = await screen.findByRole('textbox', { name: 'Text' });
+    expectCleanEditor();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+
+    const quill = Quill.find(editor.parentElement);
+    act(() => quill.insertText(0, 'New ', 'user'));
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
+
+    act(() => quill.history.undo());
+    expectCleanEditor();
+    fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
+    expect(screen.queryByRole('alertdialog', { name: 'Unsaved changes' })).not.toBeInTheDocument();
+    await waitFor(() => expect(editor).not.toBeInTheDocument());
+  });
+
+  it('explains the line break change and saves the cleaned value only on submit', async () => {
+    await restoreTextDraft(LEGACY_LINE_BREAK);
+    const editor = await screen.findByRole('textbox', { name: 'Text' });
+    expect(editor).toHaveAccessibleDescription(/line breaks.*paragraph/i);
+    expectCleanEditor();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
+    const [, request] = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
+    expect(JSON.parse(request.body).fields.value).toBe(CLEAN_LINE_BREAK);
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+
+  it('keeps the public renderer output for both restored Text fixtures', () => {
+    const { container } = render(<>
+      <RichTextBlock block={{ value: LEGACY_TEXT }} />
+      <RichTextBlock block={{ value: CLEAN_TEXT }} />
+      <RichTextBlock block={{ value: LEGACY_LINE_BREAK }} />
+      <RichTextBlock block={{ value: CLEAN_LINE_BREAK }} />
+    </>);
+    expect(Array.from(container.children, (block) => block.innerHTML)).toEqual([
+      LEGACY_TEXT, CLEAN_TEXT, LEGACY_LINE_BREAK, CLEAN_LINE_BREAK,
+    ]);
   });
 
   it('opens the Map form with the carried URL and saves a new block in the same section', async () => {

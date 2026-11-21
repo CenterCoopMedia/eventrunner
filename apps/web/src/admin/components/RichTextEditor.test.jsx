@@ -49,19 +49,23 @@ describe('RichTextEditor', () => {
     expect(screen.getByText('13 characters')).toBeInTheDocument();
   });
 
-  it('sanitizes stored HTML before loading it and returns the cleaned value', async () => {
+  it('sanitizes stored HTML without reporting an edit or a public formatting change', async () => {
+    const onNormalize = vi.fn();
+    const value = '<p onclick="bad()"><strong>Safe</strong></p><img src="x">' +
+      '<iframe class="ql-video">gone</iframe><span class="ql-formula" data-value="x"></span>';
     const { onChange } = renderEditor({
-      value: '<p onclick="bad()"><strong>Safe</strong></p><img src="x">' +
-        '<iframe class="ql-video">gone</iframe><span class="ql-formula" data-value="x"></span>',
+      value,
+      onNormalize,
     });
     const editor = await screen.findByRole('textbox', { name: 'answer' });
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith('<p><strong>Safe</strong></p>'));
+    expect(onNormalize).toHaveBeenCalledWith(value, '<p><strong>Safe</strong></p>');
+    expect(onChange).not.toHaveBeenCalled();
     expect(editor.innerHTML).toBe('<p><strong>Safe</strong></p>');
-    expect(screen.getByRole('status')).toHaveTextContent('Unsupported formatting was removed');
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     Quill.find(editor.parentElement).setSelection(4, 0, 'user');
     fireEvent.paste(editor, { clipboardData: { getData: (type) => type === 'text/plain' ? ' copy' : '' } });
     expect(editor).toHaveTextContent('Safe copy');
-    expect(screen.getByRole('status')).toHaveTextContent('Save to store the cleaned version.');
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('sanitizes HTML paste before Quill converts it', async () => {

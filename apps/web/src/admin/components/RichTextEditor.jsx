@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import HelpTooltip from './HelpTooltip.jsx';
 import Quill, { Delta } from 'quill/core.js';
 import { BlockEmbed } from 'quill/blots/block.js';
@@ -14,6 +14,7 @@ import CodeBlock, { Code } from 'quill/formats/code.js';
 import { hasRichTextContent, isSafeRichTextHref } from 'shared/richText';
 import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
 import { mapEmbedInput } from '../mapEmbedInput.js';
+import { richTextCleanupNotice } from './richTextCleanupNotice.js';
 import './RichTextEditor.css';
 import {
   FieldError,
@@ -105,7 +106,6 @@ const toolbarButtonClass =
 
 const HTML_SOURCE = /^\s*<(?:!--|!doctype\b|\/?[a-z][\w:-]*(?=[\s>]|\/>))/i;
 const EMBED_TAG = /<\/?(?:iframe|script|embed|object)(?=[\s/>])/i;
-const STORED_TEXT_CLEANUP = 'Unsupported formatting was removed from this saved text. Save to store the cleaned version.';
 
 function looksLikeHtmlSource(text) {
   return HTML_SOURCE.test(text) || EMBED_TAG.test(text);
@@ -133,7 +133,7 @@ function active(format, value, formats) {
  * A controlled editor for the registry's richtext fields. The parent still
  * owns the draft value and the ordinary content-block save flow.
  */
-export default function RichTextEditor({ label, value, onChange, error, help, required = false, newMapBlockHref }) {
+export default function RichTextEditor({ label, value, onChange, onNormalize, error, help, required = false, newMapBlockHref }) {
   const generatedId = useId();
   const editorId = `richtext-${generatedId}`;
   const labelId = `${editorId}-label`;
@@ -143,9 +143,8 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
   const noticeId = `${editorId}-notice`;
   const mountRef = useRef(null);
   const quillRef = useRef(null);
-  const initialValueRef = useRef(value ?? '');
-  const onChangeRef = useRef(onChange);
-  const lastValueRef = useRef('');
+  const callbacksRef = useRef({ onChange, onNormalize });
+  const lastValueRef = useRef(null);
   const lastSelectionRef = useRef({ index: 0, length: 0 });
   const linkButtonRef = useRef(null);
   const linkInputRef = useRef(null);
@@ -157,11 +156,13 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
   const [linkValue, setLinkValue] = useState('');
   const [linkError, setLinkError] = useState('');
   const [notice, setNotice] = useState('');
+  const [storedNotice, setStoredNotice] = useState('');
   const [pastedMapUrl, setPastedMapUrl] = useState('');
+  const message = notice || storedNotice;
 
-  onChangeRef.current = onChange;
+  callbacksRef.current = { onChange, onNormalize };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const mount = mountRef.current;
     const quill = new Quill(mount, {
       formats: FORMATS,
@@ -186,18 +187,6 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
       });
     }
 
-    const supplied = initialValueRef.current;
-    const safeInitial = sanitizeHtml(supplied);
-    quill.clipboard.dangerouslyPasteHTML(safeInitial, 'silent');
-    quill.history.clear();
-    const normalized = outputHtml(quill);
-    lastValueRef.current = normalized;
-    if (normalized !== supplied) {
-      setNotice(STORED_TEXT_CLEANUP);
-      onChangeRef.current(normalized);
-    }
-    updateToolbar({ index: 0, length: 0 });
-
     const rememberSelection = (range) => {
       if (range) lastSelectionRef.current = range;
       updateToolbar(range);
@@ -206,8 +195,9 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
       updateToolbar();
       if (source !== 'user') return;
       const next = outputHtml(quill);
+      if (next === lastValueRef.current) return;
       lastValueRef.current = next;
-      onChangeRef.current(next);
+      callbacksRef.current.onChange(next);
     };
     const rejectHtmlPaste = (source) => {
       setNotice('Pasted HTML won’t appear on the page.');
@@ -218,7 +208,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
       const pastedHtml = event.clipboardData?.getData('text/html') ?? '';
       const isSource = looksLikeHtmlSource(pastedText);
       setPastedMapUrl('');
-      setNotice((current) => current === STORED_TEXT_CLEANUP ? current : '');
+      setNotice('');
       if (!pastedHtml && !isSource) return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -266,38 +256,39 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
       quill.root.removeEventListener('paste', sanitizePaste, true);
       quill.root.removeEventListener('keydown', tabToMapLink, true);
       quillRef.current = null;
+      lastValueRef.current = null;
       mount.replaceChildren();
     };
   }, [editorId, labelId, required]);
 
-  useEffect(() => {
+  // Adopt the value and its form baseline before the editor can receive input.
+  useLayoutEffect(() => {
     const quill = quillRef.current;
     const supplied = value ?? '';
-    const safe = sanitizeHtml(supplied);
-    if (!quill || safe === lastValueRef.current || supplied === lastValueRef.current) return;
-    quill.clipboard.dangerouslyPasteHTML(safe, 'silent');
+    if (!quill || supplied === lastValueRef.current) return;
+    quill.clipboard.dangerouslyPasteHTML(sanitizeHtml(supplied), 'silent');
     quill.history.clear();
     const normalized = outputHtml(quill);
     lastValueRef.current = normalized;
     setCount(characterCount(quill));
     setFormats(quill.getFormat(lastSelectionRef.current));
     setHistory({ undo: false, redo: false });
-    if (normalized !== supplied) {
-      setNotice(STORED_TEXT_CLEANUP);
-      onChangeRef.current(normalized);
-    }
-  }, [value]);
+    setNotice('');
+    setPastedMapUrl('');
+    setStoredNotice(normalized === supplied ? '' : richTextCleanupNotice(supplied, normalized));
+    if (normalized !== supplied) callbacksRef.current.onNormalize?.(supplied, normalized);
+  }, [editorId, labelId, required, value]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const quill = quillRef.current;
     if (!quill) return;
-    const describedBy = [help ? `${editorId}-help` : null, hintId, countId, notice ? noticeId : null, error ? errorId : null]
+    const describedBy = [help ? `${editorId}-help` : null, hintId, countId, message ? noticeId : null, error ? errorId : null]
       .filter(Boolean)
       .join(' ');
     quill.root.setAttribute('aria-describedby', describedBy);
     if (error) quill.root.setAttribute('aria-invalid', 'true');
     else quill.root.removeAttribute('aria-invalid');
-  }, [countId, editorId, error, errorId, help, hintId, notice, noticeId]);
+  }, [countId, editorId, error, errorId, help, hintId, message, noticeId, required]);
 
   useEffect(() => {
     if (linkOpen) linkInputRef.current?.focus();
@@ -510,7 +501,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
         {count.toLocaleString()} {count === 1 ? 'character' : 'characters'}
       </p>
       <p id={noticeId} role="status" className="text-admin-sm text-admin-state-caution">
-        {notice}
+        {message}
       </p>
       {newMapBlockHref && pastedMapUrl ? (
         <a
