@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
+import { expectControlFits, expectNoOverlap, expectPageFits, setReflowProfile } from './reflow.mjs';
 
 async function firstId(collection) {
   const snapshot = await adminDb().collection(collection).limit(1).get();
@@ -114,5 +115,51 @@ test('admin workspaces bound their reading width and group readable cards withou
       expect(geometry.controlsInside, `${task.name} controls fit at ${viewport.width}`).toBe(true);
       await page.screenshot({ path: path.join(evidenceDir, `${task.name}-${viewport.name}-${viewport.width}.png`), fullPage: true, animations: 'disabled' });
     }
+  }
+});
+
+test('the phone menu shows the full name of a long current destination', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, ADMIN_EMAIL);
+  await page.goto('/admin/unpublished');
+  const name = 'Unpublished changes';
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  const endTour = page.getByRole('button', { name: 'End tour', exact: true });
+  if (await endTour.isVisible()) await endTour.click();
+
+  const evidenceDir = path.resolve('test-results/admin-visual-evidence');
+  await fs.mkdir(evidenceDir, { recursive: true });
+  await page.screenshot({ path: path.join(evidenceDir, 'menu-destination-desktop.png'), animations: 'disabled' });
+
+  const summary = page.locator('details.admin-mobile-docket > summary');
+  const label = summary.getByText(name, { exact: true });
+  const sheet = page.locator('#admin-docket');
+  for (const profile of [{ width: 320 }, { width: 720, rootSize: 32 }]) {
+    await setReflowProfile(page, profile);
+    await expect(summary).toHaveAccessibleName('Open menu');
+    await expectControlFits(summary);
+    const fit = await label.evaluate(async (element) => {
+      await element.ownerDocument.fonts.ready;
+      const bounds = element.getBoundingClientRect();
+      const trigger = element.closest('summary').getBoundingClientRect();
+      return {
+        inlineOverflow: element.scrollWidth - element.clientWidth,
+        insideTrigger: bounds.top >= trigger.top && bounds.bottom <= trigger.bottom,
+      };
+    });
+    expect(fit.inlineOverflow, `the full label fits at ${profile.width}px`).toBeLessThanOrEqual(1);
+    expect(fit.insideTrigger, 'the label stays inside the trigger when it wraps').toBe(true);
+    await expectNoOverlap(label, summary.locator('svg'));
+    await expectPageFits(page);
+    await page.screenshot({ path: path.join(evidenceDir, `menu-destination-${profile.width}.png`), animations: 'disabled' });
+
+    await summary.press('Enter');
+    await expect(summary).toHaveAccessibleName('Close menu');
+    const current = sheet.getByRole('link', { name, exact: true });
+    await expect(current).toHaveAttribute('aria-current', 'page');
+    await expectNoOverlap(summary, sheet);
+    await current.press('Escape');
+    await expect(summary).toHaveAccessibleName('Open menu');
+    await expect(summary).toBeFocused();
   }
 });

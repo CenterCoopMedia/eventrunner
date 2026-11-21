@@ -720,7 +720,7 @@ function AdminDesk() {
         {railHidden ? <CollapsedDocket docket={docket} activeGroup={activeGroup} pathname={pathname} /> : null}
 
         <details
-          className="admin-mobile-docket shrink-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+          className="admin-mobile-docket max-w-[65%] shrink-0 lg:flex lg:min-h-0 lg:max-w-none lg:flex-1 lg:flex-col"
           open={wide || mobileDocketOpen}
           onToggle={(event) => {
             if (!wide) setMobileDocketOpen(event.currentTarget.open);
@@ -728,17 +728,17 @@ function AdminDesk() {
         >
           <summary
             ref={mobileMenuRef}
-            className="admin-target flex h-14 cursor-pointer items-center gap-xs px-sm font-semibold text-admin-rail-ink lg:hidden"
+            className="admin-target flex h-14 cursor-pointer items-center gap-2xs px-xs font-semibold text-admin-rail-ink lg:hidden"
             aria-label={mobileDocketOpen ? 'Close menu' : 'Open menu'}
             aria-controls="admin-docket"
           >
             <span
-              className="max-w-28 truncate font-admin-data text-admin-xs text-admin-rail-ink-muted"
+              className="min-w-0 wrap-anywhere font-admin-data text-admin-xs leading-tight text-admin-rail-ink-muted"
               title={activeSection?.label ?? 'Admin sections'}
             >
               {activeSection?.label ?? 'Admin sections'}
             </span>
-            <AdminIcon name={mobileDocketOpen ? 'close' : 'menu'} />
+            <AdminIcon name={mobileDocketOpen ? 'close' : 'menu'} className="shrink-0" />
           </summary>
           <div
             id="admin-docket"
