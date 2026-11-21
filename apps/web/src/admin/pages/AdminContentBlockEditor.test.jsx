@@ -42,6 +42,7 @@ let pagesLive = [];
 let pagesDrafts = [];
 let contentLive = [];
 let contentDrafts = [];
+const adminSubscriptions = new Map();
 const COLLECTIONS = {
   cmsPages: () => pagesLive,
   cmsPages_drafts: () => pagesDrafts,
@@ -50,8 +51,9 @@ const COLLECTIONS = {
 };
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext) => {
+    adminSubscriptions.set(name, onNext);
     onNext(COLLECTIONS[name]?.() ?? []);
-    return () => {};
+    return () => adminSubscriptions.delete(name);
   },
 }));
 
@@ -674,6 +676,34 @@ describe('content editing workspace', () => {
       section: 'hero', field: 'register', visible: true,
       fields: { blockType: 'cta', label: 'Reserve a place', url: 'https://example.org/register', order: 2 },
     });
+  });
+
+  it('leaves a teammate’s Spanish draft alone when saving an English block edit', async () => {
+    const draft = { ...contentLive[0], status: 'dirty', translations: { es: { label: 'Inscríbete' } } };
+    contentDrafts = [draft];
+    await renderAt('/admin/content/home/hero/register');
+    await act(async () => {
+      adminSubscriptions.get('cmsContent_drafts')([{ ...draft, translations: { es: { label: 'Reserva tu plaza' } } }]);
+    });
+
+    async function saveFields() {
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save draft' })); });
+      expect(screen.getByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
+      const [, request] = fetch.mock.calls.filter(([url]) => String(url).includes('cmsUpdateContent')).at(-1);
+      return JSON.parse(request.body).fields;
+    }
+
+    fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
+    const englishEdit = await saveFields();
+    expect(englishEdit.label).toBe('Reserve a place');
+    expect(englishEdit).not.toHaveProperty('translations');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Spanish translation' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Spanish Button text' }), { target: { value: 'Únete' } });
+    expect((await saveFields()).translations).toEqual({ es: { label: 'Únete' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Spanish translation' }));
+    expect((await saveFields()).translations).toBe('__cms_delete_field__');
   });
 
   it('keeps creation setup visible before the value and retains it after saving', async () => {
