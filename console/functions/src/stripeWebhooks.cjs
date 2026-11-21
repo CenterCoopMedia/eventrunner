@@ -140,6 +140,6 @@ function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.n
 }
 
 module.exports = {
-  STRIPE_ROUTE_COLLECTION, STRIPE_WEBHOOK_FUNCTION, STRIPE_WEBHOOK_SECRET,
+  STRIPE_ROUTE_COLLECTION, STRIPE_WEBHOOK_FUNCTION, STRIPE_WEBHOOK_SECRET, STRIPE_DEAUTHORIZED,
   deleteStripeRoutes, registerStripeRoute, routeSecretId, stripeConnectWebhook, stripeRoutes, ticketWebhookUrl,
 };
