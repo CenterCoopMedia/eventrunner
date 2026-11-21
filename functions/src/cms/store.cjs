@@ -34,6 +34,8 @@ const {
   writePendingDelta,
 } = require('./pendingCounts.cjs');
 
+const { randomUUID } = require('node:crypto');
+
 const MAX_WRITES_PER_BATCH = 400;
 const WRITES_PER_DOC = 3; // live set + draft update + version-history append
 // The queue progress row and pending-count row may both ride in the batch.
@@ -51,6 +53,7 @@ const RESERVED_FIELDS = Object.freeze([
   'status',
   'revision',
   'basedOnRevision',
+  'draftRevision',
   'updatedAt',
   'updatedBy',
   'publishedAt',
@@ -141,7 +144,7 @@ function writeConfigVersion({ tx, ref, historyRef, docPath, fields, at, actor })
  *           docId: string, fields: object, visible?: boolean,
  *           actor: { uid: string, email: string }, now?: () => number,
  *           createOnly?: boolean, rejectLive?: boolean, replacesDirtyDraft?: boolean }} args
- * @returns {Promise<{ docPath: string, existed: boolean }>}
+ * @returns {Promise<{ docPath: string, existed: boolean, draftRevision?: string }>}
  */
 async function writeDraft({ db, tx = null, collection, docId, fields, visible, actor, now = Date.now, createOnly = false, rejectLive = false, replacesDirtyDraft = false }) {
   const draftCol = draftCollectionFor(collection);
@@ -179,6 +182,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     }
   }
 
+  const pageRevision = collection === 'cmsPages' ? { draftRevision: randomUUID() } : {};
   const payload = {
     ...contentFieldsOf(fields),
     // A page editor may have opened before someone published a new menu order.
@@ -186,6 +190,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     visible: typeof visible === 'boolean' ? visible : priorVisible,
     status: 'dirty',
     basedOnRevision,
+    ...pageRevision,
     updatedAt: new Date(now()),
     updatedBy: actor.email,
   };
@@ -193,7 +198,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
   await writePendingDelta({ db, tx, collection, delta: Number(!wasDirty) - Number(replacesDirtyDraft), now });
   if (createOnly) tx.create(ref, payload);
   else tx.set(ref, payload);
-  return { docPath: `${draftCol}/${docId}`, existed: draftSnap.exists };
+  return { docPath: `${draftCol}/${docId}`, existed: draftSnap.exists, ...pageRevision };
 }
 
 /**

@@ -59,7 +59,7 @@ test('navigation link drafts accept internal paths and HTTPS while keeping page 
 
   const fixture = deps();
   const response = fakeRes();
-  await createSavePageHandler(fixture)(adminReq({ page: navigationLink, create: true }), response);
+  await createSavePageHandler(fixture)(adminReq({ page: navigationLink, create: true, expectedRevision: null }), response);
   assert.equal(response.statusCode, 200);
   assert.deepEqual(fixture.store.writes[0].fields, navigationLink);
   assert.equal(fixture.store.writes[0].collection, 'cmsPages');
@@ -67,11 +67,11 @@ test('navigation link drafts accept internal paths and HTTPS while keeping page 
 
   const existing = deps({ db: fakeDb({ 'cmsPages/visitor-info': validPage({ id: navigationLink.id }) }) });
   const rejected = fakeRes();
-  await createSavePageHandler(existing)(adminReq({ page: navigationLink }), rejected);
+  await createSavePageHandler(existing)(adminReq({ page: navigationLink, expectedRevision: 'live:0' }), rejected);
   assert.equal(rejected.statusCode, 403);
   assert.equal(existing.store.writes.length, 0);
   const collision = fakeRes();
-  await createSavePageHandler(existing)(adminReq({ page: navigationLink, create: true }), collision);
+  await createSavePageHandler(existing)(adminReq({ page: navigationLink, create: true, expectedRevision: null }), collision);
   assert.equal(collision.statusCode, 409);
   assert.equal(existing.store.writes.length, 0);
 });
@@ -127,7 +127,7 @@ function fakeStore() {
     writes,
     deletes,
     logs,
-    async writeDraft(args) { writes.push(args); },
+    async writeDraft(args) { writes.push(args); return { draftRevision: 'saved-revision' }; },
     async deleteBoth(args) { deletes.push(args); return { publishedRevision: null }; },
     async logAdminAction(args) { logs.push(args); },
   };
@@ -477,10 +477,11 @@ test('validatePageDoc rejects non-objects without throwing', () => {
 // ------------------------------------------------------------- cmsSavePage
 
 test('cmsSavePage writes the DRAFT collection only, never live', async () => {
-  const d = deps();
+  const d = deps({ db: fakeDb({ 'cmsPages/scholarships': validPage({ revision: 2 }) }) });
   const res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage(), expectedRevision: 'live:2' }), res);
   assert.equal(res.statusCode, 200);
+  assert.equal(res.body.revision, 'saved-revision');
   assert.equal(d.store.writes.length, 1);
   const write = d.store.writes[0];
   assert.equal(write.collection, 'cmsPages');
@@ -492,6 +493,58 @@ test('cmsSavePage writes the DRAFT collection only, never live', async () => {
   assert.ok(!('revision' in write.fields));
   assert.ok(!('status' in write.fields));
   assert.equal(d.store.deletes.length, 0);
+});
+
+test('cmsSavePage retries against a teammate’s newer draft and refuses without writing', async () => {
+  const id = 'scholarships';
+  const live = validPage({ revision: 2 });
+  const draft = validPage({ status: 'dirty', basedOnRevision: 2 });
+  const d = deps({ db: fakeDb({ [`cmsPages/${id}`]: live, [`cmsPages_drafts/${id}`]: draft }) });
+  d.store.writeDraft = writeDraft;
+  const save = createSavePageHandler(d);
+  const expectedRevision = '["draft",null,2]';
+  const newer = validPage();
+  newer.sections[0].label = 'New eligibility details';
+  const fresh = fakeRes();
+  let freshWrites;
+  d.db.beforeCommit = async () => {
+    await save(adminReq({ page: newer, expectedRevision }), fresh);
+    freshWrites = [...d.db.writes];
+  };
+
+  const stale = fakeRes();
+  await save(adminReq({ page: validPage({ label: 'Older tab' }), expectedRevision }), stale);
+
+  const savedDraft = d.db.read('cmsPages_drafts', id);
+  assert.equal(fresh.statusCode, 200);
+  assert.equal(savedDraft.draftRevision, fresh.body.revision);
+  assert.notEqual(fresh.body.revision, expectedRevision);
+  assert.deepEqual(savedDraft.sections, newer.sections);
+  assert.equal(savedDraft.label, newer.label);
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'page-revision-conflict');
+  assert.deepEqual(d.db.read('cmsPages', id), live);
+  assert.deepEqual(d.db.writes, freshWrites);
+  assert.equal(d.store.logs.length, 1);
+});
+
+test('cmsSavePage rejects a full save with no revision from an older tab', async () => {
+  const id = 'scholarships';
+  const live = validPage({ revision: 2 });
+  const draft = validPage({ status: 'dirty', draftRevision: 'newer-revision' });
+  const d = deps({ db: fakeDb({ [`cmsPages/${id}`]: live, [`cmsPages_drafts/${id}`]: draft }) });
+  d.store.writeDraft = writeDraft;
+  const save = createSavePageHandler(d);
+  for (const body of [{ page: validPage() }, { page: validPage({ id: 'new' }), create: true }]) {
+    const res = fakeRes();
+    await save(adminReq(body), res);
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.error.code, 'page-revision-conflict');
+  }
+  assert.deepEqual(d.db.read('cmsPages_drafts', id), draft);
+  assert.deepEqual(d.db.read('cmsPages', id), live);
+  assert.deepEqual(d.db.writes, []);
+  assert.deepEqual(d.store.logs, []);
 });
 
 test('a page save can carry no seed flag: the validator refuses it, and a save writes the page whole', async () => {
@@ -508,7 +561,7 @@ test('a page save can carry no seed flag: the validator refuses it, and a save w
   assert.equal(d.store.writes.length, 0);
 
   const saved = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), saved);
+  await createSavePageHandler(d)(adminReq({ page: validPage(), create: true, expectedRevision: null }), saved);
   assert.equal(saved.statusCode, 200);
   assert.ok(!('seeded' in d.store.writes[0].fields));
 });
@@ -516,7 +569,7 @@ test('a page save can carry no seed flag: the validator refuses it, and a save w
 test('cmsSavePage create asks for a create-only write and maps an existing id to 409', async () => {
   const created = deps();
   const createdRes = fakeRes();
-  await createSavePageHandler(created)(adminReq({ create: true, page: validPage() }), createdRes);
+  await createSavePageHandler(created)(adminReq({ create: true, page: validPage(), expectedRevision: null }), createdRes);
   assert.equal(createdRes.statusCode, 200);
   assert.equal(created.store.writes[0].createOnly, true);
   assert.equal(created.store.writes[0].rejectLive, true);
@@ -526,13 +579,13 @@ test('cmsSavePage create asks for a create-only write and maps an existing id to
     throw new Error('ALREADY_EXISTS: cmsPages/scholarships');
   };
   const takenRes = fakeRes();
-  await createSavePageHandler(taken)(adminReq({ create: true, page: validPage() }), takenRes);
+  await createSavePageHandler(taken)(adminReq({ create: true, page: validPage(), expectedRevision: null }), takenRes);
   assert.equal(takenRes.statusCode, 409);
   assert.match(takenRes.body.error.message, /already belongs to a page/);
 
-  const edit = deps();
+  const edit = deps({ db: fakeDb({ 'cmsPages/scholarships': validPage({ revision: 4 }) }) });
   const editRes = fakeRes();
-  await createSavePageHandler(edit)(adminReq({ page: validPage() }), editRes);
+  await createSavePageHandler(edit)(adminReq({ page: validPage(), expectedRevision: 'live:4' }), editRes);
   assert.equal(editRes.statusCode, 200);
   assert.equal(edit.store.writes[0].createOnly, false);
   assert.equal(edit.store.writes[0].rejectLive, false);
@@ -575,7 +628,7 @@ test('cmsSavePage refuses to flip systemPage true -> false (live doc)', async ()
   const d = deps({ db });
   const res = fakeRes();
   await createSavePageHandler(d)(
-    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: false }) }),
+    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: false }), expectedRevision: 'live:0' }),
     res,
   );
   assert.equal(res.statusCode, 403);
@@ -588,7 +641,7 @@ test('cmsSavePage refuses the flip when only the DRAFT says systemPage', async (
   const d = deps({ db });
   const res = fakeRes();
   await createSavePageHandler(d)(
-    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: false }) }),
+    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: false }), expectedRevision: '["draft",null,null]' }),
     res,
   );
   assert.equal(res.statusCode, 403);
@@ -600,7 +653,7 @@ test('cmsSavePage still allows editing a system page that stays systemPage', asy
   const d = deps({ db });
   const res = fakeRes();
   await createSavePageHandler(d)(
-    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: true }) }),
+    adminReq({ page: validPage({ id: 'home', path: '/home', systemPage: true }), expectedRevision: 'live:0' }),
     res,
   );
   assert.equal(res.statusCode, 200);
@@ -614,7 +667,7 @@ test('cmsSavePage refuses to move a system page off its mounted route', async ()
   const d = deps({ db });
   const res = fakeRes();
   await createSavePageHandler(d)(
-    adminReq({ page: validPage({ id: 'schedule', path: '/agenda', systemPage: true }) }),
+    adminReq({ page: validPage({ id: 'schedule', path: '/agenda', systemPage: true }), expectedRevision: 'live:0' }),
     res,
   );
   assert.equal(res.statusCode, 403);
@@ -629,7 +682,7 @@ test('cmsSavePage refuses the move when only the DRAFT stores the path', async (
   const d = deps({ db });
   const res = fakeRes();
   await createSavePageHandler(d)(
-    adminReq({ page: validPage({ id: 'schedule', path: '/agenda', systemPage: true }) }),
+    adminReq({ page: validPage({ id: 'schedule', path: '/agenda', systemPage: true }), expectedRevision: '["draft",null,null]' }),
     res,
   );
   assert.equal(res.statusCode, 403);
@@ -645,6 +698,7 @@ test('cmsSavePage still saves a system page edited at the path it already has', 
   await createSavePageHandler(d)(
     adminReq({
       page: validPage({ id: 'schedule', path: '/schedule', label: 'Programme', systemPage: true }),
+      expectedRevision: 'live:0',
     }),
     res,
   );
@@ -656,7 +710,7 @@ test('cmsSavePage leaves a generic page free to change its path', async () => {
   const db = fakeDb({ 'cmsPages/scholarships': { id: 'scholarships', path: '/scholarships', systemPage: false } });
   const d = deps({ db });
   const res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage({ path: '/bursaries' }) }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage({ path: '/bursaries' }), expectedRevision: 'live:0' }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(d.store.writes.length, 1);
 });
@@ -665,10 +719,10 @@ test('cmsSavePage allows systemPage:false on brand-new and non-system pages', as
   const db = fakeDb({ 'cmsPages/extra': { id: 'extra', systemPage: false } });
   const d = deps({ db });
   let res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage({ id: 'extra', path: '/extra' }) }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage({ id: 'extra', path: '/extra' }), expectedRevision: 'live:0' }), res);
   assert.equal(res.statusCode, 200);
   res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage(), create: true, expectedRevision: null }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(d.store.writes.length, 2);
 });
@@ -679,7 +733,7 @@ test('cmsSavePage rejects a path already used by another LIVE page', async () =>
   const db = fakeDb({ 'cmsPages/faq': { id: 'faq', path: '/scholarships', systemPage: false } });
   const d = deps({ db });
   const res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage(), create: true, expectedRevision: null }), res);
   assert.equal(res.statusCode, 400);
   assert.ok(res.body.error.message.includes("already used by page 'faq'"));
   assert.equal(d.store.writes.length, 0);
@@ -689,7 +743,7 @@ test('cmsSavePage rejects a path already used by another DRAFT page', async () =
   const db = fakeDb({ 'cmsPages_drafts/faq': { id: 'faq', path: '/scholarships', systemPage: false } });
   const d = deps({ db });
   const res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage(), create: true, expectedRevision: null }), res);
   assert.equal(res.statusCode, 400);
   assert.ok(res.body.error.message.includes("already used by page 'faq'"));
   assert.equal(d.store.writes.length, 0);
@@ -702,7 +756,7 @@ test('cmsSavePage allows re-saving a page under its own unchanged path', async (
   });
   const d = deps({ db });
   const res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage(), expectedRevision: '["draft",null,null]' }), res);
   assert.equal(res.statusCode, 200);
 });
 
@@ -710,13 +764,13 @@ test('cmsSavePage allows two different pages with different paths', async () => 
   const db = fakeDb({ 'cmsPages/faq': { id: 'faq', path: '/faq', systemPage: false } });
   const d = deps({ db });
   const res = fakeRes();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(d)(adminReq({ page: validPage(), create: true, expectedRevision: null }), res);
   assert.equal(res.statusCode, 200);
 });
 
 test('cmsSavePage records an admin_logs entry via the store', async () => {
   const d = deps();
-  await createSavePageHandler(d)(adminReq({ page: validPage() }), fakeRes());
+  await createSavePageHandler(d)(adminReq({ page: validPage(), create: true, expectedRevision: null }), fakeRes());
   assert.equal(d.store.logs.length, 1);
   const entry = d.store.logs[0];
   assert.equal(entry.action, 'cmsSavePage');
@@ -728,14 +782,14 @@ test('cmsSavePage succeeds even when the admin log throws', async () => {
   const store = fakeStore();
   store.logAdminAction = async () => { throw new Error('down'); };
   const res = fakeRes();
-  await createSavePageHandler(deps({ store }))(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(deps({ store }))(adminReq({ page: validPage(), create: true, expectedRevision: null }), res);
   assert.equal(res.statusCode, 200);
 });
 
 test('cmsSavePage maps a store failure to 500 without a stack leak', async () => {
   const store = { async writeDraft() { throw new Error('firestore exploded at /internal/path'); } };
   const res = fakeRes();
-  await createSavePageHandler(deps({ store }))(adminReq({ page: validPage() }), res);
+  await createSavePageHandler(deps({ store }))(adminReq({ page: validPage(), create: true, expectedRevision: null }), res);
   assert.equal(res.statusCode, 500);
   assert.ok(!res.body.error.message.includes('exploded'));
 });

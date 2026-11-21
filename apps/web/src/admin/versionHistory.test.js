@@ -161,11 +161,11 @@ describe('restoreRequestFor', () => {
 
   it('sends a page and update through their whole-record save endpoints', () => {
     expect(restoreRequestFor('cmsPages', 'about', entry({ id: 'about', label: 'About' }), null)).toEqual({
-      endpoint: 'cmsSavePage', body: { page: { id: 'about', label: 'About', visible: true }, create: true },
+      endpoint: 'cmsSavePage', body: { page: { id: 'about', label: 'About', visible: true }, expectedRevision: null, create: true },
     });
-    expect(restoreRequestFor('cmsPages', 'about', entry({ id: 'about', label: 'About', seeded: true }, false), { id: 'about' })).toEqual({
+    expect(restoreRequestFor('cmsPages', 'about', entry({ id: 'about', label: 'About', seeded: true }, false), { id: 'about' }, { expectedRevision: 'live:3' })).toEqual({
       endpoint: 'cmsSavePage',
-      body: { page: { id: 'about', label: 'About', visible: false } },
+      body: { page: { id: 'about', label: 'About', visible: false }, expectedRevision: 'live:3' },
     });
     expect(restoreRequestFor('cmsUpdates', 'u1', entry({ title: 'T', publishAt: '2026-09-23T18:02:00.000Z' }), null)).toEqual({
       endpoint: 'cmsSaveUpdate',

@@ -49,6 +49,7 @@ it('chooses a site page and saves its navigation link through the Pages draft fl
   fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
   await waitFor(() => expect(call).toHaveBeenCalledWith('cmsSavePage', {
     create: true,
+    expectedRevision: null,
     page: { id: 'visitor-information', label: 'Visitor information', url: '/travel', visible: true, systemPage: false, order: 6 },
   }));
   expect(await screen.findByRole('heading', { name: 'Pages' })).toBeInTheDocument();

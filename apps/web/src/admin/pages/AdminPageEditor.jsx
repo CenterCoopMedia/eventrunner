@@ -16,7 +16,7 @@
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
 // the BLOCK_TYPES registry, and `defaultBlocks` are the placeholders a new
 // site is seeded with. Neither is edited here; both pass through a save.
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -36,13 +36,13 @@ import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
 import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
 import ContentContext, { prepareTimelineDocs } from '../../contexts/ContentContext.jsx';
-import { subscribeAdminCollection } from '../adminSource.js';
+import { readAdminPage, subscribeAdminCollection } from '../adminSource.js';
 import { contentLanguages, resolveContentVariant } from 'shared/contentLanguages';
 import { buildNavItems } from '../../lib/siteNavigation.js';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useVenueMapImage } from '../../components/VenueMap.jsx';
 import { openStreetMapCoordinates } from '../../components/AreaMap.jsx';
-import { builtInSectionBlockTypes, pageHeading } from 'shared/page';
+import { builtInSectionBlockTypes, isNavigationLink, pageEditRevision, pageHeading } from 'shared/page';
 import { isStarterContent, publicContentDoc } from 'shared/seed';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
 import { moveItem, nextStoredOrder } from '../reorder.js';
@@ -67,6 +67,7 @@ import {
   DestructiveConfirm,
   Notice,
   Panel,
+  SaveStatus,
   SelectField,
   ServerErrorSummary,
   TextAreaField,
@@ -394,12 +395,12 @@ function PageEditor({ mode }) {
   ));
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'delete'
+  const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'reload' | 'delete'
   const [status, setStatus] = useState('');
   // Set once a create has landed, so the form switches to editing that
   // document instead of trying to create it again.
   const [savedId, setSavedId] = useState(null);
-  const [loadedVersion, setLoadedVersion] = useState('new');
+  const [expectedRevision, setExpectedRevision] = useState(null);
   // The individual layout variants, behind their own disclosure. Closed by
   // default: the template above is the answer for almost every page.
   const [layoutOpen, setLayoutOpen] = useState(false);
@@ -423,31 +424,30 @@ function PageEditor({ mode }) {
   // are assigned before the server answers, so a refused save leaves ids
   // here that no stored revision has; those sections get no link.
   const storedRow = findRow(savedId ?? pageId);
+  const revisionConflict = error?.code === 'page-revision-conflict';
   const savedSectionIds = new Set((storedRow?.current?.sections ?? []).map((section) => section.id));
   const localDraft = useLocalDraft({
     accountId: user?.uid,
     docPath: `cmsPages/${savedId ?? pageId ?? 'new'}`,
-    version: loadedVersion,
+    version: expectedRevision ?? 'new',
     baseline: savedSnapshot,
     value: pageSnapshot(page),
     dirty: unsaved,
     enabled: !isReadOnlyDemo(eventConfig) && (mode === 'create' || loadedIdRef.current === pageId),
   });
 
-  useEffect(() => {
-    if (mode !== 'edit') return;
-    if (!ready) return;
-    if (loadedIdRef.current === pageId) return;
-    const found = rows.find((candidate) => candidate.id === pageId);
-    if (!found) return;
-    loadedIdRef.current = pageId;
-    const editable = toEditablePage(found.draft ?? found.live);
-    const source = found.draft ?? found.live;
-    setLoadedVersion(JSON.stringify([source.updatedAt ?? null, source.basedOnRevision ?? source.revision ?? null]));
+  const loadPage = useCallback(({ id, draft, live }) => {
+    loadedIdRef.current = id;
+    const editable = toEditablePage(draft ?? live);
+    setExpectedRevision(pageEditRevision(draft, live));
     editable.sections = editable.sections.map((section) => ({ ...section, [EDITOR_SECTION_KEY]: nextSectionKey.current++ }));
     setPage(editable);
     setSavedSnapshot(pageSnapshot(editable));
-  }, [mode, pageId, ready, rows]);
+  }, []);
+
+  useEffect(() => {
+    if (mode === 'edit' && ready && row && loadedIdRef.current !== pageId) loadPage(row);
+  }, [mode, pageId, ready, row, loadPage]);
 
   useEffect(() => {
     if (!error) return;
@@ -556,7 +556,7 @@ function PageEditor({ mode }) {
   }
 
   async function save({ publish }) {
-    if (localDraft.recovery) return;
+    if (localDraft.recovery || revisionConflict) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -603,7 +603,8 @@ function PageEditor({ mode }) {
     setBusy(publish ? 'publish' : 'draft');
     let stage = 'save';
     try {
-      await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
+      const saved = await call('cmsSavePage', { page: payload, expectedRevision, ...(creating ? { create: true } : {}) });
+      setExpectedRevision(saved.revision);
       // The next session keeps newer typing under the assigned document id.
       // Stop the old new-page session before its cleanup can write it back.
       if (creating) {
@@ -632,7 +633,7 @@ function PageEditor({ mode }) {
     } catch (err) {
       if (stage === 'publish') setErrorTitle('The draft was saved. Check the publish result');
       else if (err?.code === 'network') setErrorTitle('The save could not be confirmed');
-      if (creating && stage === 'save' && err?.status === 409) {
+      if (creating && stage === 'save' && err?.code === 'already-exists') {
         rejectedPageIds.current.add(payload.id);
         setPage((current) => ({ ...current, id: '' }));
         setError({
@@ -640,10 +641,37 @@ function PageEditor({ mode }) {
         });
         return;
       }
+      if (stage === 'save' && err?.code === 'page-revision-conflict') {
+        setError({
+          code: err.code,
+          message: 'A teammate saved a newer version of this page. Your edits are still here. Copy anything you want to keep before loading the newer version.',
+        });
+        return;
+      }
       setError(stage === 'publish' ? pagePublishError(err) : pageSaveError(err, address, page.systemPage));
       if (err?.code === 'unauthenticated') localDraft.flush();
       // A part-way publish failure carries the queue row to resume from.
       if (err?.queueId) setResumeQueueId(err.queueId);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function loadNewerPage() {
+    setBusy('reload');
+    setStatus('');
+    try {
+      const latest = await readAdminPage(savedId ?? pageId);
+      if (!latest || isNavigationLink(latest.draft ?? latest.live)) {
+        setStatus('This page is no longer available. Your edits are still here.');
+        return;
+      }
+      localDraft.discard();
+      loadPage(latest);
+      setError(null);
+      setStatus('Newer version loaded.');
+    } catch {
+      setStatus('The newer version could not be loaded. Your edits are still here. Try again.');
     } finally {
       setBusy(null);
     }
@@ -736,13 +764,13 @@ function PageEditor({ mode }) {
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to pages
             </Link>
-            <button type="submit" className={secondaryButtonClass} disabled={busy !== null || Boolean(localDraft.recovery)} aria-busy={busy === 'draft' || undefined}>
+            <button type="submit" className={secondaryButtonClass} disabled={busy !== null || Boolean(localDraft.recovery) || revisionConflict} aria-busy={busy === 'draft' || undefined}>
               <BusyLabel busy={busy === 'draft'} pending="Saving the page draft…">Save draft</BusyLabel>
             </button>
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={busy !== null || Boolean(localDraft.recovery)}
+              disabled={busy !== null || Boolean(localDraft.recovery) || revisionConflict}
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
@@ -753,6 +781,14 @@ function PageEditor({ mode }) {
       />
 
       {!addressOnlyError ? <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} /> : null}
+      {revisionConflict ? (
+        <div>
+          <button type="button" className={secondaryButtonClass} disabled={busy !== null} onClick={loadNewerPage}>
+            <BusyLabel busy={busy === 'reload'} pending="Loading the newer version…">Load newer version</BusyLabel>
+          </button>
+          {status ? <SaveStatus message={status} /> : null}
+        </div>
+      ) : null}
       {error?.code === 'unauthenticated' && unsaved ? (
         <Notice tone="caution" message={localDraft.kept
           ? 'Your text is kept on this browser. Sign in again, return to this page, and choose Restore.'

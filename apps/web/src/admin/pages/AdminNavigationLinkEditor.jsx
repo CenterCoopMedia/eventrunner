@@ -54,7 +54,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
     try {
       const payload = toPagePayload(page);
       if (creating) {
-        await call('cmsSavePage', { page: payload, create: true });
+        await call('cmsSavePage', { page: payload, create: true, expectedRevision: null });
       } else {
         const previous = toPagePayload({ ...baseline, url: navigationLinkUrl(baseline.url) });
         const changes = Object.fromEntries(['label', 'url', 'visible']

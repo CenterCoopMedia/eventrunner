@@ -32,7 +32,9 @@ let listenerError = null;
 let silentCollections = [];
 const adminSubscriptions = new Map();
 const adminErrors = new Map();
+const readAdminPage = vi.fn();
 vi.mock('../adminSource.js', () => ({
+  readAdminPage: (...args) => readAdminPage(...args),
   subscribeAdminCollection: (name, onNext, onError) => {
     adminSubscriptions.set(name, onNext);
     adminErrors.set(name, onError);
@@ -537,6 +539,42 @@ describe('page editor', () => {
     expect(bodyOf(0).create).toBeUndefined();
     expect(urlOf(1)).toMatch(/\/cmsPublish$/);
     expect(bodyOf(1)).toEqual({ collection: 'cmsPages', docIds: ['scholarships'] });
+  });
+
+  it('keeps typed text after a revision conflict and loads the newer version on request', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, draftRevision: 'loaded-revision' }];
+    const newerDraft = { ...SCHOLARSHIPS_DRAFT, label: 'Teammate’s page', draftRevision: 'newer-revision' };
+    readAdminPage.mockResolvedValueOnce({ id: newerDraft.id, draft: newerDraft, live: null });
+    fetch
+      .mockResolvedValueOnce(errorResponse(409, 'page-revision-conflict', 'Load the latest version.'))
+      .mockResolvedValueOnce(okResponse({ revision: 'my-save' }))
+      .mockResolvedValueOnce(okResponse({ revision: 'my-next-save' }));
+    await renderAt('/admin/pages/scholarships');
+
+    const label = await screen.findByLabelText('Navigation label');
+    fireEvent.change(label, { target: { value: 'My unsaved label' } });
+    act(() => adminSubscriptions.get('cmsPages_drafts')([newerDraft]));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+
+    expect(await screen.findByText(/A teammate saved a newer version of this page/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(bodyOf(0)).toMatchObject({ expectedRevision: 'loaded-revision', page: { label: 'My unsaved label' } });
+    expect(label).toHaveValue('My unsaved label');
+    expect(readAdminPage).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load newer version' }));
+    await waitFor(() => expect(label).toHaveValue('Teammate’s page'));
+    expect(readAdminPage).toHaveBeenCalledWith('scholarships');
+
+    fireEvent.change(label, { target: { value: 'My next edit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. It is not public until you publish.');
+    expect(bodyOf(1).expectedRevision).toBe('newer-revision');
+
+    fireEvent.change(label, { target: { value: 'One more edit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(bodyOf(2).expectedRevision).toBe('my-save');
   });
 
   it('sends only the fields the server accepts, dropping stored bookkeeping', async () => {
