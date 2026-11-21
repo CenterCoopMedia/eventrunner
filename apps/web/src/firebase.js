@@ -73,14 +73,14 @@ if (useEmulators) {
 // demo has no OTP endpoint to attest to in the first place.
 const appCheckReady = appCheckSiteKey
   ? import('firebase/app-check')
-      .then(({ initializeAppCheck, ReCaptchaV3Provider }) => {
+      .then(({ initializeAppCheck, ReCaptchaEnterpriseProvider }) => {
         // Must be set before initializeAppCheck. Dev-only: a debug token in
         // a production bundle is a published bypass of the whole control.
         if (import.meta.env.DEV && import.meta.env.VITE_APP_CHECK_DEBUG_TOKEN) {
           self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APP_CHECK_DEBUG_TOKEN;
         }
         return initializeAppCheck(app, {
-          provider: new ReCaptchaV3Provider(appCheckSiteKey),
+          provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
           isTokenAutoRefreshEnabled: true,
         });
       })

@@ -240,19 +240,33 @@ the normal main push can start client deployments. Do not print the value or put
 | `EVENT_TICKETING_EVENT_ID` | Eventbrite event ID or stable internal event ID for Stripe; required for either provider |
 | `EVENT_STRIPE_MODE` | explicit `test` or `live` when using Stripe; begin onboarding in `test` |
 | `EVENT_OPERATOR_NOTIFIER` | `webhook` \| `email` \| `none` |
-| `EVENT_APP_CHECK_ENFORCED` | `false` by default; set the App Check site key before changing this to `true` |
+| `EVENT_APP_CHECK_ENFORCED` | `false` by default. Set and verify the App Check site key before enabling enforcement for email-code sign-in. |
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | positive integer; defaults to `500` |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | from Firebase Console → Project settings → your web app's SDK config |
 | `VITE_FIREBASE_MEASUREMENT_ID` | optional; Firebase omits it when Google Analytics is disabled, and Eventrunner does not use it |
-| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key; set this before enabling App Check enforcement |
+| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | Public reCAPTCHA Enterprise site key registered for this Firebase web app. Leave empty when App Check is off. |
 | `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. Set to `true` after provisioning the site-publisher Cloud Run job (§9.1) |
 | `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§9) |
 | `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.jobsExecutorWithOverrides` on the publisher job (§9) |
 
-App Check activation requires two successful deploys. First set
-`VITE_FIREBASE_APP_CHECK_SITE_KEY` and wait for that deploy to finish. Then set
-`EVENT_APP_CHECK_ENFORCED=true` and deploy again. Do not enable both settings in
-the first deploy because Functions deploys before the new web bundle.
+To configure App Check, create a score-based website key in Google Cloud Fraud
+Defense for the event's project. Keep domain verification enabled and list the
+hostnames that serve the app. In the Firebase console, open Security → App Check →
+Apps and register the web app with the reCAPTCHA Enterprise provider and that
+same key. [Firebase setup guide](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider)
+
+If the environment already has an App Check site key, confirm that the Firebase
+web app is registered with reCAPTCHA Enterprise and that its registered key
+matches `VITE_FIREBASE_APP_CHECK_SITE_KEY`. For environments in
+`AUTO_DEPLOY_ENVIRONMENTS`, finish any registration and key change before merging
+a provider change to `main`. For manual deployments, finish before dispatch.
+
+App Check activation requires two successful deploys. Set
+`VITE_FIREBASE_APP_CHECK_SITE_KEY` and deploy with `EVENT_APP_CHECK_ENFORCED=false`.
+On the deployed site, verify that the App Check token exchange succeeds when
+requesting a sign-in code with a test account. Then set `EVENT_APP_CHECK_ENFORCED=true`
+and deploy again. Functions deploys before the web bundle, so enabling enforcement
+in the first deploy would block email-code sign-in until the browser gets the new bundle.
 
 Full list, with descriptions: `.env.example`.
 

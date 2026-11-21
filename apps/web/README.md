@@ -165,7 +165,7 @@ log to drive the sign-in flow end to end without any real inbox; see below.
 | `VITE_USE_EMULATORS` | `'true'` connects Auth/Firestore/Storage to local emulators (dev only) |
 | `GENERATED_DIR` | Points the `@generated` alias at an out-of-tree deploy-time snapshot instead of the committed `src/generated` (spec §8.6) |
 | `VITE_DEMO_MODE` | `'1'` builds the static, read-only GitHub Pages demo (see "Demo mode" below). Never set by a client build. |
-| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key for App Check. Empty: App Check is off |
+| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA Enterprise site key for App Check. App Check stays off when this is empty. |
 | `VITE_APP_CHECK_DEBUG_TOKEN` | App Check debug token, used only in dev |
 | `VITE_ENABLE_CLIENT_ERROR_REPORTING` | `'true'` or `'false'` turns client error reporting on or off. Default: on in a production build, off in dev |
 | `VITE_CONSOLE_ORIGIN` | Where the admin **Report a problem** dialog sends the report (default `https://console.eventrunner.org`) |

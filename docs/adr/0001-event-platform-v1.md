@@ -327,7 +327,7 @@ is missing.
 | `EVENT_OPERATOR_NOTIFIER` | var | functions | `webhook` \| `email` \| `none` |
 | `EVENT_APP_CHECK_ENFORCED` | var | functions | `true` \| `false`, default `false`. Enforces App Check on the OTP endpoints (§3.1). Requires `VITE_FIREBASE_APP_CHECK_SITE_KEY`. |
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | var | functions | positive integer, default `500`. Deployment-wide OTP send ceiling (§3.1). |
-| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | var | build | reCAPTCHA v3 site key, non-secret. Absent → the App Check SDK is never loaded. |
+| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | var | build | reCAPTCHA Enterprise site key, non-secret. Absent → the App Check SDK is never loaded. |
 | Firebase web app config (six values) | var | build | required settings read by `apps/web/src/firebase.js` |
 | `VITE_EVENT_PUBLIC_URL` | var | build | mirrors `EVENT_PUBLIC_URL` into the bundle |
 | `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, generate-content | |
@@ -721,7 +721,7 @@ so an existing deployment keeps its current behavior until an operator opts in.
 
 | Control | Variable | Behavior |
 |---|---|---|
-| Firebase App Check | `EVENT_APP_CHECK_ENFORCED` (+ `VITE_FIREBASE_APP_CHECK_SITE_KEY`) | `true` makes `sendOtpCode` and `verifyOtpCode` verify the `X-Firebase-AppCheck` header (`core/auth.cjs` `requireAppCheck`, backed by `getAppCheck().verifyToken`) before any request work. The web app initializes the App Check SDK (reCAPTCHA v3) and sends the header **only** when the site key is set; with no key the SDK is never fetched. `validateDeployEnv` fails the build if the flag is on without a key, because that combination is a total sign-in outage. |
+| Firebase App Check | `EVENT_APP_CHECK_ENFORCED` (+ `VITE_FIREBASE_APP_CHECK_SITE_KEY`) | `true` makes `sendOtpCode` and `verifyOtpCode` verify the `X-Firebase-AppCheck` header (`core/auth.cjs` `requireAppCheck`, backed by `getAppCheck().verifyToken`) before any request work. The web app loads the App Check SDK and initializes reCAPTCHA Enterprise only when a site key is set. `validateDeployEnv` fails the build if enforcement is on without a key, since the browser could not attest email-code sign-in requests. |
 | Global send ceiling | `EVENT_OTP_SEND_CEILING_PER_HOUR` (default 500) | A deployment-wide circuit breaker on total OTP sends per rolling hour, in `auth_send_ceiling/global` — same storage and sweep shape as `auth_rate_limits`. Over the ceiling, every request gets the *same* generic rate-limited answer the per-address bucket gives (no oracle), and the first request over the line emits an `OperatorEvent` with `dedupeKey: 'otp-send-ceiling-tripped'`. The document's `trippedAt` marker makes that once per trip episode and durable across containers, not once per request; it clears as the window drains. There is no "unlimited" setting — an absent, zero, or unparseable value falls back to 500. |
 
 Enforcement is explicit rather than the v2 `enforceAppCheck` option: that option is declared on
