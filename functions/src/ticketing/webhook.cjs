@@ -46,6 +46,8 @@ const {
   internals: { WEBHOOK_DELIVERIES, SYNC_QUEUE, QUEUE_PENDING, QUEUE_EXHAUSTED, safeDocId },
 } = require('./index.cjs');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
+const { STRIPE_DEAUTHORIZED } = require('./providers/stripe.cjs');
+const { CATALOG, CONNECTION } = require('./stripeCommerce.cjs');
 
 /**
  * Generous for a webhook envelope (a full order payload with attendees),
@@ -167,6 +169,18 @@ async function claimAndEnqueue({ db, deliveryId, orderId, eventType, providerNam
   }
 }
 
+async function endStripeCheckout(db, now) {
+  return db.runTransaction(async (tx) => {
+    const policy = await checkDemoWrites({ db, transaction: tx });
+    throwIfDemoPolicyUnavailable(policy);
+    if (!policy.ok) return false;
+    const ref = db.collection(CATALOG).doc(CONNECTION);
+    if ((await tx.get(ref)).data()?.ended === true) return false;
+    tx.set(ref, { ended: true, at: now() });
+    return true;
+  });
+}
+
 /**
  * @param {{ db: object, provider: object, now?: () => Date,
  *           log?: Pick<Console,'warn'|'error'> }} deps
@@ -232,6 +246,16 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
       // in the log, acknowledge to the provider.
       log.warn('ticketing: verified delivery carried no usable deliveryId');
       res.status(200).json({ ok: true, ignored: 'no_delivery_id' });
+      return;
+    }
+    if (provider.name === 'stripe' && eventType === STRIPE_DEAUTHORIZED) {
+      try {
+        const ended = await endStripeCheckout(db, now);
+        res.status(200).json({ ok: true, ended });
+      } catch (err) {
+        log.error('ticketing: Stripe connection could not be marked ended', { code: err?.code || 'internal' });
+        res.status(500).json({ error: { code: 'internal', message: 'Delivery could not be processed.' } });
+      }
       return;
     }
     if (eventType === INVOICE_CHECKOUT_EVENT) {

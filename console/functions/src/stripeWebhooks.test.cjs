@@ -23,8 +23,9 @@ function request(account = 'acct_one', { secret = PLATFORM_SECRET, timestamp = N
   };
 }
 
-function setup() {
-  const db = makeFakeDb(Object.fromEntries(SITES.map(({ accountId, secret: _secret, ...route }) => [`console_stripe_routes/${accountId}`, route])));
+function setup(seed = {}) {
+  const routes = Object.fromEntries(SITES.map(({ accountId, secret: _secret, ...route }) => [`console_stripe_routes/${accountId}`, route]));
+  const db = makeFakeDb({ ...routes, ...seed });
   const secrets = makeFakeSecrets(Object.fromEntries(SITES.map((site) => [routeSecretId(site.appId), site.secret])));
   const calls = [];
   const logs = [];
@@ -43,6 +44,73 @@ function setup() {
   };
   return { db, secrets, calls, logs, deps, deliver };
 }
+
+const REVOKED = { type: 'account.application.deauthorized', created: NOW / 1000 };
+const EVENTBRITE = { connected: true, displayName: 'Organizer' };
+const LIVE_STRIPE = { connected: true, livemode: true, connectedAt: new Date(NOW - 5000) };
+
+test('a verified live deauthorization disconnects only matching Console connections and reaches the site', async () => {
+  const live = { accountId: 'acct_one', livemode: true };
+  const { db, deliver, calls } = setup({
+    'applications/a1': { connections: { stripe: LIVE_STRIPE, eventbrite: EVENTBRITE } },
+    'applications/a2': { connections: { stripe: LIVE_STRIPE } },
+    'applications/a3': { connections: { stripe: { ...LIVE_STRIPE, livemode: false } } },
+    'applications/a4': { connections: { stripe: { ...LIVE_STRIPE, connectedAt: new Date(NOW + 5000) } } },
+    'console_connections/a1': { stripe: live, eventbrite: { accountId: 'org_fixture' } },
+    'console_connections/a2': { stripe: { ...live, accountId: 'acct_two' } },
+    'console_connections/a3': { stripe: { ...live, livemode: false } },
+    'console_connections/a4': { stripe: live },
+  });
+  const req = request('acct_one', { body: REVOKED });
+  assert.equal((await deliver(req)).statusCode, 200);
+  assert.deepEqual(db.read('applications/a1').connections, { eventbrite: EVENTBRITE });
+  assert.deepEqual(db.read('console_connections/a1'), { eventbrite: { accountId: 'org_fixture' } });
+  for (const appId of ['a2', 'a3', 'a4']) assert.equal(db.read(`applications/${appId}`).connections.stripe.connected, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, ticketWebhookUrl(SITES[0]));
+  assert.strictEqual(calls[0].body, req.rawBody);
+
+  const writes = db.writes.length;
+  assert.equal((await deliver(req)).statusCode, 200);
+  assert.equal(db.writes.length, writes);
+});
+
+test('a failed site delivery remains retryable after the Console records the disconnect', async () => {
+  const { db, deliver, calls } = setup({
+    'applications/a1': { connections: { stripe: LIVE_STRIPE } },
+    'console_connections/a1': { stripe: { accountId: 'acct_one', livemode: true } },
+  });
+  const req = request('acct_one', { body: REVOKED });
+  assert.equal((await deliver(req, { fetch: async () => new Response(null, { status: 503 }) })).statusCode, 502);
+  assert.deepEqual(db.read('applications/a1').connections, {});
+  assert.equal((await deliver(req)).statusCode, 200);
+  assert.equal(calls[0].url, ticketWebhookUrl(SITES[0]));
+});
+
+test('an invalid deauthorization signature changes nothing and an unknown account is acknowledged', async () => {
+  const { db, deliver, calls, logs } = setup({
+    'applications/a1': { connections: { stripe: LIVE_STRIPE } },
+    'console_connections/a1': { stripe: { accountId: 'acct_one', livemode: true } },
+  });
+  assert.equal((await deliver(request('acct_one', { body: REVOKED, secret: 'whsec_wrong_fixture' }))).statusCode, 400);
+  assert.equal((await deliver(request('acct_unknown', { body: REVOKED }))).statusCode, 200);
+  assert.equal(db.writes.length, 0);
+  assert.equal(calls.length, 0);
+  assert.equal(logs.at(-1)[1].category, 'unrouted-account');
+});
+
+test('a test deauthorization affects only matching test connections and is never forwarded to a live site', async () => {
+  const { db, deliver, calls } = setup({
+    'applications/a1': { connections: { stripe: LIVE_STRIPE } },
+    'applications/test': { connections: { stripe: { ...LIVE_STRIPE, livemode: false } } },
+    'console_connections/a1': { stripe: { accountId: 'acct_one', livemode: true } },
+    'console_connections/test': { stripe: { accountId: 'acct_one', livemode: false } },
+  });
+  assert.equal((await deliver(request('acct_one', { body: { ...REVOKED, livemode: false } }))).statusCode, 200);
+  assert.equal(db.read('applications/a1').connections.stripe.connected, true);
+  assert.deepEqual(db.read('applications/test').connections, {});
+  assert.equal(calls.length, 0);
+});
 
 test('two signed connected accounts reach only their own site with the original bytes and the site signature', async () => {
   const { calls, deliver } = setup();

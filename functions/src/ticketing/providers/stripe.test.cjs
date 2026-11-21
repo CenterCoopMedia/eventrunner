@@ -7,6 +7,8 @@ const { makeFakeDb } = require('../../cms/firestoreFake.cjs');
 const { createStripeProvider, stripeScope, internals } = require('./stripe.cjs');
 const { getTicketingProvider, ticketingSecretNames, providerNameSupportsWebhooks } = require('./index.cjs');
 const { createTicketingWebhookHandler } = require('../webhook.cjs');
+const { readTicketingCatalog } = require('../stripeCheckout.cjs');
+const { catalog, checkout, response, setup, QUIET } = require('../commerceTestKit.cjs');
 
 const ENV = {
   EVENT_TICKETING_PROVIDER: 'stripe', EVENT_TICKETING_EVENT_ID: 'conference-1',
@@ -129,6 +131,62 @@ test('signed deliveries for another account, mode, conference or payment attempt
   const { provider } = fixture({ accountId: 'acct_other' });
   const delivery = signed();
   await assert.rejects(provider.verifyWebhook(delivery.rawBody, delivery.headers), /account/);
+});
+
+test('a verified deauthorization closes paid Checkout for a revoked key and replay keeps existing orders', async () => {
+  const { db, provider, stripeClient, calls } = fixture();
+  await db.collection('ticket_catalog').doc('current').set(catalog());
+  await db.collection('users').doc('uid-ada').set({ registrationStatus: 'pending' });
+  const now = () => new Date('2026-10-12T16:00:00Z');
+  const handler = createTicketingWebhookHandler({ db, provider, now, log: QUIET });
+  const event = { ...EVENT, type: 'account.application.deauthorized', account: ENV.EVENT_STRIPE_ACCOUNT_ID };
+  let accountReads = 0;
+  stripeClient.accounts.retrieveCurrent = async () => {
+    accountReads += 1;
+    throw Object.assign(new Error('Revoked key'), { statusCode: 401 });
+  };
+  const deliver = async (request) => {
+    const res = response();
+    await handler({ method: 'POST', ...request }, res);
+    return res;
+  };
+
+  assert.equal((await readTicketingCatalog({ db, provider, now })).salesEnabled, true);
+  assert.equal((await deliver({ ...signed(event), headers: {} })).statusCode, 401);
+  assert.equal((await deliver(signed({ ...event, account: 'acct_other' }))).body.ignored, 'wrong_event');
+  assert.equal(accountReads, 0);
+  assert.equal(db.read('ticket_catalog', 'connection'), undefined);
+
+  const first = await deliver(signed(event));
+  assert.equal(first.statusCode, 200);
+  assert.deepEqual(first.body, { ok: true, ended: true });
+  assert.equal((await readTicketingCatalog({ db, provider, now })).salesEnabled, false);
+  const attemptedCheckout = await checkout({ ...setup().deps, db, provider, now });
+  assert.equal(attemptedCheckout.statusCode, 503);
+  assert.equal(attemptedCheckout.body.error.code, 'ticketing-unavailable');
+  const writes = db.writes.length;
+  assert.deepEqual((await deliver(signed(event))).body, { ok: true, ended: false });
+  assert.equal(db.writes.length, writes);
+  assert.deepEqual(db.read('ticket_orders', ORDER.id), ORDER);
+  assert.deepEqual(db.ids('ticket_sync_queue'), []);
+  assert.deepEqual(calls.events, []);
+  assert.deepEqual(calls.create, []);
+});
+
+test('a failed credential read retries and a working replacement key keeps paid sales open', async () => {
+  const { db, provider, stripeClient } = fixture();
+  const event = { ...EVENT, type: 'account.application.deauthorized', account: ENV.EVENT_STRIPE_ACCOUNT_ID };
+  const handler = createTicketingWebhookHandler({ db, provider, log: QUIET });
+  const deliver = async () => {
+    const res = response();
+    await handler({ method: 'POST', ...signed(event) }, res);
+    return res;
+  };
+  stripeClient.accounts.retrieveCurrent = async () => { throw new Error('Stripe temporarily unavailable'); };
+  assert.equal((await deliver()).statusCode, 500);
+  stripeClient.accounts.retrieveCurrent = async () => ({ id: ENV.EVENT_STRIPE_ACCOUNT_ID });
+  assert.equal((await deliver()).body.ignored, 'not_actionable');
+  assert.equal(db.read('ticket_catalog', 'connection'), undefined);
 });
 
 test('verified Session delivery recovers a lost creation response only for the durable attempt', async () => {

@@ -123,7 +123,7 @@ before repeating this block.
 node -e '
 const { execFileSync } = require("node:child_process");
 const { createSecretStore } = require("./console/functions/src/secretStore.cjs");
-const { STRIPE_WEBHOOK_SECRET } = require("./console/functions/src/stripeWebhooks.cjs");
+const { STRIPE_WEBHOOK_SECRET, STRIPE_DEAUTHORIZED } = require("./console/functions/src/stripeWebhooks.cjs");
 const { internals: { WEBHOOK_EVENTS } } = require("./functions/src/ticketing/providers/stripe.cjs");
 const Stripe = require("stripe");
 (async () => {
@@ -134,7 +134,7 @@ const Stripe = require("stripe");
   const url = `https://us-central1-${projectId}.cloudfunctions.net/stripeConnectWebhook`;
   for await (const endpoint of stripe.webhookEndpoints.list({ limit: 100 })) if (endpoint.url === url) throw new Error();
   if (await secrets.versionStamp(STRIPE_WEBHOOK_SECRET)) throw new Error();
-  const endpoint = await stripe.webhookEndpoints.create({ url, connect: true, enabled_events: WEBHOOK_EVENTS });
+  const endpoint = await stripe.webhookEndpoints.create({ url, connect: true, enabled_events: [...WEBHOOK_EVENTS, STRIPE_DEAUTHORIZED] });
   console.log(`Created shared endpoint ${endpoint.id}`);
   if (!endpoint.secret) throw new Error();
   await secrets.writeSecret(STRIPE_WEBHOOK_SECRET, endpoint.secret);
@@ -281,6 +281,7 @@ const Stripe = require("stripe");
   const token = execFileSync("gcloud", ["auth", "print-access-token"], { encoding: "utf8" }).trim();
   const credential = { getAccessToken: async () => ({ access_token: token }) };
   const { internals: { WEBHOOK_EVENTS } } = require("./functions/src/ticketing/providers/stripe.cjs");
+  const { STRIPE_DEAUTHORIZED } = require("./console/functions/src/stripeWebhooks.cjs");
   const secrets = createSecretStore({ projectId: e.CONSOLE_PROJECT_ID, getAccessToken: () => credential.getAccessToken(), fetch });
   const stripe = new Stripe(await secrets.readSecret("CONSOLE_STRIPE_SECRET_KEY"));
   const endpoint = await stripe.webhookEndpoints.retrieve(e.OLD_ENDPOINT_ID);
@@ -293,7 +294,7 @@ const Stripe = require("stripe");
   const current = await stripe.webhookEndpoints.retrieve(shared.id);
   if (current.url !== sharedUrl || current.status !== "enabled" || current.livemode !== true ||
       !current.application || current.application !== endpoint.application ||
-      !WEBHOOK_EVENTS.every(type => current.enabled_events.includes(type))) throw new Error();
+      ![...WEBHOOK_EVENTS, STRIPE_DEAUTHORIZED].every(type => current.enabled_events.includes(type))) throw new Error();
   console.log(`${new Date().toISOString()} shared endpoint ${current.id} verified live, enabled, Connect, exact URL and reviewed events`);
   await stripe.webhookEndpoints.del(endpoint.id);
   let absent = false;
@@ -326,6 +327,25 @@ If shared delivery fails before old-endpoint deletion, keep the existing endpoin
 and the deployed one-site guard, repair the receiver and retry. After deletion,
 repair shared delivery and use Stripe's event redelivery; do not restore a per-site
 platform endpoint or admit another account through it.
+
+### Add deauthorization to an existing Connect destination
+
+Deploy the Console receiver and the routed sites' ticketing webhook code
+before changing Stripe. In the sandbox platform's Workbench, open the existing
+**Connected accounts** snapshot destination at
+`https://us-central1-<rehearsal-console-project>.cloudfunctions.net/stripeConnectWebhook`.
+Add `account.application.deauthorized` to its selected events. Keep the URL,
+signing secret, and other event types.
+
+Read back the destination's scope, mode, URL, and selected events. Disconnect
+a disposable Connect test account in Stripe. In Workbench, verify the event
+received HTTP 200 from the rehearsal Console. Check that its application now
+shows Stripe as disconnected. A test event never goes to a live site.
+
+Repeat the event selection and readback in the live platform's Workbench at
+`https://us-central1-<live-console-project>.cloudfunctions.net/stripeConnectWebhook`.
+Use a naturally occurring deauthorization for live delivery proof. Keep the
+direct test payment destinations on the client sites unchanged. [Stripe Connect webhook documentation](https://docs.stripe.com/connect/webhooks?accounts-namespace=v1)
 
 ### Partial setup containment
 
