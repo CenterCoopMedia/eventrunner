@@ -32,12 +32,19 @@ describe('authoritative order status and attendee confirmation', () => {
     expect(ticketingRequest).not.toHaveBeenCalled();
   });
   it('does not treat a success redirect, pending payment, or unverified ticket array as fulfillment', async () => {
-    ticketingRequest.mockResolvedValue({ ...ORDER, status: 'pending', paymentStatus: 'pending', checkoutUrl: null });
+    ticketingRequest.mockResolvedValue({
+      ...ORDER, status: 'pending', paymentStatus: 'pending', checkoutUrl: null,
+      canRecoverCheckout: false, expiresAt: '2026-11-25T12:00:00.000Z',
+    });
     render(surface());
     expect(await screen.findByRole('heading', { name: 'We are confirming your order' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Your order is confirmed' })).not.toBeInTheDocument();
     expect(screen.queryByText(TICKET.externalId)).not.toBeInTheDocument();
     expect(screen.getByText(/Returning|Closing Stripe/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check payment status' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continue your existing Stripe checkout' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Recover existing checkout' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Checkout expires/)).not.toBeInTheDocument();
   });
   it('shows authoritative paid tickets with opaque printable codes and an explicit verified claim path', async () => {
     render(surface());
@@ -90,8 +97,17 @@ describe('authoritative order status and attendee confirmation', () => {
     expect(screen.queryByRole('button', { name: 'Start a separate order' })).not.toBeInTheDocument();
     expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(0);
   });
+  it('directs the buyer to the organizers when payment failed and the checkout has closed', async () => {
+    ticketingRequest.mockResolvedValue({
+      ...ORDER, status: 'pending', paymentStatus: 'failed', checkoutUrl: null, canRecoverCheckout: false, tickets: [],
+    });
+    render(surface());
+    expect(await screen.findByText('Your latest payment attempt failed. Contact the organizers before trying to pay again.')).toBeInTheDocument();
+    expect(screen.queryByText(/Wait for this order to be confirmed/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Recover existing checkout' })).not.toBeInTheDocument();
+  });
   it('recovers a pending order by its owner-scoped reference on a different device', async () => {
-    ticketingRequest.mockResolvedValue({ ...ORDER, status: 'pending', paymentStatus: 'pending', tickets: [], checkoutUrl: null });
+    ticketingRequest.mockResolvedValue({ ...ORDER, status: 'pending', paymentStatus: 'pending', tickets: [], checkoutUrl: null, canRecoverCheckout: true });
     render(surface());
     fireEvent.click(await screen.findByRole('button', { name: 'Recover existing checkout' }));
     await waitFor(() => expect(ticketingRequest).toHaveBeenCalledWith('ticketingCheckout', expect.objectContaining({ user: state.auth.user, body: { orderId: ORDER.orderId, resume: true } })));

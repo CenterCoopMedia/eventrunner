@@ -437,6 +437,8 @@ test('cross-device resume replays unknown creation and hides another purchaserâ€
     return sessions.get(options.idempotencyKey);
   } });
   const initial = await checkout(deps);
+  const lookup = { orderId: initial.body.orderId };
+  assert.equal((await status(deps, lookup)).body.canRecoverCheckout, true);
   advance(6000);
   const foreign = await checkout(deps, { orderId: initial.body.orderId, resume: true }, 'bob');
   const missing = await checkout(deps, { orderId: `ord_${'f'.repeat(40)}`, resume: true }, 'bob');
@@ -446,6 +448,9 @@ test('cross-device resume replays unknown creation and hides another purchaserâ€
   const recovered = await checkout(deps, { orderId: initial.body.orderId, resume: true });
   assert.equal(recovered.statusCode, 200);
   assert.equal(recovered.body.orderId, initial.body.orderId);
+  const owned = await status(deps, lookup);
+  assert.equal(owned.body.canRecoverCheckout, false);
+  assert.equal(owned.body.checkoutUrl, recovered.body.checkoutUrl);
   assert.deepEqual(calls[0], calls[1]);
   assert.equal(db.ids('ticket_orders').length, 1);
 });

@@ -144,6 +144,7 @@ function financialPatch(order, state, at) {
   return {
     stripeSessionId: session.id, stripePaymentIntentId: objectId(session.payment_intent),
     stripeChargeId: objectId(state.paymentIntent?.latest_charge),
+    ...(session.status !== 'open' ? { checkoutUrl: null } : {}),
     status, paymentStatus, refunds, disputes, refundedAmount, refundStatus, reconciliationException,
     ...(paid && !order.paidAt ? { paidAt: at } : {}),
     reconciledAt: at, updatedAt: at,
