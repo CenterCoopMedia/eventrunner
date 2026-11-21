@@ -59,7 +59,17 @@ const KIND_SWEEP_PAGE_SIZE = 200;
 // or invoice_review_<40 hex>. Checked before any read.
 const ERROR_ID_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const SAFE_KIND_RE = /^[a-z0-9-]{1,80}$/;
-const ROUTE_SEGMENT_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+// Route names a page URL may report, copied from apps/web/src/routes.jsx and
+// admin/AdminApp.jsx. logClientError is unauthenticated, so any other segment
+// could be text a caller chose; it prints as `*`. A route added to the app and
+// not here only loses detail.
+const PUBLIC_ROUTES = new Set(['schedule', 'speakers', 'sponsors', 'updates', 'pitch', 'signin', 'speaker',
+  'ticket', 'tickets', 'registration', 'profile', 'dashboard', 'attendees', 'admin']);
+const ADMIN_SECTIONS = new Set(['access', 'announcements', 'attendees', 'badges', 'branding', 'change-requests',
+  'content', 'data-export', 'email-log', 'features', 'feed-moderation', 'feedback', 'import', 'invoices',
+  'live-updates', 'materials', 'media', 'organizations', 'overview', 'pages', 'pitches', 'registration-form',
+  'reminders', 'sessions', 'settings', 'setup', 'speakers', 'system-errors', 'ticketing', 'timeline',
+  'unpublished', 'updates', 'versions', 'web-address']);
 
 function isPlainObject(v) {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
@@ -107,9 +117,9 @@ function toRow(doc) {
 }
 
 /**
- * The page a row came from, as a route shape. Only the first segment (and an
- * /admin section name) is kept; deeper segments can be a uid, a speaker slug
- * or another record id, so they print as `*`. No host, query or fragment.
+ * The page a row came from, as a route shape. A known first segment and, under
+ * /admin, a known section name are kept; every other segment prints as `*`
+ * (a uid, a speaker slug, a CMS page or caller text). No host, query or fragment.
  * @param {unknown} url @returns {string|null}
  */
 function routeOf(url) {
@@ -121,10 +131,9 @@ function routeOf(url) {
     return null;
   }
   const segments = pathname.split('/').filter(Boolean);
-  const keep = segments[0] === 'admin' ? 2 : 1;
-  return `/${segments
-    .map((segment, i) => (i < keep && ROUTE_SEGMENT_RE.test(segment) ? segment : '*'))
-    .join('/')}`;
+  const known = (segment, i) => (i === 0 && PUBLIC_ROUTES.has(segment))
+    || (i === 1 && segments[0] === 'admin' && ADMIN_SECTIONS.has(segment));
+  return `/${segments.map((segment, i) => (known(segment, i) ? segment : '*')).join('/')}`;
 }
 
 /** Browser family from a user agent string. Order matters: Edge and Chrome both say Safari. */

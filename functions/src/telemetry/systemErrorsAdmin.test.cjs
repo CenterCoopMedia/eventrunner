@@ -611,6 +611,23 @@ test('getSystemError: an operator gets only the safe fields of one row', async (
   assert.equal(res.body.row.browser, 'edge');
 });
 
+test('getSystemError: route keeps only known route names, never caller-chosen segments', () => {
+  const cases = [
+    ['https://event.example.org/alice-example', '/*'],
+    ['https://event.example.org/admin/secretabc123', '/admin/*'],
+    ['https://event.example.org/admin/attendees/uid-1', '/admin/attendees/*'],
+    ['https://event.example.org/speakers/alice-example?x=1#y', '/speakers/*'],
+    ['https://event.example.org/schedule/user/uid-1', '/schedule/*/*'],
+    ['https://event.example.org/Schedule', '/*'],
+    ['https://event.example.org/', '/'],
+    ['/updates', '/updates'],
+    ['//attacker.example/alice', '/*'],
+    ['javascript:alert(1)', '/*'],
+  ];
+  for (const [url, route] of cases) assert.equal(internals.routeOf(url), route, url);
+  assert.equal(internals.routeOf(null), null);
+});
+
 test('getSystemError: signed-out, non-admin and staff callers are refused without the row', async () => {
   const db = seedLookup();
   const staffAuth = {
