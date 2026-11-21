@@ -12,7 +12,6 @@ const {
   uploadSessionMaterialRequest,
   updateSessionMaterial,
   deleteSessionMaterial,
-  deleteMaterialsForSession,
   internals: {
     SessionNotFoundError,
     MaterialNotFoundError,
@@ -74,17 +73,6 @@ function fakeDb(seed = {}) {
             },
           };
           return query;
-        },
-      };
-    },
-    batch() {
-      const ops = [];
-      return {
-        delete(ref) {
-          ops.push(() => docs.delete(ref._key));
-        },
-        async commit() {
-          for (const op of ops) op();
         },
       };
     },
@@ -1122,38 +1110,4 @@ test('uploadSessionMaterial: the cap applies to file materials too', async () =>
     MaterialCapExceededError,
   );
   assert.equal(bucket.state.fileCalls, 0);
-});
-
-// ------------------------------------------------- deleteMaterialsForSession (cascade)
-
-test('deleteMaterialsForSession: removes every material AND its public projection for the session', async () => {
-  const db = fakeDb(seedSession('s1'));
-  const { id: id1 } = await addSessionMaterialLink({ db, sessionId: 's1', url: 'https://a.org', label: 'A', actor: ADMIN, now });
-  const { id: id2 } = await addSessionMaterialLink({ db, sessionId: 's1', url: 'https://b.org', label: 'B', actor: ADMIN, now });
-  db.docs.set(`session_materials_public/${id1}`, { sessionId: 's1', type: 'link', filename: 'A', reviewStatus: 'approved' });
-  db.docs.set(`session_materials_public/${id2}`, { sessionId: 's1', type: 'link', filename: 'B', reviewStatus: 'approved' });
-
-  const result = await deleteMaterialsForSession({ db, sessionId: 's1' });
-
-  assert.equal(result.deleted, 2);
-  assert.equal(db.docs.has(`session_materials/${id1}`), false);
-  assert.equal(db.docs.has(`session_materials/${id2}`), false);
-  assert.equal(db.docs.has(`session_materials_public/${id1}`), false);
-  assert.equal(db.docs.has(`session_materials_public/${id2}`), false);
-});
-
-test('deleteMaterialsForSession: never touches another session\'s materials', async () => {
-  const db = fakeDb({ ...seedSession('s1'), ...seedSession('s2') });
-  const { id: keep } = await addSessionMaterialLink({ db, sessionId: 's2', url: 'https://c.org', label: 'C', actor: ADMIN, now });
-  await addSessionMaterialLink({ db, sessionId: 's1', url: 'https://a.org', label: 'A', actor: ADMIN, now });
-
-  await deleteMaterialsForSession({ db, sessionId: 's1' });
-
-  assert.equal(db.docs.has(`session_materials/${keep}`), true);
-});
-
-test('deleteMaterialsForSession: a session with no materials is a no-op', async () => {
-  const db = fakeDb();
-  const result = await deleteMaterialsForSession({ db, sessionId: 'empty' });
-  assert.equal(result.deleted, 0);
 });

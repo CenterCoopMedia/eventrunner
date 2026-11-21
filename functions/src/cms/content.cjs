@@ -44,7 +44,6 @@ const {
   normalizeSessionRecordingUrl,
   checkSessionDeletable,
 } = require('../schedule/sessions.cjs');
-const { deleteMaterialsForSession } = require('../materials/store.cjs');
 const {
   ORGANIZATIONS_COLLECTION,
   organizationSlugError,
@@ -866,12 +865,19 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
           // how staff undo that, so the pitch's decision can change again.
           // Read before any write: Firestore transactions need that order.
           const converted = await tx.get(db.collection('session_pitches').where('conversion.sessionId', '==', target.docId));
+          const materials = await tx.get(db.collection('session_materials').where('sessionId', '==', target.docId));
           const deleted = await deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
           for (const pitch of converted.docs) {
             const revision = Number.isSafeInteger(pitch.data().reviewRevision) ? pitch.data().reviewRevision : 0;
             tx.update(pitch.ref, { conversion: null, reviewRevision: revision + 1 });
           }
-          return deleted;
+          // Commit both material records with the session. The existing
+          // trigger retries cleanup of managed Storage objects after commit.
+          for (const material of materials.docs) {
+            tx.delete(material.ref);
+            tx.delete(db.collection('session_materials_public').doc(material.id));
+          }
+          return { ...deleted, removedMaterials: materials.size };
         });
       } else if (target.collection === ORGANIZATIONS_COLLECTION) {
         paths = await db.runTransaction(async (tx) => {
@@ -893,21 +899,6 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
       throw err;
     }
     const { livePath, draftPath } = paths;
-
-    // Cascade cleanup (issue #23 follow-up, spec §4.4): deleting a
-    // cmsSchedule doc must not orphan its session_materials /
-    // session_materials_public rows — without this, listSessionMaterials
-    // 404s on the now-gone session (so the admin UI can never reach them
-    // again) while the public projection keeps serving metadata for a
-    // session that no longer exists. Only cmsSchedule carries materials;
-    // every other GENERIC_COLLECTIONS member is a no-op-safe call away
-    // from this (deleteMaterialsForSession would just find nothing), but
-    // scoping it to cmsSchedule keeps the intent explicit and skips the
-    // query entirely for the collections that never have materials.
-    if (target.collection === 'cmsSchedule') {
-      const materials = await deleteMaterialsForSession({ db, sessionId: target.docId });
-      paths.removedMaterials = materials.deleted;
-    }
 
     await logAdminAction({ db, action: 'cms-delete-content', docPath: livePath, actor, now, log });
     res.status(200).json({

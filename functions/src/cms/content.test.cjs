@@ -921,28 +921,66 @@ test('cmsDeleteContent on a session made from a pitch clears the pitch\'s conver
   assert.ok(db.read('session_pitches', 'p2').conversion, 'another pitch keeps its conversion');
 });
 
-test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their public projections are deleted too (issue #23 follow-up)', async () => {
-  const db = makeFakeDb({
+test('cmsDeleteContent rolls back a session and its pitch when a material delete fails', async () => {
+  const seed = {
     'cmsSchedule/s1': { title: 'Session', visible: true, revision: 1, materialCount: 2 },
-    'cmsSchedule_drafts/s1': { title: 'Session', visible: true, status: 'clean', basedOnRevision: 1 },
+    'cmsSchedule_drafts/s1': { title: 'Session draft', visible: true, status: 'dirty', basedOnRevision: 1 },
+    'session_pitches/p1': { status: 'accepted', reviewRevision: 3, conversion: { sessionId: 's1' } },
     'session_materials/m1': { sessionId: 's1', type: 'link', url: 'https://a.org', filename: 'A', reviewStatus: 'approved' },
-    'session_materials/m2': { sessionId: 's1', type: 'link', url: 'https://b.org', filename: 'B', reviewStatus: 'pending' },
+    'session_materials/m2': { sessionId: 's1', type: 'link', url: 'https://b.org', filename: 'B', reviewStatus: 'approved' },
     'session_materials_public/m1': { sessionId: 's1', type: 'link', filename: 'A', reviewStatus: 'approved' },
-    // A different session's material must survive.
+    'session_materials_public/m2': { sessionId: 's1', type: 'link', filename: 'B', reviewStatus: 'approved' },
     'session_materials/other': { sessionId: 's2', type: 'link', url: 'https://c.org', filename: 'C', reviewStatus: 'approved' },
+    'session_materials_public/other': { sessionId: 's2', type: 'link', filename: 'C', reviewStatus: 'approved' },
+  };
+  const db = makeFakeDb(seed);
+  const { batch, runTransaction } = db;
+  let fail = true;
+  const withFailingMaterialDelete = (writer) => ({
+    ...writer,
+    delete(ref) {
+      if (fail && ref.path === 'session_materials_public/m2') {
+        fail = false;
+        throw new Error('injected material delete failure');
+      }
+      return writer.delete(ref);
+    },
   });
+  // Fail the same staged write whether it is in a batch or a transaction.
+  db.batch = () => withFailingMaterialDelete(batch());
+  db.runTransaction = (fn) => runTransaction((tx) => fn(withFailingMaterialDelete(tx)));
+  const remove = createCmsDeleteContentHandler(deps(db));
+  const request = req({ body: { collection: 'cmsSchedule', docId: 's1' } });
+
+  await assert.rejects(remove(request, fakeRes()), /injected material delete failure/);
+  for (const [path, record] of Object.entries(seed)) {
+    assert.deepEqual(db.read(...path.split('/')), record, path);
+  }
+  assert.equal(db.read('cmsMeta', 'pending'), undefined);
+
   const res = fakeRes();
-  await createCmsDeleteContentHandler(deps(db))(
-    req({ body: { collection: 'cmsSchedule', docId: 's1' } }),
-    res,
-  );
+  await remove(request, res);
   assert.equal(res.statusCode, 200);
-  assert.equal(db.read('cmsSchedule', 's1'), undefined);
-  assert.equal(db.read('session_materials', 'm1'), undefined);
-  assert.equal(db.read('session_materials', 'm2'), undefined);
-  assert.equal(db.read('session_materials_public', 'm1'), undefined);
+  assert.equal(res.body.publishedRevision, 1);
   assert.equal(res.body.removedMaterials, 2);
-  assert.notEqual(db.read('session_materials', 'other'), undefined);
+  assert.equal(db.read('cmsSchedule', 's1'), undefined);
+  assert.equal(db.read('cmsSchedule_drafts', 's1'), undefined);
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsSchedule, 0);
+  assert.deepEqual(db.read('session_pitches', 'p1'), { status: 'accepted', reviewRevision: 4, conversion: null });
+  assert.deepEqual(db.ids('session_materials'), ['other']);
+  assert.deepEqual(db.ids('session_materials_public'), ['other']);
+
+  const replay = fakeRes();
+  await remove(request, replay);
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.body.removedMaterials, 0);
+  assert.equal(db.read('session_pitches', 'p1').reviewRevision, 4);
+
+  await db.collection('cmsSchedule').doc('s1').set({ title: 'Replacement', visible: true, revision: 2 });
+  const materials = await db.collection('session_materials').where('sessionId', '==', 's1').get();
+  const projections = await db.collection('session_materials_public').where('sessionId', '==', 's1').get();
+  assert.equal(materials.size, 0);
+  assert.equal(projections.size, 0);
 });
 
 test('cmsDeleteContent refuses to orphan a session’s children, naming them', async () => {
