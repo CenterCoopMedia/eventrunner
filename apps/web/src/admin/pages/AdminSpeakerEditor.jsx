@@ -80,10 +80,6 @@ const EMPTY = {
   status: 'draft',
 };
 
-function editorSnapshot(form) {
-  return JSON.stringify(form);
-}
-
 function toForm(speaker) {
   if (!speaker) return { ...EMPTY };
   return {
@@ -104,16 +100,8 @@ function toForm(speaker) {
   };
 }
 
-/**
- * Empty string clears the optional scalars; the server stores null.
- *
- * `status` is included only when the admin actually picked a new one. A
- * speaker mid-invite has a status this form may not set (the server rejects
- * `invited`/`accepted` by name — they are meaningful only alongside a token
- * it issues), and an editor that echoed a status back on every save would
- * either be rejected or, worse, quietly rewrite the pipeline.
- */
-function toPayload(form, { includeStatus, includeHeadshot = true }) {
+/** The profile fields as the server stores them. Empty string clears the optional scalars. */
+function profileFields(form, { includeHeadshot = true } = {}) {
   const payload = {
     firstName: form.firstName,
     lastName: form.lastName,
@@ -129,8 +117,29 @@ function toPayload(form, { includeStatus, includeHeadshot = true }) {
   payload.headshotPath = includeHeadshot && form.headshotPath.trim() !== ''
     ? form.headshotPath.trim()
     : null;
-  if (includeStatus) payload.status = form.status;
   return payload;
+}
+
+/**
+ * An edit sends only the fields this form changed, so a save from an old
+ * tab cannot write back a teammate's newer values. The server re-derives
+ * the slug on a name change, and the slug stays fixed after create, so a
+ * name change carries the stored slug. A status change is its own move: it
+ * names the status this form last saw, and the server refuses it when a
+ * teammate has changed the status since (issue #1359).
+ */
+function editPayload(form, savedForm) {
+  const fields = profileFields(form);
+  const saved = profileFields(savedForm);
+  const speaker = Object.fromEntries(Object.entries(fields).filter(([field, value]) => value !== saved[field]));
+  delete speaker.slug;
+  if ('firstName' in speaker || 'lastName' in speaker) speaker.slug = saved.slug;
+  const body = { speaker };
+  if (form.status !== savedForm.status) {
+    speaker.status = form.status;
+    body.expectedStatus = savedForm.status;
+  }
+  return body;
 }
 
 /** A Firestore time as an ISO string, or null. */
@@ -155,36 +164,51 @@ export default function AdminSpeakerEditor({ mode }) {
   const eventTimeZone = eventConfig?.timezone;
 
   const speaker = mode === 'edit' ? findSpeaker(speakerId) : null;
-  const [form, setForm] = useState(() => toForm(null));
-  const [savedSnapshot, setSavedSnapshot] = useState(() => (
-    mode === 'create' ? editorSnapshot(EMPTY) : null
-  ));
+  // `savedForm` is the record as this form last saw it. Fields that differ
+  // from it are this form's own edits, and only those are saved.
+  const [{ form, savedForm }, setEditor] = useState(() => ({
+    form: toForm(null),
+    savedForm: mode === 'create' ? toForm(null) : null,
+  }));
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
   const [action, setAction] = useState(null);
   const saving = action !== null;
   const [status, setStatus] = useState('');
   const [deleteBlocked, setDeleteBlocked] = useState(false);
-  // Only a deliberate pick sends a status (see toPayload). Creating always
-  // sends one — a new record needs a starting state, and the form's default
-  // is the one the server would apply anyway.
-  const [statusPicked, setStatusPicked] = useState(mode === 'create');
   const [photoBusy, setPhotoBusy] = useState(false);
   const errorRef = useRef(null);
   const formRef = useRef(null);
-  // Adopt the live record exactly once, so a listener update does not
-  // overwrite what the admin is typing.
-  const adoptedRef = useRef(false);
-  const unsaved = savedSnapshot !== null && (editorSnapshot(form) !== savedSnapshot || photoBusy);
+  // The listener's last values. After the first adoption, a field that
+  // changed there moves the baseline, and the form too unless the admin
+  // has edited that field.
+  const observedRef = useRef(null);
+  const unsaved = savedForm !== null && (
+    Object.keys(EMPTY).some((field) => form[field] !== savedForm[field]) || photoBusy
+  );
   const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving || photoBusy });
 
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !speaker) return;
-    adoptedRef.current = true;
-    const next = toForm(speaker);
-    setForm(next);
-    setSavedSnapshot(editorSnapshot(next));
-  }, [mode, speaker]);
+    if (mode !== 'edit' || !speaker || saving) return;
+    const incoming = toForm(speaker);
+    const observed = observedRef.current;
+    observedRef.current = incoming;
+    if (!observed) {
+      setEditor({ form: incoming, savedForm: incoming });
+      return;
+    }
+    const changed = Object.keys(incoming).filter((field) => incoming[field] !== observed[field]);
+    if (changed.length === 0) return;
+    setEditor((current) => {
+      const next = { ...current.form };
+      const baseline = { ...current.savedForm };
+      for (const field of changed) {
+        if (next[field] === baseline[field]) next[field] = incoming[field];
+        baseline[field] = incoming[field];
+      }
+      return { form: next, savedForm: baseline };
+    });
+  }, [mode, speaker, saving]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -207,7 +231,7 @@ export default function AdminSpeakerEditor({ mode }) {
   }, [error]);
   const errorFor = (field) => fieldErrors.get(field);
 
-  const set = (patch) => setForm((current) => ({ ...current, ...patch }));
+  const set = (patch) => setEditor((current) => ({ ...current, form: { ...current.form, ...patch } }));
 
   async function submit(event) {
     event.preventDefault();
@@ -218,16 +242,23 @@ export default function AdminSpeakerEditor({ mode }) {
     try {
       if (mode === 'create') {
         const response = await call('createSpeaker', {
-          speaker: toPayload(form, { includeStatus: true, includeHeadshot: false }),
+          speaker: { ...profileFields(form, { includeHeadshot: false }), status: form.status },
         });
         showToast('Speaker created.');
         navigate(`/admin/speakers/${encodeURIComponent(response.speakerId)}`, { replace: true });
       } else {
-        await call('updateSpeaker', {
-          speakerId,
-          speaker: toPayload(form, { includeStatus: statusPicked }),
+        const body = editPayload(form, savedForm);
+        if (Object.keys(body.speaker).length > 0) {
+          await call('updateSpeaker', { speakerId, ...body });
+        }
+        // Only what was sent becomes the baseline. A listener value that
+        // arrived during the save stays visible as the stored one.
+        const sent = Object.keys(EMPTY).filter((field) => form[field] !== savedForm[field]);
+        setEditor((current) => {
+          const baseline = { ...current.savedForm };
+          for (const field of sent) baseline[field] = form[field];
+          return { ...current, savedForm: baseline };
         });
-        setSavedSnapshot(editorSnapshot(form));
         setStatus('Saved. The public directory updates within moments.');
       }
     } catch (err) {
@@ -366,10 +397,9 @@ export default function AdminSpeakerEditor({ mode }) {
                   label="Status"
                   value={form.status}
                   onChange={(value) => {
-                    setStatusPicked(true);
                     set({ status: value });
                   }}
-                  options={mode === 'edit' && speaker ? speakerStatusOptions(STATUS_OPTIONS, speaker.status ?? null) : STATUS_OPTIONS}
+                  options={mode === 'edit' && speaker ? speakerStatusOptions(STATUS_OPTIONS, savedForm?.status ?? null) : STATUS_OPTIONS}
                   error={errorFor('status')}
                 />
               ) : (

@@ -180,11 +180,11 @@ test('approvedAt is stamped on entering approved and not rewritten afterwards', 
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'draft', approvedAt: null },
   });
-  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, expectedStatus: 'draft', actor: ACTOR, now: NOW });
   assert.deepEqual(db.read('speakers', 's1').approvedAt, AT);
 
   const later = () => Date.parse('2026-09-01T00:00:00Z');
-  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved', bio: 'x' }, actor: ACTOR, now: later });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved', bio: 'x' }, expectedStatus: 'approved', actor: ACTOR, now: later });
   assert.deepEqual(db.read('speakers', 's1').approvedAt, AT);
 });
 
@@ -194,11 +194,11 @@ test('re-approval after a removal keeps the ORIGINAL approvedAt', async () => {
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'draft', approvedAt: null, uid: null },
   });
-  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
-  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'removed' }, actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, expectedStatus: 'draft', actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'removed' }, expectedStatus: 'approved', actor: ACTOR, now: NOW });
 
   const later = () => Date.parse('2026-09-01T00:00:00Z');
-  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: later });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, expectedStatus: 'removed', actor: ACTOR, now: later });
   assert.deepEqual(db.read('speakers', 's1').approvedAt, AT);
 });
 
@@ -210,7 +210,7 @@ test('setting status to removed severs both halves of the account link', async (
     'users/u1': { uid: 'u1', speakerId: 's1', registrationStatus: 'pending' },
   });
   const result = await applyUpdateSpeaker({
-    db, speakerId: 's1', payload: { status: 'removed' }, actor: ACTOR, now: NOW,
+    db, speakerId: 's1', payload: { status: 'removed' }, expectedStatus: 'approved', actor: ACTOR, now: NOW,
   });
 
   assert.equal(result.ok, true);
@@ -228,19 +228,19 @@ test('unpublishing a speaker who has an account keeps them accepted and linked',
     'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: 'u1' },
     'users/u1': { uid: 'u1', speakerId: 's1', registrationStatus: 'pending' },
   });
-  const result = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  const result = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, expectedStatus: 'approved', actor: ACTOR, now: NOW });
   assert.equal(result.ok, true);
   assert.equal(db.read('speakers', 's1').status, 'accepted');
   assert.equal(db.read('speakers', 's1').uid, 'u1');
   assert.equal(db.read('users', 'u1').speakerId, 's1');
 
   // An accepted speaker set to draft stays accepted too.
-  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, expectedStatus: 'accepted', actor: ACTOR, now: NOW });
   assert.equal(db.read('speakers', 's1').status, 'accepted');
 
   // With no account, draft is draft.
   const unlinked = makeSpeakersDb({ 'speakers/s2': { firstName: 'C', lastName: 'D', slug: 'c-d', status: 'approved', uid: null } });
-  await applyUpdateSpeaker({ db: unlinked, speakerId: 's2', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({ db: unlinked, speakerId: 's2', payload: { status: 'draft' }, expectedStatus: 'approved', actor: ACTOR, now: NOW });
   assert.equal(unlinked.read('speakers', 's2').status, 'draft');
 });
 
@@ -249,7 +249,7 @@ test('removing a speaker whose account is already gone still succeeds', async ()
     'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: 'ghost' },
   });
   const result = await applyUpdateSpeaker({
-    db, speakerId: 's1', payload: { status: 'removed' }, actor: ACTOR, now: NOW,
+    db, speakerId: 's1', payload: { status: 'removed' }, expectedStatus: 'approved', actor: ACTOR, now: NOW,
   });
   assert.equal(result.ok, true);
   assert.equal(db.read('speakers', 's1').uid, null);
@@ -259,7 +259,7 @@ test('an unrelated edit to an already-removed speaker does not re-run the unlink
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'removed', uid: null },
   });
-  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'removed', bio: 'x' }, actor: ACTOR, now: NOW });
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'removed', bio: 'x' }, expectedStatus: 'removed', actor: ACTOR, now: NOW });
   assert.deepEqual(
     db.writes.map((w) => w.path),
     ['speakers/s1'],
@@ -272,23 +272,23 @@ test('a removed speaker goes back only to draft; a draft may be published with n
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'removed', uid: null },
   });
-  const refused = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  const refused = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, expectedStatus: 'removed', actor: ACTOR, now: NOW });
   assert.equal(refused.ok, false);
   assert.equal(refused.status, 409);
   assert.equal(refused.code, 'status-conflict');
   assert.match(refused.message, /Draft/);
   assert.equal(db.read('speakers', 's1').status, 'removed');
   assert.deepEqual(db.writes, []);
-  const restored = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  const restored = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, expectedStatus: 'removed', actor: ACTOR, now: NOW });
   assert.equal(restored.ok, true);
-  const published = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  const published = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, expectedStatus: 'draft', actor: ACTOR, now: NOW });
   assert.equal(published.ok, true);
   assert.equal(db.read('speakers', 's1').status, 'approved');
 });
 
 test('a speaker stored without a status moves as a draft does', async () => {
   const db = makeSpeakersDb({ 'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', uid: null } });
-  const published = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  const published = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, expectedStatus: 'draft', actor: ACTOR, now: NOW });
   assert.equal(published.ok, true);
 });
 
@@ -509,12 +509,82 @@ test('an edit that leaves `invited` by status still kills the token', async () =
   const db = makeSpeakersDb(world);
 
   await applyUpdateSpeaker({
-    db, speakerId: 'rae', payload: { status: 'removed' }, actor: ACTOR, now: NOW,
+    db, speakerId: 'rae', payload: { status: 'removed' }, expectedStatus: 'invited', actor: ACTOR, now: NOW,
   });
 
   assert.equal(db.read('speakers', 'rae').status, 'removed');
   assert.equal(db.read('speakers', 'rae').inviteToken, null);
   assert.equal(db.read(SPEAKER_INVITES, hash).status, 'superseded');
+});
+
+// --- stale status saves (issue #1359) --------------------------------------
+
+test('a status change names the status it saw; a teammate\'s newer status is not reverted', async () => {
+  // Tab A loaded the speaker as a draft. A teammate then published them.
+  // Tab A's "Draft" pick must not unpublish the speaker it never saw published.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: null },
+  });
+  const stale = await applyUpdateSpeaker({
+    db, speakerId: 's1', payload: { status: 'draft', bio: 'x' }, expectedStatus: 'draft', actor: ACTOR, now: NOW,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.status, 409);
+  assert.equal(stale.code, 'status-conflict');
+  assert.match(stale.message, /Published/);
+  assert.deepEqual(db.writes, [], 'a refused status change writes nothing, the other fields included');
+  assert.equal(db.read('speakers', 's1').status, 'approved');
+
+  const missing = await applyUpdateSpeaker({
+    db, speakerId: 's1', payload: { status: 'draft' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.status, 400);
+  assert.match(missing.message, /expectedStatus/);
+  assert.equal(db.read('speakers', 's1').status, 'approved');
+});
+
+test('a repeated removal from a stale tab cannot unlink a speaker who was restored and accepted', async () => {
+  // Tab A removed the speaker. A teammate restored them to draft, invited
+  // them, and they accepted. Tab A sending its old removal again must not
+  // sever the new account link.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'accepted', uid: 'u1' },
+    'users/u1': { uid: 'u1', speakerId: 's1', registrationStatus: 'pending' },
+  });
+  const stale = await applyUpdateSpeaker({
+    db, speakerId: 's1', payload: { status: 'removed' }, expectedStatus: 'removed', actor: ACTOR, now: NOW,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.code, 'status-conflict');
+  assert.equal(db.read('speakers', 's1').uid, 'u1');
+  assert.equal(db.read('users', 'u1').speakerId, 's1');
+});
+
+test('a stale status change cannot cancel a teammate\'s outstanding invitation', async () => {
+  const { world, hash } = invitedWorld();
+  const db = makeSpeakersDb(world);
+  const stale = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { status: 'approved' }, expectedStatus: 'draft', actor: ACTOR, now: NOW,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.code, 'status-conflict');
+  assert.equal(db.read('speakers', 'rae').status, 'invited');
+  assert.equal(db.read('speakers', 'rae').inviteToken, hash);
+  assert.equal(db.read(SPEAKER_INVITES, hash).status, 'pending');
+});
+
+test('updateSpeaker passes expectedStatus from the request body', async () => {
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: null },
+  });
+  const res = fakeRes();
+  await createUpdateSpeakerHandler(adminDeps(db))(
+    adminReq({ speakerId: 's1', speaker: { status: 'draft' }, expectedStatus: 'approved' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('speakers', 's1').status, 'draft');
 });
 
 test('an email edit on a speaker with no invitation changes no invite row', async () => {
