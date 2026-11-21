@@ -84,7 +84,8 @@ export class OtpRequestError extends Error {
 
 // Every sign-in action waits for the Firebase module and then for its auth
 // startup, and neither has a time limit (issue 1357). Wait for both at most
-// SIGN_IN_WAIT_MS together, then fail with a reload message. Verification
+// SIGN_IN_WAIT_MS together, then fail with a reload message. The App Check
+// header uses the same wait but falls back to no header (see postJson). Verification
 // calls this before the code is sent for checking, so a stalled page does not
 // use up the emailed code.
 function withinSignInWait(promise) {
@@ -111,7 +112,12 @@ async function postJson(name, body) {
   let response;
   // Empty unless App Check is configured for this deployment; the server
   // only requires it when EVENT_APP_CHECK_ENFORCED is on (issue #45).
-  const attestation = await withinSignInWait(appCheckHeaders());
+  // A token that is slow to arrive gets the same fallback as a failed one:
+  // the request goes without attestation and the server applies its policy.
+  const attestation = await withinSignInWait(appCheckHeaders()).catch((error) => {
+    console.warn('App Check is slow; sending the request unattested.', error);
+    return {};
+  });
   try {
     response = await fetch(`${functionsOrigin()}/${name}`, {
       method: 'POST',
