@@ -108,19 +108,25 @@ export const test = base.extend({
             }
             await check({ compact: viewport.innerWidth <= 639, minimumTarget });
           } catch (error) {
-            await info.attach(`${name} screenshot`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
-            const overflow = await page.evaluate(() => {
-              const width = document.documentElement.clientWidth;
-              return Array.from(document.querySelectorAll('main *')).flatMap((element) => {
-                const bounds = element.getBoundingClientRect();
-                return bounds.right > width + 1
-                  ? [{ tag: element.tagName, class: element.getAttribute('class'), right: bounds.right }]
-                  : [];
-              }).slice(0, 12);
-            });
-            if (overflow.length) await info.attach('Elements beyond the viewport', {
-              body: JSON.stringify(overflow, null, 2), contentType: 'application/json',
-            });
+            try {
+              const overflow = await page.evaluate(() => {
+                const width = document.documentElement.clientWidth;
+                const elements = Array.from(document.querySelectorAll('main *')).flatMap((element) => {
+                  const bounds = element.getBoundingClientRect();
+                  return bounds.right > width + 1 ? [{ element, right: bounds.right }] : [];
+                }).slice(0, 12);
+                elements[0]?.element.scrollIntoView({ block: 'center', inline: 'start' });
+                return elements.map(({ element, right }) => ({
+                  tag: element.tagName, class: element.getAttribute('class'), right,
+                }));
+              });
+              if (overflow.length) await info.attach('Elements beyond the viewport', {
+                body: JSON.stringify(overflow, null, 2), contentType: 'application/json',
+              });
+              await info.attach(`${name} screenshot`, { body: await page.screenshot({ scale: 'css' }), contentType: 'image/png' });
+            } catch {
+              // Keep the original layout error if evidence capture fails.
+            }
             throw error;
           }
         });

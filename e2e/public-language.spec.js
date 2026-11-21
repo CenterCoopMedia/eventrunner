@@ -199,12 +199,14 @@ test.describe('public reflow with touch targets', () => {
 
   test('home keeps the hero, header navigation and footer readable', settingsTag, async ({ page, checkReflow }) => {
     await page.goto('/?lang=en');
+    await expect(page.locator('article[data-cms-content-source="live"]')).toBeVisible();
     const hero = page.locator('.event-hero__title');
     const mainNav = page.getByRole('navigation', { name: 'Main', exact: true });
     const menu = page.getByRole('button', { name: 'Menu', exact: true });
     const schedule = mainNav.locator('a[href="/schedule"], a[href^="/schedule?"]');
     const footer = page.getByRole('contentinfo').locator('.footer-link').first();
     await expect(hero).toBeVisible();
+    await expect(page.locator('.logo-wall > li').first()).toBeVisible();
 
     await checkReflow(hero, async ({ compact, minimumTarget }) => {
       await expectPageFits(page);
