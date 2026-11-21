@@ -1,11 +1,12 @@
 // Complete your registration (ADR 0008 §5) on the emulators: a signed-in
 // ticket holder sees the dashboard reminder, answers the questions in the
 // steps, sees them on Review, and the reminder goes away.
-import { test, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { settingsTag, test } from './browser-text-settings.mjs';
 import { adminDb, ensureUser, signIn } from './helpers.mjs';
-import { REFLOW_PROFILES, expectControlFits, expectNoOverlap, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
+import { expectControlFits, expectNoOverlap, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 
-test('a ticket holder answers the registration questions from the dashboard reminder', async ({ page }) => {
+test('a ticket holder answers the registration questions from the dashboard reminder', settingsTag, async ({ page, checkReflow, textSettings }) => {
   const db = adminDb();
   const stamp = Date.now();
   const email = `complete-${stamp}@example.test`;
@@ -36,17 +37,15 @@ test('a ticket holder answers the registration questions from the dashboard remi
     const organization = page.getByLabel('Organization (required)');
     await expect(organization).toBeFocused();
     const viewport = page.viewportSize();
-    for (const profile of REFLOW_PROFILES) {
-      await test.step(`Registration validation at ${profile.name}`, async () => {
-        await setReflowProfile(page, profile);
-        await expectTextFits(page.getByText('Which track interests you most?', { exact: false }));
-        await expectTextFits(validation);
-        await expectControlFits(next);
-        await expectTextFits(next);
-        await expectNoOverlap(validation, next);
-        await expectPageFits(page);
-      });
-    }
+    await checkReflow(validation, async ({ minimumTarget }) => {
+      await expectTextFits(page.getByText('Which track interests you most?', { exact: false }));
+      await expectTextFits(validation);
+      await expectControlFits(next, minimumTarget);
+      await expectTextFits(next);
+      await expectNoOverlap(validation, next);
+      await expectPageFits(page);
+    }, next);
+    if (textSettings) return;
     await setReflowProfile(page, viewport);
     await organization.fill('Example News');
     const phone = page.getByLabel('Phone number (required)');
