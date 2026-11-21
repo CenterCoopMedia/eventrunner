@@ -356,9 +356,10 @@ const api = async (method, path, body) => {
   if (!r.ok) throw new Error(`HTTP ${r.status} ${j?.error?.type} ${j?.error?.code}`);
   return j;
 };
-const view = e => ({ id: "..." + e.id.slice(-4), url: e.url, status: e.status, livemode: e.livemode, connect: !!e.application, api_version: e.api_version, events: [...e.enabled_events].sort() });
-const enc = events => events.map(e => `enabled_events[]=${encodeURIComponent(e)}`).join("&");
+const { createHash } = await import("node:crypto");
 const rest = e => { const { enabled_events, ...r } = e; return JSON.stringify(Object.keys(r).sort().map(k => [k, r[k]])); };
+const view = e => ({ id: "..." + e.id.slice(-4), url: e.url, status: e.status, livemode: e.livemode, connect: !!e.application, api_version: e.api_version, rest_sha256: createHash("sha256").update(rest(e)).digest("hex"), events: [...e.enabled_events].sort() });
+const enc = events => events.map(e => `enabled_events[]=${encodeURIComponent(e)}`).join("&");
 const list = await api("GET", "webhook_endpoints?limit=100");
 if (list.has_more || list.data.length !== 1 || list.data[0].url !== URL_EXPECTED) throw new Error("unexpected endpoint set");
 const id = list.data[0].id;
@@ -390,13 +391,19 @@ let key = ""; for await (const chunk of process.stdin) key += chunk; key = key.t
 const r = await fetch("https://api.stripe.com/v1/webhook_endpoints?limit=100", { headers: { Authorization: `Bearer ${key}` } });
 const j = await r.json();
 if (!r.ok) throw new Error(`HTTP ${r.status} ${j?.error?.type}`);
-for (const e of j.data) console.log(JSON.stringify({ id: "..." + e.id.slice(-4), url: e.url, status: e.status, livemode: e.livemode, connect: !!e.application, events: [...e.enabled_events].sort() }));
+const { createHash } = await import("node:crypto");
+const rest = e => { const { enabled_events, ...r } = e; return JSON.stringify(Object.keys(r).sort().map(k => [k, r[k]])); };
+for (const e of j.data) console.log(JSON.stringify({ id: "..." + e.id.slice(-4), url: e.url, status: e.status, livemode: e.livemode, connect: !!e.application, api_version: e.api_version, rest_sha256: createHash("sha256").update(rest(e)).digest("hex"), events: [...e.enabled_events].sort() }));
 '
 ```
 
-If it shows exactly BEFORE plus `account.application.deauthorized`, the change
-is complete. If it shows exactly BEFORE, run the update block again. If it shows
-anything else, restore the BEFORE list with the rollback below and stop.
+`rest_sha256` hashes every endpoint field except `enabled_events`, so an equal
+hash means no other field changed. If `rest_sha256` equals BEFORE and the events
+are exactly BEFORE plus `account.application.deauthorized`, the change is
+complete. If both equal BEFORE, run the update block again. If the events differ
+in any other way, restore the BEFORE list with the rollback below and stop. If
+`rest_sha256` differs, stop and report: the update block never sends another
+field.
 
 To undo the change, send one update to the same endpoint with only
 `enabled_events[]` set to the BEFORE list, using the same stdin key method, and
