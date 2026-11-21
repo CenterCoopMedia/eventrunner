@@ -14,6 +14,7 @@ import { Suspense } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
+import { englishLanguage, LanguageContext } from '../contexts/PublicLanguageContext.jsx';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 import * as chunkReload from '../lib/chunkReload.js';
 import { isRoutePrefetchPending, routePage } from '../lib/routePage.jsx';
@@ -120,6 +121,7 @@ function renderShell(
     loading = false,
     profile = null,
     profileStatus = user ? 'ready' : 'signed-out',
+    publicLanguage = englishLanguage,
   } = {},
 ) {
   theme = { logos, header, ...themeDoc };
@@ -135,7 +137,9 @@ function renderShell(
     <MemoryRouter
       initialEntries={[path]}
     >
-      <Layout />
+      <LanguageContext.Provider value={publicLanguage}>
+        <Layout />
+      </LanguageContext.Provider>
     </MemoryRouter>,
   );
 }
@@ -556,6 +560,23 @@ describe('Layout navigation (built from page documents)', () => {
     const nav = side.getByRole('navigation', { name: 'Main' });
     expect(nav.querySelector('details.site-nav-more')).toBeNull();
     expect(within(nav).getByRole('link', { name: 'Help desk (opens in a new tab)' })).toBeInTheDocument();
+  });
+
+  it('marks the language of custom link labels in Spanish navigation', () => {
+    const link = { visible: true, systemPage: false, publicLanguage: 'en' };
+    const view = renderShell({}, {
+      pageDocs: [
+        ...FIXTURE_PAGES,
+        { ...link, id: 'directions', label: 'Directions', url: '/travel' },
+        { ...link, id: 'help-desk', label: 'Help desk', url: 'https://example.org/help' },
+      ],
+      publicLanguage: { ...englishLanguage, language: 'es', text: (_english, spanish) => spanish },
+    });
+    const nav = within(view.getByRole('navigation', { name: 'Principal' }));
+    expect(nav.getByRole('link', { name: 'Directions' })).toHaveAttribute('lang', 'en');
+    const external = nav.getByRole('link', { name: 'Help desk (se abre en una pestaña nueva)' });
+    expect(external).toHaveAttribute('lang', 'en');
+    expect(within(external).getByText('(se abre en una pestaña nueva)')).toHaveAttribute('lang', 'es');
   });
 
   it('still gates a system page on its feature flag', () => {

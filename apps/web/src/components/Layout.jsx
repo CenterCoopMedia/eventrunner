@@ -183,10 +183,10 @@ function navClass({ isActive }) {
 
 function HeaderNavLink({ item, onClick }) {
   if (item.external) {
-    return <ExternalLink href={item.to} rel="noopener noreferrer" className={navClass({ isActive: false })} onClick={onClick}>{item.label}</ExternalLink>;
+    return <ExternalLink href={item.to} rel="noopener noreferrer" className={navClass({ isActive: false })} lang={item.language} onClick={onClick}>{item.label}</ExternalLink>;
   }
   if (item.custom) {
-    return <Link to={item.to} className={navClass({ isActive: false })} onClick={onClick}>{item.label}</Link>;
+    return <Link to={item.to} className={navClass({ isActive: false })} lang={item.language} onClick={onClick}>{item.label}</Link>;
   }
   return <NavLink to={item.to} end={item.end} className={navClass} lang={item.language} onClick={onClick}>{item.label}</NavLink>;
 }
