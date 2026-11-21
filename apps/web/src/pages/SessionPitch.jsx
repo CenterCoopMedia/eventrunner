@@ -43,14 +43,17 @@ import useLoadingStage from '../lib/useLoadingStage.js';
 
 const hrefFor = (step) => `/pitch/${step.slug}`;
 const FORM_STEPS = PITCH_STEPS.filter((step) => step.slug !== 'review');
+const AVAILABILITY_UNKNOWN = 'We don’t know whether submissions are open yet.';
 
-function PitchAvailability({ checking, result }) {
+function PitchAvailability({ checking, result, attempt, onRetry }) {
   const label = 'Checking submissions…';
-  const { stage, clock } = useLoadingStage({ active: checking });
+  const { stage, clock } = useLoadingStage({ active: checking, phase: attempt });
+  const stalled = checking && stage === 'prolonged';
   return (
     <>
-      {checking ? <LoadingStateView label={label} stage={stage} rows={0} announce={false} /> : null}
-      <LoadingAnnouncement label={label} stage={stage} clock={clock} result={checking ? undefined : result} resultClassName="font-semibold" />
+      <LoadingAnnouncement label={label} stage={stage} clock={clock}
+        result={stalled ? AVAILABILITY_UNKNOWN : checking ? undefined : result} resultClassName="font-semibold" />
+      {checking ? <LoadingStateView label={label} stage={stage} rows={0} announce={false} recover onRetry={onRetry} /> : null}
     </>
   );
 }
@@ -72,6 +75,7 @@ export default function SessionPitch() {
   const [draft, setDraft] = useState(restorePitch);
   const [settings, setSettings] = useState(null);
   const [configError, setConfigError] = useState(false);
+  const [configRead, setConfigRead] = useState(0);
   const [now, setNow] = useState(Date.now);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(null);
@@ -85,8 +89,13 @@ export default function SessionPitch() {
 
   useEffect(() => {
     if (IS_DEMO) return undefined;
-    return subscribePitchCall((value) => { setSettings(value); setConfigError(false); }, () => setConfigError(true));
-  }, []);
+    let current = true;
+    const unsubscribe = subscribePitchCall(
+      (value) => { if (current) { setSettings(value); setConfigError(false); } },
+      () => { if (current) setConfigError(true); },
+    );
+    return () => { current = false; unsubscribe(); };
+  }, [configRead]);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -169,7 +178,8 @@ export default function SessionPitch() {
       <p className="max-w-prose text-lead text-text-secondary">Share an idea for {event.shortName}. Tell the organizers what people will learn and how you will involve them.</p>
       <section className="space-y-xs border-t-hairline border-rule-hairline pt-sm" aria-labelledby="pitch-call-heading">
         <h2 id="pitch-call-heading" className="sr-only">Call for sessions</h2>
-        <PitchAvailability checking={checkingCall} result={IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : open ? 'Submissions are open' : 'Submissions are closed'} />
+        <PitchAvailability checking={checkingCall} attempt={configRead} onRetry={() => setConfigRead((value) => value + 1)}
+          result={IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : open ? 'Submissions are open' : 'Submissions are closed'} />
         <div role="region" aria-label="Submission availability" aria-busy={checkingCall} className="space-y-xs">
           {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p>
             : open ? <p className="text-caption text-text-secondary">There is no set deadline. The organizers close submissions when they are ready.</p> : null}

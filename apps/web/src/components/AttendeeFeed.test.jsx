@@ -222,6 +222,26 @@ afterEach(() => {
 });
 
 describe('when the feed asks for posts', () => {
+  it('restarts a held feed read and waits for the server to supply posts', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      renderFeed();
+      await openFeedAs(makeUser('ada'));
+      const [first] = activeFeedListeners();
+      expect(screen.getByText('Loading the attendee feed…')).toBeVisible();
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(screen.queryByText('No posts yet')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(first.active).toBe(false);
+      pushPosts(first, [post('p0', 'ada', 'Old feed response')]);
+      expect(screen.queryByText('Old feed response')).toBeNull();
+      pushPosts(activeFeedListeners()[0], [post('p1', 'ada', 'Current feed response')]);
+      expect(screen.getByText('Current feed response')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('asks nothing while config/features is unresolved, even with the snapshot on and another config document live', async () => {
     renderFeed();
     publishAuth(makeUser('ada'));
@@ -971,6 +991,28 @@ describe('post text', () => {
 });
 
 describe('the thread page', () => {
+  it('restarts a held reply read without treating it as an empty thread', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      renderThread();
+      await openFeedAs(makeUser('ada'));
+      const first = replyListener();
+      pushDoc('social_posts/root1', post('root1', 'ada', 'Root text'));
+      expect(screen.getByText('Loading the thread…')).toBeVisible();
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(screen.queryByText('Root text')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(first.active).toBe(false);
+      pushPosts(first, []);
+      expect(screen.queryByText('Root text')).toBeNull();
+      pushDoc('social_posts/root1', post('root1', 'ada', 'Root text'));
+      pushPosts(replyListener(), [post('r1', 'ada', 'Current reply', { parentPostId: 'root1' })]);
+      expect(screen.getByText('Current reply')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows neutral loading through auth and config startup without private reads', async () => {
     vi.mocked(onAuthStateChanged).mockImplementation((_auth, listener) => {
       authListener = listener;

@@ -77,6 +77,7 @@ export default function AttendeeThread() {
   const [rootState, setRootState] = useState({ key: null, value: NO_ROOT });
   const [replyState, setReplyState] = useState({ key: null, value: NO_REPLIES });
   const [pageState, setPageState] = useState({ key: null, value: 1 });
+  const [threadRead, setThreadRead] = useState(0);
   const root = own(rootState, feedKey, NO_ROOT);
   const thread = own(replyState, feedKey, NO_REPLIES);
   const pages = own(pageState, feedKey, 1);
@@ -99,7 +100,7 @@ export default function AttendeeThread() {
       current = false;
       unsubscribe();
     };
-  }, [feedKey, postId]);
+  }, [feedKey, postId, threadRead]);
 
   useEffect(() => {
     if (feedKey === null) return undefined;
@@ -117,7 +118,7 @@ export default function AttendeeThread() {
       current = false;
       unsubscribe();
     };
-  }, [feedKey, postId, pages]);
+  }, [feedKey, postId, pages, threadRead]);
 
   // The reply draft for this reader, access session and thread (#1006): kept
   // in memory across a read refusal, never across a key change or navigation.
@@ -163,7 +164,7 @@ export default function AttendeeThread() {
       />
     );
   } else if (root.root === undefined || entries === null) {
-    content = <LoadingState shape="rows" label="Loading the thread…" />;
+    content = <LoadingState key={feedKey} shape="rows" label="Loading the thread…" recover onRetry={() => setThreadRead((value) => value + 1)} />;
   } else {
     const rootActive = root.root !== null;
     // Full for the pages it was read for: there may be more.

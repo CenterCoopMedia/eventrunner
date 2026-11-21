@@ -34,6 +34,7 @@ import PromoCodeField from '../components/tickets/PromoCodeField.jsx';
 import RegistrationQuestionFields from '../components/registration/RegistrationQuestionFields.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import useLoadingStage from '../lib/useLoadingStage.js';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { subscribeRegistrationForm } from '../lib/registrationFormSource.js';
@@ -120,8 +121,12 @@ export default function Tickets() {
   const [promo, setPromo] = useState(null);
   const [promoRefusal, setPromoRefusal] = useState('');
   // Pay waits for a running code check, so a discount shown later is the one sent.
-  const [promoPending, setPromoPending] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
+  const [promoCheck, setPromoCheck] = useState(null);
+  const [promoUnconfirmed, setPromoUnconfirmed] = useState(false);
+  const [checkoutCheck, setCheckoutCheck] = useState(null);
+  const [checkoutUnconfirmed, setCheckoutUnconfirmed] = useState(false);
   const [saved, setSaved] = useState(null);
   const [passed, setPassed] = useState([]);
   // undefined until the first read; null when no form is stored.
@@ -132,15 +137,21 @@ export default function Tickets() {
   const requestRef = useRef(null);
   const formRef = useRef(null);
   const errorRef = useRef(null);
-  const submittingRef = useRef(false);
-  const activeUid = useRef(user?.uid);
-  activeUid.current = user?.uid;
+  const submittingRef = useRef(null);
+  const promoCheckRef = useRef(null);
   // A new account session invalidates callbacks even after A → B → A.
-  const promoOwnerRef = useRef({ uid: user?.uid, generation: 0 });
+  const promoOwnerRef = useRef({ uid: user?.uid });
   if (promoOwnerRef.current.uid !== user?.uid) {
-    promoOwnerRef.current = { uid: user?.uid, generation: promoOwnerRef.current.generation + 1 };
+    promoOwnerRef.current = { uid: user?.uid };
   }
   const promoOwner = promoOwnerRef.current;
+  const busy = checkoutCheck !== null;
+  const { stage: checkoutStage } = useLoadingStage({ active: busy, phase: checkoutCheck, action: true, report: false });
+  const checkoutStalled = busy && checkoutStage === 'prolonged';
+  const checkoutUnknown = checkoutStalled || checkoutUnconfirmed;
+  const promoBusy = promoCheck !== null;
+  const { stage: promoStage } = useLoadingStage({ active: promoBusy, action: true, report: false });
+  const promoUnknown = promoUnconfirmed || (promoBusy && promoStage === 'prolonged');
   // A refusal that moves the buyer to another step focuses its error there,
   // not the step heading. The move can commit after the error does.
   const currentSlug = useRef(stepSlug);
@@ -182,8 +193,8 @@ export default function Tickets() {
   useEffect(() => {
     setSaved(user?.uid ? { uid: user.uid, attempt: readCheckoutAttempt(user.uid) } : null);
     requestRef.current = null;
-    submittingRef.current = false;
-    setBusy(false);
+    setCheckoutCheck(null);
+    setCheckoutUnconfirmed(false);
     setQuantities({});
     setAttendees({});
     setAcceptedCatalogRevision(null);
@@ -194,7 +205,16 @@ export default function Tickets() {
     setFormNotice('');
     setPromo(null);
     setPromoRefusal('');
-    setPromoPending(false);
+    setPromoCode('');
+    setPromoError('');
+    setPromoCheck(null);
+    setPromoUnconfirmed(false);
+    return () => {
+      submittingRef.current?.abort();
+      submittingRef.current = null;
+      promoCheckRef.current?.abort();
+      promoCheckRef.current = null;
+    };
   }, [user?.uid]);
 
   useEffect(() => {
@@ -293,21 +313,60 @@ export default function Tickets() {
     return found;
   }
 
-  async function sendCheckout(body) {
-    if (submittingRef.current || !user) return;
+  async function checkPromo() {
+    if (promoCheckRef.current || promoUnconfirmed || submittingRef.current) return;
+    if (!promoCode.trim()) { setPromoError('Enter a promo code.'); return; }
+    const controller = new AbortController();
+    promoCheckRef.current = controller;
+    setPromoCheck(controller);
+    setPromoError('');
+    try {
+      const preview = await ticketingRequest('ticketingPromoPreview', {
+        user, body: { code: promoCode.trim(), catalogRevision: catalog.catalogRevision, lines: cart }, signal: controller.signal,
+      });
+      if (controller.signal.aborted || promoOwnerRef.current !== promoOwner) return;
+      setPromoRefusal('');
+      setPromo({ owner: promoOwner, cartKey, preview });
+      setPromoCode('');
+    } catch (err) {
+      if (controller.signal.aborted || promoOwnerRef.current !== promoOwner) return;
+      if (err.code === 'network' || err.code === 'unknown' || err.status >= 500) setPromoUnconfirmed(true);
+      else setPromoError(err.message);
+    } finally {
+      if (promoCheckRef.current === controller) {
+        promoCheckRef.current = null;
+        setPromoCheck(null);
+      }
+    }
+  }
+
+  function continueWithoutPromo() {
+    promoCheckRef.current?.abort();
+    promoCheckRef.current = null;
+    setPromoCheck(null);
+    setPromoUnconfirmed(false);
+    setPromoCode('');
+    setPromoRefusal('');
+  }
+
+  async function sendCheckout(body, retryStalled = false) {
+    if (!user || (submittingRef.current && (!retryStalled || submittingRef.current !== checkoutCheck))) return;
+    submittingRef.current?.abort();
+    const controller = new AbortController();
     const uid = user.uid;
     const startingNewCheckout = !attempt && body.resume !== true;
     // The form this request was answered against, for reading a refusal.
     const sentForm = form;
-    submittingRef.current = true;
-    setBusy(true);
+    submittingRef.current = controller;
+    setCheckoutCheck(controller);
+    setCheckoutUnconfirmed(false);
     setRequestError('');
     rememberCheckoutAttempt(uid, { requestId: body.requestId, orderId: body.orderId });
     setSaved({ uid, attempt: { requestId: body.requestId, orderId: body.orderId } });
     try {
-      const result = await ticketingRequest('ticketingCheckout', { user, body });
+      const result = await ticketingRequest('ticketingCheckout', { user, body, signal: controller.signal });
+      if (controller.signal.aborted || promoOwnerRef.current !== promoOwner) return;
       rememberCheckoutAttempt(uid, { requestId: body.requestId, orderId: result.orderId });
-      if (activeUid.current !== uid) return;
       setSaved({ uid, attempt: { requestId: body.requestId, orderId: result.orderId } });
       if (result.checkoutUrl) {
         const url = safeCheckoutUrl(result.checkoutUrl);
@@ -317,7 +376,7 @@ export default function Tickets() {
         navigate(`/tickets/status?orderId=${encodeURIComponent(result.orderId)}`);
       }
     } catch (err) {
-      if (activeUid.current === uid) {
+      if (!controller.signal.aborted && promoOwnerRef.current === promoOwner) {
         if (err.code === 'purchase-in-progress' && err.existingOrderId) {
           rememberCheckoutAttempt(uid, { orderId: err.existingOrderId });
           requestRef.current = null;
@@ -362,14 +421,17 @@ export default function Tickets() {
           setPromoRefusal(err.message);
         }
         if (missingSavedCheckout || BACK_TO_SELECTION_CODES.includes(err.code)) moveWithError(STEPS[0]);
+        if (!profileRejectedBeforeCreation && (err.code === 'network' || err.code === 'unknown' || err.status >= 500)) {
+          setCheckoutUnconfirmed(true);
+        }
         setRequestError(missingSavedCheckout
           ? 'The saved checkout is not available to this account. Choose your tickets again.'
           : err.message || 'Checkout could not be opened. Retry the saved request.');
       }
     } finally {
-      if (activeUid.current === uid) {
-        submittingRef.current = false;
-        setBusy(false);
+      if (submittingRef.current === controller) {
+        submittingRef.current = null;
+        setCheckoutCheck(null);
       }
     }
   }
@@ -443,7 +505,7 @@ export default function Tickets() {
     }
 
     function pay() {
-      if (submittingRef.current || promoPending) return;
+      if (submittingRef.current || promoCheckRef.current || promoUnconfirmed) return;
       for (const formStep of formSteps) {
         const found = stepErrors(formStep.slug);
         if (hasErrors(found)) {
@@ -478,7 +540,7 @@ export default function Tickets() {
 
     const questions = asksQuestions ? activeQuestions(form) : [];
     const payControl = (
-      <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy || promoPending}>{busy ? 'Preparing your order…' : !count ? 'Continue' : payable > 0 ? `Continue to Stripe — ${formatTicketMoney(payable, catalog.currency)}` : 'Reserve tickets'}</button>
+      <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy || promoBusy || promoUnknown}>{busy ? 'Preparing your order…' : !count ? 'Continue' : payable > 0 ? `Continue to Stripe — ${formatTicketMoney(payable, catalog.currency)}` : 'Reserve tickets'}</button>
     );
 
     return (
@@ -574,8 +636,11 @@ export default function Tickets() {
                     </div>
                   </dl>
                   {count ? <PromoCodeField
-                    key={`${promoOwner.generation}:${cartKey}`} user={user} cart={cart} catalogRevision={catalog.catalogRevision} applied={applied} refusal={promoRefusal} onPendingChange={(pending) => { if (promoOwnerRef.current === promoOwner) setPromoPending(pending); }}
-                    onApplied={(preview) => { if (promoOwnerRef.current !== promoOwner) return; setPromoRefusal(''); setPromo(preview ? { owner: promoOwner, cartKey, preview } : null); }}
+                    code={promoCode} applied={applied} error={promoError || (promoCode ? '' : promoRefusal)}
+                    busy={promoBusy} unknown={promoUnknown}
+                    onChange={(code) => { setPromoCode(code); setPromoError(''); }}
+                    onApply={checkPromo} onRemove={() => { setPromo(null); setPromoRefusal(''); }}
+                    onContinueWithoutPromo={continueWithoutPromo}
                   /> : null}
                   <p className="text-caption text-text-secondary">{catalog.taxTreatment === 'inclusive' ? 'Any applicable tax is included in these prices.' : 'The organizer has configured this event not to collect tax.'} The organizer pays processing fees; no additional fees are added to your total.</p>
                   <h3 className="font-heading text-h3 font-semibold">Attendees</h3>
@@ -624,6 +689,10 @@ export default function Tickets() {
   }
 
   function renderStripeTickets() {
+    // A promo checkout spends a code check before looking for a matching
+    // order. Use the status read first so recovery never repeats that check.
+    const checkOrderOnly = checkoutUnknown && Boolean(requestRef.current?.promoCode);
+    const showCheckoutBusy = busy && !checkoutStalled;
     return <>
       {!attempt && requestError ? <p ref={errorRef} tabIndex={-1} role="alert" className="text-danger">{requestError}</p> : null}
 
@@ -632,11 +701,18 @@ export default function Tickets() {
           <h2 id="saved-checkout-heading" className="font-heading text-h2">Continue your existing order</h2>
           <p>A checkout request is already saved for this account. Check or resume that order before starting another purchase. Going back from Stripe does not cancel a payment or release its seats.</p>
           {requestError ? <p ref={errorRef} tabIndex={-1} role="alert" className="text-danger">{requestError}</p> : null}
+          {checkoutUnknown ? <p role="status">We don’t know whether checkout was completed. Your ticket details are still here.</p> : null}
           <div className="flex flex-wrap gap-sm">
-            <button type="button" className={primaryActionClass} aria-busy={busy} aria-disabled={busy} onClick={() => sendCheckout(requestRef.current || (attempt.orderId ? { orderId: attempt.orderId, resume: true } : { requestId: attempt.requestId, resume: true }))}>
-              {busy ? 'Opening your order…' : 'Resume existing checkout'}
-            </button>
-            <Link to={`/tickets/status?${attempt.orderId ? `orderId=${encodeURIComponent(attempt.orderId)}` : `requestId=${encodeURIComponent(attempt.requestId)}`}`} className={secondaryActionClass}>View order status</Link>
+            {!checkOrderOnly ? (
+              <button type="button" className={primaryActionClass} aria-busy={showCheckoutBusy} aria-disabled={showCheckoutBusy}
+                onClick={() => sendCheckout(requestRef.current || (attempt.orderId ? { orderId: attempt.orderId, resume: true } : { requestId: attempt.requestId, resume: true }), checkoutStalled)}>
+                {showCheckoutBusy ? 'Opening your order…' : 'Resume existing checkout'}
+              </button>
+            ) : null}
+            <Link to={`/tickets/status?${attempt.orderId ? `orderId=${encodeURIComponent(attempt.orderId)}` : `requestId=${encodeURIComponent(attempt.requestId)}`}`}
+              target={checkoutUnknown ? '_blank' : undefined} rel={checkoutUnknown ? 'noopener' : undefined} className={secondaryActionClass}>
+              {checkoutUnknown ? 'Check my order (opens in a new tab)' : 'View order status'}
+            </Link>
           </div>
         </section>
       ) : null}

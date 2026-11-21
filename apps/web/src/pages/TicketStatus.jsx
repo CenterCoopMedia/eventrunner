@@ -6,11 +6,12 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import TicketDocuments from '../components/TicketDocuments.jsx';
-import LoadingState from '../components/LoadingState.jsx';
+import LoadingState, { LoadingStateView } from '../components/LoadingState.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import useLoadingStage from '../lib/useLoadingStage.js';
 import { ticketingRequest } from '../lib/ticketingCommerce.js';
 import {
   forgetCheckoutAttempt, formatTicketMoney, formatTicketTime, readCheckoutAttempt, rememberCheckoutAttempt,
@@ -42,6 +43,9 @@ export default function TicketStatus() {
   const key = `${user?.uid}:${orderId || requestId}`;
   const order = loaded?.key === key ? loaded.order : null;
   const error = failure?.key === key ? failure.error : null;
+  const { stage, clock } = useLoadingStage({ active: busy, phase: `${key}:${refresh}` });
+  const stalled = busy && stage === 'prolonged';
+  const checkAgain = () => setRefresh((value) => value + 1);
   const complete = order && COMPLETE.has(order.status) && order.paymentStatus === 'succeeded';
   const terminal = order && TERMINAL.has(order.status);
   const needsReview = order?.status === 'exception';
@@ -68,10 +72,10 @@ export default function TicketStatus() {
   // A bounded refresh helps after the hosted handoff without claiming that the
   // redirect, an elapsed timer, or the browser itself fulfilled the order.
   useEffect(() => {
-    if (!order || complete || terminal || needsReview || refunded || error || refresh >= 12) return undefined;
+    if (!order || complete || terminal || needsReview || refunded || error || busy || refresh >= 12) return undefined;
     const timer = setTimeout(() => setRefresh((value) => value + 1), 5000);
     return () => clearTimeout(timer);
-  }, [order, complete, terminal, needsReview, refunded, error, refresh]);
+  }, [order, complete, terminal, needsReview, refunded, error, busy, refresh]);
 
   const resume = useCallback(async () => {
     if (resumeRef.current || !user) return;
@@ -119,9 +123,11 @@ export default function TicketStatus() {
     <article className="ticket-print-page min-w-0 space-y-lg text-body text-text-primary">
       {heading}
       {error ? <div className="space-y-sm no-print"><p role="alert" className="text-danger">{error.message}</p><button type="button" className={secondaryActionClass} onClick={() => setRefresh((value) => value + 1)}>Retry order status</button>{error.status === 404 && requestId && stored?.requestId === requestId ? <><p>No order is recorded for this saved request. If another tab is still submitting it, let that request finish before choosing tickets again.</p><button type="button" className={secondaryActionClass} onClick={startAnother}>Return to ticket selection</button></> : null}</div> : null}
-      {!order && !error ? <LoadingState label="Loading your order…" rows={0} /> : null}
-      <section aria-label="Order status content" aria-busy={busy || (!order && !error)} className="space-y-lg">
-      {order ? <>
+      <LoadingStateView active={stalled || (!order && !error)} label="Loading your order…" rows={0}
+        stage={stage} clock={clock} recover recoveryMessage="We don’t know your order status yet."
+        retryLabel="Check again" onRetry={checkAgain} />
+      <section aria-label="Order status content" aria-busy={!stalled && (busy || (!order && !error))} className="space-y-lg">
+      {order && !stalled ? <>
         <section className="space-y-sm" aria-labelledby="payment-status-heading">
           <SectionHead title={complete ? 'Your order is confirmed' : needsReview ? 'Your order needs organizer review' : refunded ? 'Your order has been refunded' : terminal ? 'This order is closed' : 'We are confirming your order'} id="payment-status-heading" />
           <p role="status">{complete ? 'Your admission records have been issued. Each attendee can claim their own ticket with their verified email.' : needsReview ? 'The organizers are reviewing a payment or admission exception. Contact them before attempting another payment.' : refunded || terminal ? 'Check each ticket below for its current admission status. A cancelled ticket does not by itself mean money was refunded.' : 'Payment is not yet confirmed. You do not have new admission from this order until confirmation finishes.'}</p>

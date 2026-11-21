@@ -109,6 +109,33 @@ describe('CompleteRegistration', () => {
     expect(screen.getByRole('link', { name: /your tickets/i })).toHaveAttribute('href', '/tickets/mine');
   });
 
+  it('retains answers and offers a read-only check when a save stays pending', async () => {
+    let finish;
+    saveMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    renderAt('/registration/answers-1');
+    const organization = await screen.findByLabelText('Organization (required)');
+    fireEvent.change(organization, { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByLabelText('Yes'));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: /Next: Ticket: Student/ }));
+      expect(screen.getByText('Saving your answers…')).toBeVisible();
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(screen.getByText(/We don’t know whether your answers were saved/)).toBeVisible();
+      expect(organization).toHaveValue('Acme');
+      expect(screen.getByLabelText('Yes')).toBeChecked();
+      expect(screen.getByRole('link', { name: /View saved answers/ })).toHaveAttribute('href', '/registration/review');
+      expect(screen.getByRole('link', { name: /Check my order/ })).toHaveAttribute('target', '_blank');
+      expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
+      fireEvent.submit(organization.closest('form'));
+      expect(saveMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+    await act(async () => finish({ answers: { organization: 'Acme', photoConsent: true }, formRevision: 2 }));
+    expect(screen.getByRole('heading', { name: 'Ticket: Student for Bo Lee' })).toBeVisible();
+  });
+
   it('has one step per valid ticket, checks before saving, then saves and moves on', async () => {
     records.t2 = { answers: { organization: 'Bo Co' }, formRevision: 2 };
     renderAt();

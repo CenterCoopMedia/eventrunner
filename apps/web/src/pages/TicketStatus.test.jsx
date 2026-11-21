@@ -46,6 +46,32 @@ describe('authoritative order status and attendee confirmation', () => {
     expect(screen.queryByRole('button', { name: 'Recover existing checkout' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Checkout expires/)).not.toBeInTheDocument();
   });
+  it('offers a status check after a held poll without treating the last answer as current', async () => {
+    const reads = [];
+    ticketingRequest.mockImplementation((_name, { signal }) => new Promise((resolve) => reads.push({ resolve, signal })));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      render(surface());
+      await act(async () => reads[0].resolve({ ...ORDER, status: 'pending', paymentStatus: 'pending' }));
+      expect(screen.getByRole('heading', { name: 'We are confirming your order' })).toBeVisible();
+      act(() => vi.advanceTimersByTime(5000));
+      expect(screen.getByRole('button', { name: 'Checking payment…' })).toBeVisible();
+      act(() => vi.advanceTimersByTime(59_999));
+      expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByText('We don’t know your order status yet.')).toBeVisible();
+      expect(screen.queryByRole('heading', { name: 'We are confirming your order' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+      expect(reads).toHaveLength(3);
+      expect(reads[1].signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+    await act(async () => reads[1].resolve({ ...ORDER, status: 'cancelled' }));
+    expect(screen.queryByRole('heading', { name: 'This order is closed' })).toBeNull();
+    await act(async () => reads[2].resolve(ORDER));
+    expect(screen.getByRole('heading', { name: 'Your order is confirmed' })).toBeVisible();
+  });
   it('shows authoritative paid tickets with opaque printable codes and an explicit verified claim path', async () => {
     render(surface());
     expect(await screen.findByRole('heading', { name: 'Your order is confirmed' })).toBeInTheDocument();

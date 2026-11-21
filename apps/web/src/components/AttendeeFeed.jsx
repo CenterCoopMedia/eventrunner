@@ -36,6 +36,7 @@ export default function AttendeeFeed() {
   // a full page, `loading` and `failed` the state of "Show older posts".
   const [older, setOlder] = useState({ key: null, value: NO_OLDER });
   const [snapshot, setSnapshot] = useState({ key: null, value: NO_FEED });
+  const [feedRead, setFeedRead] = useState(0);
   const loaded = own(older, feedKey, NO_OLDER);
   const through = loaded.through;
   const feed = own(snapshot, feedKey, NO_FEED);
@@ -62,7 +63,7 @@ export default function AttendeeFeed() {
       current = false;
       unsubscribe();
     };
-  }, [feedKey, through]);
+  }, [feedKey, through, feedRead]);
 
   // The composer's draft for this reader and access session (#1006): kept in
   // memory across a read refusal, never across a key change or navigation.
@@ -121,7 +122,7 @@ export default function AttendeeFeed() {
       />
     );
   } else if (posts === null) {
-    body = <LoadingState shape="rows" label="Loading the attendee feed…" />;
+    body = <LoadingState key={feedKey} shape="rows" label="Loading the attendee feed…" recover onRetry={() => setFeedRead((value) => value + 1)} />;
   } else if (posts.length === 0 && !(through !== null && loaded.more)) {
     body = <EmptyState title="No posts yet" description="Posts from attendees appear here." />;
   } else {

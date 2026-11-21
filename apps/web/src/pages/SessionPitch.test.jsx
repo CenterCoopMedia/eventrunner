@@ -122,6 +122,26 @@ describe('SessionPitch with an external form', () => {
 });
 
 describe('SessionPitch before the call is known', () => {
+  it('retries a stalled call read without guessing whether submissions are open', () => {
+    pitchCall = undefined;
+    vi.useFakeTimers();
+    try {
+      renderPitch();
+      const first = listener;
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(screen.getByRole('status')).toHaveTextContent('We don’t know whether submissions are open yet.');
+      expect(screen.queryByLabelText(/Session title/)).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      act(() => first.onNext({ enabled: false }));
+      expect(screen.queryByText('Submissions are closed')).toBeNull();
+      act(() => listener.onNext(NATIVE));
+      expect(screen.getByRole('status')).toHaveTextContent('Submissions are open');
+      expect(screen.getByLabelText(/Session title/)).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('stages the call check outside the busy region and clears it on a listener error', () => {
     pitchCall = undefined;
     vi.useFakeTimers();
