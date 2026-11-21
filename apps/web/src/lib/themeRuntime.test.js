@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FONT_SET_STACKS,
   buildRuntimeThemeCss,
   fontSetFaces,
   hexToRgbTriple,
@@ -91,7 +90,7 @@ describe('buildRuntimeThemeCss', () => {
     const css = buildRuntimeThemeCss({ preset: 'zine', optionPicks: { quote: 'toner-block' } });
     const declared = [...css.matchAll(/--callout-font: ([^;]+);/g)].map((match) => match[1]);
     expect(declared.length).toBeGreaterThan(0);
-    expect(declared.at(-1)).toBe(FONT_SET_STACKS.karrik);
+    expect(declared.at(-1)).toBe("'Karrik', 'karrik fallback', 'Arial Black', Impact, sans-serif");
   });
 
   it('derives a dark block from a document that names one palette', () => {
@@ -149,7 +148,7 @@ describe('buildRuntimeThemeCss', () => {
     const css = buildRuntimeThemeCss({
       fonts: { heading: 'sans-humanist', body: 'remote-url-not-allowed' },
     });
-    expect(css).toContain("--font-heading: 'Source Sans 3'");
+    expect(css).toContain("--font-heading: 'Source Sans 3', 'sans-humanist fallback', 'Segoe UI'");
     expect(css).not.toContain('--font-body');
   });
 

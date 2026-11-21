@@ -51,6 +51,7 @@ import {
   resolveAdminScheme,
   resolveComponentFonts,
   resolveFontRoles,
+  fontStackWithFallback,
   resolveMotifSet,
   resolvePresetTokens,
   resolveShape,
@@ -171,8 +172,9 @@ export function buildRuntimeThemeCss(themeDoc) {
   // any role the document names outright. One resolver answers all three.
   const roles = resolveFontRoles(themeDoc);
   for (const role of THEME_FONT_ROLES) {
-    const stack = FONT_SETS[roles[role]];
-    if (stack) rootLines.push(`  --font-${role}: ${stack};`);
+    const setId = roles[role];
+    const stack = FONT_SETS[setId];
+    if (stack) rootLines.push(`  --font-${role}: ${fontStackWithFallback(setId, stack)};`);
   }
   // A document that names no preset overrides only what it names outright,
   // exactly as it did before presets existed: density and the motif-set
@@ -209,7 +211,7 @@ export function buildRuntimeThemeCss(themeDoc) {
   // written first, a picked face lost to it.
   for (const [name, setId] of Object.entries(resolveComponentFonts(themeDoc))) {
     const stack = FONT_SETS[setId];
-    if (stack) rootLines.push(`  ${name}: ${stack};`);
+    if (stack) rootLines.push(`  ${name}: ${fontStackWithFallback(setId, stack)};`);
   }
 
   // The record of which motif set is active. It does NOT do the switching:

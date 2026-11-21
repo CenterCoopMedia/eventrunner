@@ -42,6 +42,7 @@ export {
   resolveOptionPicks,
   pickedChoices,
   resolveFontRoles,
+  fontStackWithFallback,
   resolveComponentFonts,
   resolvePresetTokens,
   resolveShape,

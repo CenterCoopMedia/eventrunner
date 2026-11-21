@@ -58,6 +58,7 @@ const {
   resolveAdminScheme,
   resolveComponentFonts,
   resolveFontRoles,
+  fontStackWithFallback,
   resolveMotifSet,
   resolvePresetTokens,
   resolveShape,
@@ -65,6 +66,7 @@ const {
   isRgb,
 } = require('./shared-theme.cjs');
 const { FONT_SETS, RADIUS_SCALES } = require('./theme.cjs');
+const { appendFontFallbacks } = require('./font-fallbacks.cjs');
 
 const TOKENS_DIR = path.resolve(__dirname, '..', '..', 'design', 'tokens');
 
@@ -307,7 +309,7 @@ function resolveFonts(theme) {
       seenFiles.add(face.file);
       faces.push({ family: set.family, file: face.file, weight: face.weight });
     }
-    return set.stack;
+    return fontStackWithFallback(setId, set.stack);
   };
 
   const roles = resolveFontRoles(theme);
@@ -1004,6 +1006,8 @@ function buildTokenCss(theme, { tokensDir } = {}) {
       lines.push('}');
     }
   }
+
+  appendFontFallbacks(lines);
 
   return lines.join('\n');
 }

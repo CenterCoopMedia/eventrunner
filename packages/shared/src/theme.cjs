@@ -725,6 +725,10 @@ function resolveFontRoles(theme) {
   return roles;
 }
 
+function fontStackWithFallback(setId, stack) {
+  return stack.replace(',', `, '${setId} fallback',`);
+}
+
 /**
  * Component-token font faces the preset asks for, beyond the four roles.
  * Zine's `--callout-font` is the only one at launch (brief §4.3).
@@ -1207,6 +1211,7 @@ module.exports = {
   resolveOptionPicks,
   pickedChoices,
   resolveFontRoles,
+  fontStackWithFallback,
   resolveComponentFonts,
   resolvePresetTokens,
   resolveShape,

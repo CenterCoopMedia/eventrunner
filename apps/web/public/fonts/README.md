@@ -9,15 +9,32 @@ subset, and every face clears the four tests in brief §9:
 3. It stays legible at nameplate size and at `--text-h3`.
 4. It holds contrast in both modes.
 
-**Twenty-four families live in this directory. A deployed site loads two to
-four of them.** The bundle is the repo's, not the reader's: `buildTokenCss`
-(`scripts/lib/tokens.cjs`) resolves the active preset plus the operator's
-picked options down to the faces that preset actually names, and emits an
-`@font-face` block for those files only. The other families are never
-mentioned in `apps/web/src/generated/theme.css`, so a browser never requests
-them. The two admin faces — Source Sans 3 and IBM Plex Mono — are emitted on
-every deployment, because the admin identity is fixed and ships with the
-product (admin story part 6g).
+The generated stylesheet declares all bundled families so a published
+theme can switch to any of them without a rebuild. The browser can begin
+requesting the snapshot's heading, body and data faces from the HTML head.
+Other bundled faces load when the page uses them. Admin uses Source Sans 3
+and IBM Plex Mono for its fixed typography.
+
+## Local fallbacks
+
+The public font stacks try a local adjusted face after each bundled family.
+The stylesheet uses only local font names for these faces. If none are
+available, the rest of the stack supplies the fallback. The adjusted faces
+cover Latin letters and punctuation shared with the bundled faces so other
+glyphs keep their existing fallback after the web font loads.
+
+`scripts/lib/font-fallbacks.cjs` records one measurement per family, using
+regular when the set supplies it. Size adjustment divides the bundled font's
+sample advance width by that of its local counterpart, in ems. The sample
+reads “Welcome to the community conference. Find sessions, speakers, and
+events for June 12 at 9:30 AM. Bienvenidos a la conferencia. Consulta las
+sesiones y actividades del día.” Monospaced faces use the width of 0.
+The other percentages use the bundled font's ascender, descender and line
+gap, divided by its em size and the size adjustment ratio. Read the
+`OS/2` typographic values when `USE_TYPO_METRICS` is set and `hhea` otherwise.
+Use Liberation 2 for the instances of Arial, Times New Roman and Courier
+New with compatible metrics. Use Liberation Sans Narrow for Arial Narrow
+and Z003 Medium Italic for Caveat.
 
 ## The faces
 
@@ -116,4 +133,6 @@ Adding a font set is a deliberate, reviewable pull request:
    `apps/web/src/lib/themeCss.js`. `THEME_FONT_SET_IDS` in
    `packages/shared/src/theme.cjs` is the allowlist the server validates
    against; `themeRuntime.parity.test.js` fails if the three drift.
-4. Point a preset's type map or one of its heading options at the set id.
+4. Add the measured local fallbacks and restrict their glyph range to the
+   intersection of the bundled faces in the set.
+5. Point a preset's type map or one of its heading options at the set id.
