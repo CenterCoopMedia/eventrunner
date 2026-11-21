@@ -310,6 +310,12 @@ describe('the invoice editor', () => {
     expect(invoiceCalls().find((body) => body.action === 'saveDraft')).toMatchObject({ expectedRevision: STORED.revision });
     expect(screen.getByRole('button', { name: 'Issue this invoice' })).toBeInTheDocument();
 
+    answers.get = () => response({ error: { code: 'unavailable', message: 'The invoice is temporarily unavailable.' } }, 503);
+    fireEvent.click(screen.getByRole('button', { name: 'Reload the saved invoice' }));
+    await screen.findByText('The invoice is temporarily unavailable. Your edits are still here.');
+    expect(screen.getByLabelText('Name to bill')).toHaveValue(STORED.billTo.name);
+
+    answers.get = () => response({ invoice: stored });
     fireEvent.click(screen.getByRole('button', { name: 'Reload the saved invoice' }));
     await screen.findByRole('heading', { level: 1, name: 'Draft for Updated Press' });
     expect(screen.getByText('Reloaded the saved invoice. Your unsaved changes were discarded.')).toBeInTheDocument();
