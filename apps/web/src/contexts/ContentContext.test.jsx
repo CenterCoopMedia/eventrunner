@@ -6,12 +6,16 @@ import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 // Capture each collection subscription so tests can fire fake snapshots.
-const { subscriptions, subscribeContentCollection, subscribeSpeakersPublic } = vi.hoisted(() => {
+const { subscriptions, onScheduleSubscribed, subscribeContentCollection, subscribeSpeakersPublic } = vi.hoisted(() => {
   const subscriptions = new Map();
+  const onScheduleSubscribed = vi.fn();
   return {
     subscriptions,
+    onScheduleSubscribed,
     subscribeContentCollection: vi.fn((name, readSource, onNext) => {
-      subscriptions.set(name, { readSource, onNext });
+      const subscription = { readSource, onNext };
+      subscriptions.set(name, subscription);
+      if (name === 'cmsSchedule') onScheduleSubscribed(subscription);
       return () => subscriptions.delete(name);
     }),
     // speakers_public is not under the publish model: no _drafts sibling,
@@ -68,6 +72,7 @@ function Probe() {
 
 beforeEach(() => {
   subscriptions.clear();
+  onScheduleSubscribed.mockReset();
   subscribeContentCollection.mockClear();
   subscribeSpeakersPublic.mockClear();
 });
@@ -118,6 +123,8 @@ describe('ContentProvider', () => {
       </MemoryRouter>,
     );
     expect(subscriptions.has('cmsSchedule')).toBe(false);
+    const scheduleSubscribed = Promise.withResolvers();
+    onScheduleSubscribed.mockImplementationOnce(scheduleSubscribed.resolve);
     act(() => {
       subscriptions.get('cmsPages').onNext([
         { id: 'archive', path: '/archive', visible: true },
@@ -135,7 +142,7 @@ describe('ContentProvider', () => {
       ]);
     });
     expect(await screen.findByRole('link', { name: 'Full schedule' })).toHaveAttribute('href', '/schedule');
-    const schedule = subscriptions.get('cmsSchedule');
+    const schedule = await scheduleSubscribed.promise;
     act(() => schedule.onNext([{ id: 'linked', visible: true }]));
     const link = await screen.findByRole('link', { name: 'Published session' });
     expect(link).toHaveAttribute('href', '/schedule/linked?lang=es#session-materials');
