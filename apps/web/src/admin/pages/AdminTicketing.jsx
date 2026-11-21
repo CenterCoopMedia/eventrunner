@@ -689,7 +689,7 @@ export default function AdminTicketing() {
       {confirmedProvider === 'stripe' ? <>
         <TicketButtonSettings call={call} />
         <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
-          <StripeTicketingWorkspace call={call} />
+          <StripeTicketingWorkspace call={call} chargesEnabled={status.chargesEnabled} />
         </Suspense>
       </> : ['eventbrite', 'manual', 'none'].includes(confirmedProvider) ? <>
         <ImportPanel call={call} onImported={onImported} />

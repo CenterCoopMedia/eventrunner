@@ -121,19 +121,24 @@ function isInvoiceCheckoutRequest(params, scope) {
 
 function createStripeProvider({ env = process.env, db, stripeClient, now = () => new Date() } = {}) {
   const scope = stripeScope(env);
+  const paymentCredentials = Boolean(stripeClient) || hasPaymentCredentials(env, scope.livemode);
   let client = null;
   let accountCheck = null;
   const sdk = () => (client ||= createStripeClient({ env, stripeClient }));
 
   // With no Connect account header, GET /v1/account is the account owning
   // the configured key. An account name in metadata cannot establish this.
+  async function readAccount(options) {
+    const accounts = sdk().accounts;
+    const account = await (options ? accounts.retrieveCurrent({}, options) : accounts.retrieve());
+    if (account?.id !== scope.stripeAccountId) throw new Error('Stripe account does not match deployment.');
+    return account;
+  }
+
   async function assertAccount() {
     if (!accountCheck) {
-      accountCheck = Promise.resolve().then(async () => {
-        const account = await sdk().accounts.retrieve();
-        if (account?.id !== scope.stripeAccountId) throw new Error('Stripe account does not match deployment.');
-        return account.id;
-      }).catch((err) => { accountCheck = null; throw err; });
+      accountCheck = readAccount().then((account) => account.id)
+        .catch((err) => { accountCheck = null; throw err; });
     }
     return accountCheck;
   }
@@ -143,10 +148,20 @@ function createStripeProvider({ env = process.env, db, stripeClient, now = () =>
     ...scope,
     // This is a local configuration check, not a Stripe request or a claim
     // that the merchant account has passed its separate launch checks.
-    hasPaymentCredentials: Boolean(stripeClient) || hasPaymentCredentials(env, scope.livemode),
+    hasPaymentCredentials: paymentCredentials,
     ownsTicketPersistence: true,
     requiresRawBody: true,
     webhookEventTypes: WEBHOOK_EVENTS,
+
+    async checkChargesEnabled() {
+      if (!paymentCredentials) return null;
+      try {
+        const account = await readAccount({ timeout: 3_000, maxNetworkRetries: 0 });
+        return typeof account.charges_enabled === 'boolean' ? account.charges_enabled : null;
+      } catch {
+        return null;
+      }
+    },
 
     async createCheckoutSession(params, { idempotencyKey } = {}) {
       if (!idempotencyKey || params?.mode !== 'payment' || params.ui_mode !== 'hosted_page' ||

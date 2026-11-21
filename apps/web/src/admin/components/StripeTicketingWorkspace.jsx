@@ -15,7 +15,7 @@ import StripeCheckInPanel from './StripeCheckInPanel.jsx';
 import StripePromoCodesPanel from './StripePromoCodesPanel.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
 
-export default function StripeTicketingWorkspace({ call }) {
+export default function StripeTicketingWorkspace({ call, chargesEnabled }) {
   const { isOperator, user } = useAuth();
   const { eventConfig } = useEventConfig();
   const demo = isReadOnlyDemo(eventConfig);
@@ -59,18 +59,23 @@ export default function StripeTicketingWorkspace({ call }) {
     <button type="button" className={secondaryButtonClass} onClick={() => { setError(''); bump(); }}>Retry Stripe ticketing</button>
   </div> : <AdminLoadingState label="Loading Stripe ticketing…" />;
   const { catalog, connectionEnded } = data;
-  const salesStatus = !catalog?.published ? 'Tickets not published'
-    : catalog.salesPaused ? 'New sales paused'
-      : connectionEnded ? 'Paid sales closed' : 'New sales enabled';
   const now = Date.now();
   const hasEnded = (sales) => sales.salesEndAt && Date.parse(sales.salesEndAt) <= now;
-  const warnAboutDisconnect = !connectionEnded && catalog?.published && !catalog.salesPaused && !hasEnded(catalog) &&
+  const hasPaidSales = catalog?.published && !catalog.salesPaused && !hasEnded(catalog) &&
     catalog.ticketTypes?.some((type) => type.active && type.visibility === 'public' && type.unitAmount > 0 && !hasEnded(type));
+  const chargesDisabled = !connectionEnded && hasPaidSales && chargesEnabled === false;
+  const chargesUnverified = !connectionEnded && hasPaidSales && chargesEnabled === null;
+  const salesStatus = !catalog?.published ? 'Tickets not published'
+    : catalog.salesPaused ? 'New sales paused'
+      : connectionEnded ? 'Paid sales closed'
+        : chargesDisabled ? 'Paid sales unavailable'
+          : chargesUnverified ? 'Paid sales unverified' : 'New sales enabled';
+  const warnAboutDisconnect = !connectionEnded && hasPaidSales && !chargesDisabled;
   return <div className="min-w-0 space-y-md" key={user?.uid}>
     <Panel help="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused." title="Stripe sales" description="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused.">
       <div className="flex flex-wrap items-center gap-sm">
         <StatusBadge tone={data.mode === 'live' ? 'caution' : 'info'}>{data.mode === 'live' ? 'Live payments' : 'Test mode'}</StatusBadge>
-        <StatusBadge tone={catalog?.published && !catalog.salesPaused && !connectionEnded ? 'ok' : 'caution'}>{salesStatus}</StatusBadge>
+        <StatusBadge tone={salesStatus === 'New sales enabled' ? 'ok' : 'caution'}>{salesStatus}</StatusBadge>
         {isOperator ? <button type="button" className={secondaryButtonClass} onClick={() => { setPause(!data.catalog?.salesPaused); setReason(''); setError(''); }}>{data.catalog?.salesPaused ? 'Reopen sales' : 'Pause sales'}</button> : null}
       </div>
       {connectionEnded ? <div className="mt-sm">
@@ -78,6 +83,8 @@ export default function StripeTicketingWorkspace({ call }) {
           Check the connection in <a href={CONSOLE_ORIGIN} className="font-semibold underline underline-offset-2">Event Runner Console</a>.
         </Notice>
       </div> : null}
+      {chargesDisabled ? <div className="mt-sm"><Notice tone="caution" message="Stripe has disabled payments on this account. Check your Stripe Dashboard, then refresh this page." /></div> : null}
+      {chargesUnverified ? <div className="mt-sm"><Notice tone="caution" message="Could not check whether Stripe is accepting payments. Refresh to try again." /></div> : null}
       {warnAboutDisconnect ? <div className="mt-sm"><Notice tone="caution" message="Disconnecting Stripe in the console stops open and scheduled paid ticket sales. Reconnecting is not guaranteed." /></div> : null}
       {data.inventory ? <dl className="mt-sm grid gap-sm sm:grid-cols-3"><div><dt className="text-admin-base font-semibold">Event capacity</dt><dd className="font-admin-data">{data.catalog?.capacity ?? 'Not configured'}</dd></div><div><dt className="text-admin-base font-semibold">Seats reserved in checkout</dt><dd className="font-admin-data">{data.inventory.held || 0}</dd></div><div><dt className="text-admin-base font-semibold">Seats issued</dt><dd className="font-admin-data">{data.inventory.sold || 0}</dd></div></dl> : null}
       {error && pause === null ? <div className="mt-sm"><Notice tone="error" message={error} /></div> : null}
