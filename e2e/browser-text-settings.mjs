@@ -151,7 +151,7 @@ export const test = base.extend({
       } else if (textSettings === 'android-text') {
         const cdp = await page.context().newCDPSession(page);
         expect(await readOsTextScale(page)).toBe(1);
-        await record('Chromium Android OS text scale 200%', async () => {
+        await record('Chromium Android OS text scale probe at 200%', async () => {
           await cdp.send('Emulation.setEmulatedOSTextScale', { scale: 2 });
           expect(await readOsTextScale(page)).toBe(2);
           expect(await readViewport(page)).toEqual({
