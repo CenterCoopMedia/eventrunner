@@ -1041,9 +1041,9 @@ describe('creating and editing a block', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields).toMatchObject({
-      blockType: 'text', value: 'Fees & deadlines <2027>',
-      translations: { es: { value: 'Cuotas & plazos <2027>' } },
+    // The restored Spanish text matches the saved draft, so the server keeps it.
+    expect(bodyOf(0).fields).toEqual({
+      blockType: 'text', value: 'Fees & deadlines <2027>', order: 3,
     });
   });
 

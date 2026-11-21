@@ -623,6 +623,12 @@ export default function AdminContentBlockEditor({ mode }) {
       ...toContentFields(savedContent),
       ...staleFieldDeletions(savedBlockTypeRef.current, savedContent.blockType),
     };
+    const nextEdit = contentEditSnapshot(nextFieldId, savedContent);
+    // Leave unchanged translations to the server's merge with the latest draft.
+    if (isExisting && nextEdit.blockType === savedEdit?.blockType
+      && JSON.stringify(nextEdit.translations) === JSON.stringify(savedEdit.translations)) {
+      delete fields.translations;
+    }
     const request = {
       section: sectionId,
       fields,
@@ -649,7 +655,7 @@ export default function AdminContentBlockEditor({ mode }) {
       for (const [type, draftAtSave] of Object.entries(textDraftsAtSave)) {
         if (textDraftKey(drafts[type]) === textDraftKey(draftAtSave)) drafts[type] = null;
       }
-      setSavedEdit(contentEditSnapshot(nextFieldId, savedContent));
+      setSavedEdit(nextEdit);
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         return;
