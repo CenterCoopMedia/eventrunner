@@ -157,12 +157,12 @@ export default function MediaLibrary({
                 />
                 <span className="block px-sm py-xs">
                   <span className="flex flex-wrap items-baseline gap-x-2xs">
-                    <span className="block truncate text-admin-base font-semibold text-admin-ink">
+                    <span className="block min-w-0 wrap-anywhere text-admin-base font-semibold text-admin-ink">
                       {asset.title || asset.filename}
                     </span>
                     {isSelected ? <StatusBadge tone="info">Selected</StatusBadge> : null}
                   </span>
-                  <span className={`block truncate ${rowMetaClass}`}>{asset.filename || asset.path?.split('/').pop()}</span>
+                  <span className={`block wrap-anywhere ${rowMetaClass}`}>{asset.filename || asset.path?.split('/').pop()}</span>
                   <span className="block font-admin-data text-admin-xs text-admin-ink-secondary">
                     {formatBytes(asset.size)}
                   </span>
