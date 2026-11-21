@@ -459,7 +459,7 @@ export default function AdminBranding() {
 
   const [form, setForm] = useState(() => toForm(theme));
   const [error, setError] = useState(null);
-  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [heroEdit, setHeroEdit] = useState({ dirty: false, busy: false });
   const leaveGuard = useUnsavedNavigation(heroEdit.dirty || heroEdit.busy, { blocked: saving || heroEdit.busy });
   const [status, setStatus] = useState('');
@@ -638,7 +638,7 @@ export default function AdminBranding() {
         }
       />
 
-      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The theme was not published" />
       {status ? <SaveStatus message={status} /> : null}
       {contrastFailures.length > 0 ? (

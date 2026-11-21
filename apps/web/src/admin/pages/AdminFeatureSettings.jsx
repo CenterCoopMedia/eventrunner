@@ -118,7 +118,7 @@ export default function AdminFeatureSettings() {
 
   const [form, setForm] = useState(() => toForm(features));
   const [error, setError] = useState(null);
-  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [status, setStatus] = useSavedMessage(form);
   const errorRef = useRef(null);
   const adoptedRef = useRef(sources.features === 'live');
@@ -194,7 +194,7 @@ export default function AdminFeatureSettings() {
         }
       />
 
-      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 

@@ -27,7 +27,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   const [edit, setEdit] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [savedField, setSavedField] = useState(null);
-  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed } = useAdminSaveState(false);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(false);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('');
   const observedImage = useRef(null);
@@ -164,7 +164,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
         : full
           ? `The top of your home page is full (${maxBlocks} items). Remove one to add a picture.`
           : 'This home page has no place for a picture at the top.'} /> : null}
-      <AdminPendingSave busy={busy} unconfirmed={unconfirmed} />
+      <AdminPendingSave busy={busy} unconfirmed={unconfirmed} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The image was not saved or published" />
       <EditorActionFeedback status={status} error={error} />
     </Panel>

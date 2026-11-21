@@ -71,7 +71,7 @@ export default function AnnouncementSavedMessages({
   const [list, setList] = useState(null); // { messages, max }
   const [listError, setListError] = useState(null);
   const [name, setName] = useState('');
-  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed } = useAdminSaveState(null);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(null);
   const [error, setError] = useState(null);
   // The one open question: { kind: 'replace'|'rename'|'remove', id, name }.
   const [question, setQuestion] = useState(null);
@@ -238,7 +238,7 @@ export default function AnnouncementSavedMessages({
         description="Save messages you send often and reuse them in a new email."
       >
         <div className="flex flex-col gap-sm">
-          <AdminPendingSave busy={saving} unconfirmed={unconfirmed} />
+          <AdminPendingSave busy={saving} unconfirmed={unconfirmed} offline={offline} />
           <ServerErrorSummary error={error ? { message: communicationsError(error, 'The message could not be saved. Check the message and try again.') } : null} errorRef={errorRef} title="This message was not saved" />
           {loaded ? (
             <p className="text-admin-sm text-admin-ink">

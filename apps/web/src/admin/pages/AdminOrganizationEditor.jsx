@@ -106,7 +106,7 @@ export default function AdminOrganizationEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action: action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action: action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
@@ -366,7 +366,7 @@ export default function AdminOrganizationEditor({ mode }) {
           }
         />
 
-        <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={creating ? '/admin/organizations' : '.'} unconfirmed={unconfirmedSave} />
+        <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={creating ? '/admin/organizations' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
         <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
         <div className="admin-editor-layout admin-editor-layout--organization">

@@ -37,7 +37,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
   const [alt, setAlt] = useState('');
   const [title, setTitle] = useState('');
   const [error, setError] = useState(null);
-  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed } = useAdminSaveState(false);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(false);
 
   function fileProblem(chosen) {
     if (chosen && !accepted.includes(chosen.type)) return `This file type is not supported. Choose ${accepted.map(typeLabel).join(', ')}.`;
@@ -120,7 +120,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
         {/* The one thing on this surface that can be rejected, so it carries
             the announcement a ServerErrorSummary would carry on a page with
             several fields. */}
-        <AdminPendingSave busy={busy} unconfirmed={unconfirmed} to="/admin/media" />
+        <AdminPendingSave busy={busy} unconfirmed={unconfirmed} to="/admin/media" offline={offline} />
         <FieldError id="media-upload-error" role="alert" message={error} />
 
         <div className="flex flex-wrap gap-xs">

@@ -336,7 +336,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const [content, setContent] = useState(() => blankContent());
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const [status, setStatus] = useState('');
   const [savedDocId, setSavedDocId] = useState(null);
   const [resumeQueueId, setResumeQueueId] = useState(null);
@@ -835,7 +835,7 @@ export default function AdminContentBlockEditor({ mode }) {
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={busy !== null}
+              disabled={unconfirmedSave || busy !== null}
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
@@ -845,7 +845,7 @@ export default function AdminContentBlockEditor({ mode }) {
         }
       />
 
-      <AdminPendingSave busy={busy === 'draft' || busy === 'publish'} to={mode === 'create' ? `/admin/content/${encodeURIComponent(pageId)}/${encodeURIComponent(sectionId)}` : '.'} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={busy === 'draft' || busy === 'publish'} to={mode === 'create' ? `/admin/content/${encodeURIComponent(pageId)}/${encodeURIComponent(sectionId)}` : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary
         error={error}
         errorRef={errorRef}

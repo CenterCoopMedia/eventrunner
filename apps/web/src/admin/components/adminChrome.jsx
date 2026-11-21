@@ -17,7 +17,7 @@
 // state is always a word — set in a badge whose tinted ground and ink agree
 // with the word, and never colour alone (§8.1).
 import { useId } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
 import LoadingStatus from '../../components/LoadingStatus.jsx';
 import HelpTooltip from './HelpTooltip.jsx';
@@ -123,6 +123,15 @@ export function AdminEmptyState({ title, description, action = null }) {
   );
 }
 
+function LoadingRecoveryLink() {
+  const { pathname, search, hash } = useLocation();
+  return (
+    <Link to={pathname + search + hash} target="_blank" rel="noopener noreferrer" className={linkButtonClass}>
+      Try again in a new tab
+    </Link>
+  );
+}
+
 /**
  * The label states what is loading; the small ring shows that work is
  * pending. It is decorative, static under reduced motion, and unmounts
@@ -138,7 +147,7 @@ export function AdminLoadingState({ label, routeAttempt, recover = false, onRetr
         {onRetry ? (
           <button type="button" className={secondaryButtonClass} onClick={() => { restart(); onRetry(); }}>Try again</button>
         ) : (
-          <Link to="." target="_blank" rel="noopener noreferrer" className={linkButtonClass}>Try again in a new tab</Link>
+          <LoadingRecoveryLink />
         )}
       </Notice>
     );

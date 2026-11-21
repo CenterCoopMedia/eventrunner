@@ -120,7 +120,7 @@ export default function AssetModal({
   const [status, setStatus] = useState('');
   const [saveError, setSaveError] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
-  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed } = useAdminSaveState('');
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState('');
   const pending = useRef(false);
   const busy = Boolean(action);
   const [confirming, setConfirming] = useState(false);
@@ -224,7 +224,7 @@ export default function AssetModal({
           <TextField help="Give this file a name staff can recognize in the media library." label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} disabled={busy} />
           <TextAreaField help="Write a caption for places on the event site that use this image." label="Caption (optional)" value={caption} onChange={(value) => { setCaption(value); setStatus(''); }} rows={2} maxLength={MAX_CAPTION_LENGTH} disabled={busy} />
           <TextField help="Name the photographer or source. The event site shows this as a credit under the image." label="Credit (optional)" value={credit} onChange={(value) => { setCredit(value); setStatus(''); }} maxLength={MAX_CREDIT_LENGTH} disabled={busy} />
-          <AdminPendingSave busy={action === 'save'} unconfirmed={unconfirmed} to="/admin/media" />
+          <AdminPendingSave busy={action === 'save'} unconfirmed={unconfirmed} to="/admin/media" offline={offline} />
           {status ? <SaveStatus message={status} /> : null}
           {saveError ? <Notice tone="error" message={saveError} /> : null}
           <div className="flex flex-wrap gap-xs">

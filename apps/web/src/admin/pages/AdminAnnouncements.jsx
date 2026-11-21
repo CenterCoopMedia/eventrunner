@@ -69,7 +69,7 @@ export default function AdminAnnouncements() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState(null);
-  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [channel, setChannel] = useState('banners');
   const channelRefs = useRef({});
@@ -214,7 +214,7 @@ export default function AdminAnnouncements() {
           description="Banners appear on your site between the start and end times. A banner that starts now appears as soon as you save."
         >
           <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}>
-            <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} />
+            <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
             <ServerErrorSummary error={error ? { message: communicationsError(error, "The announcement could not be saved. Check the message and dates, then try again.") } : null} />
             <TextAreaField help="Write the short announcement attendees should see in the site banner."
               label="Message"

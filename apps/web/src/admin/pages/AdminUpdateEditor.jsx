@@ -113,7 +113,7 @@ export default function AdminUpdateEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
@@ -333,7 +333,7 @@ export default function AdminUpdateEditor({ mode }) {
 
       <FeatureSwitch featureKeys={['updates']} />
 
-      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/updates' : '.'} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/updates' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
       <Panel help="Write the news and date attendees should see on the Updates page." title="Public update">

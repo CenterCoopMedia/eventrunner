@@ -396,7 +396,7 @@ function PageEditor({ mode }) {
   ));
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const [status, setStatus] = useState('');
   // Set once a create has landed, so the form switches to editing that
   // document instead of trying to create it again.
@@ -771,7 +771,7 @@ function PageEditor({ mode }) {
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={busy !== null || Boolean(localDraft.recovery) || revisionConflict}
+              disabled={unconfirmedSave || busy !== null || Boolean(localDraft.recovery) || revisionConflict}
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
@@ -781,7 +781,7 @@ function PageEditor({ mode }) {
         }
       />
 
-      <AdminPendingSave busy={busy === 'draft' || busy === 'publish'} to={mode === 'create' ? '/admin/pages' : '.'} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={busy === 'draft' || busy === 'publish'} to={mode === 'create' ? '/admin/pages' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       {!addressOnlyError ? <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} /> : null}
       {revisionConflict ? (
         <div>
