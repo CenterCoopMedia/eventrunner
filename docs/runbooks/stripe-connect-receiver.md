@@ -380,20 +380,44 @@ console.log("OK", new Date().toISOString());
 '
 ```
 
-Stop on a nonzero exit. To undo the change, send one update to the same
-endpoint with only `enabled_events[]` set to the BEFORE list, using the same
-stdin key method, and read it back.
+Stop on a nonzero exit. If the block failed after printing BEFORE, the update
+may have been applied without a readback. Do not rerun it blind: read the
+endpoint with this read-only block and compare it with the printed BEFORE list.
+
+```sh
+gcloud secrets versions access latest --secret=CONSOLE_STRIPE_SECRET_KEY --project="$CONSOLE_PROJECT_ID" | node --input-type=module -e '
+let key = ""; for await (const chunk of process.stdin) key += chunk; key = key.trim();
+const r = await fetch("https://api.stripe.com/v1/webhook_endpoints?limit=100", { headers: { Authorization: `Bearer ${key}` } });
+const j = await r.json();
+if (!r.ok) throw new Error(`HTTP ${r.status} ${j?.error?.type}`);
+for (const e of j.data) console.log(JSON.stringify({ id: "..." + e.id.slice(-4), url: e.url, status: e.status, livemode: e.livemode, connect: !!e.application, events: [...e.enabled_events].sort() }));
+'
+```
+
+If it shows exactly BEFORE plus `account.application.deauthorized`, the change
+is complete. If it shows exactly BEFORE, run the update block again. If it shows
+anything else, restore the BEFORE list with the rollback below and stop.
+
+To undo the change, send one update to the same endpoint with only
+`enabled_events[]` set to the BEFORE list, using the same stdin key method, and
+read it back.
 
 No test event can prove live delivery. Use the first naturally occurring
-deauthorization: confirm in Stripe that it received HTTP 200 from the Console,
-and that the client's application shows Stripe as disconnected. Keep the
-direct test payment destinations on the client sites unchanged.
+deauthorization. Confirm in Stripe that it received HTTP 200 from the Console,
+and that the client's application shows Stripe as disconnected. If the account
+has a route, also confirm the routed site processed it: its `ticketingWebhook`
+runs code that includes #1313, and its `ticket_catalog/connection` document
+has `ended: true` (the site's ticketing admin shows the connection as ended). A
+site on older code acknowledges the event as ignored with HTTP 200, so the
+Console checks alone do not prove that checkout closed. Keep the direct test
+payment destinations on the client sites unchanged.
 
 November 21, 2026 receipt: the block above ran against the live platform at
 19:29:41 UTC on Console commit `76a5d490`. The single Connect endpoint went from
 16 to 17 selected events; the only addition was
 `account.application.deauthorized`, and every other field was identical.
-Live delivery proof is pending. [Stripe Connect webhook documentation](https://docs.stripe.com/connect/webhooks?accounts-namespace=v1)
+The one routed live site's `ticketingWebhook` was deployed from `76a5d490`,
+which includes #1313. Live delivery proof is pending. [Stripe Connect webhook documentation](https://docs.stripe.com/connect/webhooks?accounts-namespace=v1)
 
 ### Partial setup containment
 
