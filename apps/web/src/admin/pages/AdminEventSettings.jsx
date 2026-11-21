@@ -319,7 +319,7 @@ export default function AdminEventSettings() {
 
   const [form, setForm] = useState(() => toForm(eventConfig));
   const [error, setError] = useState(null);
-  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [status, setStatus] = useSavedMessage(toPayload(form, payloadOptions));
   const [liveSessions, setLiveSessions] = useState([]);
   const [draftSessions, setDraftSessions] = useState([]);
@@ -578,7 +578,7 @@ export default function AdminEventSettings() {
         }
       />
 
-      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 

@@ -132,12 +132,14 @@ describe('AdminAnnouncements', () => {
       fireEvent.change(message, { target: { value: 'Use the east entrance.' } });
       const save = screen.getByRole('button', { name: 'Save' });
       fireEvent.click(save);
+      expect(screen.getByText(/the save was held while you were offline/i)).toBeVisible();
       expect(call).not.toHaveBeenCalled();
       expect(message).toHaveValue('Use the east entrance.');
 
       online.mockReturnValue(true);
       fireEvent.click(save);
       await waitFor(() => expect(message).toHaveValue(''));
+      expect(screen.queryByText(/the save was held while you were offline/i)).not.toBeInTheDocument();
       expect(call).toHaveBeenCalledTimes(1);
     } finally {
       online.mockRestore();

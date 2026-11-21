@@ -60,7 +60,7 @@ export default function AdminBadgeSettings() {
 
   const [categories, setCategories] = useState(() => toForm(badges));
   const [error, setError] = useState(null);
-  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [status, setStatus] = useSavedMessage(categories);
   const errorRef = useRef(null);
   // Keyed on CONFIG/BADGES' own readiness (never the aggregate `source`):
@@ -129,7 +129,7 @@ export default function AdminBadgeSettings() {
 
       <FeatureSwitch featureKeys={['badges', 'customBadges']} />
 
-      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 

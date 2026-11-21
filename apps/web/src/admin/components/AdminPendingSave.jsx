@@ -7,6 +7,7 @@ import { Notice, linkButtonClass } from './formControls.jsx';
 export function useAdminSaveState(idle) {
   const [action, setAction] = useState(idle);
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const [offline, setOffline] = useState(false);
   const current = useRef(idle);
   const lostReply = useRef(false);
 
@@ -16,7 +17,12 @@ export function useAdminSaveState(idle) {
   }
 
   function begin(next) {
-    if (current.current !== idle || lostReply.current || navigator.onLine === false) return false;
+    if (current.current !== idle || lostReply.current) return false;
+    if (navigator.onLine === false) {
+      setOffline(true);
+      return false;
+    }
+    setOffline(false);
     set(next);
     return true;
   }
@@ -29,7 +35,7 @@ export function useAdminSaveState(idle) {
     return true;
   }
 
-  return { action, set, begin, capture, unconfirmed };
+  return { action, set, begin, capture, unconfirmed, offline };
 }
 
 /** Check the server in a fresh view while the submitting editor stays intact. */
@@ -42,8 +48,9 @@ function SavedChangesLink({ to }) {
   );
 }
 
-export default function AdminPendingSave({ busy, to, unconfirmed = false }) {
+export default function AdminPendingSave({ busy, to, unconfirmed = false, offline = false }) {
   const late = useBusyLate(busy);
+  if (offline) return <Notice tone="caution" message="The save was held while you were offline. Reconnect and submit your changes again." />;
   if (!late && !unconfirmed) return null;
   return (
     <Notice tone="caution" message={unconfirmed

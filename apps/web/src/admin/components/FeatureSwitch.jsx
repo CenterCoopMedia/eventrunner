@@ -13,7 +13,7 @@ export default function FeatureSwitch({ featureKeys }) {
   const { isOperator } = useAuth();
   const { features, sources } = useEventConfig();
   const call = useAdminApi();
-  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed } = useAdminSaveState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [awaiting, setAwaiting] = useState(null);
@@ -62,7 +62,7 @@ export default function FeatureSwitch({ featureKeys }) {
           <p key={key} className="text-admin-sm text-admin-ink-secondary">{label}: {enabled ? 'On' : 'Off'}. Only an operator can change this setting.</p>
         );
       })}
-      <AdminPendingSave busy={saving} unconfirmed={unconfirmed} to="/admin/features" />
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmed} to="/admin/features" offline={offline} />
       {isOperator && (!ready || awaiting) ? <AdminLoadingState recover quiet label="Loading the current settings…" /> : null}
       {error ? <Notice tone="error" message={error} /> : null}
       {saved ? <SaveStatus message={saved} /> : null}

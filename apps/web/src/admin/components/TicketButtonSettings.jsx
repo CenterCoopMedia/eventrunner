@@ -16,7 +16,7 @@ export default function TicketButtonSettings({ call }) {
   const { eventConfig } = useEventConfig();
   const registration = eventConfig?.registration;
   const [draft, setDraft] = useState({});
-  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed } = useAdminSaveState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
   const label = draft.ticketButtonLabel ?? registration?.ticketButtonLabel ?? '';
@@ -69,7 +69,7 @@ export default function TicketButtonSettings({ call }) {
             <BusyLabel busy={saving} pending="Saving ticket button…">Save ticket button</BusyLabel>
           </button>
         </div>
-        <AdminPendingSave busy={saving} unconfirmed={unconfirmed} />
+        <AdminPendingSave busy={saving} unconfirmed={unconfirmed} offline={offline} />
         {saved ? <Notice tone="ok" message="Ticket button saved." /> : null}
         {error ? <Notice tone="error" message={error} /> : null}
       </form>

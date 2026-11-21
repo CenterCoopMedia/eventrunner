@@ -26,7 +26,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
   const reportDeleted = useDeletedRecord();
   const [draft, setDraft] = useState(initial);
   const [kind, setKind] = useState(navigationLinkUrl(initial.url).startsWith('https://') ? 'external' : 'internal');
-  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const [error, setError] = useState('');
   const saved = useRef(false);
   const rejectedIds = useRef(new Set());
@@ -90,7 +90,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
 
   return <>
     <form className="flex flex-col gap-md" onSubmit={save} inert={leave.pending ? '' : undefined}>
-      <AdminPendingSave busy={busy === 'save'} to={PAGES_PATH} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={busy === 'save'} to={PAGES_PATH} unconfirmed={unconfirmedSave} offline={offline} />
       <AdminPageHeader title={creating ? 'Add a navigation link' : 'Edit navigation link'}
         description="This link joins the Pages list. Set its position there and publish it with your other page drafts."
         actions={<>

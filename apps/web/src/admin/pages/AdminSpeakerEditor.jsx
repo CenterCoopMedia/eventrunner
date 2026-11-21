@@ -173,7 +173,7 @@ export default function AdminSpeakerEditor({ mode }) {
   }));
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const [deleteBlocked, setDeleteBlocked] = useState(false);
@@ -336,7 +336,7 @@ export default function AdminSpeakerEditor({ mode }) {
         }
       />
 
-      <AdminPendingSave busy={action === 'draft'} to={mode === 'create' ? '/admin/speakers' : '.'} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={action === 'draft'} to={mode === 'create' ? '/admin/speakers' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog

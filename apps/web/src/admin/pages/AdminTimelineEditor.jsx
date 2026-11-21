@@ -95,7 +95,7 @@ export default function AdminTimelineEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
@@ -304,7 +304,7 @@ export default function AdminTimelineEditor({ mode }) {
         }
       />
 
-      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/timeline' : '.'} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/timeline' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
       <Panel help="Use the year and title to tell readers which past edition this was." title="Entry">

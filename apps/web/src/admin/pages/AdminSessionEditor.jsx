@@ -133,7 +133,7 @@ export default function AdminSessionEditor({ mode }) {
   const [speakerToAdd, setSpeakerToAdd] = useState('');
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action: action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(null);
+  const { action: action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
@@ -415,7 +415,7 @@ export default function AdminSessionEditor({ mode }) {
         }
       />
 
-      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/sessions' : '.'} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/sessions' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog

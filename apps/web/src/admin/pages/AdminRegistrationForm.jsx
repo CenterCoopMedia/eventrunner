@@ -70,7 +70,7 @@ export default function AdminRegistrationForm() {
   const [live, setLive] = useState(undefined);
   const [listError, setListError] = useState(null);
   const [draft, setDraft] = useState(null);
-  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave } = useAdminSaveState(false);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState('');
   const errorRef = useRef(null);
@@ -151,7 +151,7 @@ export default function AdminRegistrationForm() {
           <div><button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => { setDraft(toDraft(live)); setError(null); setResult('Current version loaded.'); }}>Load the current version</button></div>
         </div>
       ) : null}
-      <AdminPendingSave busy={busy} unconfirmed={unconfirmedSave} />
+      <AdminPendingSave busy={busy} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The form could not be saved" />
       {result ? <SaveStatus message={result} /> : null}
 
