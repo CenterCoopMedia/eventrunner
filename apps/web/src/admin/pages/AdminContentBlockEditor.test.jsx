@@ -29,6 +29,10 @@ vi.mock('../../lib/contentSource.js', () => ({
 }));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 
+// BlockTypePicker.test.jsx exercises the public examples. Keep the real
+// picker radios and editor fields here without rendering those sample blocks.
+vi.mock('../../components/blocks/SectionBlocks.jsx', () => ({ default: () => null }));
+
 // cmsPages/cmsContent each have a live + drafts sibling; both listeners must
 // report (useAdminPages.js, useAdminContent.js) before the editor treats the
 // section/block as known.
@@ -157,22 +161,22 @@ describe('AdminContentBlockEditor value fields', () => {
   it('routes the image block’s url field through ImagePicker, not a plain text field', async () => {
     await renderAt('/admin/content/home/hero/_new');
 
-    await chooseBlockType('Image');
+    const picker = within(await screen.findByRole('group', { name: 'Block type' }));
+    fireEvent.click(picker.getByRole('radio', { name: 'Image' }));
 
     // ImagePicker's own affordance — a bare TextField never renders this.
-    expect(await screen.findByRole('button', { name: /choose or upload/i })).toBeInTheDocument();
-
-    const urlInput = screen.getByRole('textbox', { name: 'Image' });
+    const content = within(screen.getByRole('heading', { name: 'Content', level: 2 }).closest('section'));
+    expect(content.getByRole('button', { name: /choose or upload/i })).toBeInTheDocument();
+    const urlInput = content.getByRole('textbox', { name: 'Image' });
     expect(urlInput).not.toHaveAttribute('type', 'url');
     expect(screen.queryByLabelText('Image size')).not.toBeInTheDocument();
     fireEvent.change(urlInput, { target: { value: 'cms-images/banner.jpg' } });
     expect(urlInput).toHaveValue('cms-images/banner.jpg');
 
-    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Banner' } });
+    fireEvent.change(content.getByLabelText('Alt text'), { target: { value: 'Banner' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save draft' })); });
+    expect(fetch).toHaveBeenCalled();
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
     expect(call).toBeTruthy();
     const body = JSON.parse(call[1].body);

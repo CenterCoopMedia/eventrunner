@@ -66,6 +66,9 @@ vi.mock('firebase/firestore', () => ({
 import App from '../../App.jsx';
 import { markTourDone } from '../tourState.js';
 import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
+// Load the route modules with the fixture so the first case measures the editor.
+import '../AdminApp.jsx';
+import './AdminPageEditor.jsx';
 
 const SCHOLARSHIPS_DRAFT = {
   id: 'scholarships',
@@ -155,17 +158,19 @@ describe('page editor server adoption', () => {
   it('saves and removes a paired translation through the existing draft action without changing English', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Spanish translation', exact: true })[0]);
-    fireEvent.change(screen.getByLabelText('Spanish navigation label'), { target: { value: 'Becas' } });
+    const page = within(screen.getByRole('heading', { name: 'Page', level: 2 }).closest('section'));
+    const saveDraft = screen.getByRole('button', { name: 'Save draft', exact: true });
+    fireEvent.click(page.getByRole('button', { name: 'Spanish translation', exact: true }));
+    fireEvent.change(page.getByLabelText('Spanish navigation label'), { target: { value: 'Becas' } });
     fetch.mockResolvedValueOnce(okResponse({ status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await act(async () => { fireEvent.click(saveDraft); });
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(bodyOf(0).page.label).toBe('Scholarships');
     expect(bodyOf(0).page.translations).toEqual({ es: { label: 'Becas' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Spanish translation' }));
+    fireEvent.click(page.getByRole('button', { name: 'Remove Spanish translation' }));
     fetch.mockResolvedValueOnce(okResponse({ status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await act(async () => { fireEvent.click(saveDraft); });
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(bodyOf(1).page).not.toHaveProperty('translations');
     expect(bodyOf(1).page.sections[0].id).toBe('intro');
   });
