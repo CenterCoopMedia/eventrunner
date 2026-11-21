@@ -275,6 +275,14 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
   );
 }
 
+/** Plain text as one escaped paragraph of rich text. */
+function plainTextAsParagraph(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return '';
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<p>${escaped}</p>`;
+}
+
 export default function AdminContentBlockEditor({ mode }) {
   const { pageId, sectionId, field: fieldParam } = useParams();
   const newBlockHref = useHref('../_new', { relative: 'path' });
@@ -327,6 +335,12 @@ export default function AdminContentBlockEditor({ mode }) {
   // the last successful save) — the reference point for clearing a PRIOR
   // type's stale fields when the operator switches types and saves again.
   const savedBlockTypeRef = useRef(null);
+  // The Short text form as it was when the operator switched away from it,
+  // so switching back restores the words and translations (issue #1184).
+  const shortTextRef = useRef(null);
+  // The type the editor adopted or last saved, for the picker: a live
+  // update from another session does not move it (issue #1184).
+  const [baseType, setBaseType] = useState(null);
 
   useEffect(() => {
     if (mode !== 'edit') return;
@@ -349,6 +363,8 @@ export default function AdminContentBlockEditor({ mode }) {
     setContent(editable);
     setSavedEdit(contentEditSnapshot(nextField, editable));
     savedBlockTypeRef.current = doc?.blockType ?? null;
+    setBaseType(doc?.blockType ?? null);
+    shortTextRef.current = null;
   }, [mode, sectionId, fieldParam, existingRow, contentReady]);
 
   useEffect(() => {
@@ -365,7 +381,11 @@ export default function AdminContentBlockEditor({ mode }) {
     // listed types on older sites, else the type of its starter block.
     const own = [...(section?.allowedBlocks ?? []), ...(section?.defaultBlocks ?? []).map((entry) => entry.blockType)];
     const mapUrl = canAddMap ? mapEmbedInput(searchParams.get('mapEmbed') ?? '') : '';
-    const fallback = mapUrl ? 'map' : (own.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0]);
+    const first = own.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0];
+    // New blocks are Text where the section takes it (issue #1184).
+    const fallback = mapUrl
+      ? 'map'
+      : (first === 'text' && (allowed.length === 0 || allowed.includes('richtext')) ? 'richtext' : first);
     const baseline = createFormBaseline({ fieldId, content, fallbackType: fallback });
     loadedKeyRef.current = 'create-defaults';
     setSavedEdit(baseline.snapshot);
@@ -471,12 +491,30 @@ export default function AdminContentBlockEditor({ mode }) {
   const currentFieldId = isExisting ? fieldParam ?? fieldId : fieldId;
 
   function changeBlockType(nextType) {
-    setContent((current) => ({
-      ...blankContent(nextType),
-      order: current.order,
-      visible: current.visible,
-      ...(Object.hasOwn(current, 'translations') ? { translations: {} } : {}),
-    }));
+    if (content.blockType === 'text' && nextType !== 'text') shortTextRef.current = content;
+    const restored = nextType === 'text' ? shortTextRef.current : null;
+    setContent((current) => {
+      if (restored) return { ...restored, order: current.order, visible: current.visible };
+      // Short text to Text (issue #1184) keeps the words, and the Spanish
+      // ones, as one paragraph, the way the public page drew them.
+      if (current.blockType === 'text' && nextType === 'richtext') {
+        const spanish = current.translations?.es?.value;
+        return {
+          ...current,
+          blockType: 'richtext',
+          values: { ...current.values, value: plainTextAsParagraph(current.values?.value) },
+          ...(typeof spanish === 'string' && spanish
+            ? { translations: { ...current.translations, es: { ...current.translations.es, value: plainTextAsParagraph(spanish) } } }
+            : {}),
+        };
+      }
+      return {
+        ...blankContent(nextType),
+        order: current.order,
+        visible: current.visible,
+        ...(Object.hasOwn(current, 'translations') ? { translations: {} } : {}),
+      };
+    });
   }
 
   function changeValue(name, value) {
@@ -491,6 +529,16 @@ export default function AdminContentBlockEditor({ mode }) {
   }
 
   async function save({ publish }) {
+    // Short text edited while this save runs keeps its own undo; the same
+    // words cached again by a round trip of switches do not.
+    // Only the words and translations: a restore takes order and
+    // visibility from the current form.
+    const shortTextKey = (form) => {
+      if (!form) return null;
+      const { values, translations } = contentEditSnapshot('', form);
+      return JSON.stringify({ values, translations });
+    };
+    const shortTextAtSave = shortTextKey(shortTextRef.current);
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -561,6 +609,10 @@ export default function AdminContentBlockEditor({ mode }) {
       setSavedDocId(docId);
       loadedKeyRef.current = `${sectionId}__${nextFieldId}`;
       savedBlockTypeRef.current = savedContent.blockType;
+      setBaseType(savedContent.blockType);
+      // A saved type change is the new starting point: an undo goes no
+      // further back than the last save.
+      if (shortTextKey(shortTextRef.current) === shortTextAtSave) shortTextRef.current = null;
       setSavedEdit(contentEditSnapshot(nextFieldId, savedContent));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
@@ -649,6 +701,9 @@ export default function AdminContentBlockEditor({ mode }) {
             <BlockTypePicker
               value={content.blockType}
               allowed={allowed}
+              // Unsaved short text kept for a switch back keeps the option
+              // too, even after a save of another type lands.
+              savedType={shortTextRef.current ? 'text' : baseType ?? undefined}
               sectionName={section?.label}
               onChange={changeBlockType}
               error={errorFor('blockType')}

@@ -18,8 +18,8 @@ import './blockTypePicker.css';
 
 /** One plain line per type, in the words staff use. */
 export const BLOCK_TYPE_SUMMARIES = Object.freeze({
-  text: 'A heading, label or one line of copy.',
-  richtext: 'One or more paragraphs, with bold text, links and lists.',
+  text: 'One line of plain text, such as a heading. No links or formatting.',
+  richtext: 'Paragraphs with links, bold, italics and lists.',
   image: 'A picture from the media library.',
   map: 'An interactive street map for the event venue or another place.',
   cta: 'A button that takes readers to another page.',
@@ -106,17 +106,27 @@ const Example = memo(function Example({ typeId }) {
  *   value: string,
  *   onChange: (id: string) => void,
  *   allowed?: string[],
+ *   savedType?: string,
  *   sectionName?: string,
  *   error?: string,
  * }} props
  */
-export default function BlockTypePicker({ value, onChange, allowed = [], sectionName, error }) {
+export default function BlockTypePicker({ value, onChange, allowed = [], savedType, sectionName, error }) {
   const name = useId();
   const errorId = `${name}-error`;
   const [grid, setGrid] = useState(null);
-  const takes = allowed.length ? allowed : BLOCK_TYPE_IDS;
+  // Short text is offered only where Text is not (issue #1184): Text takes
+  // links and emphasis, and staff found Short text could not. A block that
+  // is Short text already keeps it, and can be switched to Text and back
+  // until the change is saved.
+  const sectionTakes = allowed.length ? allowed : BLOCK_TYPE_IDS;
+  const keepsText = value === 'text' || savedType === 'text';
+  const takes = !keepsText && sectionTakes.includes('richtext')
+    ? sectionTakes.filter((id) => id !== 'text')
+    : sectionTakes;
   // What the section takes comes first; the rest follow, disabled.
-  const ordered = [...BLOCK_TYPE_IDS.filter((id) => takes.includes(id) || id === value), ...BLOCK_TYPE_IDS.filter((id) => !takes.includes(id) && id !== value)];
+  const offered = BLOCK_TYPE_IDS.filter((id) => id !== 'text' || takes.includes('text') || !sectionTakes.includes('text'));
+  const ordered = [...offered.filter((id) => takes.includes(id) || id === value), ...offered.filter((id) => !takes.includes(id) && id !== value)];
   const listed = value && !BLOCK_TYPE_IDS.includes(value) ? [value, ...ordered] : ordered;
   const words = takes.map((id) => blockTypeLabel(id).toLowerCase());
   const names = words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words[0];

@@ -208,7 +208,7 @@ describe('AdminContentBlockEditor value fields', () => {
     ]);
     const enabled = radios.filter((radio) => !radio.disabled).map((radio) => radio.value);
     expect(enabled).toEqual(['text', 'image', 'cta']);
-    const paragraphs = within(picker).getByRole('radio', { name: 'Paragraphs' });
+    const paragraphs = within(picker).getByRole('radio', { name: 'Text' });
     expect(paragraphs).toBeDisabled();
     expect(paragraphs).toHaveAccessibleDescription(/^Hero takes only short text, button and image\.$/);
     expect(within(picker).getByRole('radio', { name: 'Button' })).toHaveAccessibleDescription(
@@ -429,7 +429,7 @@ describe('AdminContentBlockEditor value fields', () => {
       }],
     }];
     await renderAt('/admin/content/about/intro/_new');
-    await chooseBlockType('Paragraphs');
+    await chooseBlockType('Text');
     const editor = await screen.findByRole('textbox', { name: 'Text' });
     await pasteHtml(editor, '<p><strong>Formatted</strong> body</p>', 'Formatted body');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -733,9 +733,9 @@ describe('content editing workspace', () => {
     await renderAt('/admin/content/home/hero/_new');
     expect(await screen.findByRole('radio', { name: 'Short text' })).toBeChecked();
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Banner' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text' }), { target: { value: 'Banner' } });
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Text'), { target: { value: '' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text' }), { target: { value: '' } });
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
   });
 
