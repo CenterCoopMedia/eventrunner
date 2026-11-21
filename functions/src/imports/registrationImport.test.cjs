@@ -107,6 +107,34 @@ test('a re-import changes nothing; a new file value lands unless the attendee ch
   assert.equal(db.read('ticket_answers', 'REG-1').uid, 'uid-ada');
 }));
 
+test('an import keeps a ticket and its answers intact when the row names a different address', withProvider('manual', async () => {
+  const db = dbWithForm();
+  await previewAndCommit(db, body());
+  const correctedEmail = 'corrected@example.org';
+  await db.collection('tickets').doc('REG-1').set({ email: correctedEmail }, { merge: true });
+  const savedTicket = db.read('tickets', 'REG-1');
+  const savedHold = db.read('ticket_answer_holds', 'REG-1');
+  const changed = { ...ROW, First: 'Grace', Newsroom: 'Herald', Lunch: 'Vegetable' };
+
+  const unlinked = dbWithForm({ 'tickets/REG-1': savedTicket });
+  for (const target of [db, unlinked]) {
+    const before = target.writes.length;
+    const { preview, commit } = await previewAndCommit(target, body([changed]));
+    for (const result of [preview, commit]) {
+      assert.equal(result.body.rows[0].verdict, 'error');
+      assert.match(result.body.rows[0].reasons[0], /email: .*different address/);
+    }
+    assert.deepEqual(writtenCollections(target, before), ['admin_logs']);
+  }
+  assert.deepEqual(db.read('tickets', 'REG-1'), savedTicket);
+  assert.deepEqual(db.read('ticket_answer_holds', 'REG-1'), savedHold);
+
+  const corrected = await previewAndCommit(db, body([{ ...changed, Email: correctedEmail }]));
+  assert.equal(corrected.commit.body.rows[0].verdict, 'update');
+  assert.equal(db.read('tickets', 'REG-1').firstName, 'Grace');
+  assert.deepEqual(db.read('ticket_answer_holds', 'REG-1').answers, { organization: 'Herald', q_meal: 'Vegetable' });
+}));
+
 test('the email of a claimed ticket never changes by import', withProvider('manual', async () => {
   const db = dbWithForm();
   await previewAndCommit(db, body());
