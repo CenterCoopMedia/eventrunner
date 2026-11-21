@@ -145,6 +145,16 @@ function isPublicPage(page, features) {
   return gate === null || features?.[gate] === true;
 }
 
+/** Revision of the stored content an editor opens, preferring the draft. */
+function pageEditRevision(draft, live) {
+  if (draft?.draftRevision) return draft.draftRevision;
+  if (draft) {
+    const updatedAt = draft.updatedAt;
+    return JSON.stringify(['draft', updatedAt?.toMillis?.() ?? updatedAt ?? null, draft.basedOnRevision ?? null]);
+  }
+  return live ? `live:${live.revision ?? 0}` : null;
+}
+
 module.exports = {
   builtInSectionBlockTypes,
   sectionBlockTypes,
@@ -153,4 +163,5 @@ module.exports = {
   isPublicPage,
   isNavigationLink,
   navigationLinkUrl,
+  pageEditRevision,
 };

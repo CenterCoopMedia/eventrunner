@@ -38,7 +38,7 @@ beforeEach(() => {
 
 describe('the result after a published delete', () => {
   it.each([
-    ['cmsPages', 'page', { label: 'Published page', path: '/page', systemPage: false, sections: [] }, false, 'cmsSavePage', { page: { label: 'Published page', path: '/page', systemPage: false, sections: [], id: 'page', visible: false }, create: true }],
+    ['cmsPages', 'page', { label: 'Published page', path: '/page', systemPage: false, sections: [] }, false, 'cmsSavePage', { page: { label: 'Published page', path: '/page', systemPage: false, sections: [], id: 'page', visible: false }, expectedRevision: null, create: true }],
     ['cmsUpdates', 'update', { title: 'Published update', body: 'Published text', publishAt: null, pinned: false }, true, 'cmsSaveUpdate', { id: 'update', update: { title: 'Published update', body: 'Published text', publishAt: null, pinned: false }, visible: true, restore: true }],
     ['cmsSchedule', 'session', { title: 'Published session', dayId: 'day-1', startTime: '09:00', endTime: '10:00' }, true, 'cmsCreateContent', { collection: 'cmsSchedule', docId: 'session', fields: { title: 'Published session', dayId: 'day-1', startTime: '09:00', endTime: '10:00' }, visible: true }],
     ['cmsOrganizations', 'org', { name: 'Published organization', order: 2 }, true, 'cmsCreateContent', { collection: 'cmsOrganizations', docId: 'org', fields: { name: 'Published organization', order: 2 }, visible: true }],
