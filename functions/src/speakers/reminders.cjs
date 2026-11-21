@@ -41,8 +41,8 @@
  *
  * A record left at "sending" for SENDING_STALE_MS (the instance died, or the
  * stamp after the send failed) is settled by the email core's claim for its
- * batch: a claim means the mail may have gone, so it counts as a reminder
- * sent at the attempt; no claim means it never reached the provider.
+ * batch. A claim leaves delivery uncertain and starts the cooldown at the
+ * time of the attempt. Without a claim the send failed before the provider.
  *
  * THE WORDING THE PREVIEW SHOWED. Preview returns `wordingVersion`, a digest
  * of the saved wording, or `shipped:` and a digest of the shipped wording.
