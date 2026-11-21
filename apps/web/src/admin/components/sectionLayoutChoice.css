@@ -1,6 +1,6 @@
 /* Section layout choice and preview (issue #1153). Admin tokens draw the
    choice; the site's theme reaches only the preview frames. */
-.admin-section-layout { display: grid; gap: var(--space-md); min-width: 0; }
+.admin-section-layout { display: grid; gap: var(--space-md); min-width: 0; container: section-layout / inline-size; }
 .admin-section-layout__choices { display: grid; gap: var(--space-xs); grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; border: 0; min-width: 0; }
 .admin-section-layout__legend { grid-column: 1 / -1; margin-bottom: var(--space-xs); font-family: var(--admin-font-ui); font-size: var(--admin-text-base); font-weight: 600; color: rgb(var(--admin-ink-rgb)); }
 .admin-section-layout__option {
@@ -36,10 +36,12 @@
 }
 .admin-section-layout__caption { margin-top: var(--space-2xs); font-family: var(--admin-font-data); font-size: var(--admin-text-xs); color: rgb(var(--admin-ink-secondary-rgb)); }
 .admin-section-layout__empty { font-size: var(--admin-text-sm); color: rgb(var(--admin-ink-secondary-rgb)); }
-@media (max-width: 40rem) {
+@container section-layout (max-width: 40rem) {
   .admin-section-layout__choices { grid-template-columns: minmax(0, 1fr); }
-  .admin-section-layout__option { flex-direction: row; align-items: center; }
-  .admin-section-layout__picture { width: 4rem; flex: none; }
+  .admin-section-layout__option { display: grid; grid-template-columns: 4rem minmax(0, 1fr); align-items: center; }
+  .admin-section-layout__picture { grid-row: span 2; }
+}
+@media (max-width: 40rem) {
   .admin-section-layout__frames { grid-template-columns: minmax(0, 1fr); }
 }
 /* A map's own page cannot run inside the preview's sandbox, so the

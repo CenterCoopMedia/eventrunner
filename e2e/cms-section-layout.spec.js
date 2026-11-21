@@ -4,16 +4,21 @@
 /* global getComputedStyle */
 import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, signIn } from './helpers.mjs';
+import { expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 import { RETRY_DELAY_MS } from '../apps/web/src/lib/retrySubscription.js';
 
 const CONTENT_TIMEOUT_MS = RETRY_DELAY_MS + 15_000;
 
-async function setVenueLayout(page, name) {
+async function openVenueLayout(page) {
   await page.goto('/admin/pages/travel');
   const venue = page.getByRole('button', { name: /^Venue \d+ blocks?$/ });
   await expect(venue).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
   if ((await venue.getAttribute('aria-expanded')) !== 'true') await venue.click();
-  const layout = page.getByRole('group', { name: 'Layout' }).first();
+  return page.getByRole('group', { name: 'Layout' }).first();
+}
+
+async function setVenueLayout(page, name) {
+  const layout = await openVenueLayout(page);
   await layout.getByRole('radio', { name }).check();
   // The preview beside the choice draws the section's own blocks, each
   // picture in its own document at its true width.
@@ -28,6 +33,37 @@ function venueColumns(page) {
   return page.locator('section', { has: page.getByRole('heading', { name: 'Venue', exact: true }) })
     .locator('.section-blocks--columns');
 }
+
+test('section layout choices give their descriptions room at phone widths and enlarged text', async ({ page }) => {
+  await signIn(page, ADMIN_EMAIL);
+  const layout = await openVenueLayout(page);
+  const cards = layout.locator('label');
+  await expect(cards).toHaveCount(3);
+
+  for (const profile of [{ width: 320 }, { width: 720, rootSize: 32 }]) {
+    await setReflowProfile(page, profile);
+    await expectTextFits(layout);
+    const geometry = await cards.evaluateAll((options) => options.map((card) => {
+      const { width, height } = card.getBoundingClientRect();
+      const name = card.querySelector('.admin-section-layout__name').getBoundingClientRect();
+      const summary = card.querySelector('.admin-section-layout__summary').getBoundingClientRect();
+      return {
+        fillsRow: Math.abs(width - card.parentElement.clientWidth) <= 1,
+        fits: card.scrollWidth - card.clientWidth <= 1,
+        largeEnough: width >= 44 && height >= 44,
+        summaryBelowName: summary.top >= name.bottom - 1,
+      };
+    }));
+    expect(geometry).toEqual(Array.from({ length: 3 }, () => ({
+      fillsRow: true, fits: true, largeEnough: true, summaryBelowName: true,
+    })));
+    await expectPageFits(page);
+  }
+
+  const wide = layout.getByRole('radio', { name: 'Wide', exact: true });
+  await wide.press('Space');
+  await expect(wide).toBeChecked();
+});
 
 test.describe.serial('section layout chosen in the page editor', () => {
   test('two columns publish to the public page, and fold to one on a phone', async ({ page }) => {
