@@ -623,6 +623,7 @@ test('getSystemError: route keeps only known route names, never caller-chosen se
     ['/updates', '/updates'],
     ['//attacker.example/alice', '/*'],
     ['javascript:alert(1)', '/*'],
+    [`https://event.example.org/speakers/${'x/'.repeat(110)}`, '/speakers/*/*/*'],
   ];
   for (const [url, route] of cases) assert.equal(internals.routeOf(url), route, url);
   assert.equal(internals.routeOf(null), null);
@@ -663,7 +664,7 @@ test('getSystemError: a malformed id is refused before any read', async () => {
     },
     runTransaction: db.runTransaction,
   };
-  for (const id of [undefined, '', 'short', 'x'.repeat(129), '../config/bootstrap', 'config/bootstrap', 'id with space', 42, ['AbCdEf0123456789wxyz']]) {
+  for (const id of [undefined, '', 'short', 'x'.repeat(129), '../config/bootstrap', 'config/bootstrap', 'id with space', '__name__', '__reserved_id__', 42, ['AbCdEf0123456789wxyz']]) {
     const res = fakeRes();
     await getHandler(watched)(req({ body: { id } }), res);
     assert.equal(res.statusCode, 400, `id ${JSON.stringify(id)}`);
@@ -684,11 +685,13 @@ test('getSystemError: a read failure is a 500 without the cause', async () => {
   const failing = {
     collection(c) {
       if (c !== 'system_errors') return db.collection(c);
-      return { doc: () => ({ get: async () => { throw new Error('backend detail'); } }) };
+      return { doc: () => ({ get: async () => { throw Object.assign(new Error('backend detail Bearer secret'), { code: 14 }); } }) };
     },
   };
+  const logged = [];
   const res = fakeRes();
-  await getHandler(failing)(req({ body: { id: 'AbCdEf0123456789wxyz' } }), res);
+  await getHandler(failing, { error: (...args) => logged.push(args) })(req({ body: { id: 'AbCdEf0123456789wxyz' } }), res);
   assert.equal(res.statusCode, 500);
   assert.ok(!JSON.stringify(res.body).includes('backend detail'));
+  assert.deepEqual(logged, [['getSystemError read failed', { code: 14 }]]);
 });
