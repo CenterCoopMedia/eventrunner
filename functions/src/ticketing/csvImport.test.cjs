@@ -291,6 +291,51 @@ test('ticketingImportCsv: commit idempotence — re-importing the same file is a
   assert.equal(db.ids('tickets').length, 1); // no duplicate document
 });
 
+test('ticketingImportCsv: re-import preserves unmapped class and status in the same ticket scope', async () => {
+  const eventId = 'server-event';
+  const claimed = ticket({ eventId, ticketClassId: 'workshop-only', claimedByUid: 'uid-1' });
+  const db = makeFakeDb({
+    'tickets/claimed': claimed,
+    'tickets/pending': { ...claimed, status: 'pending_info' },
+    'tickets/other-event': { ...claimed, eventId: 'other-event' },
+    'tickets/other-provider': { ...claimed, provider: 'eventbrite' },
+  });
+  const handler = createTicketingImportCsvHandler({ db, ...makeAuthDeps(), eventId, now: () => T0, log: QUIET });
+  const mapping = { email: 'Email', id: 'Order ID', name: 'Name' };
+  const row = (id, cells = {}) => ({ Email: 'a@example.com', 'Order ID': id, Name: 'Ada Byron', ...cells });
+  const rows = ['claimed', 'pending', 'other-event', 'other-provider', 'new'].map((id) => row(id));
+  const runImport = async (body) => {
+    const res = makeRes();
+    await handler(req({ body }), res);
+    assert.equal(res.statusCode, 200);
+    return res.body;
+  };
+
+  const preview = await runImport({ mapping, rows, dryRun: true });
+  assert.equal(db.read('tickets', 'claimed').lastName, 'Lovelace');
+  const committed = await runImport({ mapping, rows, dryRun: false });
+  assert.deepEqual(committed.rows, preview.rows);
+  assert.equal(committed.rows[1].status, 'pending_info');
+  assert.equal(db.read('tickets', 'pending').status, 'pending_info');
+  assert.equal(db.read('tickets', 'pending').ticketClassId, 'workshop-only');
+  assert.equal(db.read('tickets', 'claimed').ticketClassId, 'workshop-only');
+  assert.equal(db.read('tickets', 'claimed').claimedByUid, 'uid-1');
+  assert.equal(db.read('tickets', 'claimed').lastName, 'Byron');
+  for (const id of ['other-event', 'other-provider', 'new']) {
+    assert.equal(db.read('tickets', id).ticketClassId, null);
+  }
+  assert.equal(db.read('tickets', 'new').status, 'valid');
+
+  await runImport({
+    mapping: { ...mapping, ticketClassId: 'Type ID', status: 'Status' },
+    rows: [row('claimed', { 'Type ID': '' }), row('pending', { 'Type ID': 'day-pass', Status: 'Paid' })],
+    dryRun: false,
+  });
+  assert.equal(db.read('tickets', 'claimed').ticketClassId, null);
+  assert.equal(db.read('tickets', 'pending').ticketClassId, 'day-pass');
+  assert.equal(db.read('tickets', 'pending').status, 'valid');
+});
+
 test('ticketingImportCsv: too many rows is refused with a clear cap message', async () => {
   const { auth, getConfig } = makeAuthDeps();
   const handler = createTicketingImportCsvHandler({ db: makeFakeDb(), auth, getConfig, now: () => T0, log: QUIET });
