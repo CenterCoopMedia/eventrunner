@@ -108,6 +108,33 @@ for (const kind of ['page', 'invoice', 'session']) {
   });
 }
 
+test('a feedback alert link lands the start of a long message below the title band', async ({ page }) => {
+  const feedback = adminDb().collection('feedback').doc();
+  const firstLine = 'The venue map shows the old entrance.';
+  try {
+    await feedback.set({
+      category: 'bug', status: 'new', createdAt: new Date(),
+      message: `${firstLine}\n${'Details about the entrance.\n'.repeat(40)}`,
+    });
+    await signIn(page, ADMIN_EMAIL);
+    await page.setViewportSize({ width: 768, height: 540 });
+    await page.goto(`/admin/feedback?request=${encodeURIComponent(feedback.id)}`);
+
+    const row = page.getByRole('listitem').filter({ hasText: firstLine });
+    await expect(row).toBeFocused();
+    await expect(page.locator('.admin-job-line')).toHaveCSS('position', 'sticky');
+    await expect.poll(async () => {
+      const { bottom, boundary, top, viewport } = await focusGeometry(page);
+      return {
+        extendsBelowViewport: bottom > viewport,
+        startsJustBelowBand: top >= boundary - 1 && top <= boundary + 16,
+      };
+    }).toEqual({ extendsBelowViewport: true, startsJustBelowBand: true });
+  } finally {
+    await feedback.delete();
+  }
+});
+
 test('reverse-tab focus clears a scrolling table head and admin padding ends at public navigation', async ({ page }) => {
   const profileRef = adminDb().doc(`users/${await ensureUser(ADMIN_EMAIL)}`);
   const profile = await profileRef.get();
