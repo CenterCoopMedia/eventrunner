@@ -189,6 +189,39 @@ describe('admin Sessions workspace', () => {
     });
   });
 
+  it('sends Spanish session fields only when the editor changes or removes the translation', async () => {
+    await renderAt('/admin/sessions/panel');
+    const panel = {
+      id: 'panel', title: 'Panel', description: 'Panel description.', dayId: 'day-1',
+      startTime: '09:15', endTime: '10:00', visible: true, status: 'dirty',
+      translations: { es: { title: 'Título anterior' } },
+    };
+    await pushSessions([], [panel]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Spanish translation', exact: true }));
+    const spanishTitle = screen.getByLabelText('Spanish public title');
+    expect(spanishTitle).toHaveValue('Título anterior');
+
+    await pushSessions([], [{ ...panel, translations: { es: { title: 'Título nuevo' } } }]);
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Updated panel' } });
+    fetch.mockResolvedValue(response({ docId: 'panel', status: 'dirty' }));
+    const save = screen.getByRole('button', { name: 'Save', exact: true });
+    fireEvent.click(save);
+    expect(await screen.findByText('Draft saved. It is not live until you publish it.')).toBeInTheDocument();
+    expect(bodyOf(0).fields.title).toBe('Updated panel');
+    expect(bodyOf(0).fields).not.toHaveProperty('translations');
+
+    fireEvent.change(spanishTitle, { target: { value: 'Título definitivo' } });
+    fireEvent.click(save);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).fields.translations).toEqual({ es: { title: 'Título definitivo' } });
+    await waitFor(() => expect(save).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Spanish translation' }));
+    fireEvent.click(save);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(bodyOf(2).fields.translations).toBe('__cms_delete_field__');
+  });
+
   it('edits the draft speaker references and can clear the last one on publish', async () => {
     await renderAt('/admin/sessions/panel');
     const panel = {
