@@ -621,6 +621,23 @@ describe('page editor', () => {
     expect(screen.getByLabelText('Section 1 label')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('shows a real address conflict response at the web address field', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', "path: '/parking' is already used by page 'parking-id'"));
+    await renderAt('/admin/pages/scholarships');
+    const path = screen.getByLabelText('Path');
+    fireEvent.change(path, { target: { value: '/parking' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Another page already uses /parking. Choose a different web address.');
+    expect(path.closest('.admin-field')).toContainElement(alert);
+    expect(path).toHaveAccessibleDescription(/Another page already uses \/parking/);
+    expect(path).toHaveFocus();
+    expect(path).toHaveValue('/parking');
+    expect(screen.queryByText(/The action failed/)).not.toBeInTheDocument();
+  });
+
   it('describes the public path in plain words', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
@@ -641,11 +658,13 @@ describe('page editor', () => {
     expect(path).toHaveValue('');
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a web address that starts with /, such as /parking.');
+    expect(path.closest('.admin-field')).toContainElement(screen.getByRole('alert'));
     expect(path).toHaveFocus();
 
     fireEvent.change(path, { target: { value: '/pitch' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(screen.getByRole('alert')).toHaveTextContent('/pitch is used by the system. Choose another address, such as /pitch-a-session.');
+    expect(path.closest('.admin-field')).toContainElement(screen.getByRole('alert'));
     expect(path).toHaveAttribute('aria-invalid', 'true');
     expect(path).toHaveValue('/pitch');
     expect(fetch).not.toHaveBeenCalled();

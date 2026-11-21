@@ -571,7 +571,6 @@ function PageEditor({ mode }) {
     }
     const invalidAddress = addressError(address, page.systemPage);
     if (invalidAddress) {
-      setErrorTitle('Check the web address');
       setError({ fieldErrors: [{ field: 'path', message: invalidAddress }] });
       return;
     }
@@ -701,6 +700,8 @@ function PageEditor({ mode }) {
   const pathHelp = isSystemPage
     ? 'This built-in page has a fixed web address.'
     : 'The page’s web address, such as /scholarships.';
+  const pathError = errorFor('path');
+  const addressOnlyError = Boolean(pathError) && error.fieldErrors.length === 1;
   // "Existing" = a document the server has already written: an edited page,
   // or one this form just created.
   const isExisting = mode === 'edit' || savedId !== null;
@@ -729,7 +730,7 @@ function PageEditor({ mode }) {
         )}
         identifiers={address || null}
         description="Save a draft to keep your changes. Publish to show them on the site."
-        feedback={status || error ? <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} /> : null}
+        feedback={!pathError && (status || error) ? <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
           <>
             <Link to=".." relative="path" className={linkButtonClass}>
@@ -751,7 +752,7 @@ function PageEditor({ mode }) {
         }
       />
 
-      <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
+      {!addressOnlyError ? <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} /> : null}
       {error?.code === 'unauthenticated' && unsaved ? (
         <Notice tone="caution" message={localDraft.kept
           ? 'Your text is kept on this browser. Sign in again, return to this page, and choose Restore.'
@@ -846,7 +847,8 @@ function PageEditor({ mode }) {
             label="Path"
             value={address}
             onChange={(value) => update({ path: value })}
-            error={errorFor('path')}
+            error={pathError}
+            errorRole={addressOnlyError ? 'alert' : undefined}
             readOnly={isSystemPage}
             help={pathHelp}
             hint={pathHelp}

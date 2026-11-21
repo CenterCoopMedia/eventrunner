@@ -122,6 +122,7 @@ export function TextField({
   value,
   onChange,
   error,
+  errorRole,
   hint,
   help,
   warning,
@@ -173,7 +174,7 @@ export function TextField({
               ) : null}
             </div>
           ) : null}
-          {error ? <FieldError id={errorId} message={error} /> : null}
+          {error ? <FieldError id={errorId} message={error} role={errorRole} /> : null}
         </div>
       ) : null}
     </div>
