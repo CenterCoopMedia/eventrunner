@@ -1,0 +1,43 @@
+name: Editor reset check
+
+on:
+  push:
+    branches: [ofj-erdiscard1-check]
+
+permissions:
+  contents: read
+
+jobs:
+  editor-reset:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [before, after]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.5"
+          cache: npm
+      - if: matrix.source == 'before'
+        run: >-
+          git restore --source=e61c13fc67fcbdb5887cc5039e729c4e28af164e --
+          apps/web/src/admin/AdminApp.jsx
+          apps/web/src/admin/pages/AdminBranding.jsx
+          apps/web/src/admin/pages/AdminInvoiceEditor.jsx
+          apps/web/src/admin/pages/AdminRegistrationForm.jsx
+          apps/web/src/admin/pages/AdminUpdateEditor.jsx
+      - run: npm run prepare:functions
+      - run: npm ci
+      - name: Exercise the affected editor paths
+        run: >-
+          npm run test -w apps/web --
+          src/admin/pages/AdminBranding.test.jsx
+          src/admin/pages/AdminInvoices.test.jsx
+          src/admin/pages/AdminRegistrationForm.test.jsx
+          src/admin/pages/AdminSpeakers.test.jsx
+          src/admin/pages/AdminUpdates.test.jsx
+          -t 'reverts to the saved theme and clears errors|requires a new confirmation|stops a save when someone else saved first|discards the previous profile|loads the created update again'
