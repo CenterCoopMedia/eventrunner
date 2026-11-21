@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import EventRouter from './EventRouter.jsx';
+import { publicRoutes } from './routes.jsx';
 
 let delayedRemaps;
 vi.mock('./lib/presetRemaps.js', async (importOriginal) => {
@@ -291,11 +292,17 @@ describe('app shell', () => {
 
   it('gates the /attendees route and its nav link behind config/features.attendeeDirectory', async () => {
     renderAt('/attendees');
+    // Join the lazy imports started by the direct visit before asserting their gates.
+    await act(() => Promise.all([
+      publicRoutes.find(({ path }) => path === 'attendees').prefetch(),
+      import('./components/FooterPageLinks.jsx'),
+    ]));
     // The historical demo disables attendance. Enable a normal client
     // directory with an isolated live page/config before checking both gates.
-    expect(await screen.findByRole('heading', {
+    expect(screen.getByRole('heading', {
       name: 'This event doesn’t have an attendee directory',
     })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Site pages' })).toBeInTheDocument();
     expect(screen.queryAllByRole('link', { name: 'Attendees' })).toHaveLength(0);
     act(() => {
       contentSubscriptions.get('cmsPages').onNext([
