@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import seed from '../scripts/lib/seed.cjs';
-import store from '../functions/src/cms/store.cjs';
 import { ADMIN_EMAIL, adminAuth, adminDb, ensureUser } from './helpers.mjs';
+
+const store = createRequire(import.meta.url)('../functions/src/cms/store.cjs');
 
 test.use({ trace: 'off', screenshot: 'off' });
 
