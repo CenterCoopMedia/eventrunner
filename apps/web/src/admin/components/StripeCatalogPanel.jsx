@@ -90,6 +90,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
       const result = await call('ticketingCommerceAdmin', { action: 'catalog' });
       loadSaved(result.catalog);
       setPriceErrors({});
+      setTimeProblems({});
       setShowTimeErrors(false);
       setLoads((count) => count + 1);
       setRecoveryRequired(false);
