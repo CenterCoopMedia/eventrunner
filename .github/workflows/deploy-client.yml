@@ -460,7 +460,7 @@ jobs:
           region="${EVENT_FIREBASE_REGION:-us-central1}"
           image="${region}-docker.pkg.dev/${EVENT_FIREBASE_PROJECT_ID}/run-of-show/site-publisher:${GITHUB_SHA}"
           gcloud auth configure-docker "${region}-docker.pkg.dev" --quiet
-          docker build -f publisher/Dockerfile -t "$image" .
+          docker build -f publisher/Dockerfile --build-arg EVENT_BUILD_COMMIT="$GITHUB_SHA" -t "$image" .
           docker push "$image"
           echo "PUBLISHER_IMAGE=$image" >> "$GITHUB_ENV"
       - name: Write the Cloud Run job environment
@@ -663,6 +663,7 @@ jobs:
       - run: npm ci
       - name: Build the web app against the generated snapshot
         env:
+          EVENT_BUILD_COMMIT: ${{ github.sha }}
           GENERATED_DIR: ${{ runner.temp }}/generated
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
