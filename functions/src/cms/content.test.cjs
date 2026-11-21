@@ -1984,6 +1984,26 @@ test('a timeline update is judged on the merged entry', async () => {
   assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').description, ENTRY.description);
 });
 
+test('a partial timeline save keeps other edits in the newer draft', async () => {
+  const db = makeFakeDb({
+    'cmsTimeline/edition-2024': { ...ENTRY, visible: true },
+    'cmsTimeline_drafts/edition-2024': {
+      ...ENTRY, description: 'The organizers added a workshop.', url: '/schedule',
+      image: 'cms-images/edition/meeting.webp', alt: 'Attendees at a table', visible: false, status: 'dirty',
+    },
+  });
+  const res = await updateEntry(db, 'edition-2024', { title: 'The opening meeting' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsTimeline_drafts', 'edition-2024');
+  assert.equal(draft.title, 'The opening meeting');
+  assert.equal(draft.year, ENTRY.year);
+  assert.equal(draft.description, 'The organizers added a workshop.');
+  assert.equal(draft.url, '/schedule');
+  assert.equal(draft.image, 'cms-images/edition/meeting.webp');
+  assert.equal(draft.alt, 'Attendees at a table');
+  assert.equal(draft.visible, false);
+});
+
 test('a timeline update over a stored stray key saves, and the stray key is gone', async () => {
   const db = makeFakeDb({
     'cmsTimeline_drafts/edition-2024': { ...ENTRY, location: 'Hall A', status: 'dirty', visible: true },
