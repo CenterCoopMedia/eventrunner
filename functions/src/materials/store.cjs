@@ -71,7 +71,6 @@ const { logAdminAction } = require('../cms/store.cjs');
 
 const SESSIONS = 'cmsSchedule';
 const MATERIALS = 'session_materials';
-const MATERIALS_PUBLIC = 'session_materials_public';
 
 /** Base64 with optional padding, nothing else. */
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -578,45 +577,6 @@ async function deleteSessionMaterial({ db, materialId, actor, now = Date.now }) 
   return result;
 }
 
-/**
- * Cascade-delete every material (and its public projection) for a session
- * that is itself being deleted. Called from functions/src/cms/content.cjs's
- * `cmsDeleteContent` handler when the deleted collection is `cmsSchedule` —
- * without this, `deleteBoth` (cms/store.cjs) removes the live+draft
- * schedule doc but leaves `session_materials` and
- * `session_materials_public` rows behind, orphaned: the admin UI's
- * `listSessionMaterials` can no longer reach them (it looks up the session
- * first and 404s), and the public projection keeps serving metadata for a
- * session that no longer exists.
- *
- * Deliberately a plain batch, not a single transaction spanning the
- * schedule delete too — `deleteBoth` already owns that batch and does not
- * accept extra writes, and a session's material count is bounded by
- * MAX_MATERIALS_PER_SESSION, so one batch here (up to 2 writes per
- * material) never approaches Firestore's 500-write batch limit. The
- * schedule doc is already gone by the time this runs; the small window
- * where the session doc is absent but its materials still exist is a
- * cosmetic ordering detail, not a security or correctness gap (the
- * materials are already fully server-only either way).
- *
- * No `materialCount` decrement: the doc that field lived on is already
- * deleted.
- *
- * @param {{ db: object, sessionId: string }} args
- * @returns {Promise<{ deleted: number }>}
- */
-async function deleteMaterialsForSession({ db, sessionId }) {
-  const snap = await db.collection(MATERIALS).where('sessionId', '==', sessionId).get();
-  if (snap.empty) return { deleted: 0 };
-  const batch = db.batch();
-  for (const doc of snap.docs) {
-    batch.delete(doc.ref);
-    batch.delete(db.collection(MATERIALS_PUBLIC).doc(doc.id));
-  }
-  await batch.commit();
-  return { deleted: snap.docs.length };
-}
-
 /** Map a store.cjs error to an HTTP response. Shared by all three handlers
  * below so the error shape (spec: `{ error: { code, message } }`) stays
  * consistent across create/update/delete. */
@@ -777,7 +737,6 @@ module.exports = {
   uploadSessionMaterialRequest,
   updateSessionMaterial,
   deleteSessionMaterial,
-  deleteMaterialsForSession,
   get handlers() {
     return buildHandlers();
   },
@@ -795,7 +754,6 @@ module.exports = {
     isSpeakerOfSession,
     SESSIONS,
     MATERIALS,
-    MATERIALS_PUBLIC,
     MAX_MATERIALS_PER_SESSION,
     MAX_MATERIAL_FILENAME_LENGTH,
     decodeMaterialUpload,

@@ -204,21 +204,28 @@ test('cleanupDeletedMaterialFile: refuses to delete outside the material session
   assert.deepEqual(bucket.deleted, []);
 });
 
-test('material written handler: a Storage failure rejects so the event can retry', async () => {
+test('material written handler retries Storage cleanup without affecting a replacement session', async () => {
   const db = fakeDb();
   const handler = createHandleSessionMaterialWritten({ db, bucket: fakeBucket({ fail: true }) });
-  await assert.rejects(
-    handler({
-      materialId: 'm-file',
-      before: {
-        sessionId: 's1',
-        type: 'file',
-        storagePath: 'session-materials/s1/server-object-id',
-        managedStorageObject: true,
-      },
-    }),
-    /Storage unavailable/,
-  );
+  const deleted = {
+    materialId: 'm-file',
+    before: {
+      sessionId: 's1',
+      type: 'file',
+      storagePath: 'session-materials/s1/server-object-id',
+      managedStorageObject: true,
+    },
+  };
+  await assert.rejects(handler(deleted), /Storage unavailable/);
+
+  const replacement = { sessionId: 's1', type: 'file', storagePath: 'session-materials/s1/replacement-object' };
+  db.docs.set('cmsSchedule/s1', { title: 'Replacement session' });
+  db.docs.set('session_materials/m-replacement', replacement);
+  const bucket = fakeBucket();
+  const retry = createHandleSessionMaterialWritten({ db, bucket });
+  await retry(deleted);
+  assert.deepEqual(bucket.deleted, [{ path: deleted.before.storagePath, options: { ignoreNotFound: true } }]);
+  assert.deepEqual(db.docs.get('session_materials/m-replacement'), replacement);
 });
 
 test('cleanupDeletedMaterialFile: preserves objects registered by the legacy path', async () => {
