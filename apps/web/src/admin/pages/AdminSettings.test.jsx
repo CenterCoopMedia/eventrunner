@@ -1214,7 +1214,7 @@ describe('feature flags', () => {
     expect(schedule).toBeChecked();
     expect(schedule).toHaveAttribute('aria-invalid', 'true');
     expect(schedule).toHaveAccessibleDescription(/Show the public schedule\..*Check public schedule/);
-    expect(await screen.findByRole('alert')).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus());
   });
 });
 

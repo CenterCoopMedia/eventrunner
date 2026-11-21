@@ -527,7 +527,7 @@ describe('AdminContentBlockEditor value fields', () => {
     const mapUrl = 'https://www.google.com/maps/embed?pb=fixture&hl=en';
     await renderAt(`/admin/content/travel/travel_map/_new?${new URLSearchParams({ mapEmbed: mapUrl })}`);
 
-    expect(await screen.findByRole('radio', { name: 'Map' })).toBeChecked();
+    await screen.findByRole('radio', { name: 'Map', checked: true });
     expect(screen.getByRole('textbox', { name: 'Google Maps embed' })).toHaveValue(mapUrl);
     fireEvent.change(screen.getByRole('textbox', { name: 'Map label' }), { target: { value: 'Directions' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -754,9 +754,8 @@ describe('content editing workspace', () => {
       ? { ok: false, status: 400, json: async () => ({ error: { code: 'bad-request', message: 'order: must be a non-negative number' } }) }
       : okResponse({})));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveFocus();
-    expect(alert).toHaveTextContent('The change could not be saved. Try again.');
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus());
+    expect(screen.getByRole('alert')).toHaveTextContent('The change could not be saved. Try again.');
     expect(screen.queryByLabelText('Order')).toBeNull();
     expect(screen.getByRole('button', { name: 'Edit block settings' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByLabelText('Button text')).toHaveValue('Register now');
@@ -837,7 +836,7 @@ describe('content editing workspace', () => {
 
   it('marks a new block unsaved only after the operator edits it', async () => {
     await renderAt('/admin/content/home/hero/_new');
-    expect(await screen.findByRole('radio', { name: 'Short text' })).toBeChecked();
+    await screen.findByRole('radio', { name: 'Short text', checked: true });
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Text' }), { target: { value: 'Banner' } });
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
