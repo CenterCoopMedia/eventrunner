@@ -222,6 +222,38 @@ test('a session typed in the editor is matched, not made twice: by its title and
   assert.equal(mapped.read('cmsSchedule_drafts', 'keynote').title, 'Keynote');
 });
 
+test('a row without an event day needs an explicit link to update a same-title session', async () => {
+  const id = 'verification-at-speed';
+  const existing = {
+    title: ROW.Title, description: ROW.Abstract, dayId: 'day-1',
+    startTime: '09:30', endTime: '10:15', visible: true, revision: 1,
+  };
+  const db = makeDb({ [`cmsSchedule/${id}`]: existing });
+  const row = { Ref: ROW.Ref, Title: ROW.Title, Recording: 'https://video.example.org/1', Day: '' };
+  const mapping = { externalId: 'Ref', title: 'Title', recordingUrl: 'Recording' };
+
+  for (const columns of [mapping, { ...mapping, day: 'Day' }]) {
+    const { preview, commit } = await previewAndCommit(db, body([row], columns));
+    for (const result of [preview, commit]) {
+      assert.equal(result.body.rows[0].verdict, 'error');
+      assert.ok(result.body.rows[0].reasons.includes('dayId: must name an event day'));
+    }
+    assert.deepEqual(db.ids('cmsSchedule_drafts'), []);
+    assert.equal(db.ids('record_imports').length, 0);
+  }
+
+  const linked = await previewAndCommit(db, body([{ ...row, Id: id }], { ...mapping, slug: 'Id' }));
+  assert.equal(linked.commit.body.rows[0].verdict, 'update');
+  assert.equal(sessionKey(db, row.Ref).docId, id);
+  assert.equal(db.read('cmsSchedule_drafts', id).recordingUrl, row.Recording);
+
+  const nextRecording = 'https://video.example.org/2';
+  const reimport = await previewAndCommit(db, body([{ ...row, Recording: nextRecording }], mapping));
+  assert.equal(reimport.commit.body.rows[0].verdict, 'update');
+  assert.equal(db.read('cmsSchedule_drafts', id).recordingUrl, nextRecording);
+  assert.deepEqual(db.read('cmsSchedule', id), existing);
+});
+
 test('a mapped ID that another external ID imported, or an earlier row uses, is a row error', async () => {
   const db = makeDb();
   const withId = { ...MAPPING, slug: 'Slug' };
