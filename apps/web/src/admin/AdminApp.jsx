@@ -14,7 +14,7 @@
 // from answering before the probe has. Which TIER the admin holds is
 // AdminLayout's concern: each docket item declares the tier it needs, and
 // the layout hides the rest and refuses their routes (issue #186).
-import { Suspense, useContext, useEffect, useState } from 'react';
+import { Fragment, Suspense, useContext, useEffect, useState } from 'react';
 import { lazyPage as lazy } from '../lib/routePage.jsx';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { clearReloadFlag } from '../lib/chunkReload.js';
@@ -149,6 +149,11 @@ function AdminPageBoundary() {
   );
 }
 
+function RecordRoute({ children }) {
+  const { pathname } = useLocation();
+  return <Fragment key={pathname}>{children}</Fragment>;
+}
+
 export function AdminGate({ children }) {
   const { user, adminStatus, adminCheckFailed, loading, refreshAdminStatus } = useAuth();
   const location = useLocation();
@@ -279,7 +284,7 @@ export default function AdminApp({ routeAttempt }) {
             element={<DeferredAdminPage label="entry"><AdminTimelineEditor mode="edit" /></DeferredAdminPage>}
           />
           <Route path="speakers" element={<StaticAdminPage><AdminSpeakersList /></StaticAdminPage>} />
-          <Route path="speakers/new" element={<StaticAdminPage><AdminSpeakerEditor mode="create" /></StaticAdminPage>} />
+          <Route path="speakers/new" element={<StaticAdminPage><RecordRoute><AdminSpeakerEditor mode="create" /></RecordRoute></StaticAdminPage>} />
           {/* Two segments, so no speaker id can shadow it: an id holds no slash. */}
           <Route
             path="speakers/reminders/send"
@@ -289,7 +294,7 @@ export default function AdminApp({ routeAttempt }) {
             path="speakers/mail/wording"
             element={<DeferredAdminPage label="speaker email wording"><AdminSpeakerMail /></DeferredAdminPage>}
           />
-          <Route path="speakers/:speakerId" element={<StaticAdminPage><AdminSpeakerEditor mode="edit" /></StaticAdminPage>} />
+          <Route path="speakers/:speakerId" element={<StaticAdminPage><RecordRoute><AdminSpeakerEditor mode="edit" /></RecordRoute></StaticAdminPage>} />
           {/* The rail links to the section; the attendee schedule (#518)
               joins the same page, so the section opens on it. */}
           <Route path="reminders" element={<Navigate to="scheduled" replace />} />
@@ -313,7 +318,7 @@ export default function AdminApp({ routeAttempt }) {
           />
           <Route path="content" element={<DeferredAdminPage label="content"><AdminContentPages /></DeferredAdminPage>} />
           <Route path="content/:pageId" element={<StaticAdminPage><AdminContentSections /></StaticAdminPage>} />
-          <Route path="content/:pageId/:sectionId" element={<DeferredAdminPage label="section content"><AdminContentSection /></DeferredAdminPage>} />
+          <Route path="content/:pageId/:sectionId" element={<DeferredAdminPage label="section content"><RecordRoute><AdminContentSection /></RecordRoute></DeferredAdminPage>} />
           {/* '_new', not 'new': a cmsContent field id may legitimately BE
               'new' (SECTION_FIELD_RE only requires an alnum first
               character), which would collide with a static 'new' segment —
@@ -324,11 +329,11 @@ export default function AdminApp({ routeAttempt }) {
               route can never collide with one. */}
           <Route
             path="content/:pageId/:sectionId/_new"
-            element={<DeferredAdminPage label="the block editor"><AdminContentBlockEditor mode="create" /></DeferredAdminPage>}
+            element={<DeferredAdminPage label="the block editor"><RecordRoute><AdminContentBlockEditor mode="create" /></RecordRoute></DeferredAdminPage>}
           />
           <Route
             path="content/:pageId/:sectionId/:field"
-            element={<DeferredAdminPage label="the block editor"><AdminContentBlockEditor mode="edit" /></DeferredAdminPage>}
+            element={<DeferredAdminPage label="the block editor"><RecordRoute><AdminContentBlockEditor mode="edit" /></RecordRoute></DeferredAdminPage>}
           />
           <Route
             path="settings"

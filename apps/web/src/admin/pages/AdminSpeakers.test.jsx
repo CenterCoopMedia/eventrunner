@@ -11,7 +11,7 @@
 //   • Server 400 → surfaced VERBATIM, including each `field: reason`.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { Link, MemoryRouter } from 'react-router';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
 vi.mock('../../lib/contentSource.js', () => ({
@@ -90,12 +90,13 @@ function errorResponse(status, code, message) {
   return { ok: false, status, json: async () => ({ error: { code, message } }) };
 }
 
-async function renderAt(path) {
+async function renderAt(path, children = null) {
   const result = render(
     <MemoryRouter
       initialEntries={[path]}
     >
       <App />
+      {children}
     </MemoryRouter>,
   );
   await act(async () => {
@@ -285,6 +286,28 @@ describe('speaker editor', () => {
     expect(urlOf(0)).toMatch(/updateSpeaker$/);
     expect(bodyOf(0).speakerId).toBe('rae-okonkwo');
     expect(bodyOf(0).speaker).toEqual({ bio: 'Updated bio.' });
+  });
+
+  it('discards the previous profile when moving directly to a second speaker', async () => {
+    const sam = { ...RAE, id: 'sam-example', firstName: 'Sam', lastName: 'Example', slug: 'sam-example', bio: 'Second profile.', headshotPath: '' };
+    speakerDocs = [RAE, sam];
+    fetch.mockResolvedValue(okResponse({ speakerId: sam.id }));
+    await renderAt('/admin/speakers/rae-okonkwo', <Link to={`/admin/speakers/${sam.id}`}>Open second profile</Link>);
+
+    const firstBio = await screen.findByLabelText('Bio');
+    await waitFor(() => expect(firstBio).toHaveValue(RAE.bio));
+    fireEvent.change(firstBio, { target: { value: 'Discard this first-speaker draft.' } });
+    fireEvent.click(screen.getByRole('link', { name: 'Open second profile' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Bio')).toHaveValue(sam.bio));
+    expect(screen.getByLabelText('First name')).toHaveValue('Sam');
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Update the second profile.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Saved. The public directory updates within moments.');
+    expect(urlOf(0)).toMatch(/updateSpeaker$/);
+    expect(bodyOf(0)).toMatchObject({ speakerId: sam.id, speaker: { bio: 'Update the second profile.' } });
+    expect(bodyOf(0).speaker.firstName ?? sam.firstName).toBe(sam.firstName);
   });
 
   it('shows the speaker logistics to staff and saves pronouns with the profile', async () => {

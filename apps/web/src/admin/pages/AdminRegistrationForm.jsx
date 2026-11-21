@@ -72,6 +72,7 @@ export default function AdminRegistrationForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState('');
+  const [previewKey, setPreviewKey] = useState(0);
   const errorRef = useRef(null);
   useEffect(() => subscribeRegistrationForm((data) => { setLive(data); setListError(null); }, setListError), []);
   // The first snapshot seeds the editor; later ones only raise the notice.
@@ -114,6 +115,14 @@ export default function AdminRegistrationForm() {
     edit({ custom });
   };
 
+  function loadCurrent() {
+    if (busy) return;
+    setDraft(toDraft(live));
+    setError(null);
+    setResult('Current version loaded.');
+    setPreviewKey((key) => key + 1);
+  }
+
   async function save(event) {
     event.preventDefault();
     if (busy || conflict) return;
@@ -141,7 +150,7 @@ export default function AdminRegistrationForm() {
       {conflict ? (
         <div className="flex flex-col gap-xs">
           <Notice tone="caution" message="Someone saved the registration form after you opened it. Your unsaved changes are still below. Load the current version to continue." />
-          <div><button type="button" className={secondaryButtonClass} onClick={() => { setDraft(toDraft(live)); setError(null); setResult('Current version loaded.'); }}>Load the current version</button></div>
+          <div><button type="button" className={secondaryButtonClass} onClick={loadCurrent} disabled={busy}>Load the current version</button></div>
         </div>
       ) : null}
       <ServerErrorSummary error={error} errorRef={errorRef} title="The form could not be saved" />
@@ -199,7 +208,7 @@ export default function AdminRegistrationForm() {
         </form>
 
         <Panel title="Preview" description="Try the questions as an attendee.">
-          <RegistrationFormPreview form={form} />
+          <RegistrationFormPreview key={previewKey} form={form} />
         </Panel>
       </div>
     </div>

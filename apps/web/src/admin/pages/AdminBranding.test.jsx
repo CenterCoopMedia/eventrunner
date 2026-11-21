@@ -945,15 +945,19 @@ describe('publishing the theme', () => {
     expect(screen.getByLabelText('Favicon')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('reverts to the saved theme on request', async () => {
+  it('reverts to the saved theme and clears errors for the discarded draft', async () => {
     await renderBranding();
     openAdvanced();
     fireEvent.change(screen.getByLabelText('Primary'), { target: { value: RUST } });
     await waitFor(() => expect(previewCss()).toContain('200 75 49'));
 
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'The draft theme could not be published.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+    expect(await screen.findByText('The draft theme could not be published.')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Revert to the saved theme' }));
     await waitFor(() => expect(previewCss()).toContain('42 157 143'));
     expect(screen.getByLabelText('Primary')).toHaveValue(TEAL);
+    expect(screen.queryByText('The draft theme could not be published.')).toBeNull();
   });
 
   it('says whether the draft is published or not, in the job line', async () => {

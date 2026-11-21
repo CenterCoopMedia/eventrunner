@@ -476,6 +476,7 @@ export default function AdminBranding() {
   const reseedFromTheme = useCallback((themeDoc) => {
     clearThemePreview();
     setForm(toForm(themeDoc));
+    setError(null);
   }, []);
 
   // Adopt the runtime doc once CONFIG/THEME itself arrives, then leave the
