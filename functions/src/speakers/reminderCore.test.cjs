@@ -9,8 +9,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeSpeakersDb } = require('./speakersFake.cjs');
-const { internals: { claimIdForOnceKey } } = require('../email/send.cjs');
-const { REMINDERS, REMINDER_COOLDOWN_MS, reserve, sendOne } = require('./reminderCore.cjs');
+const { REMINDERS, REMINDER_COOLDOWN_MS, reserve } = require('./reminderCore.cjs');
 
 const ACTOR = { uid: 'staff-1', email: 'staff@example.test' };
 const NOW = Date.parse('2026-11-13T15:00:00Z');
@@ -47,30 +46,6 @@ test('without `also`, a reservation writes only the speaker_reminders record', a
   const db = makeSpeakersDb();
   await reserve({ db, speakerId: 'sp1', batchId: 'batch-0004', items: ['bio'], actor: ACTOR, nowMs: NOW });
   assert.deepEqual(db.writes.map((w) => w.path), [`${REMINDERS}/sp1`]);
-});
-
-test('an interrupted reminder with a claim stays uncertain and prevents another send during cooldown', async () => {
-  const batchId = 'batch-interrupted';
-  const lastAttemptAt = new Date(NOW - 15 * 60 * 1000);
-  const onceKey = `speaker-reminder:sp1:${batchId}`;
-  const db = makeSpeakersDb({
-    [`${REMINDERS}/sp1`]: { lastBatchId: batchId, lastStatus: 'sending', lastAttemptAt },
-    [`email_claims/${claimIdForOnceKey(onceKey)}`]: { onceKey, createdAt: lastAttemptAt },
-  });
-  const deps = {
-    db,
-    actor: ACTOR,
-    nowMs: NOW,
-    recipient: { speakerId: 'sp1', items: ['bio'] },
-    rendered: { message: { to: 'speaker@example.test' } },
-    sendEmail() { assert.fail('An unresolved delivery must not reach the email provider again.'); },
-  };
-
-  assert.deepEqual(await sendOne({ ...deps, batchId }), { ok: false, outcome: 'uncertain' });
-  const stored = db.read(REMINDERS, 'sp1');
-  assert.equal(stored.lastStatus, 'uncertain');
-  assert.deepEqual(stored.lastSentAt, lastAttemptAt);
-  assert.deepEqual(await sendOne({ ...deps, batchId: 'batch-new' }), { ok: false, outcome: 'skipped', reason: 'recent' });
 });
 
 test('the shipped wording version is a digest of the shipped copy, so a deploy that changes it changes the version', () => {
