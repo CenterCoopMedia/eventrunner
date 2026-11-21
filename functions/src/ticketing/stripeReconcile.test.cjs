@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const { reconcileStripeOrder } = require('./stripeReconcile.cjs');
+const { drainTicketSyncQueue } = require('./sync.cjs');
 const { recomputeEntitlement } = require('./entitlement.cjs');
 const { publishTicketAccessPolicy } = require('./resourceGrants.cjs');
 
@@ -345,6 +346,45 @@ test('an expired reconciliation worker cannot overwrite a newer refund result', 
   assert.equal((await first).complete, false);
   assert.equal(db.read('ticket_orders', ORDER.id).refundedAmount, 3000);
   assert.equal(db.read('tickets', ORDER.ticketIds[0]).status, 'refunded');
+});
+
+test('the queue retries when a superseded Stripe read reports a mismatch', async () => {
+  const { db, provider } = fixture();
+  const queue = db.collection('ticket_sync_queue').doc(ORDER.id);
+  await queue.set({ orderId: ORDER.id, status: 'pending', provider: 'stripe', readyAt: T0, attempts: 0 });
+  let at = T0;
+  const now = () => at;
+  const log = { error() {}, warn() {} };
+  const reconcile = () => reconcileStripeOrder({ db, provider, orderId: ORDER.id, now, log });
+  provider.ownsTicketPersistence = true;
+  provider.fetchOrder = reconcile;
+  provider.readFinancialState = async () => {
+    at = new Date(T0.getTime() + 6 * 60_000);
+    provider.readFinancialState = async () => { throw new Error('Stripe read failed'); };
+    await assert.rejects(reconcile(), /Stripe reconciliation is temporarily unavailable/);
+    const delayed = state();
+    delayed.session.currency = 'eur';
+    return delayed;
+  };
+  const alerts = [];
+  const drain = () => drainTicketSyncQueue({ db, provider, now, log, notifyOperator: (event) => alerts.push(event) });
+
+  const interrupted = await drain();
+  assert.equal(interrupted.completed, 0);
+  assert.equal(interrupted.retried, 1);
+  const pending = (await queue.get()).data();
+  assert.equal(pending.status, 'pending');
+  assert.equal(pending.attempts, 0);
+  assert.equal(db.read('ticket_orders', ORDER.id).reconciliationException, undefined);
+  assert.deepEqual(alerts, []);
+
+  provider.readFinancialState = async () => state();
+  at = pending.readyAt;
+  assert.equal((await drain()).completed, 1);
+  assert.equal((await queue.get()).exists, false);
+  assert.equal(db.read('ticket_orders', ORDER.id).paymentStatus, 'succeeded');
+  assert.equal(db.read('ticket_inventory', 'current').sold, 2);
+  assert.deepEqual(db.ids('tickets').sort(), ORDER.ticketIds);
 });
 
 test('a local cancellation racing with provider retrieval remains cancelled', async () => {
