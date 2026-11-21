@@ -28,10 +28,33 @@ function sourcePresenters(baseline) {
 function matchedPresenters(incoming, previous, mapping) {
   const [lead, ...coPresenters] = incoming;
   const [previousLead, ...previousCoPresenters] = previous;
-  return [{ ...lead,
+  const matchedLead = { ...lead,
     name: mapping.name ? lead.name : previousLead?.name ?? null,
     role: mapping.role ? lead.role : previousLead?.role ?? null,
-  }, ...(mapping.coPresenters ? coPresenters : previousCoPresenters)];
+  };
+  if (!mapping.coPresenters) return [matchedLead, ...previousCoPresenters];
+  return [matchedLead, ...coPresenters.map((person, index) => {
+    const prior = previousCoPresenters.find(({ email }) => email === person.email);
+    const fields = mapping.coPresenters[index];
+    return { ...person,
+      organization: fields.organization ? person.organization : prior?.organization ?? null,
+      role: fields.role ? person.role : prior?.role ?? null,
+    };
+  })];
+}
+
+function preserveCoPresenterEdits(incoming, previous, current) {
+  if (sameValue(incoming, previous)) return current;
+  return incoming.map((person) => {
+    const stored = current.find(({ email }) => email === person.email);
+    if (!stored) return person;
+    const prior = previous.find(({ email }) => email === person.email);
+    const next = { ...person };
+    for (const field of ['name', 'organization', 'role']) {
+      if (sameValue(person[field], prior?.[field])) next[field] = stored[field] ?? null;
+    }
+    return next;
+  });
 }
 
 // Staff-only imports have stable source/external-id identities. Validate the
@@ -100,7 +123,9 @@ async function importPitches({ db, actor, body, at }) {
         const [lead, ...incomingCoPresenters] = presenters;
         const [currentLead, ...currentCoPresenters] = stored.presenters ?? [];
         const [previousLead, ...previousCoPresenters] = previousPresenters;
-        const coPresenters = currentLead && sameValue(incomingCoPresenters, previousCoPresenters) ? currentCoPresenters : incomingCoPresenters;
+        const coPresenters = patch.presenters && currentLead
+          ? preserveCoPresenterEdits(incomingCoPresenters, previousCoPresenters, currentCoPresenters)
+          : incomingCoPresenters;
         if (coPresenters.some((person) => person.email === email)) {
           fail(400, 'bad-request', `Row ${i + 1}: The lead email is already used by a co-presenter. Match the presenter columns to update both.`);
         }
