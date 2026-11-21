@@ -11,16 +11,20 @@ const SHA = /^[0-9a-f]{40}$/;
 async function readLiveState({ repository, environment, read }) {
   async function* deployments() {
     let previous;
+    const seen = new Set();
     for (let page = 1; page <= 3; page += 1) {
       const rows = await read(`/repos/${repository}/deployments?environment=${encodeURIComponent(environment)}&per_page=100&page=${page}`);
       if (!Array.isArray(rows) || rows.length > 100) throw new Error('Invalid deployment history');
       for (const row of rows) {
+        const created = Date.parse(row.created_at);
+        // GitHub can allocate a higher ID to an earlier deployment.
         if (!Number.isSafeInteger(row.id) || row.id <= 0 || !SHA.test(row.sha) ||
-            row.environment !== environment || !Number.isFinite(Date.parse(row.created_at)) ||
-            (previous && (row.id >= previous.id || Date.parse(row.created_at) > Date.parse(previous.created_at)))) {
+            row.environment !== environment || !Number.isFinite(created) || seen.has(row.id) ||
+            (previous && (created > previous.created || (created === previous.created && row.id >= previous.id)))) {
           throw new Error('Cannot verify deployment identity or history order');
         }
-        previous = row;
+        seen.add(row.id);
+        previous = { id: row.id, created };
         yield row;
       }
       if (rows.length < 100) return;

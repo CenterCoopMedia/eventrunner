@@ -52,7 +52,7 @@ async function guard({ rows = [], states = {}, jobs = {}, ancestry = [], fetchEr
         const state = statuses(id)[0]?.state;
         body = {
           id: Number(job[1]), run_id: id + 1000, head_sha: rows.find((row) => row.id === id).sha,
-          name: environment === 'console' ? 'Deploy the console' : `Deploy (${env.EVENT_DEPLOY_ENVIRONMENT}) / Deploy hosting`,
+          name: environment === 'console' ? 'Deploy the console' : `Deploy (${environment || env.EVENT_DEPLOY_ENVIRONMENT}) / Deploy hosting`,
           conclusion: ['success', 'inactive'].includes(state) ? 'success' : 'failure',
           steps: [], ...jobs[id],
         };
@@ -110,6 +110,33 @@ test('an older live ancestor permits a forward deploy', async () => {
     ['merge-base', '--is-ancestor', RUN, OLDER],
     ['merge-base', '--is-ancestor', OLDER, RUN],
   ]);
+});
+
+test('client deploy history is ordered by creation time when job deployment IDs cross', async () => {
+  const environment = 'fresh-nov11-ae21';
+  const liveSHA = 'b72603ee195e6909f55628ed51425354e1e7b411';
+  const rows = [
+    [7949115549, '18:12:57'], [7949061204, '18:10:22'], [7949044876, '18:09:36'],
+    [7948876336, '18:01:31'], [7948861589, '18:00:53'], [7948861591, '18:00:52'],
+    [7948861588, '18:00:52'], [7948854060, '18:00:32'],
+  ].map(([id, time]) => ({ id, sha: liveSHA, environment, created_at: `2026-11-20T${time}Z` }));
+  const states = Object.fromEntries(rows.slice(1).map(({ id }) => [id, [{ state: 'inactive' }]]));
+  rows.push({ id: 7943320410, sha: OLDER, environment, created_at: '2026-11-20T13:52:31Z' });
+  const jobs = {
+    7949115549: { name: `Deploy (${environment}) / Post-deploy smoke test` },
+    7949061204: { name: `Deploy (${environment}) / Refresh the SSR meta functions after hosting (template ordering)` },
+  };
+  const forward = await guard({ rows, states, jobs, environment, ancestry: [1, 0] });
+  assert.equal(forward.code, 0, forward.messages);
+  assert.match(forward.messages, new RegExp(`live_sha=${liveSHA}`));
+  assert.deepEqual(forward.git, [
+    ['merge-base', '--is-ancestor', RUN, liveSHA],
+    ['merge-base', '--is-ancestor', liveSHA, RUN],
+  ]);
+
+  const backward = await guard({ rows, states, jobs, environment, ancestry: [0] });
+  assert.equal(backward.code, 1);
+  assert.match(backward.messages, /newer descendant is already live/);
 });
 
 test('an environment never deployed permits its first deploy', async () => {
@@ -220,6 +247,15 @@ test('SHA groups span API pages and an exhausted history fails closed', async ()
   const exhausted = await guard({ rows: Array.from({ length: 300 }, (_, i) => deployment(300 - i, NEWER)) });
   assert.equal(exhausted.code, 1);
   assert.match(exhausted.messages, /history window/);
+});
+
+test('duplicate deployment IDs across pages fail closed even with older timestamps', async () => {
+  const rows = Array.from({ length: 100 }, (_, i) => deployment(300 - i, NEWER));
+  rows.push({ ...deployment(200, NEWER), id: 300 });
+  const result = await guard({ rows });
+  assert.equal(result.code, 1);
+  assert.match(result.messages, /Cannot verify deployment identity or history order/);
+  assert.deepEqual(result.git, []);
 });
 
 test('job API failures, missing links, and mismatched job identity fail closed', async () => {
