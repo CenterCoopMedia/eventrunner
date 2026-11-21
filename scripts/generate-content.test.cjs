@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { main, readDeployment } = require('./generate-content.cjs');
+const { emitSiteContent } = require('./lib/emit.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -190,6 +191,54 @@ test('an unpublished (visible: false) live doc never reaches the snapshot', asyn
   const snapshot = await readDeployment({ db });
 
   assert.deepEqual(snapshot.content, []);
+});
+
+test('publishes dimensions only for referenced library images with ready manifests', async () => {
+  const hall = 'cms-images/first/hall.jpg';
+  const foyer = 'cms-images/second/foyer.webp';
+  const missing = 'cms-images/third/stage.png';
+  const privateImage = 'cms-images/private/draft.jpg';
+  const image = (id, url, visible = true) => ({ __id: id, blockType: 'image', url, visible });
+  const db = readFake({ config: CONFIG, collections: {
+    cmsContent: [
+      image('hall', hall),
+      image('hall-again', hall),
+      image('foyer', foyer),
+      image('missing', missing),
+      image('external', 'https://example.org/photo.jpg'),
+      image('unpublished', privateImage, false),
+    ],
+    cmsContent_drafts: [image('draft', privateImage)],
+  } });
+  const requested = [];
+  const snapshot = await readDeployment({
+    db,
+    storageBucket: 'demo-bucket',
+    async fetchImpl(url, options) {
+      const parsed = new URL(url);
+      assert.equal(parsed.origin, 'https://firebasestorage.googleapis.com');
+      assert.equal(parsed.search, '?alt=media');
+      assert.equal(options.redirect, 'error');
+      const object = decodeURIComponent(parsed.pathname.split('/').at(-1));
+      requested.push(object);
+      if (object.startsWith('cms-images/third/')) throw new Error('Storage unavailable');
+      const manifest = {
+        status: 'ready', sourceGeneration: '7', width: 1200, sizes: [],
+        ...(object.startsWith('cms-images/first/') ? { source: hall, height: 800 } : { source: foyer }),
+      };
+      return { ok: true, json: async () => manifest };
+    },
+  });
+  assert.deepEqual(requested.sort(), [
+    'cms-images/first/_sizes/manifest.json',
+    'cms-images/second/_sizes/manifest.json',
+    'cms-images/third/_sizes/manifest.json',
+  ]);
+  assert.deepEqual(snapshot.imageDimensions, { [hall]: { width: 1200, height: 800 } });
+  assert.match(
+    emitSiteContent(snapshot.content, snapshot.imageDimensions),
+    /export const imageDimensions = \{\s+'cms-images\/first\/hall\.jpg': \{\s+width: 1200,\s+height: 800,/,
+  );
 });
 
 // Speakers come from the one-way `speakers_public` projection, never from

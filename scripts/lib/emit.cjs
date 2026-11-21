@@ -180,9 +180,10 @@ function emitEventConfig({ event, features, theme, launch = null }) {
  * siteContent.js — published cmsContent docs as a `<section>__<field>` map.
  *
  * @param {object[]} contentDocs
+ * @param {Record<string, { width: number, height: number }>} imageDimensions
  * @returns {string}
  */
-function emitSiteContent(contentDocs) {
+function emitSiteContent(contentDocs, imageDimensions = {}) {
   const sorted = [...contentDocs].sort((a, b) => a.id.localeCompare(b.id));
   const map = {};
   for (const doc of sorted) {
@@ -206,6 +207,8 @@ function emitSiteContent(contentDocs) {
     ]),
     '',
     `export const siteContent = ${jsValue(map)};`,
+    '',
+    `export const imageDimensions = ${jsValue(imageDimensions)};`,
     '',
     'export default siteContent;',
     '',
@@ -383,7 +386,7 @@ function emitThemeCss(theme) {
 function emitAll(snapshot) {
   return {
     'eventConfig.js': emitEventConfig(snapshot),
-    'siteContent.js': emitSiteContent(snapshot.content),
+    'siteContent.js': emitSiteContent(snapshot.content, snapshot.imageDimensions),
     'pagesData.js': emitPagesData(snapshot.pages),
     'scheduleData.js': emitScheduleData(snapshot),
     'organizationsData.js': emitOrganizationsData(snapshot.organizations),

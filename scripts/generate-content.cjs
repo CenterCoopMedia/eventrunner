@@ -39,11 +39,15 @@ const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { emitAll } = require('./lib/emit.cjs');
 const { demoSnapshot } = require('./lib/demo-event.cjs');
 const { assertNoPitchPageCollisions } = require('./lib/pitch-route-check.cjs');
+const { imageSizePaths, readImageSizeManifest } = require('shared/imageSizes');
+const { isMediaLibraryPath, storageObjectPath } = require('shared/venueFields');
 
 const ROOT = path.resolve(__dirname, '..');
 const COMMITTED_DIR = path.join(ROOT, 'apps', 'web', 'src', 'generated');
 
 const FLAGS = ['demo', 'out', 'check', 'help'];
+const IMAGE_MANIFEST_BUDGET_MS = 4000;
+const IMAGE_MANIFEST_BATCH_SIZE = 8;
 
 /**
  * True when `target` is the repository root or anything under it.
@@ -72,14 +76,52 @@ function usage() {
   ].join('\n');
 }
 
+/** Read public dimensions for the library paths referenced by published Image blocks. */
+async function readImageDimensions(content, storageBucket, fetchImpl) {
+  if (!storageBucket) return {};
+  const manifests = new Map();
+  for (const block of content) {
+    if (block.blockType !== 'image') continue;
+    const object = storageObjectPath(block.url);
+    const paths = isMediaLibraryPath(object) && imageSizePaths(object);
+    if (paths) manifests.set(object, paths.manifest);
+  }
+
+  const dimensions = {};
+  const entries = [...manifests].sort(([a], [b]) => a.localeCompare(b));
+  const baseUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(storageBucket)}/o/`;
+  // The lookup is optional. Missing copies or a slow bucket must not block publishing.
+  const signal = AbortSignal.timeout(IMAGE_MANIFEST_BUDGET_MS);
+  for (let index = 0; index < entries.length && !signal.aborted; index += IMAGE_MANIFEST_BATCH_SIZE) {
+    const batch = entries.slice(index, index + IMAGE_MANIFEST_BATCH_SIZE);
+    const results = await Promise.all(batch.map(async ([object, manifest]) => {
+      try {
+        const response = await fetchImpl(`${baseUrl}${encodeURIComponent(manifest)}?alt=media`, {
+          redirect: 'error',
+          signal,
+        });
+        if (!response.ok) return null;
+        return readImageSizeManifest(object, await response.json());
+      } catch {
+        return null;
+      }
+    }));
+    for (const [offset, [object]] of batch.entries()) {
+      const result = results[offset];
+      if (result?.height) dimensions[object] = { width: result.width, height: result.height };
+    }
+  }
+  return dimensions;
+}
+
 /**
  * Read a live deployment into the emitter snapshot shape. Published
  * collections only — drafts are not what the public bundle ships.
  *
- * @param {{ db: object }} deps
+ * @param {{ db: object, storageBucket?: string, fetchImpl?: typeof fetch }} deps
  * @returns {Promise<object>}
  */
-async function readDeployment({ db }) {
+async function readDeployment({ db, storageBucket, fetchImpl = fetch }) {
   const configIds = ['event', 'features', 'theme'];
   // config/launch rides the same read, and is optional: a site from before
   // the coming-soon page has no such document, and is open.
@@ -150,6 +192,7 @@ async function readDeployment({ db }) {
     launch,
     pages,
     content,
+    imageDimensions: await readImageDimensions(content, storageBucket, fetchImpl),
     sessions,
     organizations,
     timeline,
@@ -192,7 +235,7 @@ async function main(argv) {
     const { initFirebase } = require('./lib/firebase-init.cjs');
     const { db, projectId, mode } = initFirebase({ env: process.env });
     console.log(`generate-content: reading ${projectId} (${mode})`);
-    snapshot = await readDeployment({ db });
+    snapshot = await readDeployment({ db, storageBucket: process.env.EVENT_STORAGE_BUCKET?.trim() });
   }
 
   const files = emitAll(snapshot);

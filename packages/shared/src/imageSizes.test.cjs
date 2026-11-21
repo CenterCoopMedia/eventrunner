@@ -119,15 +119,24 @@ describe('readImageSizeManifest', () => {
     ...overrides,
   });
 
-  test('returns each copy at its real width, and the original width', () => {
+  test('returns each copy at its real width, and the original dimensions', () => {
     assert.deepEqual(readImageSizeManifest(SOURCE, ready()), {
       generation: '17',
       width: 1254,
+      height: 800,
       sizes: [
         { width: 320, path: 'cms-images/a1b2c3/_sizes/17/320.webp' },
         { width: 640, path: 'cms-images/a1b2c3/_sizes/17/640.webp' },
       ],
     });
+  });
+
+  test('still returns sizes when the original height is missing or invalid', () => {
+    for (const height of [undefined, 0, 32.5, '800']) {
+      const read = readImageSizeManifest(SOURCE, ready({ height }));
+      assert.equal(read.height, undefined);
+      assert.equal(read.sizes.length, 2);
+    }
   });
 
   test('refuses a manifest that is not ready, or is for another object', () => {
