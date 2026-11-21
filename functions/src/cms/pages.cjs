@@ -12,6 +12,8 @@
  *                 a generic page's `path` must be root-level, normalized, not
  *                 reserved (shared/routing, issue #52), and not already
  *                 claimed by another page (draft or live).
+ *                 POST { navigationLink } applies the supplied label, URL
+ *                 and visibility of an existing link in one transaction.
  *   cmsDeletePage POST { id }   — remove live + draft in one transaction; refuses
  *                 to delete a systemPage (those own a dedicated React route;
  *                 deleting the doc would strand the route's content).
@@ -53,7 +55,8 @@ const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
 const PAGE_KEYS = Object.freeze(['id', 'label', 'title', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template', 'translations']);
-const NAVIGATION_LINK_KEYS = Object.freeze(['id', 'label', 'url', 'order', 'visible', 'systemPage']);
+const NAVIGATION_EDIT_KEYS = Object.freeze(['id', 'label', 'url', 'visible']);
+const NAVIGATION_LINK_KEYS = Object.freeze([...NAVIGATION_EDIT_KEYS, 'order', 'systemPage']);
 const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot', 'layout', 'translations']);
 const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
 
@@ -340,6 +343,57 @@ async function writeAdminLog({ db, store, now, log }, { action, docPath, uid, em
   }
 }
 
+async function finishPageSave(context, res, gate, id) {
+  await writeAdminLog(context, {
+    action: 'cmsSavePage',
+    docPath: `${PAGES_DRAFTS}/${id}`,
+    uid: gate.uid,
+    email: gate.email,
+  });
+  return res.status(200).json({ id, status: 'dirty' });
+}
+
+async function saveNavigationLinkEdit(context, res, gate, edit) {
+  const { db, store, now, log } = context;
+  if (!edit || typeof edit !== 'object' || Array.isArray(edit) ||
+      typeof edit.id !== 'string' || !DOC_ID_RE.test(edit.id) ||
+      Object.keys(edit).some((key) => !NAVIGATION_EDIT_KEYS.includes(key))) {
+    return badRequest(res, 'Enter a valid navigation link ID and edit only its label, destination, or visibility.');
+  }
+
+  const { id } = edit;
+  try {
+    const failure = await db.runTransaction(async (tx) => {
+      const snapshots = await tx.getAll(db.collection(PAGES_DRAFTS).doc(id), db.collection(PAGES_COLLECTION).doc(id));
+      const revisions = snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => snapshot.data());
+      const current = revisions[0];
+      if (!current) return { status: 404, code: 'not-found', message: 'That navigation link no longer exists.' };
+      if (revisions.some((revision) => revision.systemPage === true || !isNavigationLink(revision))) {
+        return { status: 403, code: 'forbidden', message: 'A page and a navigation link must use separate records.' };
+      }
+
+      const page = {
+        label: current.label, url: current.url, visible: current.visible === true,
+        order: current.order, systemPage: false, ...edit,
+      };
+      const verdict = validatePageDoc(page);
+      if (!verdict.ok) return { status: 400, code: 'bad-request', message: `Invalid page: ${verdict.errors.join('; ')}` };
+
+      await store.writeDraft({
+        db, tx, collection: PAGES_COLLECTION, docId: id,
+        fields: { ...page, label: page.label.trim(), url: navigationLinkUrl(page.url) },
+        visible: page.visible, actor: { uid: gate.uid, email: gate.email }, now,
+      });
+      return null;
+    });
+    if (failure) return sendError(res, failure.status, failure.code, failure.message);
+  } catch (err) {
+    log.error('cmsSavePage draft write failed', err);
+    return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
+  }
+  return finishPageSave(context, res, gate, id);
+}
+
 /**
  * @param {{ db: object,
  *           auth: { verifyIdToken: (t: string) => Promise<object> },
@@ -348,10 +402,19 @@ async function writeAdminLog({ db, store, now, log }, { action, docPath, uid, em
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
 function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log = console }) {
+  const context = { db, store, now, log };
   return async function cmsSavePage(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+
+    const edit = req.body?.navigationLink;
+    if (edit !== undefined) {
+      if (req.body.page !== undefined || req.body.create === true) {
+        return badRequest(res, 'Send a navigation link edit on its own.');
+      }
+      return saveNavigationLinkEdit(context, res, gate, edit);
+    }
 
     const page = req.body?.page;
     const verdict = validatePageDoc(page);
@@ -468,13 +531,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
       log.error('cmsSavePage draft write failed', err);
       return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
     }
-    await writeAdminLog({ db, store, now, log }, {
-      action: 'cmsSavePage',
-      docPath: `${PAGES_DRAFTS}/${page.id}`,
-      uid: gate.uid,
-      email: gate.email,
-    });
-    res.status(200).json({ id: page.id, status: 'dirty' });
+    return finishPageSave(context, res, gate, page.id);
   };
 }
 
