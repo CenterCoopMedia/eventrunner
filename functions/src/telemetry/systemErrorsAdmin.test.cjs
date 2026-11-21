@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  createGetSystemErrorHandler,
   createListSystemErrorsHandler,
   createResolveSystemErrorsHandler,
   internals,
@@ -545,4 +546,152 @@ test('listSystemErrors / resolveSystemErrors are operator-only: a staff admin is
     assert.equal(res.body.error.message, 'Operator access required.');
   }
   assert.equal(db.store.get('system_errors/e1').resolved, false);
+});
+
+// --- getSystemError ----------------------------------------------------------
+
+const REPORTER_TEXT = 'reporter wrote alice@example.org token=abc123 Alice Example';
+
+function seedLookup() {
+  return makeFakeDb({
+    'system_errors/AbCdEf0123456789wxyz': {
+      kind: 'client-error',
+      message: `TypeError: ${REPORTER_TEXT}`,
+      stack: `at f (${REPORTER_TEXT})`,
+      context: JSON.stringify({ note: REPORTER_TEXT }),
+      url: 'https://event.example.org/speakers/alice-example?invite=abc123#frag',
+      userAgent: 'Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+      ipHash: 'f'.repeat(64),
+      resolved: true, resolvedBy: 'admin@example.org', resolvedAt: new Date(4000),
+      alertedAt: new Date(1000), createdAt: new Date(1000),
+    },
+    [`system_errors/${'a'.repeat(64)}`]: {
+      kind: 'template-override-invalid', templateId: 'auth.otp', errors: [REPORTER_TEXT],
+      resolved: false, alertedAt: new Date(2000), createdAt: new Date(2000), lastSeenAt: new Date(3000),
+    },
+    'system_errors/AdminRow000000000000': {
+      kind: 'Client Error <b>', url: '/admin/attendees/uid-of-someone', resolved: false, createdAt: new Date(500),
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Edg/130.0',
+    },
+  });
+}
+
+function getHandler(db, log = { error() {} }) {
+  return createGetSystemErrorHandler({ db, auth: fakeAuth(), getConfig, log });
+}
+
+test('getSystemError: an operator gets only the safe fields of one row', async () => {
+  const db = seedLookup();
+  let res = fakeRes();
+  await getHandler(db)(req({ body: { id: 'AbCdEf0123456789wxyz' } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    row: {
+      id: 'AbCdEf0123456789wxyz', kind: 'client-error', route: '/speakers/*', browser: 'safari',
+      firstSeenAt: 1000, lastSeenAt: null, open: false,
+    },
+  });
+  const raw = JSON.stringify(res.body);
+  for (const leak of ['alice', 'Alice', 'abc123', 'token', 'invite', 'frag', 'example.org', 'Mozilla', 'f'.repeat(16)]) {
+    assert.ok(!raw.includes(leak), `response leaked ${leak}`);
+  }
+
+  res = fakeRes();
+  await getHandler(db)(req({ body: { id: 'a'.repeat(64) } }), res);
+  assert.deepEqual(res.body.row, {
+    id: 'a'.repeat(64), kind: 'template-override-invalid', route: null, browser: null,
+    firstSeenAt: 2000, lastSeenAt: 3000, open: true,
+  });
+  assert.ok(!JSON.stringify(res.body).includes('reporter'));
+
+  res = fakeRes();
+  await getHandler(db)(req({ body: { id: 'AdminRow000000000000' } }), res);
+  assert.equal(res.body.row.kind, 'unknown');
+  assert.equal(res.body.row.route, '/admin/attendees/*');
+  assert.equal(res.body.row.browser, 'edge');
+});
+
+test('getSystemError: route keeps only known route names, never caller-chosen segments', () => {
+  const cases = [
+    ['https://event.example.org/alice-example', '/*'],
+    ['https://event.example.org/admin/secretabc123', '/admin/*'],
+    ['https://event.example.org/admin/attendees/uid-1', '/admin/attendees/*'],
+    ['https://event.example.org/speakers/alice-example?x=1#y', '/speakers/*'],
+    ['https://event.example.org/schedule/user/uid-1', '/schedule/*/*'],
+    ['https://event.example.org/Schedule', '/*'],
+    ['https://event.example.org/', '/'],
+    ['/updates', '/updates'],
+    ['//attacker.example/alice', '/*'],
+    ['javascript:alert(1)', '/*'],
+    [`https://event.example.org/speakers/${'x/'.repeat(110)}`, '/speakers/*/*/*'],
+  ];
+  for (const [url, route] of cases) assert.equal(internals.routeOf(url), route, url);
+  assert.equal(internals.routeOf(null), null);
+});
+
+test('getSystemError: signed-out, non-admin and staff callers are refused without the row', async () => {
+  const db = seedLookup();
+  const staffAuth = {
+    async verifyIdToken(t) {
+      if (t === 'staff-token') return { uid: 'staff1', email: 'staff@example.org', email_verified: true };
+      throw new Error('auth/argument-error');
+    },
+  };
+  const cases = [
+    [getHandler(db), null, 401],
+    [getHandler(db), 'user-token', 403],
+    [getHandler(db), 'not-a-token', 401],
+    [createGetSystemErrorHandler({ db, auth: staffAuth, getConfig }), 'staff-token', 403],
+  ];
+  for (const [handler, token, status] of cases) {
+    const res = fakeRes();
+    await handler(req({ token, body: { id: 'AbCdEf0123456789wxyz' } }), res);
+    assert.equal(res.statusCode, status);
+    assert.ok(!JSON.stringify(res.body).includes('client-error'));
+  }
+  const res = fakeRes();
+  await getHandler(db)(req({ method: 'GET', body: { id: 'AbCdEf0123456789wxyz' } }), res);
+  assert.equal(res.statusCode, 405);
+});
+
+test('getSystemError: a malformed id is refused before any read', async () => {
+  const db = seedLookup();
+  const reads = [];
+  const watched = {
+    collection(c) {
+      reads.push(c);
+      return db.collection(c);
+    },
+    runTransaction: db.runTransaction,
+  };
+  for (const id of [undefined, '', 'short', 'x'.repeat(129), '../config/bootstrap', 'config/bootstrap', 'id with space', '__name__', '__reserved_id__', 42, ['AbCdEf0123456789wxyz']]) {
+    const res = fakeRes();
+    await getHandler(watched)(req({ body: { id } }), res);
+    assert.equal(res.statusCode, 400, `id ${JSON.stringify(id)}`);
+  }
+  assert.deepEqual(reads, []);
+});
+
+test('getSystemError: an unknown id is not-found with no detail', async () => {
+  const res = fakeRes();
+  await getHandler(seedLookup())(req({ body: { id: 'Missing0000000000000' } }), res);
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.error.code, 'not-found');
+  assert.ok(!JSON.stringify(res.body).includes('Missing'));
+});
+
+test('getSystemError: a read failure is a 500 without the cause', async () => {
+  const db = makeFakeDb();
+  const failing = {
+    collection(c) {
+      if (c !== 'system_errors') return db.collection(c);
+      return { doc: () => ({ get: async () => { throw Object.assign(new Error('backend detail Bearer secret'), { code: 14 }); } }) };
+    },
+  };
+  const logged = [];
+  const res = fakeRes();
+  await getHandler(failing, { error: (...args) => logged.push(args) })(req({ body: { id: 'AbCdEf0123456789wxyz' } }), res);
+  assert.equal(res.statusCode, 500);
+  assert.ok(!JSON.stringify(res.body).includes('backend detail'));
+  assert.deepEqual(logged, [['getSystemError read failed', { code: 14 }]]);
 });
