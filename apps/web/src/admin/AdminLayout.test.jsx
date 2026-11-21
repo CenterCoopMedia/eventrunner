@@ -299,6 +299,7 @@ describe('the admin shell', () => {
     try {
       const { container } = await renderAdmin('/admin/pages');
       const rail = container.querySelector('.admin-rail');
+      vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue(new window.DOMRect(0, 0, 320, 84));
       const docket = rail.querySelector('details.admin-mobile-docket');
       const summary = docket.querySelector('summary');
       const sheet = docket.querySelector('.admin-mobile-docket__content');
@@ -312,7 +313,7 @@ describe('the admin shell', () => {
       expect(summary.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
       expect(docket).not.toHaveAttribute('open');
       expect(sheet.className).toMatch(/\bfixed\b/);
-      expect(sheet.className).toContain('top-14');
+      expect(sheet.className).toContain('top-[var(--admin-phone-bar-height,3.5rem)]');
       expect(sheet.className).toContain('bottom-0');
 
       for (const group of nav.children) {
@@ -338,11 +339,13 @@ describe('the admin shell', () => {
       );
       // The scroll lock is applied in an effect after the sheet opens.
       await waitFor(() => expect(document.documentElement.style.overflow).toBe('hidden'));
+      expect(rail.style.getPropertyValue('--admin-phone-bar-height')).toBe('84px');
       // A media dialog owns body overflow. If it closes while this sheet is
       // open, closing the sheet must not restore the dialog's stale lock.
       document.body.style.overflow = '';
       fireEvent.click(summary);
       await waitFor(() => expect(document.documentElement.style.overflow).toBe(''));
+      expect(rail.style.getPropertyValue('--admin-phone-bar-height')).toBe('');
       expect(document.body.style.overflow).toBe('');
 
       fireEvent.click(summary);
