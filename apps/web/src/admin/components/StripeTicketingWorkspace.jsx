@@ -1,5 +1,6 @@
 import HelpDisclosure from './HelpDisclosure.jsx';
 import { plannerMessage } from '../plannerErrors.js';
+import { CONSOLE_ORIGIN } from '../consoleOrigin.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -57,18 +58,26 @@ export default function StripeTicketingWorkspace({ call }) {
     <Notice tone="error" message={error} />
     <button type="button" className={secondaryButtonClass} onClick={() => { setError(''); bump(); }}>Retry Stripe ticketing</button>
   </div> : <AdminLoadingState label="Loading Stripe ticketing…" />;
-  const { catalog } = data;
+  const { catalog, connectionEnded } = data;
+  const salesStatus = !catalog?.published ? 'Tickets not published'
+    : catalog.salesPaused ? 'New sales paused'
+      : connectionEnded ? 'Paid sales closed' : 'New sales enabled';
   const now = Date.now();
   const hasEnded = (sales) => sales.salesEndAt && Date.parse(sales.salesEndAt) <= now;
-  const warnAboutDisconnect = catalog?.published && !catalog.salesPaused && !hasEnded(catalog) &&
+  const warnAboutDisconnect = !connectionEnded && catalog?.published && !catalog.salesPaused && !hasEnded(catalog) &&
     catalog.ticketTypes?.some((type) => type.active && type.visibility === 'public' && type.unitAmount > 0 && !hasEnded(type));
   return <div className="min-w-0 space-y-md" key={user?.uid}>
     <Panel help="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused." title="Stripe sales" description="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused.">
       <div className="flex flex-wrap items-center gap-sm">
         <StatusBadge tone={data.mode === 'live' ? 'caution' : 'info'}>{data.mode === 'live' ? 'Live payments' : 'Test mode'}</StatusBadge>
-        <StatusBadge tone={data.catalog?.salesPaused || !data.catalog?.published ? 'caution' : 'ok'}>{!data.catalog?.published ? 'Tickets not published' : data.catalog.salesPaused ? 'New sales paused' : 'New sales enabled'}</StatusBadge>
+        <StatusBadge tone={catalog?.published && !catalog.salesPaused && !connectionEnded ? 'ok' : 'caution'}>{salesStatus}</StatusBadge>
         {isOperator ? <button type="button" className={secondaryButtonClass} onClick={() => { setPause(!data.catalog?.salesPaused); setReason(''); setError(''); }}>{data.catalog?.salesPaused ? 'Reopen sales' : 'Pause sales'}</button> : null}
       </div>
+      {connectionEnded ? <div className="mt-sm">
+        <Notice tone="caution" message="Paid ticket sales are closed because the Stripe connection ended. ">
+          Check the connection in <a href={CONSOLE_ORIGIN} className="font-semibold underline underline-offset-2">Event Runner Console</a>.
+        </Notice>
+      </div> : null}
       {warnAboutDisconnect ? <div className="mt-sm"><Notice tone="caution" message="Disconnecting Stripe in the console stops open and scheduled paid ticket sales. Reconnecting is not guaranteed." /></div> : null}
       {data.inventory ? <dl className="mt-sm grid gap-sm sm:grid-cols-3"><div><dt className="text-admin-base font-semibold">Event capacity</dt><dd className="font-admin-data">{data.catalog?.capacity ?? 'Not configured'}</dd></div><div><dt className="text-admin-base font-semibold">Seats reserved in checkout</dt><dd className="font-admin-data">{data.inventory.held || 0}</dd></div><div><dt className="text-admin-base font-semibold">Seats issued</dt><dd className="font-admin-data">{data.inventory.sold || 0}</dd></div></dl> : null}
       {error && pause === null ? <div className="mt-sm"><Notice tone="error" message={error} /></div> : null}

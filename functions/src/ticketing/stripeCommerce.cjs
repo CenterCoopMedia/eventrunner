@@ -8,6 +8,8 @@ const { parseEventPublicBase } = require('shared/config/publicBase');
 const { joinEventPath } = require('shared/config/publicPath');
 
 const CATALOG = 'ticket_catalog';
+// Written when Stripe refuses the site's key. Functions only, like the catalog.
+const CONNECTION = 'connection';
 const INVENTORY = 'ticket_inventory';
 const ORDERS = 'ticket_orders';
 const ATTEMPTS = 'ticket_payment_attempts';
@@ -290,7 +292,7 @@ function iso(value) {
 }
 
 module.exports = {
-  CATALOG, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
+  CATALOG, CONNECTION, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, inventoryTransitionPatch, transitionOrderInventory,
   priceSelections, makeSeats, ticketsForFreeOrder, configuredPublicBase, checkoutRequestFor, millis, iso,

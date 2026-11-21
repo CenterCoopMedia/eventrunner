@@ -14,14 +14,11 @@ const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { stripeErrorDetails } = require('./stripeErrors.cjs');
 const { sendError, methodNotAllowed } = require('../core/errors.cjs');
 const {
-  CATALOG, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
+  CATALOG, CONNECTION, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, priceSelections, makeSeats, ticketsForFreeOrder,
   configuredPublicBase, checkoutRequestFor, millis, iso,
 } = require('./stripeCommerce.cjs');
-
-// Written when Stripe refuses the site's key. Functions only, like the catalog.
-const CONNECTION = 'connection';
 
 const ATTEMPT_LEASE_MS = 30 * 1000;
 const RETRY_BACKOFF_MS = 5 * 1000;

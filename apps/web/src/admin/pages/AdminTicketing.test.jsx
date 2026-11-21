@@ -216,6 +216,27 @@ describe('AdminTicketing', () => {
     expect(await screen.findByText('Disconnecting Stripe in the console stops open and scheduled paid ticket sales. Reconnecting is not guaranteed.')).toBeVisible();
   });
 
+  it('shows recorded Stripe closure and keeps check-in available', async () => {
+    callMock.mockImplementation(async (name, body) => {
+      if (name === 'getTicketingStatus') return { ...STATUS, provider: 'stripe' };
+      if (body.action === 'catalog') return { mode: 'test', connectionEnded: true, catalog: {
+        published: true, salesPaused: false, currency: 'usd',
+        ticketTypes: [{ id: 'general', name: 'General', visibility: 'public', active: true, unitAmount: 5000 }],
+      } };
+      if (body.action === 'orders') return { orders: [], nextCursor: null };
+      if (body.action === 'tickets') return { tickets: [], nextCursor: null };
+      throw new Error(`unexpected call: ${name}`);
+    });
+    render(<AdminTicketing />);
+    expect(await screen.findByText('Paid sales closed')).toBeVisible();
+    const link = screen.getByRole('link', { name: 'Event Runner Console' });
+    expect(link).toHaveAttribute('href', 'https://console.eventrunner.org');
+    expect(link.closest('[role="status"]')).toHaveTextContent('Paid ticket sales are closed because the Stripe connection ended.');
+    expect(screen.queryByText('New sales enabled')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Disconnecting Stripe in the console/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Ticket code for check-in')).toBeInTheDocument();
+  });
+
   it('retries an initial Stripe catalog failure in place and clears the stale error', async () => {
     let catalogCalls = 0;
     let resolveCatalog;
