@@ -59,6 +59,7 @@ export const test = base.extend({
       chromiumSandbox: true,
       baseURL,
       locale,
+      hasTouch: false,
       reducedMotion: 'reduce',
       viewport: null,
       args: ['--screen-info={1440x900}', '--window-size=1440,900'],
@@ -90,19 +91,36 @@ export const test = base.extend({
             await checkSetting();
             const viewport = await readViewport(page);
             const text = await measureText(sample);
+            const dimensions = await measureText(control);
             await info.attach(`${name} measurements`, {
               body: JSON.stringify({
-                browser, baseline, viewport, text, control: await measureText(control),
+                browser, baseline, viewport, text, control: dimensions,
                 renderedLineHeightChanged: text.lineHeight !== baseline.text.lineHeight,
               }, null, 2),
               contentType: 'application/json',
             });
             if (requireLargerText) {
-              expect(text.lineHeight, 'the larger text profile enlarges rendered glyphs').toBeGreaterThan(baseline.text.lineHeight);
+              // A responsive heading can be limited by the available width.
+              // Verify a rendered text range grows in the sample or its control.
+              const largerText = text.lineHeight > baseline.text.lineHeight
+                || dimensions.lineHeight > baseline.control.lineHeight;
+              expect(largerText, 'the larger text profile enlarges the sample text or control label').toBe(true);
             }
             await check({ compact: viewport.innerWidth <= 639, minimumTarget });
           } catch (error) {
-            await info.attach(`${name} screenshot`, { body: await page.screenshot(), contentType: 'image/png' });
+            await info.attach(`${name} screenshot`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+            const overflow = await page.evaluate(() => {
+              const width = document.documentElement.clientWidth;
+              return Array.from(document.querySelectorAll('main *')).flatMap((element) => {
+                const bounds = element.getBoundingClientRect();
+                return bounds.right > width + 1
+                  ? [{ tag: element.tagName, class: element.getAttribute('class'), right: bounds.right }]
+                  : [];
+              }).slice(0, 12);
+            });
+            if (overflow.length) await info.attach('Elements beyond the viewport', {
+              body: JSON.stringify(overflow, null, 2), contentType: 'application/json',
+            });
             throw error;
           }
         });

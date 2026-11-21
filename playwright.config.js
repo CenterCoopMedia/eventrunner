@@ -86,7 +86,7 @@ export default defineConfig({
     screenshot: textSettings ? 'off' : 'only-on-failure',
   },
   projects: textSettings ? [
-    { name: 'chromium-page-zoom', use: { ...devices['Desktop Chrome'], channel: 'chrome', textSettings: 'chrome-zoom' } },
+    { name: 'chromium-page-zoom', use: { channel: 'chrome', textSettings: 'chrome-zoom' } },
     { name: 'chromium-android-text', use: { ...devices['Pixel 7'], channel: 'chrome', textSettings: 'android-text', reducedMotion: 'reduce' } },
     { name: 'webkit-iphone-text', use: { ...devices['iPhone 15'], textSettings: 'webkit-text', reducedMotion: 'reduce' } },
   ] : [

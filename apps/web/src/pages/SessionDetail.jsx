@@ -112,7 +112,7 @@ export default function SessionDetail() {
       </p>
       <header>
         <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-          <h1 lang={session.publicLanguage} className="font-heading text-h1 font-semibold text-text-primary">{session.title}</h1>
+          <h1 lang={session.publicLanguage} className="wrap-anywhere font-heading text-h1 font-semibold text-text-primary">{session.title}</h1>
           <SessionFormat format={session.type} />
         </div>
         <p className="mt-2xs font-data text-caption text-text-secondary">
