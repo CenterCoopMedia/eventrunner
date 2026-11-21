@@ -254,7 +254,8 @@ test.describe('public reflow with touch targets', () => {
         await expectTextFits(facets.getByText('Format', { exact: true }));
         await expectPageFits(page);
         if (profile.width === 320) {
-          await facets.getByRole('checkbox', { name: /Workshop/i }).press('Escape');
+          const format = facets.getByRole('group', { name: 'Format', exact: true });
+          await format.getByRole('checkbox', { name: /^Workshop\s*\(/i }).press('Escape');
           await expect(filters).toBeFocused();
           await expect(facets).toBeHidden();
         }
@@ -266,7 +267,7 @@ test.describe('public reflow with touch targets', () => {
     await page.goto(`/schedule/${session.id}?lang=en`);
     const heading = page.getByRole('heading', { name: session.title, level: 1, exact: true });
     const description = page.getByText(session.description, { exact: true });
-    const share = page.getByRole('button', { name: /^(Share|Copy) link$/ });
+    const share = page.getByRole('button', { name: /^(Share session|Copy session link)$/ });
     await expect(heading).toBeVisible();
     for (const profile of REFLOW_PROFILES) {
       await test.step(profile.name, async () => {
