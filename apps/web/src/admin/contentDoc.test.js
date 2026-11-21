@@ -368,9 +368,20 @@ describe('gallery content', () => {
     });
   });
 
-  it('starts with no pictures and requires one, a layout, and alt text on each', () => {
-    expect(blankContent('gallery').values.images).toEqual([]);
-    expect(validateRequiredContent(blankContent('gallery')).map((error) => error.field)).toEqual(['images', 'layout']);
+  it('starts with grid selected and saves it with the first picture', () => {
+    const fresh = blankContent('gallery');
+    expect(fresh.values).toMatchObject({ layout: 'grid', images: [] });
+    expect(validateRequiredContent(fresh).map((error) => error.field)).toEqual(['images']);
+    fresh.values.images = [stored.images[0]];
+    expect(validateRequiredContent(fresh)).toEqual([]);
+    expect(toContentFields(fresh)).toMatchObject({ blockType: 'gallery', layout: 'grid' });
+  });
+
+  it('keeps a missing layout on an existing gallery and validates alt text', () => {
+    const { layout, ...withoutLayout } = stored;
+    const missingLayout = toEditableContent(withoutLayout);
+    expect(missingLayout.values.layout).toBe('');
+    expect(validateRequiredContent(missingLayout).map((error) => error.field)).toEqual(['layout']);
     const missingAlt = toEditableContent({ ...stored, images: [stored.images[0], { url: 'cms-images/a3/x.webp', alt: ' ' }] });
     expect(validateRequiredContent(missingAlt)).toEqual([
       { field: 'images.2.alt', message: 'Picture 2: needs alt text.' },

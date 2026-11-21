@@ -98,11 +98,13 @@ export function toEditableContent(doc, blockTypeId) {
 
 /** A blank editable state for the create form, optionally pre-selecting a block type. */
 export function blankContent(blockTypeId = '') {
+  const values = blankContentValues(blockTypeId);
+  if (blockTypeId === 'gallery') values.layout = 'grid';
   return {
     blockType: blockTypeId,
     order: '',
     visible: true,
-    values: blankContentValues(blockTypeId),
+    values,
   };
 }
 
