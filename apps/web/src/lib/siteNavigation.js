@@ -73,7 +73,7 @@ function isNonEmptyString(v) {
  *
  * @param {unknown} page a cmsPages document
  * @param {object|null|undefined} features config/features
- * @returns {{ to: string, label: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }|null}
+ * @returns {{ to: string, label: string, language?: string, end?: boolean, custom?: boolean, external?: boolean, key?: string }|null}
  */
 export function navItemFor(page, features, pages) {
   if (!page || typeof page !== 'object') return null;
@@ -82,7 +82,10 @@ export function navItemFor(page, features, pages) {
     if (page.visible !== true || page.systemPage !== false || !isNonEmptyString(page.id) ||
         !isNonEmptyString(page.label) || !to || switchedOffSectionFor(to, features) ||
         leadsToNoPublicPage(to, pages, features)) return null;
-    return { to, label: page.label.trim(), custom: true, external: to.startsWith('https://'), key: `link:${page.id}` };
+    return {
+      to, label: page.label.trim(), custom: true, external: to.startsWith('https://'), key: `link:${page.id}`,
+      ...(page.publicLanguage && { language: page.publicLanguage }),
+    };
   }
   // Visible, and its feature on — the shared read, so this list and the
   // sitemap cannot disagree about which pages a stranger can see.
