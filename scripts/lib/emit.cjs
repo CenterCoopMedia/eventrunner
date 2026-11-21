@@ -181,9 +181,10 @@ function emitEventConfig({ event, features, theme, launch = null }) {
  *
  * @param {object[]} contentDocs
  * @param {Record<string, { width: number, height: number }>} imageDimensions
+ * @param {Record<string, { width: number, sizes: Array<{ width: number, path: string }> }>} heroImageSizes
  * @returns {string}
  */
-function emitSiteContent(contentDocs, imageDimensions = {}) {
+function emitSiteContent(contentDocs, imageDimensions = {}, heroImageSizes = {}) {
   const sorted = [...contentDocs].sort((a, b) => a.id.localeCompare(b.id));
   const map = {};
   for (const doc of sorted) {
@@ -209,6 +210,8 @@ function emitSiteContent(contentDocs, imageDimensions = {}) {
     `export const siteContent = ${jsValue(map)};`,
     '',
     `export const imageDimensions = ${jsValue(imageDimensions)};`,
+    '',
+    `export const heroImageSizes = ${jsValue(heroImageSizes)};`,
     '',
     'export default siteContent;',
     '',
@@ -386,7 +389,7 @@ function emitThemeCss(theme) {
 function emitAll(snapshot) {
   return {
     'eventConfig.js': emitEventConfig(snapshot),
-    'siteContent.js': emitSiteContent(snapshot.content, snapshot.imageDimensions),
+    'siteContent.js': emitSiteContent(snapshot.content, snapshot.imageDimensions, snapshot.heroImageSizes),
     'pagesData.js': emitPagesData(snapshot.pages),
     'scheduleData.js': emitScheduleData(snapshot),
     'organizationsData.js': emitOrganizationsData(snapshot.organizations),

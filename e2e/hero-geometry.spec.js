@@ -14,6 +14,7 @@
 // composition, and the shared Newsroom hero is the one #345 is about.
 /* global document, Node, NodeFilter */
 import { test, expect } from '@playwright/test';
+import sharp from 'sharp';
 import { adminDb } from './helpers.mjs';
 
 const THEMES = ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'];
@@ -81,6 +82,93 @@ async function measureHero(page) {
     };
   });
 }
+
+test('published hero artwork skips the manifest and preserves the box and crop', async ({ page }) => {
+  const original = 'cms-images/published-hero/hall.webp';
+  const copy = 'cms-images/published-hero/_sizes/7/320.webp';
+  const manifest = 'cms-images/published-hero/_sizes/manifest.json';
+  const alt = 'A published photo of the venue';
+  const block = { section: 'hero', field: 'image', blockType: 'image', url: original, alt, visible: true };
+  const imageRef = adminDb().doc('cmsContent/hero__image');
+  const saved = await imageRef.get();
+  const snapshot = { [original]: { width: 1280, sizes: [{ width: 320, path: copy }] } };
+  const [originalImage, copyImage] = await Promise.all([1280, 320].map((width) => sharp({
+    create: { width, height: width / 2, channels: 3, background: '#000080' },
+  }).webp().toBuffer()));
+  const requests = [];
+  let published = false;
+  let artworkBlock = block;
+  await page.route('**/src/generated/siteContent.js*', async (route) => {
+    const response = await route.fetch();
+    const overrides = `
+      siteContent.hero__image = ${JSON.stringify(artworkBlock)};
+      Object.assign(heroImageSizes, ${JSON.stringify(published ? snapshot : {})});
+    `;
+    await route.fulfill({ response, body: `${await response.text()}\n${overrides}` });
+  });
+  await page.route((url) => decodeURIComponent(url.pathname).includes('/o/cms-images/published-hero/'), async (route) => {
+    const objectPath = decodeURIComponent(new URL(route.request().url()).pathname.split('/o/').at(-1));
+    requests.push(objectPath);
+    if (objectPath === manifest) {
+      await route.fulfill({
+        headers: { 'access-control-allow-origin': '*' },
+        json: {
+          status: 'ready', source: original, sourceGeneration: '7', width: 1280,
+          sizes: [{ target: 320, width: 320, path: copy }],
+        },
+      });
+    } else {
+      await route.fulfill({
+        contentType: 'image/webp',
+        body: objectPath === copy ? copyImage : originalImage,
+      });
+    }
+  });
+  const artwork = page.getByRole('img', { name: alt });
+  async function measureAtWidths(path, usePublishedSizes) {
+    await page.goto('about:blank');
+    published = usePublishedSizes;
+    requests.length = 0;
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto(path, { waitUntil: 'domcontentloaded' });
+    await expect.poll(() => artwork.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+    if (artworkBlock.url === original) {
+      expect(requests).toEqual(published ? [copy] : [manifest, copy]);
+    } else {
+      expect(requests).toEqual([]);
+      await expect(artwork).not.toHaveAttribute('srcset');
+    }
+    await page.evaluate(() => document.fonts.ready);
+    const boxes = [];
+    for (const viewport of [320, 768, 1280]) {
+      await page.setViewportSize({ width: viewport, height: 800 });
+      const geometry = await artwork.evaluate((image) => {
+        const { width, height } = image.getBoundingClientRect();
+        const { objectFit, objectPosition } = globalThis.getComputedStyle(image);
+        return { width, height, objectFit, objectPosition };
+      });
+      expect(geometry.width).toBeGreaterThan(0);
+      expect(geometry.height).toBeGreaterThan(0);
+      boxes.push({ viewport, ...geometry });
+    }
+    return boxes;
+  }
+  try {
+    for (const [source, url] of [['library', original], ['site file', '/hero/civic.webp']]) {
+      artworkBlock = { ...block, url, focalX: 20, focalY: 70 };
+      await imageRef.set(artworkBlock);
+      for (const path of ['/', '/schedule']) {
+        const before = await measureAtWidths(path, false);
+        const after = await measureAtWidths(path, true);
+        expect(after).toEqual(before);
+        console.log(`Published hero geometry ${source} ${path} ${JSON.stringify(after)}`);
+      }
+    }
+  } finally {
+    if (saved.exists) await imageRef.set(saved.data());
+    else await imageRef.delete();
+  }
+});
 
 function round(value) {
   return Math.round(value * 10) / 10;

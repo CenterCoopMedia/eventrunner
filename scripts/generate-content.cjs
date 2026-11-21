@@ -76,19 +76,25 @@ function usage() {
   ].join('\n');
 }
 
-/** Read public dimensions for the library paths referenced by published Image blocks. */
-async function readImageDimensions(content, storageBucket, fetchImpl) {
-  if (!storageBucket) return {};
+/** Read dimensions for published Image blocks and responsive copies for hero artwork. */
+async function readPublishedImages(content, storageBucket, fetchImpl) {
+  const imageDimensions = {};
+  const heroImageSizes = {};
+  if (!storageBucket) return { imageDimensions, heroImageSizes };
   const manifests = new Map();
+  const heroPaths = new Set();
   for (const block of content) {
     if (block.blockType !== 'image') continue;
     const object = storageObjectPath(block.url);
     const paths = isMediaLibraryPath(object) && imageSizePaths(object);
-    if (paths) manifests.set(object, paths.manifest);
+    if (!paths) continue;
+    manifests.set(object, paths.manifest);
+    if (block.section === 'hero') heroPaths.add(object);
   }
 
-  const dimensions = {};
-  const entries = [...manifests].sort(([a], [b]) => a.localeCompare(b));
+  // Give the first-paint artwork the first chance at the shared lookup budget.
+  const entries = [...manifests].sort(([a], [b]) =>
+    Number(heroPaths.has(b)) - Number(heroPaths.has(a)) || a.localeCompare(b));
   const baseUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(storageBucket)}/o/`;
   // The lookup is optional. Missing copies or a slow bucket must not block publishing.
   const signal = AbortSignal.timeout(IMAGE_MANIFEST_BUDGET_MS);
@@ -108,10 +114,13 @@ async function readImageDimensions(content, storageBucket, fetchImpl) {
     }));
     for (const [offset, [object]] of batch.entries()) {
       const result = results[offset];
-      if (result?.height) dimensions[object] = { width: result.width, height: result.height };
+      if (result?.height) imageDimensions[object] = { width: result.width, height: result.height };
+      if (heroPaths.has(object) && result?.sizes.length) {
+        heroImageSizes[object] = { width: result.width, sizes: result.sizes };
+      }
     }
   }
-  return dimensions;
+  return { imageDimensions, heroImageSizes };
 }
 
 /**
@@ -184,6 +193,7 @@ async function readDeployment({ db, storageBucket, fetchImpl = fetch }) {
   // the emitted snapshot addresses speakers by `id` like every other
   // collection, so carrying both would be two spellings of one value.
   const speakers = speakerProjections.map(({ speakerId: _speakerId, ...rest }) => rest);
+  const images = await readPublishedImages(content, storageBucket, fetchImpl);
 
   return {
     event: config.event,
@@ -192,7 +202,7 @@ async function readDeployment({ db, storageBucket, fetchImpl = fetch }) {
     launch,
     pages,
     content,
-    imageDimensions: await readImageDimensions(content, storageBucket, fetchImpl),
+    ...images,
     sessions,
     organizations,
     timeline,

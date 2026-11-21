@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { heroImageSizes } from '@generated/siteContent.js';
 import WayfindingIcon from './editorial/WayfindingIcon.jsx';
 import { focalPosition, useSizedImageSources } from '../lib/useImageSizeSrcSet.js';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
@@ -30,7 +31,7 @@ export default function EventHero({
   const src = image?.url && isSafeHref(image.url) && alt ? image.url : null;
   // The artwork can fill the whole hero on a phone, and a style can give it
   // the full width at any size, so the slot is stated as the viewport.
-  const art = useSizedImageSources(src);
+  const art = useSizedImageSources(src, heroImageSizes);
   const figure = src ? <ImageFigure
     placement={image}
     assetPath={art.path}
