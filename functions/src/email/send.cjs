@@ -280,7 +280,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     }
   }
 
-  async function send(message) {
+  async function send(message, { reportPreviousFailure = false } = {}) {
     // The final boundary protects every mail caller, including delayed
     // triggers. Refusal must not itself create claims or audit records.
     const policy = await checkDemoWrites({ db });
@@ -314,17 +314,19 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     // Send-once claim, written BEFORE the send and never rolled back —
     // a rolled-back claim plus repeated webhook deliveries is how a
     // recipient gets the same message a dozen times (spec §3.1).
+    let claimRef;
     if (message.onceKey) {
-      const ref = db.collection('email_claims').doc(claimIdForOnceKey(message.onceKey));
+      claimRef = db.collection('email_claims').doc(claimIdForOnceKey(message.onceKey));
       try {
-        await ref.create({
+        await claimRef.create({
           onceKey: message.onceKey,
           source: message.source || null,
           createdAt: new Date(),
         });
       } catch (err) {
         if (isAlreadyExists(err)) {
-          return { providerMessageId: null, status: 'sent', skipped: true, retries: 0 };
+          const claim = reportPreviousFailure ? (await claimRef.get()).data() : undefined;
+          return claimedResult(claim);
         }
         throw err;
       }
@@ -365,6 +367,16 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       ...(ambiguous ? { ambiguous: true } : {}),
     };
 
+    // Ticket confirmations need to distinguish a claimed failure from a
+    // successful skip when an organizer retries the same request.
+    if (claimRef && reportPreviousFailure && outcome.status === 'failed') {
+      try {
+        // Provider errors can echo private message content.
+        await claimRef.update({ failure: { uncertain: ambiguous } });
+      } catch (err) {
+        log.warn('email_claims failure record failed', { code: err?.code });
+      }
+    }
     // Audit what was actually handed to the adapter (footer included).
     await writeAuditRow(fullMessage, fullMessage.from?.email || null, toEmail, outcome, true);
     return outcome;
@@ -577,15 +589,17 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    * or is sending it now.
    */
   async function skippedResult(ref) {
-    let failure = null;
-    let gap = {};
     try {
-      const claim = (await ref.get()).data();
-      failure = claim?.failure ?? null;
-      if (claim?.auditFailed === true) gap = { auditFailed: true };
+      return claimedResult((await ref.get()).data());
     } catch (err) {
       log.warn('email_claims read failed', err);
+      return claimedResult();
     }
+  }
+
+  function claimedResult(claim) {
+    const failure = claim?.failure;
+    const gap = claim?.auditFailed === true ? { auditFailed: true } : {};
     if (!failure) return { providerMessageId: null, status: 'sent', skipped: true, retries: 0, ...gap };
     return {
       providerMessageId: null,

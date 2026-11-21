@@ -103,20 +103,29 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
     const outcome = await send({
       to: recipient.to, ...rendered, tag: recipient.templateId, onceKey,
       source: 'ticketing-confirmation', storeRendered: false,
-    });
-    if (outcome.skipped) skipped += 1;
-    else if (outcome.status === 'sent') sent += 1;
-    else failed += 1;
+    }, { reportPreviousFailure: true });
+    if (outcome.status !== 'sent') failed += 1;
+    else if (outcome.skipped) skipped += 1;
+    else sent += 1;
   }
-  // This audit is not retryable work. It records the outcome a staff member
-  // needs before deliberately choosing a fresh resend after an uncertain send.
-  if (sent || failed) {
+  // Keep earlier failures visible when a retry finishes other recipients
+  // or when an explicit resend already has a needs-attention audit entry.
+  if (sent || failed || (resendKey && skipped)) {
     const key = createHash('sha256').update(`ticket-email:${orderId}:${resendKey || 'initial'}`).digest('hex');
-    await db.collection('admin_logs').doc(key).set({
-      action: failed ? 'ticketing.confirmation-needs-attention' : 'ticketing.confirmation-sent',
-      docPath: `ticket_orders/${orderId}`, orderId, uid: actorUid, actorUid,
-      at: now(), reason: failed ? 'Some ticket messages could not be confirmed. Review the email log before resending.' : null,
-      ticketIds: [], details: { sent, failed, explicitResend: Boolean(resendKey) },
+    const ref = db.collection('admin_logs').doc(key);
+    failed = await db.runTransaction(async (tx) => {
+      const previous = (await tx.get(ref)).data()?.details;
+      const previousFailures = previous?.failed || 0;
+      const failures = Math.max(failed, previousFailures);
+      if (sent || failures > previousFailures) {
+        tx.set(ref, {
+          action: failures ? 'ticketing.confirmation-needs-attention' : 'ticketing.confirmation-sent',
+          docPath: `ticket_orders/${orderId}`, orderId, uid: actorUid, actorUid,
+          at: now(), reason: failures ? 'Some ticket messages could not be confirmed. Review the email log before resending.' : null,
+          ticketIds: [], details: { sent: sent + (previous?.sent || 0), failed: failures, explicitResend: Boolean(resendKey) },
+        });
+      }
+      return failures;
     });
   }
   return { sent, failed, alreadySent: sent === 0 && failed === 0 && skipped > 0 };

@@ -130,7 +130,7 @@ test('unpaid, wrong-scope, refunded-only, and demo orders send no messages', asy
   }
 });
 
-test('uncertain delivery is visible and an explicit new resend key remains idempotent', async () => {
+test('a retry keeps recorded failures visible without resending the same request', async () => {
   const db = fixture();
   let sends = 0;
   const provider = { name: 'test', async send() { sends += 1; return { status: 'failed', providerMessageId: null, error: 'synthetic failure' }; } };
@@ -138,10 +138,61 @@ test('uncertain delivery is visible and an explicit new resend key remains idemp
   const first = await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail });
   assert.equal(first.failed, 2);
   assert.equal((await db.collection('admin_logs').get()).docs[0].data().action, 'ticketing.confirmation-needs-attention');
-  await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail });
+  const retry = await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail });
+  assert.deepEqual(retry, { sent: 0, failed: 2, alreadySent: false });
   assert.equal(sends, 2);
   await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail, resendKey: 'explicit-request' });
   assert.equal(sends, 4);
-  await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail, resendKey: 'explicit-request' });
+  const replay = await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail, resendKey: 'explicit-request' });
+  assert.deepEqual(replay, { sent: 0, failed: 2, alreadySent: false });
   assert.equal(sends, 4);
+});
+
+test('a partial run can finish later recipients and still report the first failed delivery', async () => {
+  const db = fixture();
+  const attempted = [];
+  const provider = {
+    name: 'test',
+    async send(message) {
+      attempted.push(message.to);
+      if (message.to === order.purchaserEmail) throw new Error('synthetic provider timeout');
+      return { status: 'sent' };
+    },
+  };
+  const send = createEmailCore({ db, provider, getConfig }).send;
+  const run = (sendEmail = send) => sendOrderConfirmations({
+    db, getConfig, orderId: 'order-1', env, sendEmail, resendKey: 'explicit-request',
+  });
+  await assert.rejects(run((message, options) => {
+    if (message.to !== order.purchaserEmail) throw new Error('synthetic read failure before claiming attendee mail');
+    return send(message, options);
+  }), /synthetic read failure/);
+  assert.equal((await db.collection('admin_logs').get()).size, 0);
+
+  assert.deepEqual(await run(), { sent: 1, failed: 1, alreadySent: false });
+  assert.deepEqual(await run(), { sent: 0, failed: 1, alreadySent: false });
+  assert.deepEqual(attempted, ['buyer@example.org', 'attendee@example.org']);
+  const audit = (await db.collection('admin_logs').get()).docs[0].data();
+  assert.equal(audit.action, 'ticketing.confirmation-needs-attention');
+  assert.deepEqual(audit.details, { sent: 1, failed: 1, explicitResend: true });
+  const claims = (await db.collection('email_claims').get()).docs.map((snap) => snap.data());
+  assert.deepEqual(claims.find((claim) => claim.failure).failure, { uncertain: true });
+});
+
+test('an explicit resend retry keeps a failure recorded in the order audit alone', async () => {
+  const db = fixture();
+  let sends = 0;
+  const provider = {
+    name: 'test',
+    async send() { sends += 1; return { status: 'failed' }; },
+  };
+  const send = createEmailCore({ db, provider, getConfig }).send;
+  const run = (sendEmail) => sendOrderConfirmations({
+    db, getConfig, orderId: 'order-1', env, sendEmail, resendKey: 'explicit-request',
+  });
+  // Existing claims can have an order-level audit without recipient outcomes.
+  const original = await run((message) => send(message));
+  assert.equal(original.failed, 2);
+  assert.deepEqual(await run(send), { sent: 0, failed: 2, alreadySent: false });
+  assert.equal(sends, 2);
 });
