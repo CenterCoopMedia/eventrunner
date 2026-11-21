@@ -352,6 +352,18 @@ group, Rolldown splits it into about 40 small files, and the first paint
 costs about 8 kB more gzip than the budget in
 `scripts/ci/bundle-budget.json` can absorb over time.
 
+### Assert after the state change
+
+When a render or action starts asynchronous work, wait for the state the
+test checks. Use a `findBy` query for content that appears and `waitFor`
+for a change such as focus on an existing input. Query inside the wait if
+a lazy render can replace the element. If a route fallback and the loaded
+page share a label, wait for a signal unique to the loaded page.
+
+When a test supplies mock subscription data, wait for the listener to
+register before delivering the data, then check the visible result. Use a
+fake clock when the test exercises a time threshold.
+
 ### Live smoke test (sign-in flow)
 
 `scripts/dev/login-smoke.mjs` drives the real Login page with Playwright

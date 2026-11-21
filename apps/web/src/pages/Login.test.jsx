@@ -223,9 +223,12 @@ describe('emailed-code sign-in', () => {
     const submit = screen.getByRole('button', { name: 'Email me a code' });
     fireEvent.click(submit);
 
-    const status = await within(screen.getByRole('region', { name: 'Sign-in options' })).findByRole('status');
-    expect(status).toHaveTextContent(/request another in/i);
-    expect(status).toHaveTextContent('1:30');
+    const options = within(screen.getByRole('region', { name: 'Sign-in options' }));
+    await waitFor(() => {
+      const status = options.getByRole('status');
+      expect(status).toHaveTextContent(/request another in/i);
+      expect(status).toHaveTextContent('1:30');
+    });
     // Not styled or announced as an error, and submit stays available.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(submit).toBeEnabled();
@@ -271,8 +274,10 @@ describe('emailed-code sign-in', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
 
-    const status = await within(screen.getByRole('region', { name: 'Sign-in options' })).findByRole('status');
-    expect(status).toHaveTextContent('Too many code requests. Try again later.');
+    const options = within(screen.getByRole('region', { name: 'Sign-in options' }));
+    await waitFor(() => {
+      expect(options.getByRole('status')).toHaveTextContent('Too many code requests. Try again later.');
+    });
   });
 
   it('marks a rejected code aria-invalid and moves focus to the error', async () => {

@@ -304,7 +304,7 @@ describe('page list', () => {
     ];
     draftDocs = [{ ...page('printed-map', 'Printed map', 1), status: 'dirty' }];
     await renderAt('/admin/pages');
-    const line = screen.getByText(/appear under More/).closest('li');
+    const line = (await screen.findByText(/appear under More/)).closest('li');
     expect(line.previousElementSibling).toHaveTextContent('Help');
     fireEvent.click(screen.getByRole('button', { name: 'Move Venue link up' }));
     expect(screen.getByText(/appear under More/).closest('li').previousElementSibling).toHaveTextContent('Venue link');
@@ -1196,7 +1196,7 @@ describe('publish results and recovery', () => {
     });
     await renderAt('/admin/pages');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
 
     // A page outside the failed run gains a draft before the operator

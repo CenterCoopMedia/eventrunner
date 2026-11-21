@@ -91,6 +91,15 @@ async function renderAt(path) {
   }, { timeout: 10_000 });
 }
 
+async function renderOrganizationList() {
+  await renderAt('/admin/organizations');
+  await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+  await waitFor(() => {
+    expect(adminSubscriptions.has('cmsOrganizations')).toBe(true);
+    expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true);
+  });
+}
+
 function pushOrganizations(live, drafts) {
   act(() => {
     adminSubscriptions.get('cmsOrganizations')(live);
@@ -157,8 +166,7 @@ describe('the organizations list', () => {
   });
 
   it('rules a table in the order the sponsors page draws, with each state in words', async () => {
-    await renderAt('/admin/organizations');
-    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    await renderOrganizationList();
     pushOrganizations(LIVE, DRAFTS);
 
     const region = screen.getByRole('region', { name: 'Organizations' });
@@ -183,8 +191,7 @@ describe('the organizations list', () => {
   });
 
   it('publishes every saved draft, and only those', async () => {
-    await renderAt('/admin/organizations');
-    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    await renderOrganizationList();
     pushOrganizations(LIVE, DRAFTS);
     fetch.mockResolvedValueOnce(published(['tide-media', 'new-grant']));
 
@@ -203,8 +210,7 @@ describe('the organizations list', () => {
 // announcement; the toast repeats it with no live role.
 describe('organization order', () => {
   it('saves a moved organization order as drafts and does not publish', async () => {
-    await renderAt('/admin/organizations');
-    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    await renderOrganizationList();
     pushOrganizations(LIVE, DRAFTS);
     fetch.mockResolvedValue(response({ status: 'dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Move Tide Media Collective up' }));
@@ -233,8 +239,7 @@ describe('the organizations list, announcing a publish', () => {
       .filter((node) => node.textContent.includes(message));
 
   it('announces a published result once, and a failure once', async () => {
-    await renderAt('/admin/organizations');
-    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    await renderOrganizationList();
     pushOrganizations(LIVE, DRAFTS);
     fetch.mockResolvedValueOnce(published(['tide-media', 'new-grant']));
     fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
@@ -256,8 +261,7 @@ describe('the organizations list, announcing a publish', () => {
 // in aria-busy.
 describe('the organizations list, while a publish runs', () => {
   it('marks Publish all and Resume publish busy while they run', async () => {
-    await renderAt('/admin/organizations');
-    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    await renderOrganizationList();
     pushOrganizations(LIVE, DRAFTS);
     let finish;
     fetch
@@ -291,8 +295,7 @@ describe('the organizations list, resuming a publish', () => {
   // failed run asked for, not the drafts that are dirty now. A draft saved
   // after the failure was never part of the run.
   it('reports a resumed publish against the ids the failed run asked for', async () => {
-    await renderAt('/admin/organizations');
-    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    await renderOrganizationList();
     pushOrganizations(LIVE, DRAFTS);
     fetch.mockResolvedValueOnce({
       ok: false,

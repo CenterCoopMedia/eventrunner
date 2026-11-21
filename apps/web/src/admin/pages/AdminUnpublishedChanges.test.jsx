@@ -117,6 +117,13 @@ async function renderAt(path) {
     expect(screen.queryByText('Checking your access…', { selector: '.loading-status__label' })).not.toBeInTheDocument();
   }, { timeout: 10_000 });
   await screen.findByRole('heading', { level: 1, name: 'Unpublished changes' }, { timeout: 5000 });
+  await waitFor(() => {
+    for (const collection of ALL) expect(drafts.has(collection)).toBe(true);
+    expect(runs.recent).not.toBeNull();
+    expect(runs.failed).not.toBeNull();
+    expect(adminSubscriptions.has('cmsPages')).toBe(true);
+    expect(adminSubscriptions.has('cmsPages_drafts')).toBe(true);
+  });
 }
 
 /** Deliver every collection's dirty drafts at once, as six listeners would. */
