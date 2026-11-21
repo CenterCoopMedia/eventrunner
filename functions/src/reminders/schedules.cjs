@@ -296,7 +296,9 @@ async function approveAction({ db, getConfig, now, log, actor, body }) {
   const timeZone = eventTimeZone(config);
   const ref = db.collection(SCHEDULES).doc(SCHEDULE_ID);
   const approved = await db.runTransaction(async (tx) => {
-    const [snap, template] = await tx.getAll(ref, db.collection('email_templates').doc(TEMPLATE_ID));
+    const [snap, template] = await Promise.all([
+      tx.get(ref), tx.get(db.collection('email_templates').doc(TEMPLATE_ID)),
+    ]);
     const version = wordingVersion(template.data() ?? null);
     if (version !== body.wordingVersion) {
       fail(409, 'stale-preview', 'The reminder wording changed after the preview. Preview again, then approve.');

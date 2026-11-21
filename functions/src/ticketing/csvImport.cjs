@@ -270,7 +270,7 @@ async function processImport({ db, mapping, rows, eventId = null, commitAt, tx, 
   const summary = { create: 0, update: 0, duplicate: 0, invalid: 0 };
   for (const row of results) summary[row.verdict] += 1;
 
-  return { results, summary, confirmationVersion: previewVersion };
+  return { results, summary, ...(previewVersion === undefined ? {} : { confirmationVersion: previewVersion }) };
 }
 
 /** Shared admin-POST preamble, mirroring speakers/invites.cjs's gateAdminPost. */

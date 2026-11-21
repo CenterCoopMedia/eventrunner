@@ -38,6 +38,7 @@ function fakeDb(seed = {}) {
             return ref.get();
           },
           set(ref, data) { writes.push(() => ref.set(data)); },
+          delete(ref) { writes.push(() => ref.delete()); },
           create(ref, data) {
             writes.push(() => {
               if (docs.has(ref.key)) throw new Error(`already exists: ${ref.key}`);

@@ -102,7 +102,8 @@ test('the list is newest first, shows an expired link as expired, and never hold
   await db.collection('signup_links').doc(first.linkId).update({ createdAt: new Date(NOW - 40 * DAY), expiresAt: new Date(NOW - 10 * DAY) });
   const { links } = (await listSignupLinks(deps(db), { body: {}, user: ops })).body;
   assert.deepEqual(links.map((l) => [l.organizationName, l.status]), [['Second org', 'open'], ['First org', 'expired']]);
-  assert.deepEqual(Object.keys(links[0]).sort(), ['appId', 'createdAt', 'expiresAt', 'id', 'orgId', 'organizationName', 'status', 'usedAt', 'usedEmail']);
+  assert.deepEqual(Object.keys(links[0]).sort(), ['appId', 'confirmationVersion', 'createdAt', 'expiresAt', 'id', 'orgId', 'organizationName', 'status', 'usedAt', 'usedEmail']);
+  assert.match(links[0].confirmationVersion, /^[a-f0-9]{64}$/);
   const text = JSON.stringify(links);
   for (const { token, url } of [first, second]) {
     assert.ok(!text.includes(token));

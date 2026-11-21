@@ -186,7 +186,9 @@ test('processImport: classifies create, update, duplicate, and invalid rows', as
   assert.equal(preview.results[2].verdict, 'duplicate');
   assert.equal(preview.results[3].verdict, 'invalid');
   const committed = await processImport({ db, mapping: MAPPING, rows, commitAt: () => T0 });
-  assert.deepEqual(committed, preview);
+  const { confirmationVersion, ...planned } = preview;
+  assert.match(confirmationVersion, /^[a-f0-9]{64}$/);
+  assert.deepEqual(committed, planned);
   assert.deepEqual(db.ids('tickets').sort(), ['ord-existing', 'ord-new']);
   assert.equal(db.read('tickets', 'ord-new').email, 'a@example.com');
   assert.equal(db.read('tickets', 'ord-existing').email, 'b@example.com');
