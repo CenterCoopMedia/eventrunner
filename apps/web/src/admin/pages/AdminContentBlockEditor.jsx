@@ -492,26 +492,27 @@ export default function AdminContentBlockEditor({ mode }) {
 
   function changeBlockType(nextType) {
     if (content.blockType === 'text' && nextType !== 'text') shortTextRef.current = content;
-    const restored = nextType === 'text' ? shortTextRef.current : null;
+    const shortText = shortTextRef.current;
     setContent((current) => {
-      if (restored) return { ...restored, order: current.order, visible: current.visible };
-      // Short text to Text (issue #1184) keeps the words, and the Spanish
-      // ones, as one paragraph, the way the public page drew them.
-      if (current.blockType === 'text' && nextType === 'richtext') {
-        const spanish = current.translations?.es?.value;
+      const placement = { order: current.order, visible: current.visible };
+      if (shortText && nextType === 'text') return { ...shortText, ...placement };
+      // Keep the Short text words and translation even if the organizer
+      // tried another block type before choosing Text.
+      if (shortText && nextType === 'richtext') {
+        const spanish = shortText.translations?.es?.value;
         return {
-          ...current,
+          ...shortText,
+          ...placement,
           blockType: 'richtext',
-          values: { ...current.values, value: plainTextAsParagraph(current.values?.value) },
+          values: { ...shortText.values, value: plainTextAsParagraph(shortText.values?.value) },
           ...(typeof spanish === 'string' && spanish
-            ? { translations: { ...current.translations, es: { ...current.translations.es, value: plainTextAsParagraph(spanish) } } }
+            ? { translations: { ...shortText.translations, es: { ...shortText.translations.es, value: plainTextAsParagraph(spanish) } } }
             : {}),
         };
       }
       return {
         ...blankContent(nextType),
-        order: current.order,
-        visible: current.visible,
+        ...placement,
         ...(Object.hasOwn(current, 'translations') ? { translations: {} } : {}),
       };
     });

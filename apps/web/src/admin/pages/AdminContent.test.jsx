@@ -966,11 +966,15 @@ describe('creating and editing a block', () => {
 
   // Issue #1184: Short text could not take a link. Switching an existing
   // Short text block to Text keeps its words, escaped, as one paragraph.
-  it('keeps the words when a Short text block becomes Text', async () => {
+  it.each([
+    { route: 'directly', intermediateType: null },
+    { route: 'after trying another type', intermediateType: 'Number' },
+  ])('keeps the words when a Short text block becomes Text $route', async ({ intermediateType }) => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [{
       id: 'intro__note', section: 'intro', field: 'note', blockType: 'text',
       value: 'Fees & deadlines <2027>', order: 3, visible: true, status: 'clean', revision: 1,
+      translations: { es: { value: 'Cuotas & plazos <2027>' } },
     }];
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__note', status: 'dirty' }));
 
@@ -978,13 +982,24 @@ describe('creating and editing a block', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
     const picker = screen.getByRole('group', { name: 'Block type' });
     expect(within(picker).getByRole('radio', { name: 'Short text' })).toBeChecked();
+    if (intermediateType) {
+      const option = within(picker).getByRole('radio', { name: intermediateType });
+      fireEvent.click(option);
+      expect(option).toBeChecked();
+    }
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Visible' }));
     fireEvent.click(within(picker).getByRole('radio', { name: 'Text' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields).toMatchObject({
-      blockType: 'richtext',
-      value: '<p>Fees &amp; deadlines &lt;2027&gt;</p>',
+    expect(bodyOf(0)).toMatchObject({
+      visible: false,
+      fields: {
+        blockType: 'richtext',
+        order: 3,
+        value: '<p>Fees &amp; deadlines &lt;2027&gt;</p>',
+        translations: { es: { value: '<p>Cuotas &amp; plazos &lt;2027&gt;</p>' } },
+      },
     });
   });
 
