@@ -298,7 +298,7 @@ export default function AdminSpeakersList() {
                         <button
                           type="button"
                           onClick={() =>
-                            run('approve', 'updateSpeaker', speaker, { speaker: { status: 'approved' } })
+                            run('approve', 'updateSpeaker', speaker, { speaker: { status: 'approved' }, expectedStatus: speaker.status })
                           }
                           disabled={busy !== null && busy !== `${speaker.id}:approve`}
                           aria-disabled={busy !== null || undefined}

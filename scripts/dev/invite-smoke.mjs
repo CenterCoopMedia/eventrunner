@@ -365,7 +365,7 @@ async function main() {
   check(reaccepted.status !== 200, `a consumed token gets nobody else in (${reaccepted.status})`);
 
   console.log('admin approves, and the public projection appears');
-  const approved = await call('updateSpeaker', { speakerId: speakerId, speaker: { status: 'approved' } }, adminToken);
+  const approved = await call('updateSpeaker', { speakerId: speakerId, speaker: { status: 'approved' }, expectedStatus: 'accepted' }, adminToken);
   check(approved.status === 200, `updateSpeaker answered 200 (${approved.status})`);
 
   const until = deadline();

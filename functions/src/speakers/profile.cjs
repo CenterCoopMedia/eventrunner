@@ -37,6 +37,14 @@ const { generateSpeakerSlug } = require('shared/slug');
 const { readLinkedUser } = require('./lifecycle.cjs');
 
 const SPEAKERS = 'speakers';
+// The admin editor's words for each stored status.
+const STATUS_LABELS = Object.freeze({
+  draft: 'Draft',
+  invited: 'Invitation sent',
+  accepted: 'Accepted, awaiting approval',
+  approved: 'Published',
+  removed: 'Removed',
+});
 /**
  * Slug reservations: `speaker_slugs/{slug}` holds `{ speakerId }`.
  *
@@ -259,7 +267,9 @@ async function applyCreateSpeaker({
  * @returns {Promise<{ ok: true, speakerId: string, docPath: string } |
  *                    { ok: false, status: number, code: string, message: string }>}
  */
-async function applyUpdateSpeaker({ db, bucket = null, speakerId, payload, actor, now = Date.now, log = console }) {
+async function applyUpdateSpeaker({
+  db, bucket = null, speakerId, payload, expectedStatus, actor, now = Date.now, log = console,
+}) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
@@ -269,6 +279,11 @@ async function applyUpdateSpeaker({ db, bucket = null, speakerId, payload, actor
   }
   if (Object.keys(verdict.fields).length === 0) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speaker: no editable fields in the payload' };
+  }
+  // A status change names the status the caller saw. Status moves the
+  // account link and the invitation, so a stale tab must not replay it.
+  if ('status' in verdict.fields && typeof expectedStatus !== 'string') {
+    return { ok: false, status: 400, code: 'bad-request', message: 'expectedStatus: required with a status change' };
   }
   const at = new Date(now());
   const ref = db.collection(SPEAKERS).doc(speakerId);
@@ -348,6 +363,15 @@ async function applyUpdateSpeaker({ db, bucket = null, speakerId, payload, actor
       // its account link, so it goes back only to draft (owner decision).
       // A record with no stored status reads as draft everywhere else.
       const fromStatus = typeof stored.status === 'string' ? stored.status : 'draft';
+      if (patch.status !== undefined && expectedStatus !== fromStatus) {
+        const err = new Error('STATUS_STALE');
+        err.conflict = {
+          status: 409,
+          code: 'status-conflict',
+          message: `Someone changed this speaker’s status to ${STATUS_LABELS[fromStatus] ?? fromStatus}. Reload the speaker before you change the status.`,
+        };
+        throw err;
+      }
       if (patch.status !== undefined && !canMoveSpeaker(fromStatus, patch.status)) {
         const err = new Error('STATUS_MOVE');
         err.conflict = {
@@ -992,6 +1016,7 @@ function createUpdateSpeakerHandler({ db, bucket = null, auth, getConfig, now = 
         bucket,
         speakerId: req.body?.speakerId,
         payload: req.body?.speaker,
+        expectedStatus: req.body?.expectedStatus,
         actor,
         now,
         log,

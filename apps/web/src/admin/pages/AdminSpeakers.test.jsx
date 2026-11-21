@@ -24,9 +24,12 @@ let speakerDocs = [];
 // speaker_logistics/{id} documents the logistics panel reads, by path.
 let logisticsDocs = {};
 let listenerError = null;
+// The live speakers listener, so a test can deliver a teammate's change.
+let pushSpeakers = null;
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
     if (name === 'speakers') {
+      pushSpeakers = onNext;
       onNext(speakerDocs);
       if (listenerError) onError?.(listenerError);
     } else {
@@ -281,8 +284,7 @@ describe('speaker editor', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/updateSpeaker$/);
     expect(bodyOf(0).speakerId).toBe('rae-okonkwo');
-    expect(bodyOf(0).speaker.bio).toBe('Updated bio.');
-    expect(bodyOf(0).speaker.headshotPath).toBe('speakers/rae.jpg');
+    expect(bodyOf(0).speaker).toEqual({ bio: 'Updated bio.' });
   });
 
   it('shows the speaker logistics to staff and saves pronouns with the profile', async () => {
@@ -348,6 +350,7 @@ describe('speaker editor', () => {
       errorResponse(400, 'bad-request', 'firstName: must be a non-empty string; slug: must be lowercase letters, digits, and single hyphens'),
     );
     await renderAt('/admin/speakers/rae-okonkwo');
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Edited.' } });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
@@ -515,7 +518,64 @@ describe('speaker editor', () => {
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).speaker.status).toBe('removed');
+    expect(bodyOf(0).speaker).toEqual({ status: 'removed' });
+    expect(bodyOf(0).expectedStatus).toBe('approved');
+  });
+
+  it("keeps a teammate's newer status and edits when this form saves later", async () => {
+    speakerDocs = [RAE];
+    fetch.mockResolvedValue(okResponse({ speakerId: 'rae-okonkwo' }));
+    await renderAt('/admin/speakers/rae-okonkwo');
+
+    // This tab publishes nothing new; it picks Removed and saves.
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'removed' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toMatchObject({ speaker: { status: 'removed' }, expectedStatus: 'approved' });
+
+    // A teammate restores the speaker to Draft and changes the organization.
+    await act(async () => {
+      pushSpeakers([{ ...RAE, status: 'draft', organization: 'Newer Org' }]);
+    });
+    expect(screen.getByLabelText('Status')).toHaveValue('draft');
+    expect(screen.getByLabelText('Organization')).toHaveValue('Newer Org');
+
+    // This tab's next save sends only its own edit: no old removal, no old
+    // organization.
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Later bio.' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1)).toEqual({ speakerId: 'rae-okonkwo', speaker: { bio: 'Later bio.' } });
+  });
+
+  it('sends an unsaved status pick against the status it was made from', async () => {
+    speakerDocs = [{ ...RAE, status: 'draft' }];
+    fetch.mockResolvedValueOnce(errorResponse(409, 'status-conflict', 'Someone changed this speaker’s status.'));
+    await renderAt('/admin/speakers/rae-okonkwo');
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
+    // A teammate sends an invitation before this pick is saved.
+    await act(async () => {
+      pushSpeakers([{ ...RAE, status: 'invited' }]);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toMatchObject({ speaker: { status: 'approved' }, expectedStatus: 'draft' });
+  });
+
+  it('keeps an unsaved edit when a teammate changes the same field', async () => {
+    speakerDocs = [RAE];
+    await renderAt('/admin/speakers/rae-okonkwo');
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Mine.' } });
+    await act(async () => {
+      pushSpeakers([{ ...RAE, bio: 'Theirs.' }]);
+    });
+    expect(screen.getByLabelText('Bio')).toHaveValue('Mine.');
   });
 
   for (const status of ['invited', 'accepted']) {
@@ -677,6 +737,7 @@ describe('invite actions', () => {
     expect(JSON.parse(callTo('updateSpeaker')[1].body)).toEqual({
       speakerId: 'accepted-one',
       speaker: { status: 'approved' },
+      expectedStatus: 'accepted',
     });
     expect(screen.getByText(/now appear on the public site/)).toBeInTheDocument();
   });
