@@ -14,6 +14,7 @@
 // composition, and the shared Newsroom hero is the one #345 is about.
 /* global document, Node, NodeFilter */
 import { test, expect } from '@playwright/test';
+import sharp from 'sharp';
 import { adminDb } from './helpers.mjs';
 
 const THEMES = ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'];
@@ -81,6 +82,103 @@ async function measureHero(page) {
     };
   });
 }
+
+test('published hero artwork skips the manifest and preserves the box and crop', async ({ page }) => {
+  const original = 'cms-images/published-hero/hall.webp';
+  const copy = 'cms-images/published-hero/_sizes/7/320.webp';
+  const manifest = 'cms-images/published-hero/_sizes/manifest.json';
+  const alt = 'A published photo of the venue';
+  const block = { section: 'hero', field: 'image', blockType: 'image', url: original, alt, visible: true };
+  const snapshot = { [original]: { width: 1280, sizes: [{ width: 320, path: copy }] } };
+  const [originalImage, copyImage] = await Promise.all([1280, 320].map((width) => sharp({
+    create: { width, height: width / 2, channels: 3, background: { r: 0, g: 0, b: 128 } },
+  }).webp().toBuffer()));
+  const requests = [];
+  let published = false;
+  let artworkBlock = block;
+  // Both visits must measure the published content while live listeners are pending.
+  await page.route('**/google.firestore.v1.Firestore/Listen/**', () => {});
+  await page.route('**/src/generated/eventConfig.js*', async (route) => {
+    const response = await route.fetch();
+    const event = { name: 'Regional Organizers Summit', shortName: 'Regional Summit', tagline: '', historicalDemo: false };
+    await route.fulfill({ response, body: `${await response.text()}\nObject.assign(eventConfig, ${JSON.stringify(event)});` });
+  });
+  await page.route('**/src/generated/siteContent.js*', async (route) => {
+    const response = await route.fetch();
+    const overrides = `
+      siteContent.hero__image = ${JSON.stringify(artworkBlock)};
+      siteContent.hero__title.value = 'Regional Organizers Summit';
+      Object.assign(heroImageSizes, ${JSON.stringify(published ? snapshot : {})});
+    `;
+    await route.fulfill({ response, body: `${await response.text()}\n${overrides}` });
+  });
+  await page.route((url) => decodeURIComponent(url.pathname).includes('/o/cms-images/published-hero/'), async (route) => {
+    const objectPath = decodeURIComponent(new URL(route.request().url()).pathname.split('/o/').at(-1));
+    requests.push(objectPath);
+    if (objectPath === manifest) {
+      await route.fulfill({
+        headers: { 'access-control-allow-origin': '*' },
+        json: {
+          status: 'ready', source: original, sourceGeneration: '7', width: 1280,
+          sizes: [{ target: 320, width: 320, path: copy }],
+        },
+      });
+    } else {
+      await route.fulfill({
+        contentType: 'image/webp',
+        body: objectPath === copy ? copyImage : originalImage,
+      });
+    }
+  });
+  const artwork = page.getByRole('img', { name: alt });
+  async function measureAtWidths(path, usePublishedSizes) {
+    await page.goto('about:blank');
+    published = usePublishedSizes;
+    requests.length = 0;
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto(path, { waitUntil: 'domcontentloaded' });
+    await expect.poll(() => artwork.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+    if (artworkBlock.url === original) {
+      // Routing disables caching, so a remounted figure can request the same URL again.
+      expect([...new Set(requests)]).toEqual(published ? [copy] : [manifest, copy]);
+    } else {
+      expect(requests).toEqual([]);
+      await expect(artwork).not.toHaveAttribute('srcset');
+    }
+    const boxes = [];
+    for (const viewport of [320, 768, 1280]) {
+      await page.setViewportSize({ width: viewport, height: 800 });
+      let geometry;
+      await expect.poll(async () => {
+        geometry = await artwork.evaluate(async (image) => {
+          // Flush the new viewport layout so fonts it needs are requested.
+          image.getBoundingClientRect();
+          await image.ownerDocument.fonts.ready;
+          const { width, height } = image.getBoundingClientRect();
+          const { objectFit, objectPosition } = globalThis.getComputedStyle(image);
+          return image.complete && image.naturalWidth > 0 ? { width, height, objectFit, objectPosition } : null;
+        });
+        return geometry && geometry.width > 0 && geometry.height > 0;
+      }, { message: `Rendered artwork on ${path} at ${viewport}px` }).toBe(true);
+      boxes.push({ viewport, ...geometry });
+    }
+    if (usePublishedSizes) expect(requests).not.toContain(manifest);
+    return boxes;
+  }
+  try {
+    for (const [source, url] of [['library', original], ['site file', '/hero/civic.webp']]) {
+      artworkBlock = { ...block, url, focalX: 20, focalY: 70 };
+      for (const path of ['/', '/schedule']) {
+        const before = await measureAtWidths(path, false);
+        const after = await measureAtWidths(path, true);
+        expect(after, `Geometry for ${source} artwork on ${path}`).toEqual(before);
+        console.log(`Published hero geometry ${source} ${path} ${JSON.stringify(after)}`);
+      }
+    }
+  } finally {
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
 
 function round(value) {
   return Math.round(value * 10) / 10;

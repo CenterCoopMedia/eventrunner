@@ -9,17 +9,18 @@
 // or a browser without WebP) calls `onError`, which drops the srcset; the
 // original then loads as the src.
 import { useEffect, useState } from 'react';
-import { imageBlockSources, imageSizeSrcSet, peekImageSizeSrcSet } from './mediaSource.js';
+import { formatImageSizeSrcSet, imageBlockSources, imageSizeSrcSet, peekImageSizeSrcSet } from './mediaSource.js';
 
 /**
  * @param {unknown} path the original's object path
  * @param {boolean} enabled false for a caller that wants the original only
+ * @param {string|null} publishedSrcSet responsive sources already available at render
  * @returns {{ pending: boolean, srcSet: string|undefined, onError: () => boolean }}
  *   onError answers true when it dropped the srcset, false when the
  *   original itself failed
  */
-export function useImageSizeSrcSet(path, enabled = true) {
-  const known = enabled ? peekImageSizeSrcSet(path) : null;
+export function useImageSizeSrcSet(path, enabled = true, publishedSrcSet = null) {
+  const known = enabled ? publishedSrcSet ?? peekImageSizeSrcSet(path) : null;
   const [loaded, setLoaded] = useState(() => ({ path, srcSet: known }));
   const [failedFor, setFailedFor] = useState(null);
 
@@ -70,17 +71,18 @@ export function focalPosition(block) {
  * The src, srcset and error handler for an image block's url (issue #333).
  *
  * A picked library path resolves to the bucket and offers its display
- * sizes at the real widths its manifest states. The src waits for the
- * manifest, so the original is not downloaded first. If a size fails to
- * load, the srcset goes and the original loads. The event hero uses this
- * too, so the two image devices stay in step.
+ * sizes at the real widths its manifest states. Published sizes can be used
+ * immediately. Otherwise the src waits for the manifest, so the original
+ * is not downloaded first. If a size fails to load, the original loads.
  *
  * @param {unknown} url a block's url, already through isSafeHref
+ * @param {Record<string, { width: number, sizes: Array<{ width: number, path: string }> }>} [publishedSizes]
  * @returns {{ path: string|null, src: unknown, srcSet: string|undefined, pending: boolean, onError: () => void }}
  */
-export function useSizedImageSources(url) {
+export function useSizedImageSources(url, publishedSizes) {
   const { src, path } = imageBlockSources(url);
-  const display = useImageSizeSrcSet(path, Boolean(path));
+  const publishedSrcSet = path ? formatImageSizeSrcSet(path, publishedSizes?.[path]) : null;
+  const display = useImageSizeSrcSet(path, Boolean(path), publishedSrcSet);
   return {
     path,
     src: display.pending ? undefined : src,

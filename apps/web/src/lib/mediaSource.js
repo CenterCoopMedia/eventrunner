@@ -221,25 +221,30 @@ const MANIFEST_TIMEOUT_MS = 4000;
 const sizeAnswers = new Map();
 const sizeRequests = new Map();
 
+/** Format candidates from a validated manifest using the current Storage origin. */
+export function formatImageSizeSrcSet(object, read) {
+  if (!read?.sizes.length) return null;
+  const originalUrl = assetUrl(object);
+  if (!originalUrl) return null;
+  const candidates = [];
+  for (const size of read.sizes) {
+    const url = assetUrl(size.path);
+    if (!url) return null;
+    candidates.push(`${url} ${size.width}w`);
+  }
+  candidates.push(`${originalUrl} ${read.width}w`);
+  return candidates.join(', ');
+}
+
 async function fetchImageSizeSrcSet(object, manifestPath) {
   const manifestUrl = assetUrl(manifestPath);
-  const originalUrl = assetUrl(object);
-  if (!manifestUrl || !originalUrl || typeof fetch !== 'function') return null;
+  if (!manifestUrl || typeof fetch !== 'function') return null;
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), MANIFEST_TIMEOUT_MS) : null;
   try {
     const response = await fetch(manifestUrl, { credentials: 'omit', signal: controller?.signal });
     if (!response?.ok) return null;
-    const read = readImageSizeManifest(object, await response.json());
-    if (!read || read.sizes.length === 0) return null;
-    const candidates = [];
-    for (const size of read.sizes) {
-      const url = assetUrl(size.path);
-      if (!url) return null;
-      candidates.push(`${url} ${size.width}w`);
-    }
-    candidates.push(`${originalUrl} ${read.width}w`);
-    return candidates.join(', ');
+    return formatImageSizeSrcSet(object, readImageSizeManifest(object, await response.json()));
   } catch {
     return null;
   } finally {

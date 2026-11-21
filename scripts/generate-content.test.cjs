@@ -193,7 +193,7 @@ test('an unpublished (visible: false) live doc never reaches the snapshot', asyn
   assert.deepEqual(snapshot.content, []);
 });
 
-test('publishes dimensions only for referenced library images with ready manifests', async () => {
+test('publishes library image dimensions and gives hero copies priority', async () => {
   const hall = 'cms-images/first/hall.jpg';
   const foyer = 'cms-images/second/foyer.webp';
   const missing = 'cms-images/third/stage.png';
@@ -203,10 +203,10 @@ test('publishes dimensions only for referenced library images with ready manifes
     cmsContent: [
       image('hall', hall),
       image('hall-again', hall),
-      image('foyer', foyer),
-      image('missing', missing),
+      { ...image('foyer', foyer), section: 'hero' },
+      { ...image('missing', missing), section: 'hero' },
       image('external', 'https://example.org/photo.jpg'),
-      image('unpublished', privateImage, false),
+      { ...image('unpublished', privateImage, false), section: 'hero' },
     ],
     cmsContent_drafts: [image('draft', privateImage)],
   } });
@@ -222,23 +222,30 @@ test('publishes dimensions only for referenced library images with ready manifes
       const object = decodeURIComponent(parsed.pathname.split('/').at(-1));
       requested.push(object);
       if (object.startsWith('cms-images/third/')) throw new Error('Storage unavailable');
+      const source = object.startsWith('cms-images/first/') ? hall : foyer;
       const manifest = {
-        status: 'ready', sourceGeneration: '7', width: 1200, sizes: [],
-        ...(object.startsWith('cms-images/first/') ? { source: hall, height: 800 } : { source: foyer }),
+        status: 'ready', sourceGeneration: '7', width: 1200, source,
+        sizes: [{ target: 320, width: 320, path: `${path.posix.dirname(source)}/_sizes/7/320.webp` }],
+        ...(source === hall ? { height: 800 } : {}),
       };
       return { ok: true, json: async () => manifest };
     },
   });
-  assert.deepEqual(requested.sort(), [
-    'cms-images/first/_sizes/manifest.json',
+  assert.deepEqual(requested, [
     'cms-images/second/_sizes/manifest.json',
     'cms-images/third/_sizes/manifest.json',
+    'cms-images/first/_sizes/manifest.json',
   ]);
   assert.deepEqual(snapshot.imageDimensions, { [hall]: { width: 1200, height: 800 } });
+  assert.deepEqual(snapshot.heroImageSizes, {
+    [foyer]: { width: 1200, sizes: [{ width: 320, path: 'cms-images/second/_sizes/7/320.webp' }] },
+  });
+  const emitted = emitSiteContent(snapshot.content, snapshot.imageDimensions, snapshot.heroImageSizes);
   assert.match(
-    emitSiteContent(snapshot.content, snapshot.imageDimensions),
+    emitted,
     /export const imageDimensions = \{\s+'cms-images\/first\/hall\.jpg': \{\s+width: 1200,\s+height: 800,/,
   );
+  assert.match(emitted, /export const heroImageSizes = \{\s+'cms-images\/second\/foyer\.webp': \{\s+width: 1200,/);
 });
 
 // Speakers come from the one-way `speakers_public` projection, never from

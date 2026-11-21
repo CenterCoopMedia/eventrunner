@@ -451,4 +451,6 @@ export const siteContent = {
 
 export const imageDimensions = {};
 
+export const heroImageSizes = {};
+
 export default siteContent;
