@@ -34,6 +34,7 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { isBackIssue } from '../lib/backIssue.js';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from '../lib/scheduleView.js';
+import { reloadPage } from '../lib/pageReload.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function SharedSchedule() {
@@ -109,7 +110,7 @@ export default function SharedSchedule() {
   if (share === undefined && !denied) {
     return (
       <div className="mt-lg">
-        <LoadingState shape="schedule" label="Loading the shared schedule…" />
+        <LoadingState shape="schedule" label="Loading the shared schedule…" phase={uid} recover onRetry={reloadPage} />
       </div>
     );
   }

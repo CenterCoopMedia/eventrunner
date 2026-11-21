@@ -62,7 +62,12 @@ describe.each(CASES)('$name loading feedback', (page) => {
     act(() => vi.advanceTimersByTime(9000));
     expect(status.textContent).toBe('This is taking longer than usual. We’re still waiting for a response.');
     act(() => vi.advanceTimersByTime(50000));
-    expect(status.textContent).toBe('We haven’t received a result after a minute. You can keep waiting.');
+    if (page.name === 'tickets') {
+      expect(status).toHaveTextContent('This is taking longer than a minute.');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+    } else {
+      expect(status.textContent).toBe('We haven’t received a result after a minute. You can keep waiting.');
+    }
     expect(state.tickets.mock.calls.length + state.changes.mock.calls.length).toBe(1);
 
     await act(async () => finish(page.result));
@@ -96,9 +101,10 @@ describe.each(CASES)('$name loading feedback', (page) => {
       expect(data).toBeEmptyDOMElement();
       expect(data.closest('.loading-state').querySelector('.loading-status__detail')).toHaveTextContent('This is taking longer than usual.');
       act(() => vi.advanceTimersByTime(29_999));
-      expect(data).not.toHaveTextContent('We haven’t received a result after a minute.');
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
       act(() => vi.advanceTimersByTime(1));
-      expect(data).toHaveTextContent('We haven’t received a result after a minute.');
+      expect(data).toHaveTextContent('This is taking longer than a minute.');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
     }
     await act(async () => finish(page.result));
     if (page.completion) expect(data).toHaveTextContent(page.sharedWait ? page.completion : '');

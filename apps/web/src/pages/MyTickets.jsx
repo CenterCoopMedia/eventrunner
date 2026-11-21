@@ -21,6 +21,7 @@ export default function MyTickets({ routeAttempt }) {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const requestController = useRef(null);
+  const paging = useRef(false);
   const tickets = loaded && user && loaded.uid === user.uid ? loaded.tickets : null;
   const error = failure && user && failure.uid === user.uid ? failure.message : null;
   const loadingTickets = !tickets && !error;
@@ -33,6 +34,7 @@ export default function MyTickets({ routeAttempt }) {
     if (demo || !user?.emailVerified) return undefined;
     const controller = new AbortController();
     requestController.current = controller;
+    paging.current = false;
     busyRef.current = true;
     setBusy(true);
     setFailure(null);
@@ -44,10 +46,12 @@ export default function MyTickets({ routeAttempt }) {
     return () => requestController.current?.abort();
   }, [user, demo, refresh]);
 
-  async function loadMore() {
-    if (busyRef.current || !user?.emailVerified || loaded?.uid !== user.uid || !loaded.nextCursor) return;
+  async function loadMore(retrying = false) {
+    if ((busyRef.current && !retrying) || !user?.emailVerified || loaded?.uid !== user.uid || !loaded.nextCursor) return;
+    if (retrying) requestController.current?.abort();
     const controller = new AbortController();
     requestController.current = controller;
+    paging.current = true;
     busyRef.current = true;
     setBusy(true);
     setFailure(null);
@@ -63,6 +67,12 @@ export default function MyTickets({ routeAttempt }) {
     }
   }
 
+  function retryTickets() {
+    if (!busyRef.current) return;
+    if (paging.current) void loadMore(true);
+    else setRefresh((value) => value + 1);
+  }
+
   const heading = <h1 className="font-heading text-h1 font-semibold">Your tickets</h1>;
   if (demo) return <article className="space-y-md">{heading}<p>This event demo does not issue tickets.</p></article>;
   if (loading) return <LoadingState label="Checking your sign-in…" rows={0} routeAttempt={routeAttempt} />;
@@ -73,15 +83,17 @@ export default function MyTickets({ routeAttempt }) {
     <div className="space-y-sm no-print"><p>These tickets have been claimed by your verified account. Claim an assigned ticket with its order reference to add it here. Purchaser payment details remain private.</p><button type="button" className={secondaryActionClass} aria-busy={busy} aria-disabled={busy} onClick={() => { if (!busy) setRefresh((value) => value + 1); }}>{busy ? 'Refreshing tickets…' : 'Refresh tickets'}</button></div>
     {error ? <p role="alert" className="text-danger">{error}</p> : null}
     <LoadingState
-      active={loadingTickets}
-      label="Loading your tickets…"
+      active={loadingTickets || busy}
+      label={loadingTickets ? 'Loading your tickets…' : 'Updating your tickets…'}
       completion={tickets ? (tickets.length ? 'Your tickets are ready.' : 'You have no tickets for this account.') : ''}
       rows={0}
       routeAttempt={routeAttempt}
+      recover
+      onRetry={retryTickets}
     />
     <section aria-label="Tickets" aria-busy={busy || loadingTickets} className="space-y-lg">
     {tickets?.length ? <TicketDocuments tickets={tickets} eventName={eventConfig.name} timezone={eventConfig.timezone} /> : tickets ? <section className="space-y-sm"><h2 className="font-heading text-h2">No tickets found for this account</h2><p>Use the email assigned by the purchaser. If you have an order reference, you can check it through the ticket claim form.</p><Link to="/ticket/claim" className={secondaryActionClass}>Claim an existing ticket</Link></section> : null}
-    {loaded && user && loaded.uid === user.uid && loaded.nextCursor ? <button type="button" className={`${secondaryActionClass} no-print`} aria-busy={busy} aria-disabled={busy} onClick={loadMore}>{busy ? 'Loading tickets…' : 'Load more tickets'}</button> : null}
+    {loaded && user && loaded.uid === user.uid && loaded.nextCursor ? <button type="button" className={`${secondaryActionClass} no-print`} aria-busy={busy} aria-disabled={busy} onClick={() => loadMore()}>{busy ? 'Loading tickets…' : 'Load more tickets'}</button> : null}
     </section>
   </article>;
 }

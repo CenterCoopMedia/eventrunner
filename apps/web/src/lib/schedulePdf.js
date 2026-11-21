@@ -23,10 +23,11 @@ export class SchedulePdfError extends Error {
  *   language?: 'en'|'es',
  *   fetchImpl?: typeof fetch,
  *   documentRef?: Document,
+ *   signal?: AbortSignal,
  * }} args
  * @returns {Promise<void>}
  */
-export async function downloadSchedulePdf({ origin, language, fetchImpl, documentRef }) {
+export async function downloadSchedulePdf({ origin, language, fetchImpl, documentRef, signal }) {
   const doFetch = fetchImpl ?? (typeof fetch === 'function' ? fetch : null);
   const doc = documentRef ?? (typeof document === 'undefined' ? null : document);
   if (!doFetch || !doc) {
@@ -35,7 +36,7 @@ export async function downloadSchedulePdf({ origin, language, fetchImpl, documen
   let response;
   try {
     const query = language ? `?${new URLSearchParams({ lang: language })}` : '';
-    response = await doFetch(`${origin}/buildSchedulePdf${query}`);
+    response = await doFetch(`${origin}/buildSchedulePdf${query}`, { signal });
   } catch {
     throw new SchedulePdfError('We could not reach the server. Check your connection and try again.');
   }
@@ -43,6 +44,7 @@ export async function downloadSchedulePdf({ origin, language, fetchImpl, documen
     throw new SchedulePdfError('The schedule PDF is not available for this event.');
   }
   const blob = await response.blob();
+  signal?.throwIfAborted();
   const url = URL.createObjectURL(blob);
   const anchor = doc.createElement('a');
   anchor.href = url;

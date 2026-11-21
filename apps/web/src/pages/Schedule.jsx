@@ -8,7 +8,7 @@
 // sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
-import { memo, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { pageHeading } from 'shared/page';
@@ -255,6 +255,8 @@ export default function Schedule() {
   ];
   // The take-it-with-you controls (issue #166) track the PDF and copy actions.
   const [pdfState, setPdfState] = useState({ status: 'idle', message: '' });
+  const pdfRequest = useRef(null);
+  useEffect(() => () => pdfRequest.current?.abort(), []);
   const [copyState, setCopyState] = useState('idle'); // idle | copied | error
   // The event's lines, in the client's own order (config/event.tracks). No
   // lines means no second axis, so there is nothing for a grid to be.
@@ -281,12 +283,15 @@ export default function Schedule() {
    * programme is public — and the flag gates the control, not the data.
    */
   async function onDownloadPdf() {
+    pdfRequest.current?.abort();
+    const controller = new AbortController();
+    pdfRequest.current = controller;
     setPdfState({ status: 'loading', message: '' });
     try {
-      await downloadSchedulePdf({ origin: functionsOrigin(), language });
-      setPdfState({ status: 'idle', message: '' });
+      await downloadSchedulePdf({ origin: functionsOrigin(), language, signal: controller.signal });
+      if (!controller.signal.aborted) setPdfState({ status: 'idle', message: '' });
     } catch (err) {
-      setPdfState({ status: 'error', message: err.message || 'The schedule PDF could not be generated.' });
+      if (!controller.signal.aborted) setPdfState({ status: 'error', message: err.message || 'The schedule PDF could not be generated.' });
     }
   }
 
@@ -589,6 +594,11 @@ export default function Schedule() {
                   >
                     {text('Download schedule (PDF)', 'Descargar el programa (PDF)')}
                   </button>
+                ) : null}
+                {pdfState.status === 'loading' ? (
+                  <div className="basis-full">
+                    <LoadingState label={text('Downloading the schedule…', 'Descargando el programa…')} rows={0} recover onRetry={onDownloadPdf} />
+                  </div>
                 ) : null}
                 {pdfState.status === 'error' ? (
                   <p role="status" className="basis-full font-data text-caption text-text-secondary">
