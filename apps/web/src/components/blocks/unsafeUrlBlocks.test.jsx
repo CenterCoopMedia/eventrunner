@@ -156,8 +156,10 @@ describe('ImageBlock', () => {
     resetImageSizeCacheForTest();
     stubManifests({ [url]: readyManifest(url, 2400) });
     try {
-      const { findByRole, getByText } = render(<ImageBlock block={{ url, size, alignment: 'right', alt: 'Hall', caption: 'Main hall' }} />);
-      const img = await findByRole('img', { name: 'Hall' });
+      const { getByRole, getByText } = render(<ImageBlock block={{ url, size, alignment: 'right', alt: 'Hall', caption: 'Main hall' }} />);
+      await waitFor(() => expect(getByRole('img', { name: 'Hall' })).toHaveAttribute('srcset'));
+      // The caption module can replace the Suspense fallback while waitFor resolves.
+      const img = getByRole('img', { name: 'Hall' });
       const figure = img.closest('figure');
       expect(figure.style.maxWidth).toBe(`min(100%, ${width}px)`);
       expect(figure).toHaveClass('ml-auto');
