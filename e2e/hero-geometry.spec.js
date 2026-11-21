@@ -89,8 +89,6 @@ test('published hero artwork skips the manifest and preserves the box and crop',
   const manifest = 'cms-images/published-hero/_sizes/manifest.json';
   const alt = 'A published photo of the venue';
   const block = { section: 'hero', field: 'image', blockType: 'image', url: original, alt, visible: true };
-  const imageRef = adminDb().doc('cmsContent/hero__image');
-  const saved = await imageRef.get();
   const snapshot = { [original]: { width: 1280, sizes: [{ width: 320, path: copy }] } };
   const [originalImage, copyImage] = await Promise.all([1280, 320].map((width) => sharp({
     create: { width, height: width / 2, channels: 3, background: { r: 0, g: 0, b: 128 } },
@@ -98,10 +96,18 @@ test('published hero artwork skips the manifest and preserves the box and crop',
   const requests = [];
   let published = false;
   let artworkBlock = block;
+  // Both visits must measure the published content while live listeners are pending.
+  await page.route('**/google.firestore.v1.Firestore/Listen/**', () => {});
+  await page.route('**/src/generated/eventConfig.js*', async (route) => {
+    const response = await route.fetch();
+    const event = { name: 'Regional Organizers Summit', shortName: 'Regional Summit', tagline: '', historicalDemo: false };
+    await route.fulfill({ response, body: `${await response.text()}\nObject.assign(eventConfig, ${JSON.stringify(event)});` });
+  });
   await page.route('**/src/generated/siteContent.js*', async (route) => {
     const response = await route.fetch();
     const overrides = `
       siteContent.hero__image = ${JSON.stringify(artworkBlock)};
+      siteContent.hero__title.value = 'Regional Organizers Summit';
       Object.assign(heroImageSizes, ${JSON.stringify(published ? snapshot : {})});
     `;
     await route.fulfill({ response, body: `${await response.text()}\n${overrides}` });
@@ -139,13 +145,15 @@ test('published hero artwork skips the manifest and preserves the box and crop',
       expect(requests).toEqual([]);
       await expect(artwork).not.toHaveAttribute('srcset');
     }
-    await page.evaluate(() => document.fonts.ready);
     const boxes = [];
     for (const viewport of [320, 768, 1280]) {
       await page.setViewportSize({ width: viewport, height: 800 });
       let geometry;
       await expect.poll(async () => {
-        geometry = await artwork.evaluate((image) => {
+        geometry = await artwork.evaluate(async (image) => {
+          // Flush the new viewport layout so fonts it needs are requested.
+          image.getBoundingClientRect();
+          await image.ownerDocument.fonts.ready;
           const { width, height } = image.getBoundingClientRect();
           const { objectFit, objectPosition } = globalThis.getComputedStyle(image);
           return image.complete && image.naturalWidth > 0 ? { width, height, objectFit, objectPosition } : null;
@@ -160,17 +168,15 @@ test('published hero artwork skips the manifest and preserves the box and crop',
   try {
     for (const [source, url] of [['library', original], ['site file', '/hero/civic.webp']]) {
       artworkBlock = { ...block, url, focalX: 20, focalY: 70 };
-      await imageRef.set(artworkBlock);
       for (const path of ['/', '/schedule']) {
         const before = await measureAtWidths(path, false);
         const after = await measureAtWidths(path, true);
-        expect(after).toEqual(before);
+        expect(after, `Geometry for ${source} artwork on ${path}`).toEqual(before);
         console.log(`Published hero geometry ${source} ${path} ${JSON.stringify(after)}`);
       }
     }
   } finally {
-    if (saved.exists) await imageRef.set(saved.data());
-    else await imageRef.delete();
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
   }
 });
 
