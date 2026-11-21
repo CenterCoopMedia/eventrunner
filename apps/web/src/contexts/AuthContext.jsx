@@ -317,12 +317,24 @@ export function AuthProvider({ children }) {
     };
   }, [awaitingServer]);
 
+  // The popup must open inside the click that asked for it, or the browser
+  // blocks it. A click while auth startup is still running waits for startup
+  // (bounded) and then asks for a new click instead of opening the popup late.
   const signInWithGoogle = useCallback(
     async () => {
-      const { auth, signInWithPopup, GoogleAuthProvider } = await startedFirebase();
+      if (loading) {
+        await startedFirebase();
+        throw new OtpRequestError({
+          code: 'auth-ready-now',
+          status: 0,
+          message: 'Sign-in is ready now. Select Continue with Google again.',
+          spanish: 'El inicio de sesión ya está listo. Vuelve a seleccionar Continuar con Google.',
+        });
+      }
+      const { auth, signInWithPopup, GoogleAuthProvider } = await loadFirebase();
       return signInWithPopup(auth, new GoogleAuthProvider());
     },
-    [],
+    [loading],
   );
 
   // Step 1 of the emailed-code flow. Resolves { challengeId,
