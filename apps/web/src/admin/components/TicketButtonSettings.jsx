@@ -4,6 +4,7 @@ import BusyLabel from '../../components/BusyLabel.jsx';
 import { ticketButtonClass } from '../../components/controlClasses.js';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { plannerMessage } from '../plannerErrors.js';
+import { settingsConflict } from '../settingsChanges.js';
 import { Notice, Panel, SelectField, TextField, primaryButtonClass } from './formControls.jsx';
 
 const STYLE_OPTIONS = [
@@ -12,9 +13,10 @@ const STYLE_OPTIONS = [
 ];
 
 export default function TicketButtonSettings({ call }) {
-  const { eventConfig } = useEventConfig();
+  const { eventConfig, liveEventConfig } = useEventConfig();
   const registration = eventConfig?.registration;
   const [draft, setDraft] = useState({});
+  const [expected, setExpected] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -23,6 +25,8 @@ export default function TicketButtonSettings({ call }) {
 
   function edit(field, value) {
     setDraft((current) => ({ ...current, [field]: value }));
+    const stored = (liveEventConfig ?? eventConfig)?.registration?.[field] ?? null;
+    setExpected((current) => Object.hasOwn(current, field) ? current : { ...current, [field]: stored });
     setSaved(false);
     setError(null);
   }
@@ -35,11 +39,15 @@ export default function TicketButtonSettings({ call }) {
     const patch = { ...draft };
     if ('ticketButtonLabel' in patch) patch.ticketButtonLabel = label.trim() || null;
     try {
-      await call('updateEventConfig', { event: { registration: patch } });
+      await call('updateEventConfig', {
+        event: { changes: { registration: patch }, expected: { registration: expected } },
+      });
       setSaved(true);
       setDraft({});
+      setExpected({});
     } catch (err) {
-      setError(plannerMessage(err?.message ?? 'The ticket button could not be saved.'));
+      setError(settingsConflict(err)?.message
+        ?? plannerMessage(err?.message ?? 'The ticket button could not be saved.'));
     } finally {
       setSaving(false);
     }

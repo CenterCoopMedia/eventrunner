@@ -43,8 +43,10 @@
  *      not a safe absolute URL, are refused by the shared validator on
  *      the merged result. Arrays replace on merge, so `milestones: []`
  *      clears the list. To clear an optional nested value, send it explicitly null.
- *      features/theme/badges stay whole-doc replaces. The admin sends every
- *      feature's current setting. Every write stamps { updatedAt, updatedBy: email }. On
+ *      Event and feature edits compare each changed field with its loaded
+ *      value inside the transaction. Features merge and validate together.
+ *      Theme and badges stay whole-doc replaces. Every write stamps
+ *      { updatedAt, updatedBy: email }. On
  *      config/event the verification pair is carried forward from the
  *      stored doc so a save cannot drop it — and the read is part of the
  *      write transaction, so a verify-sender-domain.cjs write landing
@@ -59,6 +61,7 @@
  * to reach the caches of containers it does not run in anyway.
  */
 
+const { isDeepStrictEqual } = require('node:util');
 const { requireAdmin } = require('../core/auth.cjs');
 const { getTierA } = require('../core/config.cjs');
 const { logAdminAction, writeConfigVersion } = require('../cms/store.cjs');
@@ -396,6 +399,41 @@ function deepMerge(base, patch) {
   return out;
 }
 
+/** A null caption setting resets it to the same default as an omitted key. */
+function comparableVenueMap(value) {
+  if (!isPlainObject(value)) return value;
+  const map = { ...value };
+  if (map.captionMode === null) delete map.captionMode;
+  if (map.captionAlign === null) delete map.captionAlign;
+  return map;
+}
+
+function changedSettingsFields(fields, expected, stored, prefix = '') {
+  return Object.entries(fields).flatMap(([key, value]) => {
+    const path = prefix + key;
+    if (!Object.hasOwn(expected, key)) return [path];
+    const previous = expected[key];
+    const current = stored?.[key] ?? null;
+    if (isPlainObject(value) && isPlainObject(previous)) {
+      if (previous.$present === true && !isPlainObject(current)) return [path];
+      return changedSettingsFields(value, previous, current, path + '.');
+    }
+    const matches = path === 'venue.map'
+      ? isDeepStrictEqual(comparableVenueMap(previous), comparableVenueMap(current))
+      : isDeepStrictEqual(previous, current);
+    return matches ? [] : [path];
+  });
+}
+
+class SettingsConflictError extends Error {
+  constructor(fields) {
+    super([
+      ...fields.map((field) => `${field}: changed since you opened these settings.`),
+      'Open this page in a new tab to review the latest settings. Reapply your edits there and save.',
+    ].join('; '));
+  }
+}
+
 /** Thrown inside the event transaction for a restricted field change;
  * applyConfigWrite maps it to a 403. */
 class ConfigFieldRefusedError extends Error {
@@ -406,7 +444,7 @@ class ConfigFieldRefusedError extends Error {
   }
 }
 
-/** Thrown inside the event transaction when the MERGED doc fails the
+/** Thrown inside the transaction when the merged doc fails the
  * shared validator; applyConfigWrite maps it to a 400. */
 class MergedConfigInvalidError extends Error {
   constructor(errors) {
@@ -458,11 +496,12 @@ async function removedPlaceReferences({ db, tx, stored, written }) {
  * reads as staff, the strict side.
  *
  * @param {{ db: FirebaseFirestore.Firestore, docId: string, payload: object,
- *           actor: { uid: string, email: string, tier?: 'operator'|'staff' }, now?: () => number }} args
+ *           expected?: object, actor: { uid: string, email: string, tier?: 'operator'|'staff' },
+ *           now?: () => number }} args
  * @returns {Promise<{ ok: true, docPath: string } |
- *                    { ok: false, status: 400|403, code: string, message: string }>}
+ *                    { ok: false, status: 400|403|409, code: string, message: string }>}
  */
-async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
+async function applyConfigWrite({ db, docId, payload, expected, actor, now = Date.now }) {
   const tier = actor?.tier === 'operator' ? 'operator' : 'staff';
   const validate = WRITABLE_CONFIG_DOCS[docId];
   if (!validate) {
@@ -489,7 +528,7 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     if (unknown.length > 0) {
       return { ok: false, status: 400, code: 'bad-request', message: unknown.join('; ') };
     }
-  } else {
+  } else if (docId !== 'features') {
     // Whole-doc replace: validate the payload itself, before any write.
     const verdict = validate(fields);
     if (!verdict.ok) {
@@ -513,6 +552,10 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     }
   }
 
+  const docPath = `config/${docId}`;
+  const isSettingsEdit = docId === 'event' || docId === 'features';
+  if (isSettingsEdit && Object.keys(fields).length === 0) return { ok: true, docPath, unchanged: true };
+
   const ref = db.collection('config').doc(docId);
   const historyRef = db.collection('cmsVersionHistory').doc();
   const at = new Date(now());
@@ -526,9 +569,19 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     await db.runTransaction(async (tx) => {
       let written = fields;
       if (docId === 'theme') written = materializeThemeColors(fields);
-      if (docId === 'event') {
+      let stored = {};
+      if (isSettingsEdit) {
         const snap = await tx.get(ref);
-        const stored = snap.exists ? stripStamps(snap.data()) : {};
+        stored = snap.exists ? stripStamps(snap.data()) : {};
+        const conflicts = changedSettingsFields(fields, expected, stored, docId === 'features' ? 'features.' : '');
+        if (conflicts.length > 0) throw new SettingsConflictError(conflicts);
+      }
+      if (docId === 'features') {
+        written = { ...stored, ...fields };
+        const verdict = validate(written);
+        if (!verdict.ok) throw new MergedConfigInvalidError(verdict.errors);
+      }
+      if (docId === 'event') {
         // Compare the merged result so replacing an entire block cannot
         // clear a setup value. The transaction also protects concurrent setup.
         const proposed = deepMerge(stored, fields);
@@ -604,7 +657,7 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
           ]);
         }
       }
-      writeConfigVersion({ tx, ref, historyRef, docPath: `config/${docId}`, fields: written, at, actor });
+      writeConfigVersion({ tx, ref, historyRef, docPath, fields: written, at, actor });
     });
   } catch (err) {
     if (err instanceof MergedConfigInvalidError) {
@@ -613,9 +666,12 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     if (err instanceof ConfigFieldRefusedError) {
       return { ok: false, status: 403, code: 'forbidden', message: err.message };
     }
+    if (err instanceof SettingsConflictError) {
+      return { ok: false, status: 409, code: 'settings-conflict', message: err.message };
+    }
     throw err;
   }
-  return { ok: true, docPath: `config/${docId}` };
+  return { ok: true, docPath };
 }
 
 /**
@@ -637,20 +693,28 @@ function createConfigWriteHandler({ docId, action }, { db, auth, getConfig, now 
     const gate = await requireAdmin({ auth, db, getConfig }, req, { tier });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
-    const payload = req.body?.[docId];
-    if (!isPlainObject(payload)) return badRequest(res, `${docId}: must be an object`);
+    const body = req.body?.[docId];
+    if (!isPlainObject(body)) return badRequest(res, `${docId}: must be an object`);
+    const isSettingsEdit = docId === 'event' || docId === 'features';
+    const payload = isSettingsEdit ? body.changes : body;
+    const expected = isSettingsEdit ? body.expected : undefined;
+    if (isSettingsEdit && (!isPlainObject(payload) || !isPlainObject(expected))) {
+      return sendError(res, 409, 'settings-conflict',
+        'Open this page in a new tab to load the current settings editor. Reapply your edits there and save.');
+    }
 
     // The tier rides on the actor: a staff CHANGE to an operator-only key is
     // refused inside the transaction, by name, against the stored values.
     const actor = { uid: gate.uid, email: gate.email, tier: gate.tier };
     let result;
     try {
-      result = await applyConfigWrite({ db, docId, payload, actor, now });
+      result = await applyConfigWrite({ db, docId, payload, expected, actor, now });
     } catch (err) {
       log.error(`${action} write failed`, err);
       return internal(res, 'The configuration could not be saved. Keep this page open and contact support for help.');
     }
     if (!result.ok) return sendError(res, result.status, result.code, result.message);
+    if (result.unchanged) return res.status(200).json({ docPath: result.docPath });
 
     try {
       await logAdminAction({ db, action, docPath: result.docPath, actor, now, log });

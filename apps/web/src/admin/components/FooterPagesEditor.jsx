@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { navItemFor } from '../../lib/siteNavigation.js';
 import { useAdminApi } from '../adminApi.js';
+import { settingsChanges, settingsConflict } from '../settingsChanges.js';
 import { moveItem } from '../reorder.js';
 import { ActionFeedback } from './ActionFeedback.jsx';
 import { OrderAnnouncement, ReorderControls, bindReorderDrop } from './ReorderControls.jsx';
@@ -10,7 +11,7 @@ import {
 } from './formControls.jsx';
 
 export default function FooterPagesEditor({ pageRows, ready, disabled, onEditStateChange }) {
-  const { eventConfig, features, available } = useEventConfig();
+  const { eventConfig, liveEventConfig, features, available } = useEventConfig();
   const call = useAdminApi();
   const stored = eventConfig?.footerPageGroup;
   const [draft, setDraft] = useState(null);
@@ -19,6 +20,7 @@ export default function FooterPagesEditor({ pageRows, ready, disabled, onEditSta
   const [feedback, setFeedback] = useState(null);
   const [announcement, setAnnouncement] = useState('');
   const saving = useRef(false);
+  const baseline = useRef(null);
   const current = saved && saved.base === stored ? saved.group : stored;
   const group = draft ?? current ?? { heading: '', pageIds: null };
   const picks = pageRows
@@ -37,6 +39,10 @@ export default function FooterPagesEditor({ pageRows, ready, disabled, onEditSta
 
   function change(fields) {
     setFeedback(null);
+    if (!dirty) baseline.current = {
+      form: { heading: group.heading || null, pageIds: selected },
+      stored: current !== stored ? current : (liveEventConfig ?? eventConfig)?.footerPageGroup,
+    };
     setDraft({ ...group, ...fields });
   }
 
@@ -56,12 +62,16 @@ export default function FooterPagesEditor({ pageRows, ready, disabled, onEditSta
     setBusy(true);
     setFeedback(null);
     try {
-      await call('updateEventConfig', { event: { footerPageGroup: next } });
+      const loaded = baseline.current;
+      await call('updateEventConfig', { event: settingsChanges(
+        { footerPageGroup: loaded.form }, { footerPageGroup: next },
+        { footerPageGroup: loaded.stored },
+      ) });
       setSaved({ base: stored, group: next });
       setDraft(null);
       setFeedback({ tone: 'ok', message: 'Footer pages saved.' });
     } catch (error) {
-      setFeedback({ tone: 'error', message: error.message });
+      setFeedback({ tone: 'error', message: settingsConflict(error)?.message ?? error.message });
     } finally {
       saving.current = false;
       setBusy(false);

@@ -23,8 +23,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { StepHeading, StepList, StepPager, resolveStep, useStepHeadingFocus } from '../../components/forms/Stepper.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useMediaQuery } from '../../lib/viewport.js';
 import { useAdminApi } from '../adminApi.js';
+import { settingsConflict } from '../settingsChanges.js';
 import { ADMIN_DESKTOP_VIEWPORT } from '../AdminLayout.jsx';
 import { OWNER_WORDS, firstOpenStep, joinSetupSteps } from '../setupSteps.js';
 import {
@@ -43,6 +45,7 @@ const stepPath = (step) => `/admin/setup/${step.slug}`;
 /** The legal sign-off: a confirmation box and one save. Operators only. */
 function LegalSignOff({ onSaved }) {
   const call = useAdminApi();
+  const { eventConfig, liveEventConfig } = useEventConfig();
   const [confirmed, setConfirmed] = useState(false);
   const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -59,10 +62,16 @@ function LegalSignOff({ onSaved }) {
     setBusy(true);
     setError(null);
     try {
-      await call('updateEventConfig', { event: { legal: { reviewRequired: false } } });
+      const reviewRequired = (liveEventConfig ?? eventConfig)?.legal?.reviewRequired ?? null;
+      await call('updateEventConfig', {
+        event: {
+          changes: { legal: { reviewRequired: false } },
+          expected: { legal: { reviewRequired } },
+        },
+      });
       await onSaved();
-    } catch {
-      setError(new Error('The legal review could not be approved. Try again.'));
+    } catch (err) {
+      setError(settingsConflict(err) ?? new Error('The legal review could not be approved. Try again.'));
     } finally {
       busyRef.current = false;
       setBusy(false);

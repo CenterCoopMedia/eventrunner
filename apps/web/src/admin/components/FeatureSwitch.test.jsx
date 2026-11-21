@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import FeatureSwitch from './FeatureSwitch.jsx';
 
 let config;
@@ -33,7 +32,7 @@ describe('in-page feature saves', () => {
     fireEvent.click(custom);
     expect(call).toHaveBeenCalledTimes(1);
     expect(call).toHaveBeenCalledWith('updateFeatures', {
-      features: Object.fromEntries(KNOWN_FEATURE_KEYS.map((key) => [key, ['schedule', 'badges', 'customBadges'].includes(key)])),
+      features: { changes: { badges: true }, expected: { badges: false } },
     });
     await act(async () => resolve({ docPath: 'config/features' }));
     expect(badges).not.toBeChecked();
@@ -44,7 +43,7 @@ describe('in-page feature saves', () => {
     expect(custom).toBeEnabled();
     call.mockResolvedValueOnce({});
     fireEvent.click(custom);
-    expect(call.mock.calls[1][1].features).toMatchObject({ badges: true, customBadges: false, schedule: true });
+    expect(call.mock.calls[1][1].features).toEqual({ changes: { customBadges: false }, expected: { customBadges: true } });
     await act(async () => {});
   });
 
