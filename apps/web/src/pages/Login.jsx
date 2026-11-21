@@ -38,6 +38,13 @@ export default function Login() {
   // The check ran past SIGN_IN_WAIT_MS (issue 1357). Offer the options and a
   // reload; Firebase's answer still replaces this view when it arrives.
   const stalled = !panelOnly && loading && authStalled;
+  // LoadingState announces only the end of an active wait, so the answer
+  // that arrives after the stalled view gets its own status line.
+  const [waitedPastLimit, setWaitedPastLimit] = useState(false);
+  if (stalled && !waitedPastLimit) setWaitedPastLimit(true);
+  const lateResult = waitedPastLimit && !loading && !panelOnly
+    ? (user ? text('You are signed in.', 'Iniciaste sesión.') : text('Sign-in options are ready.', 'Las opciones de inicio de sesión están listas.'))
+    : '';
   const stalledNotice = text(
     'We could not confirm your sign-in yet. You can sign in below or try again.',
     'Aún no pudimos confirmar tu inicio de sesión. Puedes iniciar sesión abajo o intentarlo de nuevo.',
@@ -108,6 +115,7 @@ export default function Login() {
         rows={0}
         onRetry={retryAuth}
       />
+      {waitedPastLimit ? <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{lateResult}</p> : null}
       <section aria-label={text('Sign-in options', 'Opciones de inicio de sesión')} aria-busy={checkingSignIn}>
         {renderSignInContent()}
       </section>

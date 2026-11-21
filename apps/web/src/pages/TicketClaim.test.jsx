@@ -58,6 +58,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../App.jsx';
+import { auth } from '../firebase.js';
 
 function jsonResponse(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
@@ -228,7 +229,7 @@ describe('signed out', () => {
     expect(await screen.findByLabelText('Order number')).toHaveValue('group-order-123');
     expect(screen.getByTestId('current-route')).toHaveTextContent(entry);
     expect(screen.getByText(/You are signed in as ada@example.org/)).toBeInTheDocument();
-    expect(signInWithCustomToken).toHaveBeenCalledWith({}, 'verified-custom-token');
+    expect(signInWithCustomToken).toHaveBeenCalledWith(auth, 'verified-custom-token');
     expect(claimRequests()).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Claim ticket' }));
 

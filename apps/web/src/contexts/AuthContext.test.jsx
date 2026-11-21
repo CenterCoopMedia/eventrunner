@@ -261,3 +261,25 @@ describe('account change in one tab', () => {
     expect(screen.getByLabelText('Account')).toHaveTextContent('existing-attendee: unverified');
   });
 });
+
+describe('stalled Firebase startup (issue 1357)', () => {
+  it('refuses the emailed code after the wait without sending it, so the code stays usable', async () => {
+    vi.useFakeTimers();
+    const ready = auth.authStateReady;
+    auth.authStateReady = () => new Promise(() => {});
+    vi.mocked(onAuthStateChanged).mockImplementation(() => () => {});
+    try {
+      renderAuth();
+      verify();
+      await act(async () => { await vi.advanceTimersByTimeAsync(14_999); });
+      expect(screen.getByLabelText('OTP result')).toHaveTextContent('waiting');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(screen.getByLabelText('OTP result')).toHaveTextContent('auth-not-ready: Sign-in is not ready on this page. Reload the page and try again.');
+      expect(fetch).not.toHaveBeenCalled();
+      expect(signInWithCustomToken).not.toHaveBeenCalled();
+    } finally {
+      auth.authStateReady = ready;
+      vi.useRealTimers();
+    }
+  });
+});

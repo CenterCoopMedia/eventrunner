@@ -81,6 +81,26 @@ export class OtpRequestError extends Error {
   }
 }
 
+// Every sign-in action waits behind Firebase's startup, which has no time
+// limit (issue 1357). Wait for it at most SIGN_IN_WAIT_MS, then fail with a
+// message the form shows. Called before the code is sent for checking, so a
+// stalled page does not use up the emailed code.
+async function authStartup(auth) {
+  let timer;
+  const stalled = new Promise((resolve, reject) => {
+    timer = setTimeout(() => reject(new OtpRequestError({
+      code: 'auth-not-ready',
+      status: 0,
+      message: 'Sign-in is not ready on this page. Reload the page and try again.',
+    })), SIGN_IN_WAIT_MS);
+  });
+  try {
+    await Promise.race([auth.authStateReady(), stalled]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function postJson(name, body) {
   let response;
   // Empty unless App Check is configured for this deployment; the server
@@ -288,6 +308,7 @@ export function AuthProvider({ children }) {
   const signInWithGoogle = useCallback(
     async () => {
       const { auth, signInWithPopup, GoogleAuthProvider } = await loadFirebase();
+      await authStartup(auth);
       return signInWithPopup(auth, new GoogleAuthProvider());
     },
     [],
@@ -305,6 +326,7 @@ export function AuthProvider({ children }) {
   // token signs the browser in.
   const verifyOtpCode = useCallback(async ({ challengeId, email, code }) => {
     const { auth, signInWithCustomToken } = await loadFirebase();
+    await authStartup(auth);
     const requestUser = auth.currentUser;
     const { token } = await postJson('verifyOtpCode', {
       challengeId,

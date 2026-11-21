@@ -226,7 +226,9 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
       ) {
         setError({
           field: null,
-          message: 'Google sign-in did not complete. Try again or use an emailed code.',
+          message: err instanceof OtpRequestError
+            ? err.message
+            : 'Google sign-in did not complete. Try again or use an emailed code.',
           spanish: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo o usa un código por correo.',
         });
       }
