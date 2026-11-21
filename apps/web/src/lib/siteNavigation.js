@@ -45,6 +45,7 @@ import {
   firstPathSegment,
   isCanonicalPagePath,
   isReservedPathSegment,
+  systemPageIdForPath,
 } from 'shared/routing';
 import { isNavigationLink, isPublicPage, navigationLinkUrl } from 'shared/page';
 import { leadsToNoPublicPage, switchedOffSectionFor } from './linkTargets.js';
@@ -82,6 +83,11 @@ export function navItemFor(page, features, pages) {
     if (page.visible !== true || page.systemPage !== false || !isNonEmptyString(page.id) ||
         !isNonEmptyString(page.label) || !to || switchedOffSectionFor(to, features) ||
         leadsToNoPublicPage(to, pages, features)) return null;
+    // The editor offers built-in landing pages by their registered route.
+    const systemId = systemPageIdForPath(to);
+    if (systemId && SYSTEM_PAGES[systemId].to === to && Array.isArray(pages) && !pages.some(
+      (target) => target?.id === systemId && target.systemPage === true && isPublicPage(target, features),
+    )) return null;
     return {
       to, label: page.label.trim(), custom: true, external: to.startsWith('https://'), key: `link:${page.id}`,
       ...(page.publicLanguage && { language: page.publicLanguage }),
