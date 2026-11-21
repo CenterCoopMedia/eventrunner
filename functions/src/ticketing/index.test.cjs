@@ -98,8 +98,16 @@ test('status offers a full sync only to a provider with a webhook to recover', a
   assert.equal((await statusOf(createNoneProvider({ env: {} }))).fullSyncSupported, false);
   const { createEventbriteProvider } = require('./providers/eventbrite.cjs');
   const { createStripeProvider } = require('./providers/stripe.cjs');
-  const eventbrite = createEventbriteProvider({ env: { TICKETING_API_TOKEN: 'token', EVENT_TICKETING_EVENT_ID: 'evt-1' } });
+  let credentialRequests = 0;
+  const eventbrite = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: 'token', EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: async () => {
+      credentialRequests += 1;
+      return Response.json({ id: 'account-1' });
+    },
+  });
   assert.equal((await statusOf(eventbrite)).fullSyncSupported, true);
+  assert.equal(credentialRequests, 0);
   const stripe = createStripeProvider({
     env: { EVENT_TICKETING_EVENT_ID: 'conference-1', EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture', EVENT_STRIPE_MODE: 'test' },
     db, getConfig, stripeClient: {},
@@ -195,9 +203,13 @@ test('the same config drives readiness.cjs, so the two agree about "no webhook t
 });
 
 test('getTicketingStatus is admin-gated', async () => {
+  let checks = 0;
   const deps = {
     db: makeFakeDb(),
-    provider: createFakeTicketingProvider(),
+    provider: {
+      ...createFakeTicketingProvider(),
+      async checkCredential() { checks += 1; return 'accepted'; },
+    },
     auth,
     getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN] }, providers: {} }),
     now: () => T0,
@@ -215,9 +227,58 @@ test('getTicketingStatus is admin-gated', async () => {
   const wrongMethod = makeRes();
   await handler({ method: 'DELETE', headers: { authorization: 'Bearer admin' } }, wrongMethod);
   assert.equal(wrongMethod.statusCode, 405);
+  assert.equal(checks, 0);
 
   const admin = makeRes();
   await handler({ method: 'GET', headers: { authorization: 'Bearer admin' } }, admin);
   assert.equal(admin.statusCode, 200);
   assert.equal(admin.body.provider, 'eventbrite');
+  assert.equal(checks, 1);
+});
+
+test('getTicketingStatus reports Eventbrite credential rejection separately from an unavailable check', async () => {
+  const { createEventbriteProvider } = require('./providers/eventbrite.cjs');
+  const cases = [
+    [200, { id: 'private-account-id' }, 'accepted'],
+    [200, {}, 'unavailable'],
+    [400, { error: 'INVALID_AUTH' }, 'rejected'],
+    [400, { error: 'INVALID_AUTH_HEADER' }, 'rejected'],
+    [400, { error: 'BAD_REQUEST' }, 'unavailable'],
+    [401, { error: 'ACCESS_DENIED' }, 'rejected'],
+    [403, {}, 'rejected'],
+    [404, {}, 'unavailable'],
+    [429, {}, 'unavailable'],
+    [503, {}, 'unavailable'],
+    [null, null, 'unavailable'],
+  ];
+
+  for (const [status, payload, expected] of cases) {
+    const requests = [];
+    const provider = createEventbriteProvider({
+      env: { TICKETING_API_TOKEN: 'synthetic-token' },
+      fetchImpl: async (url, options) => {
+        requests.push({ url, options });
+        if (status === null) throw new Error('Provider unreachable');
+        return Response.json({ ...payload, error_description: 'private-provider-detail' }, { status });
+      },
+    });
+    const webhookRegisteredAt = T0.toISOString();
+    const handler = createGetTicketingStatusHandler({
+      db: makeFakeDb(), provider, auth, now: () => T0,
+      getConfig: async () => ({ providers: { ticketing: { webhookRegisteredAt } } }),
+    });
+    const res = makeRes();
+    await handler({ method: 'GET', headers: { authorization: 'Bearer admin' } }, res);
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, 'https://www.eventbriteapi.com/v3/users/me/');
+    assert.equal(requests[0].options.method, 'GET');
+    assert.equal(requests[0].options.headers.Authorization, 'Bearer synthetic-token');
+    assert.ok(requests[0].options.signal instanceof AbortSignal);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.credentialCheck, expected, `Eventbrite HTTP ${status}`);
+    assert.equal(res.body.webhookRegisteredAt, webhookRegisteredAt);
+    assert.equal(res.body.fullSyncSupported, true);
+    assert.doesNotMatch(JSON.stringify(res.body), /private-account-id|private-provider-detail|synthetic-token/);
+  }
 });
