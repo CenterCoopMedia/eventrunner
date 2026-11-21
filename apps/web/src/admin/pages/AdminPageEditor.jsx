@@ -24,7 +24,7 @@
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
 // the BLOCK_TYPES registry, and `defaultBlocks` are the placeholders a new
 // site is seeded with. Neither is edited here; both pass through a save.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -37,6 +37,17 @@ import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
+import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
+import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
+import ContentContext, { prepareTimelineDocs } from '../../contexts/ContentContext.jsx';
+import { subscribeAdminCollection } from '../adminSource.js';
+import { contentLanguages, resolveContentVariant } from 'shared/contentLanguages';
+import { buildNavItems } from '../../lib/siteNavigation.js';
+import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
+import { useVenueMapImage } from '../../components/VenueMap.jsx';
+import { openStreetMapCoordinates } from '../../components/AreaMap.jsx';
+import { builtInSectionBlockTypes, pageHeading } from 'shared/page';
+import { isStarterContent, publicContentDoc } from 'shared/seed';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
 import { moveItem, nextStoredOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
@@ -45,6 +56,8 @@ import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedCha
 import {
   PAGE_LAYOUT_DEFAULTS,
   PAGE_LAYOUT_VALUES,
+  resolvePageLayout,
+  sectionsBySlot,
 } from '../../lib/pageLayout.js';
 import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
 import {
@@ -179,6 +192,9 @@ function slotValue(slot) {
   return slot === 'above' ? 'above' : 'main';
 }
 
+// The section the area map draws in on the travel page (ContentPage).
+const AREA_MAP_SECTION_ID = 'travel_local';
+
 export default function AdminPageEditor({ mode }) {
   const { user } = useAuth();
   const { pageId } = useParams();
@@ -193,8 +209,102 @@ function PageEditor({ mode }) {
   const reportDeleted = useDeletedRecord();
   const { rows, ready, error: listenerError, findRow } = useAdminPages({ includeNavigationLinks: mode === 'create' });
   const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
+  const { theme, eventConfig, features } = useEventConfig();
   // The count staff see is the content the section holds (both revisions of
   // one block are one block), not its seed list.
+  // What the public page draws for a section once this page is published:
+  // its published blocks (publishing the page does not publish content
+  // drafts), in order, without hidden blocks or starter text the public
+  // site leaves out.
+  // A cta or link_group that leads to a section that is off, or to a page
+  // that is not public, is dropped first, as the public page does
+  // (lib/linkTargets.js), so the columns split the blocks the reader gets.
+  // Targets are the published pages: publishing this page does not publish
+  // the page a link leads to.
+  // The language a reader meets first: a site that opens in Spanish draws
+  // its approved Spanish copy (PublicLanguageRuntime), so the preview does.
+  const opensInSpanish = contentLanguages(eventConfig).default === 'es';
+  const inPublicLanguage = (record, kind) => (opensInSpanish && record
+    ? resolveContentVariant(record, kind, 'es', eventConfig).value
+    : record);
+  // The published timeline entries, from the timeline collection itself:
+  // the page's content provider may be showing drafts (?preview=1).
+  // The published timeline only (cmsTimeline, not its drafts), visible
+  // entries as the public query asks for. A listener failure stays stated
+  // until a fresh snapshot arrives, and a cache-only snapshot (offline)
+  // clears the timeline until the server confirms it again, so a stale
+  // timeline is never shown as current.
+  const [liveTimeline, setLiveTimeline] = useState(null);
+  const [timelineError, setTimelineError] = useState(null);
+  useEffect(() => subscribeAdminCollection('cmsTimeline', (docs, metadata) => {
+    if (metadata?.fromCache) {
+      setLiveTimeline(null);
+      return;
+    }
+    setLiveTimeline(docs);
+    setTimelineError(null);
+  }, setTimelineError), []);
+  const publishedTimeline = useMemo(
+    () => prepareTimelineDocs((liveTimeline ?? []).filter((doc) => doc?.visible === true)),
+    [liveTimeline],
+  );
+  // Only a section that holds a published, visible timeline block waits for it.
+  const holdsTimeline = (section) => contentRows.some((row) => row.live?.section === section.id
+    && row.live.blockType === 'timeline' && row.live.visible !== false);
+  // The preview draws that published timeline too, whatever the page's own
+  // content provider is showing.
+  const contentContext = useContext(ContentContext);
+  const previewContent = useMemo(
+    () => (contentContext ? { ...contentContext, timeline: publishedTimeline } : null),
+    [contentContext, publishedTimeline],
+  );
+  // The pages a link can lead to once this page is published: the
+  // published pages, with this page as it is being edited in place of its
+  // published record (a new path or visibility counts).
+  const linkTargetPages = () => {
+    if (!ready) return null;
+    const own = rows.find((row) => row.live?.id === page.id)?.live ?? {};
+    return [
+      ...rows.map((row) => row.live).filter((live) => live && live.id !== page.id),
+      { ...own, id: page.id, path: page.path, visible: page.visible },
+    ];
+  };
+  const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
+    contentRows
+      // The public shape first (shared/seed publicContentDoc), as the site's
+      // content provider does, so starter text is judged the same way; then
+      // the reader's language, as PublicLanguageRuntime projects it after.
+      .map((row) => (row.live ? publicContentDoc(row.live) : null))
+      .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
+      // A timeline block draws only once the timeline has a published entry.
+      .filter((block) => block.blockType !== 'timeline' || publishedTimeline.length > 0)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((block) => inPublicLanguage(block, 'block')),
+    features,
+    linkTargetPages(),
+  );
+  // The section that takes the Long read opening on the public page
+  // (ContentPage): the first section with something in it, on a custom page
+  // that states the Long read template. A map section counts only when its
+  // map draws, as it does there.
+  // The editor loads the venue map picture out of sight, so a picture that
+  // fails takes its section out of the count, as it does on the page.
+  const venueMapImage = useVenueMapImage(resolveVenueMap(eventConfig));
+  const venueMapShown = Boolean(venueMapImage);
+  const areaMapShown = Boolean(openStreetMapCoordinates(eventConfig?.venue?.mapUrl));
+  // Whether the public page draws a map in this section (ContentPage, for
+  // custom pages only).
+  const sectionHasMap = (current, section) => !current.systemPage && (
+    (section.id === VENUE_MAP_SECTION_ID && venueMapShown)
+    || (section.id === AREA_MAP_SECTION_ID && current.id === VENUE_MAP_PAGE_ID && areaMapShown));
+  const sectionHasContent = (current, section) => sectionPreviewBlocks(section).length > 0
+    || sectionHasMap(current, section);
+  // The first section the page draws; it takes no gap above its blocks.
+  const firstShownSection = (current) => (current.sections ?? [])
+    .find((section) => sectionHasContent(current, section))?.id ?? null;
+  const longReadSection = (current) => (current.systemPage || current.template !== 'long-read'
+    ? null
+    : firstShownSection(current));
   const sectionBlockCount = (section) => {
     if (!contentReady) return contentError ? '' : 'Counting blocks…';
     const count = contentRows.filter((row) => row.current?.section === section.id).length;
@@ -203,10 +313,35 @@ function PageEditor({ mode }) {
   // What the site is set to, so the "follow the site" option can say what
   // following it means instead of sending the operator to another tab to
   // find out.
-  const { theme, eventConfig } = useEventConfig();
   const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
+  // The page's sections in the order the public page reads them, with their
+  // blocks, for the one pull quote a page may draw (blocks/pullQuoteBudget):
+  // a system page reads its slots above, main, below (SystemPage); a custom
+  // page reads its stored order (ContentPage).
+  const slots = sectionsBySlot(page.sections ?? []);
+  const quoteBudget = {
+    sections: page.systemPage ? [...slots.above, ...slots.main, ...slots.below] : (page.sections ?? []),
+    getSectionBlocks: (id) => sectionPreviewBlocks({ id }),
+  };
+  const longReadSectionId = longReadSection(page);
+  const firstShownSectionId = firstShownSection(page);
+  // ContentPage hides a heading that repeats the page title, after the
+  // reader's language is applied to both.
+  const shownPage = inPublicLanguage(page, 'page');
+  const headingHidden = (section) => {
+    const shown = inPublicLanguage(section, 'section') ?? section;
+    return !page.systemPage && (shown.label === shownPage?.label
+      || shown.label === pageHeading(shownPage)
+      || /_intro$/.test(section.id) || /_header$/.test(section.id));
+  };
+  // Layout draws the side navigation rail only when the site has public
+  // pages to list, so the preview reserves it only then too.
+  const publicNavShown = buildNavItems(
+    ready ? rows.map((row) => (row.live ? publicContentDoc(row.live) : null)).filter(Boolean) : [],
+    features,
+  ).length > 0;
   const [savedSnapshot, setSavedSnapshot] = useState(() => (
     mode === 'create' ? pageSnapshot(blankPage()) : null
   ));
@@ -517,6 +652,9 @@ function PageEditor({ mode }) {
         save({ publish: false });
       }}
     >
+      {venueMapImage && !page.systemPage && (page.sections ?? []).some((section) => section.id === VENUE_MAP_SECTION_ID) ? (
+        <img src={venueMapImage.src} onError={venueMapImage.onError} alt="" hidden />
+      ) : null}
       <AdminPageHeader help="Save a draft to keep your changes. Publish to show them on the site."
         title={mode === 'create' ? 'New page' : page.label || 'Page'}
         recentTitle={row?.current?.label}
@@ -884,6 +1022,32 @@ function PageEditor({ mode }) {
                       />
                     </div>
                   </div>
+
+                  {/* Home's built-in sections draw their own arrangement, so a
+                      layout choice would change nothing there. */}
+                  {builtInSectionBlockTypes(page, section) ? null : (
+                    <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
+                      <ContentContext.Provider value={previewContent}>
+                      <SectionLayoutChoice
+                        value={section.layout}
+                        onChange={(layout) => updateSection(sectionIndex, { layout })}
+                        label={section.label}
+                        blocks={sectionPreviewBlocks(section)}
+                        blocksReady={contentReady && (!holdsTimeline(section) || liveTimeline !== null)}
+                        previewId={`admin-section-preview-${sectionIndex}`}
+                        budget={quoteBudget}
+                        readingMeasure={page.systemPage && resolvePageLayout(page).arrangement !== 'grid'}
+                        longReadOpening={section.id === longReadSectionId}
+                        map={sectionHasMap(page, section)}
+                        previewLabel={inPublicLanguage(section, 'section')?.label}
+                        hideHeading={headingHidden(section)}
+                        firstOnPage={!page.systemPage && section.id === firstShownSectionId}
+                        sideNav={(page.layout?.navPlacement ?? siteNavPlacement) === 'side' && publicNavShown}
+                        blocksError={(Boolean(contentError) && !contentReady) || (Boolean(timelineError) && holdsTimeline(section))}
+                      />
+                      </ContentContext.Provider>
+                    </div>
+                  )}
 
                   {/* What this section SAYS is written under Content. The page
                       document's starter list only seeds a brand-new site

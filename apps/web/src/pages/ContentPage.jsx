@@ -32,6 +32,7 @@ import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
 import AreaMap, { openStreetMapCoordinates } from '../components/AreaMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
+import { sectionLayoutOf } from '../lib/pageLayout.js';
 import { PullQuoteBudget } from '../components/blocks/pullQuoteBudget.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import LongReadOpening from '../components/editorial/LongReadOpening.jsx';
@@ -441,7 +442,7 @@ export default function ContentPage() {
                     from the layout values, and never on any later section,
                     even when a keyword filter leaves it first. */}
                 <LongReadOpening active={isLongRead && section.id === baseSections[0]?.section.id}>
-                  <SectionBlocks blocks={blocks} />
+                  <SectionBlocks blocks={blocks} layout={sectionLayoutOf(section)} />
                 </LongReadOpening>
                 {sectionAreaMap ? <AreaMap url={sectionAreaMap} /> : null}
                 <VenueMap

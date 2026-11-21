@@ -32,7 +32,7 @@ import SectionBlocks from './blocks/SectionBlocks.jsx';
 import { PullQuoteBudget } from './blocks/pullQuoteBudget.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
 import SectionEditLink from './SectionEditLink.jsx';
-import { resolvePageLayout, sectionsBySlot, statedPageLayout } from '../lib/pageLayout.js';
+import { resolvePageLayout, sectionLayoutOf, sectionsBySlot, statedPageLayout } from '../lib/pageLayout.js';
 
 /**
  * One slot's sections, each opened by a section boundary and rendered
@@ -102,8 +102,11 @@ function SlotSections({ pageId, sections, getSectionBlocks, renderSection, arran
                 a page read straight through wants, and what keeps an
                 introduction paragraph from running the width of a schedule
                 grid. */}
-            <div className={arrangement === 'grid' ? 'mt-md' : 'measure mt-md'}>
-              <SectionBlocks blocks={blocks} />
+            {/* A section that chose Wide or Two columns sets its own
+                measure, so the list arrangement's measure would only
+                narrow it back (issue #1153). */}
+            <div className={arrangement === 'grid' || sectionLayoutOf(section) !== 'reading' ? 'mt-md' : 'measure mt-md'}>
+              <SectionBlocks blocks={blocks} layout={sectionLayoutOf(section)} />
             </div>
           </section>
         ),

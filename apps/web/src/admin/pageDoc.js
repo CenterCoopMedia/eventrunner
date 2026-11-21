@@ -9,7 +9,7 @@
 import { lockEditorialId } from './editorialId.js';
 import { builtInSectionBlockTypes, isNavigationLink } from 'shared/page';
 import { recordStateOf } from './recordState.js';
-import { DEFAULT_SECTION_SLOT, slotOf, statedPageLayout } from '../lib/pageLayout.js';
+import { DEFAULT_SECTION_SLOT, SECTION_LAYOUTS, slotOf, statedPageLayout } from '../lib/pageLayout.js';
 import { templateOf } from '../lib/pageTemplates.js';
 
 /** Keys a cmsPages doc may carry (mirrors PAGE_KEYS on the server). */
@@ -37,6 +37,7 @@ export const SECTION_KEYS = Object.freeze([
   'reorderable',
   'defaultBlocks',
   'slot',
+  'layout',
   'translations',
 ]);
 
@@ -111,6 +112,9 @@ export function toEditablePage(doc) {
             maxBlocks: Number.isInteger(s.maxBlocks) ? s.maxBlocks : 1,
             reorderable: s.reorderable !== false,
             slot: slotOf(s),
+            // Absent stays absent: a section that never chose keeps the
+            // reading layout and stores nothing new on save.
+            layout: SECTION_LAYOUTS.includes(s.layout) ? s.layout : null,
             defaultBlocks: Array.isArray(s.defaultBlocks)
               ? s.defaultBlocks.map((block) => {
                   const b = pick(block ?? {}, DEFAULT_BLOCK_KEYS);
@@ -142,6 +146,7 @@ export function blankSection() {
     maxBlocks: 6,
     reorderable: true,
     slot: DEFAULT_SECTION_SLOT,
+    layout: null,
     defaultBlocks: [],
   };
 }
@@ -196,6 +201,7 @@ export function toPagePayload(page) {
         maxBlocks: Number.isInteger(maxBlocks) ? maxBlocks : section.maxBlocks,
         reorderable: Boolean(section.reorderable),
         slot: slotOf(section),
+        ...(SECTION_LAYOUTS.includes(section.layout) ? { layout: section.layout } : {}),
         defaultBlocks: (section.defaultBlocks ?? []).map((block) => ({
           field: block.field ?? '',
           blockType: block.blockType ?? '',

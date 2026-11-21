@@ -54,7 +54,7 @@ const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
 const PAGE_KEYS = Object.freeze(['id', 'label', 'title', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template', 'translations']);
 const NAVIGATION_LINK_KEYS = Object.freeze(['id', 'label', 'url', 'order', 'visible', 'systemPage']);
-const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot', 'translations']);
+const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot', 'layout', 'translations']);
 const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
 
 /**
@@ -115,6 +115,14 @@ const PAGE_LAYOUT_VALUES = Object.freeze({
  * the old position — no migration runs, and no seeded page changes shape.
  */
 const SECTION_SLOTS = Object.freeze(['above', 'main', 'below']);
+
+/**
+ * How a section sets its blocks (issue #1153): `reading` (one column at the
+ * reading measure), `wide` (one column at the wide measure) or `columns`
+ * (two columns, one on a phone). Optional; absent reads as `reading`, so
+ * stored sections keep their look without a migration.
+ */
+const SECTION_LAYOUTS = Object.freeze(['reading', 'wide', 'columns']);
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -283,6 +291,11 @@ function validatePageDoc(doc) {
     if (section.slot !== undefined && !SECTION_SLOTS.includes(section.slot)) {
       errors.push(
         `${at}.slot: must be one of ${SECTION_SLOTS.join(', ')}, got ${JSON.stringify(section.slot)}`,
+      );
+    }
+    if (section.layout !== undefined && !SECTION_LAYOUTS.includes(section.layout)) {
+      errors.push(
+        `${at}.layout: must be one of ${SECTION_LAYOUTS.join(', ')}, got ${JSON.stringify(section.layout)}`,
       );
     }
     if (!Array.isArray(section.defaultBlocks)) {
@@ -554,6 +567,7 @@ module.exports = {
   PAGE_LAYOUT_KEYS,
   PAGE_LAYOUT_VALUES,
   SECTION_SLOTS,
+  SECTION_LAYOUTS,
   PAGE_TEMPLATE_IDS,
   internals: { writeAdminLog, DOC_ID_RE, PAGE_KEYS, SECTION_KEYS, DEFAULT_BLOCK_KEYS },
 };
