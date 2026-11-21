@@ -66,7 +66,7 @@ function response() {
   };
 }
 
-function makeHarness({ records = seed(), config = CONFIG, sendEmail, now = NOW } = {}) {
+function makeHarness({ records = seed(), getConfig = async () => CONFIG, sendEmail, now = NOW } = {}) {
   const db = makeSpeakersDb(records);
   const authChecks = [];
   const auth = {
@@ -81,7 +81,7 @@ function makeHarness({ records = seed(), config = CONFIG, sendEmail, now = NOW }
     sent.push(message);
     return { status: 'sent', providerMessageId: `message-${sent.length}` };
   });
-  const deps = { db, auth, getConfig: async () => config, sendEmail: deliver, now, log: QUIET };
+  const deps = { db, auth, getConfig, sendEmail: deliver, now, log: QUIET };
   const get = createGetSpeakerDiscussionPointsHandler(deps);
   const save = createSaveSpeakerDiscussionPointsHandler(deps);
   const call = async (handler, token, body, method = 'POST') => {
@@ -450,7 +450,6 @@ test('missing or unsuccessful notification paths keep the saved text and report 
   const cases = [
     {
       name: 'missing address',
-      config: { ...CONFIG, event: { ...CONFIG.event, legal: { ...CONFIG.event.legal, supportEmail: '' } } },
       records: seed({
         'config/event': { ...CONFIG.event, legal: { ...CONFIG.event.legal, supportEmail: '' } },
       }),
@@ -465,7 +464,6 @@ test('missing or unsuccessful notification paths keep the saved text and report 
   for (const scenario of cases) {
     const h = makeHarness({
       records: scenario.records,
-      config: scenario.config || CONFIG,
       sendEmail: scenario.sendEmail,
     });
     const res = await h.save('owner', body(`Question for ${scenario.name}.`));
@@ -474,6 +472,20 @@ test('missing or unsuccessful notification paths keep the saved text and report 
     assert.equal(h.db.read('speakers', 's1').discussionPoints.text, `Question for ${scenario.name}.`);
     assert.equal(h.db.read('speakers', 's1').discussionPoints.notification.state, scenario.state);
   }
+});
+
+test('a configuration read failure before sending reports failed and preserves the saved discussion points', async () => {
+  const h = makeHarness({
+    getConfig: async () => { throw new Error('config read unavailable'); },
+  });
+  const request = body('Questions for the panel.');
+  const saved = await h.save('owner', request);
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.body.submission.text, request.text);
+  assert.equal(saved.body.submission.notification.state, 'failed');
+  assert.deepEqual((await h.get('owner')).body, saved.body);
+  assert.deepEqual((await h.save('owner', request)).body, { ...saved.body, replay: true });
+  assert.equal(h.sent.length, 0);
 });
 
 test('a historical demo refuses the save inside the transaction', async () => {

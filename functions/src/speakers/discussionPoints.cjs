@@ -98,7 +98,7 @@ async function saveSubmission({ db, speakerId, uid, fields, now }) {
   });
 }
 
-async function notifyOrganizers({ db, getConfig, sendEmail, speakerId, speaker, submission }) {
+async function notifyOrganizers({ db, getConfig, sendEmail, log, speakerId, speaker, submission }) {
   const ref = db.collection('speakers').doc(speakerId);
   const skipped = await db.runTransaction(async (tx) => {
     const policy = await checkDemoWrites({ db, transaction: tx });
@@ -134,7 +134,7 @@ async function notifyOrganizers({ db, getConfig, sendEmail, speakerId, speaker, 
       submitted_at: submissionView(submission).submittedAt,
     },
   });
-  const result = await sendEmail({
+  const message = {
     to: address.trim(),
     subject: rendered.subject.replace(/\s+/g, ' ').trim(),
     html: rendered.html,
@@ -146,7 +146,15 @@ async function notifyOrganizers({ db, getConfig, sendEmail, speakerId, speaker, 
     hasLegalFooterHtml: rendered.hasLegalFooterHtml,
     hasLegalFooterText: rendered.hasLegalFooterText,
     ...(channel.stream ? { messageStream: channel.stream } : {}),
-  });
+  };
+  let result;
+  try {
+    result = await sendEmail(message);
+  } catch {
+    // The provider may have accepted the message before the send call threw.
+    log.error('Speaker discussion points notification outcome unknown');
+    return { state: 'unknown' };
+  }
   if (!result || result.skipped || result.ambiguous) return { state: 'unknown' };
   return { state: result.status === 'sent' ? 'accepted' : 'failed' };
 }
@@ -189,11 +197,11 @@ function createSaveSpeakerDiscussionPointsHandler({ db, auth, getConfig, sendEma
     if (!result.notify) return res.status(200).json({ submission: submissionView(result.submission) });
     let notification;
     try {
-      notification = await notifyOrganizers({ db, getConfig, sendEmail, speakerId, ...result });
+      notification = await notifyOrganizers({ db, getConfig, sendEmail, log, speakerId, ...result });
     } catch {
-      // Preparation or provider errors can contain private text. Do not log them.
-      notification = { state: 'unknown' };
-      log.error('Speaker discussion points notification outcome unknown');
+      // Preparation errors can contain private text.
+      notification = { state: 'failed' };
+      log.error('Speaker discussion points notification preparation failed');
     }
     try {
       const completed = await recordNotification({ db, speakerId, uid, submission: result.submission, notification });
