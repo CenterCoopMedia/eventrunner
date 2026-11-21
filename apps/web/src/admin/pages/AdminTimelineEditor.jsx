@@ -50,6 +50,15 @@ const FIELD_LABELS = { year: 'Year', title: 'Title', description: 'Description',
 
 const textOf = (value) => (typeof value === 'string' ? value : '');
 
+function changedTimelineFields(next, previous) {
+  const changed = new Set(Object.keys(next).filter((field) => next[field] !== previous[field]));
+  if (changed.has('image') || changed.has('alt')) {
+    changed.add('image');
+    changed.add('alt');
+  }
+  return changed;
+}
+
 function toForm(row) {
   const entry = row?.current ?? {};
   return {
@@ -75,7 +84,7 @@ export default function AdminTimelineEditor({ mode }) {
   const reportDeleted = useDeletedRecord();
   const { showToast } = useToast();
   const { ready, error: listenerError, findRow } = useAdminTimeline();
-  const [form, setForm] = useState(EMPTY);
+  const [{ form, savedForm }, setEditor] = useState({ form: EMPTY, savedForm: EMPTY });
   // Minted once per form, on the first render in create mode.
   const [newId] = useState(() => (mode === 'create' ? mintId() : null));
   // The id this form created, once it has. From then on it only updates.
@@ -88,29 +97,46 @@ export default function AdminTimelineEditor({ mode }) {
   const [action, setAction] = useState(null);
   const saving = action !== null;
   const [status, setStatus] = useState('');
-  const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   const errorRef = useRef(null);
   const formRef = useRef(null);
   const adoptedRef = useRef(null);
+  const observedRef = useRef(null);
 
   const creating = mode === 'create' && !createdId;
   const docId = mode === 'edit' ? entryId : (createdId ?? newId);
   const row = mode === 'edit' || createdId ? findRow(docId) : null;
 
-  // Each record is adopted from the merged row only after both the
-  // live and the draft listener have reported: filled from the live
-  // revision alone, a save would replace the unpublished draft.
+  // Start from the merged row and keep untouched fields current as the
+  // listeners report newer values.
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current === docId || !ready || !row) return;
+    if (mode !== 'edit' || !ready || !row || saving) return;
+    const incoming = toForm(row);
+    const observed = observedRef.current;
+    observedRef.current = incoming;
+    if (adoptedRef.current === docId) {
+      // An unrelated snapshot can precede the echo of our latest save.
+      const changed = changedTimelineFields(incoming, observed);
+      if (!changed.size) return;
+      setEditor((current) => {
+        const edited = changedTimelineFields(current.form, current.savedForm);
+        const nextForm = { ...current.form };
+        const nextSaved = { ...current.savedForm };
+        for (const field of changed) {
+          if (!edited.has(field)) nextForm[field] = incoming[field];
+          nextSaved[field] = incoming[field];
+        }
+        return { form: nextForm, savedForm: nextSaved };
+      });
+      return;
+    }
     adoptedRef.current = docId;
-    setForm(toForm(row));
+    setEditor({ form: incoming, savedForm: incoming });
     setTouched(new Set());
     setAttempted(false);
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
-    setFeedbackSnapshot(null);
-  }, [mode, docId, ready, row]);
+  }, [mode, docId, ready, row, saving]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -132,6 +158,8 @@ export default function AdminTimelineEditor({ mode }) {
   // save, so a blank new form does not open on a column of errors.
   const errorFor = (field) =>
     ((attempted || touched.has(field)) ? localErrors.get(field) : undefined) ?? serverErrors.get(field);
+  const editedFields = changedTimelineFields(form, savedForm);
+  const setForm = (update) => setEditor((current) => ({ ...current, form: update(current.form) }));
   const set = (field, value) => {
     setTouched((current) => (current.has(field) ? current : new Set(current).add(field)));
     setForm((current) => ({ ...current, [field]: value }));
@@ -151,18 +179,24 @@ export default function AdminTimelineEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
-    const body = { collection: COLLECTION, docId, fields: timelineFields(form), visible: form.visible };
+    const values = timelineFields(form);
+    const fields = creating ? values : Object.fromEntries(
+      Object.entries(values).filter(([field]) => editedFields.has(field)),
+    );
+    const body = { collection: COLLECTION, docId, fields };
+    if (creating || editedFields.has('visible')) body.visible = form.visible;
     let stage = 'save';
     try {
       if (creating) {
         await call('cmsCreateContent', body);
         // Created: this form never creates again.
         adoptedRef.current = docId;
+        observedRef.current = form;
         setCreatedId(docId);
       } else {
         await call('cmsUpdateContent', body);
       }
-      setFeedbackSnapshot(JSON.stringify(form));
+      setEditor((current) => ({ ...current, savedForm: form }));
       if (publish) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: COLLECTION, docIds: [docId] });
@@ -244,7 +278,7 @@ export default function AdminTimelineEditor({ mode }) {
         title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
         recentTitle={row?.current?.title}
         state={!creating && row ? <RecordState state={row.state} /> : null}
-        feedback={status || error ? <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} /> : null}
+        feedback={status || error ? <EditorActionFeedback unsaved={editedFields.size > 0} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
           <>
             <button

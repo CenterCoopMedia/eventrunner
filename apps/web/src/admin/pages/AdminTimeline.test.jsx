@@ -164,7 +164,7 @@ describe('timeline editor server adoption', () => {
     fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields.title).toBe(DRAFTS[0].title);
+    expect(bodyOf(0)).toEqual({ collection: 'cmsTimeline', docId: 'edition-2025', fields: {} });
   });
 });
 
@@ -365,6 +365,7 @@ describe('the timeline entry editor', () => {
       'cmsCreateContent', 'cmsPublish', 'cmsUpdateContent', 'cmsPublish',
     ]);
     expect(bodyOf(2).docId).toBe(bodyOf(0).docId);
+    expect(bodyOf(2).fields).toEqual({});
     expect(bodyOf(3).docIds).toEqual([bodyOf(0).docId]);
   });
 
@@ -444,8 +445,45 @@ describe('the timeline entry editor', () => {
       collection: 'cmsTimeline',
       docId: 'edition-2025',
       visible: false,
-      fields: { year: 2025, title: 'Two workshop tracks, edited', description: 'Practice and planning.', url: null, image: null, alt: null },
+      fields: { description: 'Practice and planning.' },
     });
+  });
+
+  it('keeps draft changes from a teammate and edits typed during a save', async () => {
+    await openEntry('edition-2025');
+    const title = await screen.findByLabelText('Title');
+    let finishSave;
+    fetch.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
+    fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
+
+    fireEvent.change(title, { target: { value: 'Updated title' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toEqual({ collection: 'cmsTimeline', docId: 'edition-2025', fields: { title: 'Updated title' } });
+
+    pushTimeline(LIVE, [{
+      ...DRAFTS[0], description: 'Updated description', visible: false,
+      image: 'cms-images/edition/meeting.webp', alt: 'Attendees at a table',
+    }, ...DRAFTS.slice(1)]);
+    fireEvent.change(screen.getByLabelText('Link'), { target: { value: '/schedule' } });
+    await act(async () => finishSave(response({ status: 'dirty' })));
+
+    expect(title).toHaveValue('Updated title');
+    expect(screen.getByLabelText('Description')).toHaveValue('Updated description');
+    expect(screen.getByLabelText('Show this entry when it is published')).not.toBeChecked();
+    expect(screen.getByLabelText('Image')).toHaveValue('cms-images/edition/meeting.webp');
+    expect(screen.getByLabelText('Alt text')).toHaveValue('Attendees at a table');
+    expect(screen.getByText(/Newer edits are still unsaved/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1)).toEqual({
+      collection: 'cmsTimeline', docId: 'edition-2025',
+      fields: { description: null, url: '/schedule', image: null, alt: null },
+    });
+    expect(await screen.findByText('Draft saved. It is not live until you publish it.')).toBeInTheDocument();
   });
 
   it('keeps alt text while editing an image path and clears it when removing the image', async () => {
@@ -458,6 +496,12 @@ describe('the timeline entry editor', () => {
     const image = await screen.findByLabelText('Image');
     fireEvent.change(image, { target: { value: 'cms-images/edition/gathering.webp' } });
     expect(screen.getByLabelText('Alt text')).toHaveValue('Attendees at a table');
+
+    fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    expect(await screen.findByText('Draft saved. It is not live until you publish it.')).toBeInTheDocument();
+    expect(bodyOf(0).fields).toEqual({ image: 'cms-images/edition/gathering.webp', alt: 'Attendees at a table' });
+
     fireEvent.click(screen.getByRole('button', { name: 'Remove image' }));
     expect(screen.queryByLabelText('Alt text')).toBeNull();
     fireEvent.change(image, { target: { value: 'cms-images/edition/gathering.webp' } });
@@ -481,7 +525,7 @@ describe('the timeline entry editor', () => {
     fetch.mockResolvedValueOnce(response({ ok: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields).toMatchObject({ title: 'Two workshop tracks, edited' });
+    expect(bodyOf(0)).toEqual({ collection: 'cmsTimeline', docId: 'edition-2025', fields: {} });
   });
 
   it('does not open the form from the live revision alone when the drafts listener fails, and says why', async () => {
