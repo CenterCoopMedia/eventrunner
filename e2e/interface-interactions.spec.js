@@ -284,7 +284,7 @@ for (const width of [1440, 390, 320]) {
   });
 }
 
-test('a pending Schedule request keeps its motion across the one-minute boundary', async ({ page }) => {
+test('a pending Schedule request offers recovery after a minute and still accepts the page', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.clock.install({ time: new Date('2026-11-01T12:00:00.000Z') });
   const pending = deferred();
@@ -294,6 +294,7 @@ test('a pending Schedule request keeps its motion across the one-minute boundary
   });
   const loading = page.locator('.loading-status__copy').filter({ hasText: 'Loading schedule…' });
   const indicator = page.locator('.held-figure__part:visible, .held-figure__glyph:visible');
+  const retry = page.getByRole('main').getByRole('button', { name: 'Try again', exact: true });
 
   try {
     await page.goto('/');
@@ -306,12 +307,15 @@ test('a pending Schedule request keeps its motion across the one-minute boundary
     await expect(loading).toContainText('This is taking longer than usual.');
     await expect(indicator).toBeVisible();
     await expect(indicator).toHaveCSS('animation-name', 'held-figure-gesture');
-
-    await page.clock.fastForward(1);
-    await expect(loading).toContainText('You can keep waiting.');
-    await expect(indicator).toHaveCSS('animation-name', 'held-figure-gesture');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(indicator).toHaveCSS('animation-name', 'none');
+    await expect(retry).toHaveCount(0);
+
+    await page.clock.fastForward(1);
+    await expect(page.getByRole('main').getByRole('status').filter({ hasText: 'This is taking longer than a minute.' })).toBeVisible();
+    await expect(retry).toBeVisible();
+    await expect(loading).toHaveCount(0);
+    await expect(indicator).toHaveCount(0);
   } finally {
     pending.resolve();
     await page.clock.resume();
@@ -319,6 +323,7 @@ test('a pending Schedule request keeps its motion across the one-minute boundary
   await expect(page.locator('[data-schedule-results]')).toBeVisible();
   await expect(loading).toHaveCount(0);
   await expect(indicator).toHaveCount(0);
+  await expect(retry).toHaveCount(0);
 });
 
 test('shared public controls keep readable edges across generated presets and modes', async ({ page }, testInfo) => {
