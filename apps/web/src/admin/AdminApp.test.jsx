@@ -86,7 +86,27 @@ let pendingOperatorProbe = null;
 // snapshot from the memory cache (metadata.fromCache true) for any account,
 // as the SDK does offline (issue #1318).
 let serverUnreachable = false;
+// When set, the server is reachable again but the SDK still waits out its
+// reconnect backoff after a failed stream, so getDocs keeps answering from
+// the cache. Only a network restart (enableNetwork, or the SDK's own restart
+// on the browser's `online` event) ends it (issue #1329).
+let streamBackoff = false;
+window.addEventListener('online', () => { streamBackoff = false; });
+// The real network restart (lib/firestoreNetwork.js) runs against this fake.
+vi.mock('@/firebase.js', async () => {
+  const { restartFirestoreNetwork } = await import('../lib/firestoreNetwork.js');
+  return {
+    app: {},
+    auth: {},
+    db: {},
+    appCheckEnabled: false,
+    appCheckHeaders: vi.fn(async () => ({})),
+    reconnectFirestore: () => restartFirestoreNetwork({}),
+  };
+});
 vi.mock('firebase/firestore', () => ({
+  disableNetwork: vi.fn(async () => {}),
+  enableNetwork: vi.fn(async () => { streamBackoff = false; }),
   collection: vi.fn((_db, name) => ({ name })),
   doc: vi.fn(() => ({})),
   // One empty answer for both listener shapes: an empty collection, or a
@@ -99,7 +119,7 @@ vi.mock('firebase/firestore', () => ({
   where: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn((ref) => {
-    if (serverUnreachable) return Promise.resolve({ docs: [], metadata: { fromCache: true } });
+    if (serverUnreachable || streamBackoff) return Promise.resolve({ docs: [], metadata: { fromCache: true } });
     if (ref?.name === 'admin_logs') {
       if (pendingOperatorProbe) {
         return new Promise((resolve, reject) => {
@@ -133,6 +153,7 @@ vi.mock('./adminApi.js', async () => {
 
 import App from '../App.jsx';
 import { DOCKET_GROUPS_KEY, forgetLayoutMemory } from './layoutPreference.js';
+import { disableNetwork, enableNetwork } from 'firebase/firestore';
 
 // The overview asks getEventStats for its figures on mount (issue #179).
 const STATS = {
@@ -182,6 +203,9 @@ beforeEach(() => {
   pendingProbe = null;
   pendingOperatorProbe = null;
   serverUnreachable = false;
+  streamBackoff = false;
+  vi.mocked(disableNetwork).mockClear();
+  vi.mocked(enableNetwork).mockClear();
   adminCall.mockReset();
   adminCall.mockImplementation((name) => Promise.resolve(name === 'getEventStats' ? STATS : {}));
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
@@ -419,6 +443,56 @@ describe('admin route gating', () => {
       expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
     }
+  });
+
+  // Issue #1329: the server is back, but no `online` event came (a blocked
+  // request, not a dropped connection), so the SDK still waits out its
+  // reconnect backoff. One press asks the server at once.
+  it.each([
+    ['an organizer', true],
+    ['a signed-in account that is not an admin', false],
+  ])('asks the server at once when %s checks again after the server comes back', async (_who, isAdmin) => {
+    adminProbeShouldSucceed = isAdmin;
+    serverUnreachable = true;
+    await renderAt('/admin');
+    expect(screen.getByRole('heading', { name: 'We could not check your admin access' })).toBeInTheDocument();
+
+    serverUnreachable = false;
+    streamBackoff = true;
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Check again' })));
+
+    if (isAdmin) {
+      expect(await screen.findByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+    } else {
+      expect(await screen.findByRole('heading', { name: 'You don’t have admin access' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
+    }
+  });
+
+  it('keeps the failed check, never the shell, when checking again while the server is still unreachable', async () => {
+    serverUnreachable = true;
+    await renderAt('/admin');
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Check again' })));
+
+    expect(await screen.findByRole('heading', { name: 'We could not check your admin access' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin sections' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Overview', exact: true })).not.toBeInTheDocument();
+  });
+
+  it('does not restart the network for an organizer checking again inside the admin', async () => {
+    operatorProbeError = Object.assign(new Error('unavailable'), { code: 'unavailable' });
+    await renderAt('/admin/branding');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+
+    operatorProbeError = null;
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Check again' })));
+
+    expect(await screen.findByText('Operator')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+    expect(disableNetwork).not.toHaveBeenCalled();
+    expect(enableNetwork).not.toHaveBeenCalled();
   });
 
   it('keeps the shell for an admin the server confirmed earlier when a later check cannot reach it', async () => {
