@@ -111,6 +111,8 @@ const URL_SECRET_PARAM = 'token';
  */
 const MIN_WEBHOOK_SECRET_LENGTH = 32;
 
+const CREDENTIAL_CHECK_TIMEOUT_MS = 2000;
+
 /** Upper bound on webhook-list pages read by registerWebhook. */
 const MAX_WEBHOOK_PAGES = 50;
 
@@ -313,9 +315,9 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
    * transient failure.
    *
    * @param {string} path leading slash, appended to API_BASE
-   * @param {{ method?: string, body?: object }} [opts]
+   * @param {{ method?: string, body?: object, signal?: AbortSignal }} [opts]
    */
-  async function apiCall(path, { method = 'GET', body } = {}) {
+  async function apiCall(path, { method = 'GET', body, signal } = {}) {
     const response = await fetchImpl(`${API_BASE}${path}`, {
       method,
       headers: {
@@ -324,6 +326,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
         ...(body ? { 'Content-Type': 'application/json' } : {}),
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
+      ...(signal ? { signal } : {}),
     });
     if (response.status === 404) return null;
     let parsed = null;
@@ -334,7 +337,10 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     }
     if (response.status < 200 || response.status > 299) {
       const detail = parsed?.error_description || parsed?.error || `eventbrite responded ${response.status}`;
-      throw Object.assign(new Error(redact(`eventbrite API ${method} ${path} failed: ${detail}`)), { status: response.status });
+      throw Object.assign(new Error(redact(`eventbrite API ${method} ${path} failed: ${detail}`)), {
+        status: response.status,
+        invalidAuth: response.status === 400 && ['INVALID_AUTH', 'INVALID_AUTH_HEADER'].includes(parsed?.error),
+      });
     }
     return parsed;
   }
@@ -398,6 +404,16 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     name: 'eventbrite',
     externalEventId,
     webhookEventTypes: WEBHOOK_ACTIONS,
+
+    async checkCredential() {
+      try {
+        const account = await apiCall('/users/me/', { signal: AbortSignal.timeout(CREDENTIAL_CHECK_TIMEOUT_MS) });
+        return typeof account?.id === 'string' && account.id.trim() ? 'accepted' : 'unavailable';
+      } catch (error) {
+        if (error?.status === 401 || error?.status === 403 || error?.invalidAuth) return 'rejected';
+        return 'unavailable';
+      }
+    },
 
     /**
      * Authenticates by the URL secret (judgment call 1). Headers carry

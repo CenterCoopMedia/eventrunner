@@ -266,14 +266,19 @@ function StatusCard({ status, error, onRefresh, busy, call }) {
           <div>
             <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Automatic updates</dt>
             <dd className="text-admin-ink-secondary">
-              {status.webhookSupported ? 'Available' : 'Tickets are imported from a file'}
+              {status.credentialCheck === 'rejected' ? 'Connection needs attention'
+                : status.webhookSupported ? 'Available' : 'Tickets are imported from a file'}
             </dd>
           </div>
           {status.webhookSupported ? (
             <div>
               <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Connection</dt>
               <dd className="text-admin-ink-secondary">
-                {status.webhookRegisteredAt ? (
+                {status.credentialCheck === 'rejected' ? (
+                  'Eventbrite denied access. Contact support to restore ticket updates.'
+                ) : status.webhookRegisteredAt && status.credentialCheck === 'unavailable' ? (
+                  'Could not check Eventbrite access. Refresh to try again.'
+                ) : status.webhookRegisteredAt ? (
                   <span className="font-admin-data text-admin-ink-data">
                     {localDateTime(status.webhookRegisteredAt) ? `Connected on ${localDateTime(status.webhookRegisteredAt)}` : 'Connected'}
                   </span>

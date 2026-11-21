@@ -57,6 +57,34 @@ describe('AdminTicketing', () => {
     expect(callMock).toHaveBeenCalledWith('getTicketingStatus', {});
   });
 
+  it.each([
+    ['rejected', 'Eventbrite denied access. Contact support to restore ticket updates.'],
+    ['unavailable', 'Could not check Eventbrite access. Refresh to try again.'],
+  ])('shows an Eventbrite check result of %s despite a stored webhook registration', async (credentialCheck, message) => {
+    const eventbriteStatus = {
+      ...STATUS, provider: 'eventbrite', webhookSupported: true, fullSyncSupported: true,
+      webhookRegisteredAt: '2026-08-20T12:00:00.000Z',
+    };
+    const getStatus = vi.fn()
+      .mockResolvedValueOnce({ ...eventbriteStatus, credentialCheck })
+      .mockResolvedValue({ ...eventbriteStatus, credentialCheck: 'accepted' });
+    callMock.mockImplementation((name) => {
+      if (name === 'getTicketingStatus') return getStatus();
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+
+    render(<AdminTicketing />);
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText(/^Connected on/)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Import tickets from a CSV' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sync all tickets' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText(/^Connected on/)).toBeInTheDocument();
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
+  });
+
   it('mounts no provider workspace or ticket reads while provider status is pending', async () => {
     let resolveStatus;
     callMock.mockImplementation((name, body) => {
@@ -274,11 +302,12 @@ describe('AdminTicketing', () => {
     expect(screen.queryByText('Connection')).not.toBeInTheDocument();
   });
 
-  it('shows "not connected" without an operator command for a webhook-capable provider with no registration yet', async () => {
+  it.each(['accepted', 'unavailable'])('shows missing webhook registration when the credential check is %s', async (credentialCheck) => {
     callMock.mockImplementation((name) => {
       if (name === 'getTicketingStatus') {
         return Promise.resolve({
           ...STATUS, provider: 'eventbrite', webhookSupported: true, webhookRegisteredAt: null, webhookId: null,
+          credentialCheck,
         });
       }
       if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
