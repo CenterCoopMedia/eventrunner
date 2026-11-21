@@ -523,24 +523,28 @@ function createTicketingMyTicketsHandler({ db, provider, auth }) {
       query = query.startAfter(id);
     }
     const snap = await query.limit(MAX_PAGE + 1).get();
-    const tickets = [];
-    const orderCache = new Map();
-    for (const row of snap.docs.slice(0, MAX_PAGE)) {
-      const ticket = row.data();
-      if (ticket.provider !== provider.name) continue;
-      if (provider.name === 'stripe') {
-        if (!safeDocId(ticket.orderId)) continue;
-        if (!orderCache.has(ticket.orderId)) {
-          const parent = await db.collection(ORDERS).doc(ticket.orderId).get();
-          orderCache.set(ticket.orderId, parent.exists && scopeMatches(parent.data(), provider));
+    const page = snap.docs.slice(0, MAX_PAGE);
+    const candidates = page.map((row) => ({ id: row.id, ticket: row.data() }))
+      .filter(({ ticket }) => ticket.provider === provider.name);
+    const scopedOrders = new Set();
+    if (provider.name === 'stripe') {
+      const orderIds = [...new Set(candidates.map(({ ticket }) => ticket.orderId).filter(safeDocId))];
+      if (orderIds.length) {
+        const orders = db.collection(ORDERS);
+        const parents = await db.getAll(...orderIds.map((id) => orders.doc(id)));
+        for (const parent of parents) {
+          if (parent.exists && scopeMatches(parent.data(), provider)) scopedOrders.add(parent.id);
         }
-        if (!orderCache.get(ticket.orderId)) continue;
       }
-      const dto = publicTicket(ticket, row.id);
+    }
+    const tickets = [];
+    for (const { id, ticket } of candidates) {
+      if (provider.name === 'stripe' && !scopedOrders.has(ticket.orderId)) continue;
+      const dto = publicTicket(ticket, id);
       delete dto.claimedByUid;
       tickets.push({ ...dto, claimedByMe: true });
     }
-    return res.status(200).json({ tickets, nextCursor: snap.size > MAX_PAGE ? snap.docs[MAX_PAGE - 1].id : null });
+    return res.status(200).json({ tickets, nextCursor: snap.size > MAX_PAGE ? page.at(-1).id : null });
   };
 }
 

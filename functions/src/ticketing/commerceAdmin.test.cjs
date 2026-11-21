@@ -234,6 +234,47 @@ test('My tickets requires verified identity and returns only that identity witho
   assert.doesNotMatch(JSON.stringify(result.body), /buyer@example|10000|stripeAccountId|second@example/);
 });
 
+test('My tickets batches unique Stripe order reads for the claimed page and still checks order scope', async () => {
+  const rows = Array.from({ length: 52 }, (_, index) => {
+    const id = `claimed-${String(index).padStart(2, '0')}`;
+    return [`tickets/${id}`, { ...ticket, externalId: id, claimedByUid: 'first', orderId: '../invalid' }];
+  });
+  const setOrder = (index, orderId, extra) => Object.assign(rows[index][1], { orderId }, extra);
+  setOrder(0, 'order-1');
+  setOrder(1, 'wrong-event');
+  setOrder(2, 'order-2');
+  setOrder(3, 'order-1');
+  setOrder(4, 'missing');
+  setOrder(5, 'wrong-account');
+  setOrder(6, 'wrong-mode');
+  setOrder(7, 'manual-order', { provider: 'manual' });
+  setOrder(8, 'second-account-order', { claimedByUid: 'second' });
+  setOrder(51, 'next-page-order');
+  const db = dbFor({ ...Object.fromEntries(rows),
+    'ticket_orders/order-2': { ...order, id: 'order-2' },
+    'ticket_orders/wrong-event': { ...order, eventId: 'elsewhere' },
+    'ticket_orders/wrong-account': { ...order, stripeAccountId: 'acct_elsewhere' },
+    'ticket_orders/wrong-mode': { ...order, livemode: true },
+    'ticket_orders/next-page-order': { ...order, id: 'next-page-order' },
+  });
+  const getAll = db.getAll.bind(db);
+  const batches = [];
+  db.getAll = (...refs) => {
+    batches.push(refs.map((ref) => ref.id));
+    return getAll(...refs);
+  };
+  const handler = createTicketingMyTicketsHandler({ db, provider, auth });
+  const first = await call(handler, {}, 'first');
+  assert.deepEqual(first.body.tickets.map((entry) => entry.externalId), ['claimed-00', 'claimed-02', 'claimed-03']);
+  assert.equal(first.body.nextCursor, 'claimed-50');
+  assert.deepEqual(batches, [['order-1', 'wrong-event', 'order-2', 'missing', 'wrong-account', 'wrong-mode']]);
+
+  const second = await call(handler, { cursor: first.body.nextCursor }, 'first');
+  assert.deepEqual(second.body.tickets.map((entry) => entry.externalId), ['claimed-51']);
+  assert.equal(second.body.nextCursor, null);
+  assert.deepEqual(batches[1], ['next-page-order']);
+});
+
 test('My tickets preserves manual and Eventbrite claimed-ticket access', async () => {
   for (const name of ['manual', 'eventbrite']) {
     const db = dbFor({ 'tickets/ticket-1': { ...ticket, provider: name, claimedByUid: 'first' } });
