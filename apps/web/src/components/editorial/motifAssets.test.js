@@ -4,15 +4,24 @@ import { resolve } from 'node:path';
 import { cwd } from 'node:process';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
+import motifs from '../../../../../design/tokens/motifs.json';
 
-const ASSET_DIR = resolve(cwd(), 'public/motifs/fauna');
+const ASSET_DIR = resolve(cwd(), 'public/motifs');
 
-const LIVE_SLOTS = [
-  { file: 'section-mark.svg', width: 20, height: 20 },
-  { file: 'nameplate-mark.svg', width: 24, height: 24 },
-  { file: 'divider.svg', width: 320, height: 32 },
-  { file: 'empty-state.svg', width: 320, height: 128 },
-];
+const LIVE_SLOTS = {
+  'section-mark': { width: 20, height: 20 },
+  'nameplate-mark': { width: 24, height: 24 },
+  divider: { width: 320, height: 32 },
+  'empty-state': { width: 320, height: 128 },
+};
+
+const SLOT_DRAWINGS = Object.values(motifs.sets).flatMap(({ assetDir, slots }) =>
+  Object.entries(slots)
+    .filter(([, file]) => file)
+    .map(([slot, file]) => ({ set: assetDir, file, ...LIVE_SLOTS[slot] })),
+);
+
+const STROKE_PRESERVING_TRANSFORM = /(?:translate|rotate)\([-+.\d,\s]+\)|scale\(\s*-?1(?:[,\s]+-?1)?\s*\)/g;
 
 const PAINT_PROPERTIES = new Set([
   'color',
@@ -29,8 +38,8 @@ const WAIT_DRAWINGS = ['botanical', 'fauna', 'cartographic'].flatMap((set) =>
   ['wait-body.svg', 'wait-part.svg'].map((file) => ({ set, file })));
 const WAIT_SLOT = 32;
 
-function readAsset(file, dir = ASSET_DIR) {
-  return readFileSync(resolve(dir, file), 'utf8');
+function readAsset(set, file) {
+  return readFileSync(resolve(ASSET_DIR, set, file), 'utf8');
 }
 
 /**
@@ -157,11 +166,18 @@ function paintValues(svg) {
   return values;
 }
 
-describe('fauna motif assets', () => {
-  it.each(LIVE_SLOTS)(
-    '$file keeps every stroke at 0.5 CSS pixels or more in its smallest live slot',
-    ({ file, width, height }) => {
-      const svg = readAsset(file);
+describe('static motif assets', () => {
+  it.each(SLOT_DRAWINGS)(
+    '$set/$file keeps its strokes at 0.5 CSS pixels or more in its smallest live slot',
+    ({ set, file, width, height }) => {
+      const svg = readAsset(set, file);
+      // Measure from the viewBox. Child transforms must preserve stroke size.
+      const markup = markupOnly(svg);
+      expect(markup).not.toMatch(/\b(?:transform|scale)\s*:/i);
+      for (const [, , transform] of markup.matchAll(/\btransform\s*=\s*(["'])([^"']+)\1/gi)) {
+        expect(transform.replace(STROKE_PRESERVING_TRANSFORM, '').replaceAll(',', '').trim()).toBe('');
+      }
+
       const viewBox = parseViewBox(svg);
       const scale = Math.min(width / viewBox.width, height / viewBox.height);
       const widths = strokeWidths(svg);
@@ -171,8 +187,8 @@ describe('fauna motif assets', () => {
     },
   );
 
-  it.each(LIVE_SLOTS)('$file inherits motif ink and carries no fixed color', ({ file }) => {
-    const values = paintValues(readAsset(file));
+  it.each(SLOT_DRAWINGS)('$set/$file inherits motif ink and carries no fixed color', ({ set, file }) => {
+    const values = paintValues(readAsset(set, file));
     expect(values.length).toBeGreaterThan(0);
     for (const { property, value } of values) {
       expect([`${property}: currentColor`, `${property}: none`]).toContain(
@@ -184,7 +200,7 @@ describe('fauna motif assets', () => {
 
 describe('wait drawings', () => {
   it.each(WAIT_DRAWINGS)('$set/$file is a solid silhouette in motif ink', ({ set, file }) => {
-    const svg = readAsset(file, resolve(cwd(), 'public/motifs', set));
+    const svg = readAsset(set, file);
     expect(strokeWidths(svg)).toEqual([]);
     expect(parseViewBox(svg)).toEqual({ width: WAIT_SLOT, height: WAIT_SLOT });
     for (const { property, value } of paintValues(svg)) {
@@ -193,7 +209,7 @@ describe('wait drawings', () => {
   });
 
   it.each(WAIT_DRAWINGS)('$set/$file has no part thinner than a pixel at 32px', async ({ set, file }) => {
-    const { ink, stray } = await strayInk(readAsset(file, resolve(cwd(), 'public/motifs', set)), WAIT_SLOT);
+    const { ink, stray } = await strayInk(readAsset(set, file), WAIT_SLOT);
     expect(ink).toBeGreaterThan(0);
     expect(stray / ink).toBeLessThanOrEqual(0.02);
   });

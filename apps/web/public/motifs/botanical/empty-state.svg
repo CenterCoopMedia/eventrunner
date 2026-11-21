@@ -1,31 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="96 48 128 310">
-  <!--
-    The unlabelled plate (visual story, Field Guide, moment 3): a frond
-    mounted on a herbarium sheet, with the label line left blank.
-
-    DRAWN FOR THE SIZE IT IS SEEN AT. The slot renders this at 8rem tall
-    under `mask-size: contain`, so what the viewBox says is what the scale
-    is. The box is drawn to the ink with one small even margin: an earlier
-    pass left a 320 by 420 sheet around a drawing 100 by 282, which was two
-    thirds empty and shrank the frond to three tenths for nothing. The plate
-    device around it supplies the margin a mounted specimen needs; the file
-    should not supply it twice.
-
-    Every stroke below is chosen so that it lands as a line at the scale
-    that leaves — the thinnest here is 1.2, and nothing thinner ships. An
-    earlier pass carried six vein ticks per pinna at 0.6, a hundred and
-    twenty of them, which no display could resolve and which greyed the
-    frond into a smudge. Detail a reader cannot see is not detail; it is
-    dirt.
-
-    No frame either. EmptyState mounts this inside the plate device, and
-    under Field Guide that device draws the double hairline itself. A second
-    frame inside the first is a doubling a plate does not do.
-  -->
+  <!-- Herbarium plate for the Field Guide empty state. The leaf paths carry their final sizes. -->
   <defs>
-    <g id="es-pinna">
-      <path fill="none" stroke="currentColor" stroke-width="2" d="M0,0 C8,-4 20,-5.5 30,-3 C34,-1.8 36,-0.8 36,0 C34,1.5 24,3.3 15,3.6 C7,3.8 1.5,2.2 0,0 Z"/>
-      <path fill="none" stroke="currentColor" stroke-width="1.2" d="M2,-0.3 C12,-1 24,-1 33,-0.4"/>
+    <g id="es-pinna-1">
+      <path fill="none" stroke="currentColor" stroke-width="2.6" d="M0,0 C10.4,-5.2 26,-7.15 39,-3.9 C44.2,-2.34 46.8,-1.04 46.8,0 C44.2,1.95 31.2,4.29 19.5,4.68 C9.1,4.94 1.95,2.86 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.56" d="M2.6,-0.39 C15.6,-1.3 31.2,-1.3 42.9,-0.52"/>
+    </g>
+    <g id="es-pinna-2">
+      <path fill="none" stroke="currentColor" stroke-width="2.3" d="M0,0 C9.2,-4.6 23,-6.325 34.5,-3.45 C39.1,-2.07 41.4,-0.92 41.4,0 C39.1,1.725 27.6,3.795 17.25,4.14 C8.05,4.37 1.725,2.53 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.38" d="M2.3,-0.345 C13.8,-1.15 27.6,-1.15 37.95,-0.46"/>
+    </g>
+    <g id="es-pinna-3">
+      <path fill="none" stroke="currentColor" stroke-width="2.06" d="M0,0 C8.24,-4.12 20.6,-5.665 30.9,-3.09 C35.02,-1.854 37.08,-0.824 37.08,0 C35.02,1.545 24.72,3.399 15.45,3.708 C7.21,3.914 1.545,2.266 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.236" d="M2.06,-0.309 C12.36,-1.03 24.72,-1.03 33.99,-0.412"/>
+    </g>
+    <g id="es-pinna-4">
+      <path fill="none" stroke="currentColor" stroke-width="1.84" d="M0,0 C7.36,-3.68 18.4,-5.06 27.6,-2.76 C31.28,-1.656 33.12,-0.736 33.12,0 C31.28,1.38 22.08,3.036 13.8,3.312 C6.44,3.496 1.38,2.024 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M1.84,-0.276 C11.04,-0.92 22.08,-0.92 30.36,-0.368"/>
+    </g>
+    <g id="es-pinna-5">
+      <path fill="none" stroke="currentColor" stroke-width="1.6" d="M0,0 C6.4,-3.2 16,-4.4 24,-2.4 C27.2,-1.44 28.8,-0.64 28.8,0 C27.2,1.2 19.2,2.64 12,2.88 C5.6,3.04 1.2,1.76 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M1.6,-0.24 C9.6,-0.8 19.2,-0.8 26.4,-0.32"/>
+    </g>
+    <g id="es-pinna-6">
+      <path fill="none" stroke="currentColor" stroke-width="1.36" d="M0,0 C5.44,-2.72 13.6,-3.74 20.4,-2.04 C23.12,-1.224 24.48,-0.544 24.48,0 C23.12,1.02 16.32,2.244 10.2,2.448 C4.76,2.584 1.02,1.496 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M1.36,-0.204 C8.16,-0.68 16.32,-0.68 22.44,-0.272"/>
+    </g>
+    <g id="es-pinna-7">
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M0,0 C4.48,-2.24 11.2,-3.08 16.8,-1.68 C19.04,-1.008 20.16,-0.448 20.16,0 C19.04,0.84 13.44,1.848 8.4,2.016 C3.92,2.128 0.84,1.232 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M1.12,-0.168 C6.72,-0.56 13.44,-0.56 18.48,-0.224"/>
+    </g>
+    <g id="es-pinna-8">
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M0,0 C3.52,-1.76 8.8,-2.42 13.2,-1.32 C14.96,-0.792 15.84,-0.352 15.84,0 C14.96,0.66 10.56,1.452 6.6,1.584 C3.08,1.672 0.66,0.968 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M0.88,-0.132 C5.28,-0.44 10.56,-0.44 14.52,-0.176"/>
+    </g>
+    <g id="es-pinna-9">
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M0,0 C2.72,-1.36 6.8,-1.87 10.2,-1.02 C11.56,-0.612 12.24,-0.272 12.24,0 C11.56,0.51 8.16,1.122 5.1,1.224 C2.38,1.292 0.51,0.748 0,0 Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.2109375" d="M0.68,-0.102 C4.08,-0.34 8.16,-0.34 11.22,-0.136"/>
     </g>
   </defs>
 
@@ -36,24 +46,24 @@
   </g>
 
   <g>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(159,286) rotate(-16) scale(1.3)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(159,286) rotate(16) scale(-1.3,1.3)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(160,262) rotate(-22) scale(1.15)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(160,262) rotate(22) scale(-1.15,1.15)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(161,238) rotate(-28) scale(1.03)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(161,238) rotate(28) scale(-1.03,1.03)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(162,214) rotate(-34) scale(0.92)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(162,214) rotate(34) scale(-0.92,0.92)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(164,190) rotate(-40) scale(0.8)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(164,190) rotate(40) scale(-0.8,0.8)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,164) rotate(-46) scale(0.68)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(165,164) rotate(46) scale(-0.68,0.68)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,136) rotate(-52) scale(0.56)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(167,136) rotate(52) scale(-0.56,0.56)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,110) rotate(-58) scale(0.44)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(168,110) rotate(58) scale(-0.44,0.44)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,88) rotate(-64) scale(0.34)"/>
-    <use xlink:href="#es-pinna" href="#es-pinna" transform="translate(169,88) rotate(64) scale(-0.34,0.34)"/>
+    <use xlink:href="#es-pinna-1" href="#es-pinna-1" transform="translate(159,286) rotate(-16)"/>
+    <use xlink:href="#es-pinna-1" href="#es-pinna-1" transform="translate(159,286) rotate(16) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-2" href="#es-pinna-2" transform="translate(160,262) rotate(-22)"/>
+    <use xlink:href="#es-pinna-2" href="#es-pinna-2" transform="translate(160,262) rotate(22) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-3" href="#es-pinna-3" transform="translate(161,238) rotate(-28)"/>
+    <use xlink:href="#es-pinna-3" href="#es-pinna-3" transform="translate(161,238) rotate(28) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-4" href="#es-pinna-4" transform="translate(162,214) rotate(-34)"/>
+    <use xlink:href="#es-pinna-4" href="#es-pinna-4" transform="translate(162,214) rotate(34) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-5" href="#es-pinna-5" transform="translate(164,190) rotate(-40)"/>
+    <use xlink:href="#es-pinna-5" href="#es-pinna-5" transform="translate(164,190) rotate(40) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-6" href="#es-pinna-6" transform="translate(165,164) rotate(-46)"/>
+    <use xlink:href="#es-pinna-6" href="#es-pinna-6" transform="translate(165,164) rotate(46) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-7" href="#es-pinna-7" transform="translate(167,136) rotate(-52)"/>
+    <use xlink:href="#es-pinna-7" href="#es-pinna-7" transform="translate(167,136) rotate(52) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-8" href="#es-pinna-8" transform="translate(168,110) rotate(-58)"/>
+    <use xlink:href="#es-pinna-8" href="#es-pinna-8" transform="translate(168,110) rotate(58) scale(-1,1)"/>
+    <use xlink:href="#es-pinna-9" href="#es-pinna-9" transform="translate(169,88) rotate(-64)"/>
+    <use xlink:href="#es-pinna-9" href="#es-pinna-9" transform="translate(169,88) rotate(64) scale(-1,1)"/>
   </g>
 
   <!-- The mounting line the label would sit on. It is left blank: this is
