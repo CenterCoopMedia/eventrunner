@@ -4,7 +4,7 @@
 //
 //   • Save draft   → cmsSavePage only. Never a live write (spec §8.4).
 //   • Publish      → cmsSavePage then cmsPublish { collection: 'cmsPages' }.
-//   • Server 400   → surfaced VERBATIM, including each `field: reason`.
+//   • Server 400   → shows how to fix each field in plain words.
 //   • System page  → delete refused in the UI, matching cmsDeletePage.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -420,7 +420,7 @@ describe('page editor', () => {
 
     expect(screen.queryByLabelText('Page id')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Scholarships' } });
-    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/scholarships' } });
+    expect(screen.getByLabelText('Path')).toHaveValue('/scholarships');
 
     // One section. Its content is written under Content once the page exists.
     fireEvent.click(screen.getByRole('button', { name: 'Add section' }));
@@ -581,27 +581,26 @@ describe('page editor', () => {
     });
   });
 
-  it('surfaces the server’s validation message verbatim, per field', async () => {
+  it('explains address conflicts and marks the fields the server rejected', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(
       errorResponse(
         400,
         'bad-request',
-        "Invalid page: path: must be a string starting with '/'; sections[0].label: must be a non-empty string",
+        "Invalid page: path: '/parking' is already used by page 'parking-id'; sections[0].label: must be a non-empty string",
       ),
     );
     await renderAt('/admin/pages/scholarships');
 
-    fireEvent.change(await screen.findByLabelText('Path'), { target: { value: 'scholarships' } });
+    fireEvent.change(await screen.findByLabelText('Path'), { target: { value: '/parking' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent("Path: must be a string starting with '/'");
-    expect(alert).toHaveTextContent('Label: must be a non-empty string');
-    // The offending inputs are marked, described by the server's own words.
+    expect(alert).toHaveTextContent('Another page already uses /parking. Choose a different web address.');
+    expect(alert).toHaveTextContent('Check label and try again.');
     expect(screen.getByLabelText('Path')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Path')).toHaveAccessibleDescription(
-      /must be a string starting with/,
+      /Another page already uses \/parking/,
     );
     expect(screen.getByLabelText('Section 1 label')).toHaveAttribute('aria-invalid', 'true');
   });
@@ -612,24 +611,28 @@ describe('page editor', () => {
     expect(screen.getByLabelText('Path')).toHaveAccessibleDescription('The page’s web address, such as /scholarships.');
   });
 
-  it('surfaces the server’s reserved-path and collision rejections verbatim', async () => {
-    draftDocs = [SCHOLARSHIPS_DRAFT];
-    fetch.mockResolvedValueOnce(
-      errorResponse(
-        400,
-        'bad-request',
-        "path: 'schedule' is a reserved route and cannot be used by a page",
-      ),
-    );
-    await renderAt('/admin/pages/scholarships');
+  it('follows the label until the address is edited and explains invalid addresses before saving', async () => {
+    await renderAt('/admin/pages/new');
+    const label = screen.getByLabelText('Navigation label');
+    const path = screen.getByLabelText('Path');
+    fireEvent.change(label, { target: { value: 'Café & Parking' } });
+    expect(path).toHaveValue('/cafe-parking');
+    fireEvent.change(label, { target: { value: 'Pitch' } });
+    expect(path).toHaveValue('/pitch-page');
 
-    fireEvent.change(await screen.findByLabelText('Path'), { target: { value: '/schedule' } });
+    fireEvent.change(path, { target: { value: '' } });
+    fireEvent.change(label, { target: { value: 'Pitch a session' } });
+    expect(path).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a web address that starts with /, such as /parking.');
+    expect(path).toHaveFocus();
+
+    fireEvent.change(path, { target: { value: '/pitch' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "Path: 'schedule' is a reserved route and cannot be used by a page",
-    );
-    expect(screen.getByLabelText('Path')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('/pitch is used by the system. Choose another address, such as /pitch-a-session.');
+    expect(path).toHaveAttribute('aria-invalid', 'true');
+    expect(path).toHaveValue('/pitch');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('states a system page’s address without offering to change it', async () => {

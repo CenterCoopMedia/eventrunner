@@ -133,7 +133,8 @@ export function toEditablePage(doc) {
 
 /** A blank page for the create form. */
 export function blankPage() {
-  return toEditablePage({ id: '', label: '', path: '', order: 0, visible: true });
+  // null lets a new page follow its label until the address is edited.
+  return { ...toEditablePage({ id: '', label: '', order: 0, visible: true }), path: null };
 }
 
 /** A blank section accepts every block type. */
@@ -155,8 +156,7 @@ export function blankSection() {
  * The wire payload for cmsSavePage. Types are coerced where a form control
  * can only produce strings (order, maxBlocks); `description` is sent as null
  * when blank because the server accepts `string | null` and an empty string
- * is not a meaningful description. Client-side coercion only — validation
- * itself stays on the server, whose messages are surfaced verbatim.
+ * is not a meaningful description.
  *
  * @param {object} page editable form state
  * @returns {object} cmsPages doc
@@ -214,7 +214,7 @@ export function toPagePayload(page) {
 
 /** Stable comparison for the unsaved-edit guard. Editor-only keys are omitted. */
 export function pageSnapshot(page) {
-  return JSON.stringify(toPagePayload(page));
+  return JSON.stringify({ ...toPagePayload(page), path: page.path });
 }
 
 /**
