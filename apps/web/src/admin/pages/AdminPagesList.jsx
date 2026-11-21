@@ -133,7 +133,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features, vis
             ) : null}
             <StatusBadge tone="neutral">{visibility.word}</StatusBadge>
           </div>
-          <p className={`mt-3xs truncate ${rowMetaClass}`} data-reorder-block="">
+          <p className={`mt-3xs wrap-anywhere ${rowMetaClass}`} data-reorder-block="">
             {custom ? row.current.url : `${sections.length} section${sections.length === 1 ? '' : 's'}`}
           </p>
           {visibility.reason ? (
