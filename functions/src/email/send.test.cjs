@@ -7,6 +7,7 @@ const { createEmailCore, createDeliveryWebhookHandler, internals } = require('./
 const { render } = require('./render.cjs');
 const { getDefaultTemplate, listTemplateIds } = require('./templates.cjs');
 const { createWebhookProvider } = require('./providers/webhook.cjs');
+const { createPostmarkProvider } = require('./providers/postmark.cjs');
 
 // --- Fakes -----------------------------------------------------------------
 
@@ -51,7 +52,7 @@ function fakeDb() {
               async get() {
                 const i = state.sentRows.findIndex((r) => r[field] === value);
                 if (i === -1) return { empty: true, docs: [] };
-                return { empty: false, docs: [{ ref: { __index: i } }] };
+                return { empty: false, docs: [{ ref: { __index: i }, data: () => state.sentRows[i] }] };
               },
             }),
           }),
@@ -364,7 +365,7 @@ test('delivery webhook: 401 on failed verification, never falls back', async () 
 
 test('delivery webhook patches the matching sent_emails row', async () => {
   const db = fakeDb();
-  db.state.sentRows.push({ providerMessageId: 'pm-1', status: 'sent' });
+  db.state.sentRows.push({ providerMessageId: 'pm-1', to: 'a@example.org', status: 'sent' });
   const handler = createDeliveryWebhookHandler({
     db,
     // A day after the events: the unknown message is no longer waiting for its row.
@@ -384,6 +385,37 @@ test('delivery webhook patches the matching sent_emails row', async () => {
   assert.deepEqual(res.body, { processed: 2, patched: 1 });
   assert.equal(db.state.sentRows[0].deliveryStatus, 'bounced');
   assert.equal(db.state.sentRows[0].bounceReason, 'mailbox full');
+});
+
+test('Postmark callbacks for an invoice copy cannot change the primary recipient status', async () => {
+  const db = fakeDb();
+  const messageId = 'pm-invoice';
+  const to = 'Billing@example.org';
+  const cc = 'copy@example.org';
+  const row = { providerMessageId: messageId, to, cc, status: 'sent' };
+  db.state.sentRows.push(row);
+  const basicAuth = 'example:example';
+  const provider = createPostmarkProvider({ env: { EMAIL_PROVIDER_API_KEY: 'test-key', EMAIL_WEBHOOK_BASIC_AUTH: basicAuth } });
+  const handler = createDeliveryWebhookHandler({ db, provider });
+  const headers = { authorization: `Basic ${Buffer.from(basicAuth).toString('base64')}` };
+  async function receive(event, patched) {
+    const res = fakeRes();
+    await handler({ method: 'POST', headers, body: { MessageID: messageId, ...event } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body, { processed: 1, patched });
+  }
+
+  await receive({ RecordType: 'Delivery', Recipient: cc, DeliveredAt: '2027-01-01T00:01:00Z' }, 0);
+  assert.equal(row.deliveryStatus, undefined);
+
+  const deliveredAt = '2027-01-01T00:00:00Z';
+  await receive({ RecordType: 'Delivery', Recipient: 'billing@example.org', DeliveredAt: deliveredAt }, 1);
+  assert.equal(row.deliveryStatus, 'delivered');
+
+  await receive({ RecordType: 'Bounce', Email: cc, BouncedAt: '2027-01-01T00:02:00Z', Description: 'Copy bounced' }, 0);
+  assert.equal(row.deliveryStatus, 'delivered');
+  assert.equal(row.deliveryUpdatedAt, deliveredAt);
+  assert.equal(row.bounceReason, null);
 });
 
 test('delivery webhook asks for a retry when a recent event beats the audit row, and applies it on the retry', async () => {
@@ -408,7 +440,7 @@ test('delivery webhook asks for a retry when a recent event beats the audit row,
   assert.equal(first.body.error.code, 'not-recorded-yet');
 
   // The sender's audit row lands; the provider's retry finds it.
-  db.state.sentRows.push({ providerMessageId: 'pm-fast', status: 'sent' });
+  db.state.sentRows.push({ providerMessageId: 'pm-fast', to: 'a@example.org', status: 'sent' });
   const retry = fakeRes();
   await handler({ method: 'POST', headers: {}, body: {} }, retry);
   assert.equal(retry.statusCode, 200);
@@ -506,6 +538,7 @@ test('delivery webhook compares timestamps as instants, not strings', async () =
   const db = fakeDb();
   db.state.sentRows.push({
     providerMessageId: 'pm-1',
+    to: 'a@example.org',
     status: 'sent',
     deliveryStatus: 'delivered',
     deliveryUpdatedAt: '2027-01-01T10:00:00Z',
@@ -532,6 +565,7 @@ test('delivery webhook ignores an event older than the stored one', async () => 
   const db = fakeDb();
   db.state.sentRows.push({
     providerMessageId: 'pm-1',
+    to: 'a@example.org',
     status: 'sent',
     deliveryStatus: 'bounced',
     deliveryUpdatedAt: '2027-01-02T00:00:00Z',
