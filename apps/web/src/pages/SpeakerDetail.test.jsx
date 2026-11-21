@@ -2,10 +2,11 @@
 // speakers_public projection Speakers.jsx reads, plus the sessions cross-
 // link (a query over scheduleData, not a stored list — spec §4.3).
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { readyManifest, stubManifests, TEST_GENERATION } from '../test/imageSizeManifests.js';
 import { resetImageSizeCacheForTest } from '../lib/mediaSource.js';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { englishLanguage, LanguageContext } from '../contexts/PublicLanguageContext.jsx';
 import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 
 let speakers;
@@ -27,12 +28,14 @@ vi.mock('../contexts/EventConfigContext.jsx', () => ({
 
 import SpeakerDetail from './SpeakerDetail.jsx';
 
-function renderAt(path) {
+function renderAt(path, language = englishLanguage) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/speakers/:slug" element={<SpeakerDetail />} />
-      </Routes>
+      <LanguageContext.Provider value={language}>
+        <Routes>
+          <Route path="/speakers/:slug" element={<SpeakerDetail />} />
+        </Routes>
+      </LanguageContext.Provider>
     </MemoryRouter>,
   );
 }
@@ -65,6 +68,29 @@ describe('SpeakerDetail', () => {
     expect(screen.getByText('Community reporter.')).toBeInTheDocument();
     expect(screen.getByText('@rae')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy speaker link' })).toBeInTheDocument();
+  });
+
+  it('offers a Spanish copy action after native sharing is unavailable', async () => {
+    speakers = [{ ...PROJECTED, headshotPath: null }];
+    scheduleData = [];
+    const share = vi.fn().mockRejectedValue(new DOMException('Unavailable', 'NotAllowedError'));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { share, clipboard: { writeText } });
+    try {
+      const path = '/speakers/rae-okonkwo';
+      const url = new URL(`${path}?lang=es`, window.location.origin).href;
+      renderAt(`${path}?lang=es`, { ...englishLanguage, language: 'es', urlLanguage: 'es', text: (_en, es) => es });
+      fireEvent.click(screen.getByRole('button', { name: 'Compartir perfil' }));
+      expect(share).toHaveBeenCalledWith({ title: PROJECTED.displayName, url });
+      const copy = await screen.findByRole('button', { name: 'Copiar enlace al perfil' });
+      expect(screen.getByRole('status')).toHaveTextContent('No se pudo compartir. Puedes copiar el enlace.');
+      expect(writeText).not.toHaveBeenCalled();
+      fireEvent.click(copy);
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Enlace copiado.'));
+      expect(writeText).toHaveBeenCalledWith(url);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('shows the speaker pronouns under the name, and nothing when there are none', () => {

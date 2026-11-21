@@ -37,7 +37,7 @@ function NotFoundState() {
 }
 
 export default function UpdateDetail() {
-  const { language } = usePublicLanguage();
+  const { language, text } = usePublicLanguage();
   const { id } = useParams();
   const { features, eventConfig } = useEventConfig();
   const { updates } = useContent();
@@ -82,7 +82,13 @@ export default function UpdateDetail() {
         {dateLabel ? (
           <Dateline className="mt-2xs" dateTime={dateInstant.toISOString()} label={dateLabel} />
         ) : null}
-        <ShareLink className="mt-sm" path={`/updates/${encodeURIComponent(update.id)}`} title={update.title} shareLabel="Share update" copyLabel="Copy update link" />
+        <ShareLink
+          className="mt-sm"
+          path={`/updates/${encodeURIComponent(update.id)}`}
+          title={update.title}
+          shareLabel={text('Share update', 'Compartir novedad')}
+          copyLabel={text('Copy update link', 'Copiar enlace a la novedad')}
+        />
       </header>
       {update.featuredImage ? <div className="mt-lg"><UpdateImage image={update.featuredImage} /></div> : null}
       {update.body ? (
