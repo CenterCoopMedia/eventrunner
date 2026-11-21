@@ -23,18 +23,20 @@ available, the rest of the stack supplies the fallback. The adjusted faces
 cover Latin letters and punctuation shared with the bundled faces so other
 glyphs keep their existing fallback after the web font loads.
 
-`scripts/lib/font-fallbacks.cjs` records one measurement per family, using
-regular when the set supplies it. Size adjustment divides the bundled font's
-sample advance width by that of its local counterpart, in ems. The sample
+`scripts/lib/font-fallbacks.cjs` records measurements for each family's
+regular and bold faces where supplied. Measure variable fonts at weights 400
+and 700. The 600-weight static IBM Plex Mono uses local bold. Size adjustment
+divides the bundled font's sample advance width by that of its local
+counterpart, in ems. The sample
 reads “Welcome to the community conference. Find sessions, speakers, and
 events for June 12 at 9:30 AM. Bienvenidos a la conferencia. Consulta las
 sesiones y actividades del día.” Monospaced faces use the width of 0.
 The other percentages use the bundled font's ascender, descender and line
 gap, divided by its em size and the size adjustment ratio. Read the
 `OS/2` typographic values when `USE_TYPO_METRICS` is set and `hhea` otherwise.
-Use Liberation 2 for the instances of Arial, Times New Roman and Courier
-New with compatible metrics. Use Liberation Sans Narrow for Arial Narrow
-and Z003 Medium Italic for Caveat.
+Use Liberation 2 for Arial, Times New Roman and Courier New, with compatible
+metrics. For the narrow faces, use Liberation Sans Narrow Regular and Arial
+Narrow Bold. Use Z003 Medium Italic for Caveat.
 
 ## The faces
 

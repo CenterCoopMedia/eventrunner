@@ -481,7 +481,9 @@ test('every face a live switch can reach is declared, whatever the build-time pr
     const adjustedFaces = [...css.matchAll(/@font-face \{([^}]+)\}/g)]
       .map(([, body]) => body)
       .filter((body) => body.includes(`font-family: '${setId} fallback';`));
-    assert.ok(adjustedFaces.length, `${setId} has an adjusted local fallback`);
+    const bundledWeights = set.faces.flatMap(({ weight }) => weight.split(' '));
+    const fallbackWeights = adjustedFaces.map((face) => face.match(/font-weight: (\d+);/)?.[1]);
+    assert.deepEqual(fallbackWeights, bundledWeights, `${setId} has local fallbacks at its bundled weight endpoints`);
     for (const face of adjustedFaces) {
       assert.match(face, /src: local\(/);
       assert.match(face, /size-adjust: [\d.]+%;/);
