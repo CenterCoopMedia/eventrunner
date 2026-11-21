@@ -6,6 +6,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
+import { englishLanguage, LanguageContext } from '../contexts/PublicLanguageContext.jsx';
 import UpdateDetail from './UpdateDetail.jsx';
 import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 
@@ -26,7 +27,7 @@ const HIDDEN_UPDATE = {
 
 function renderDetail(
   id,
-  { features = { updates: true }, updates = [VISIBLE_UPDATE], eventConfig = {} } = {},
+  { features = { updates: true }, updates = [VISIBLE_UPDATE], eventConfig = {}, language = englishLanguage } = {},
 ) {
   return render(
     <MemoryRouter initialEntries={[`/updates/${id}`]}>
@@ -34,9 +35,11 @@ function renderDetail(
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <ContentContext.Provider value={{ updates, getBlock: () => null }}>
-          <Routes>
-            <Route path="/updates/:id" element={<UpdateDetail />} />
-          </Routes>
+          <LanguageContext.Provider value={language}>
+            <Routes>
+              <Route path="/updates/:id" element={<UpdateDetail />} />
+            </Routes>
+          </LanguageContext.Provider>
         </ContentContext.Provider>
       </EventConfigContext.Provider>
     </MemoryRouter>,
@@ -59,6 +62,13 @@ describe('UpdateDetail', () => {
     expect(screen.getByText('Please use lot B starting Thursday.')).toBeInTheDocument();
     expect(screen.getByText('October 1, 2026')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy update link' })).toBeInTheDocument();
+  });
+
+  it('labels the direct copy action in Spanish', () => {
+    renderDetail('update-1', {
+      language: { ...englishLanguage, language: 'es', urlLanguage: 'es', text: (_en, es) => es },
+    });
+    expect(screen.getByRole('button', { name: 'Copiar enlace a la novedad' })).toBeInTheDocument();
   });
 
   it('dates the update on the event’s clock, not the reader’s', () => {

@@ -56,7 +56,7 @@ function NotFoundState() {
 }
 
 export default function SpeakerDetail() {
-  const { language } = usePublicLanguage();
+  const { language, text: translate } = usePublicLanguage();
   const { slug } = useParams();
   const { eventConfig, features } = useEventConfig();
   const { speakers, scheduleData } = useContent();
@@ -162,7 +162,13 @@ export default function SpeakerDetail() {
             ))}
           </ul>
         ) : null}
-        <ShareLink className="mt-sm" path={`/speakers/${encodeURIComponent(speaker.slug)}`} title={text(speaker.displayName)} shareLabel="Share speaker" copyLabel="Copy speaker link" />
+        <ShareLink
+          className="mt-sm"
+          path={`/speakers/${encodeURIComponent(speaker.slug)}`}
+          title={text(speaker.displayName)}
+          shareLabel={translate('Share speaker', 'Compartir perfil')}
+          copyLabel={translate('Copy speaker link', 'Copiar enlace al perfil')}
+        />
       </header>
       <Rule weight="hairline" />
 
