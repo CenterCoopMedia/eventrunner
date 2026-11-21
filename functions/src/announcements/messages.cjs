@@ -1,5 +1,7 @@
 'use strict';
 
+const { confirmationVersion, requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Saved announcement messages (issue #496): reusable content for the
  * announcement email composer, kept until staff remove it.
@@ -130,7 +132,10 @@ async function audit({ db, action, id, actor, now, log }) {
 
 async function listAction({ db }) {
   const snap = await db.collection(MESSAGES).orderBy('updatedAt', 'desc').limit(MAX_MESSAGES).get();
-  return { messages: snap.docs.map((doc) => summaryOf(doc.id, doc.data() || {})), max: MAX_MESSAGES };
+  return { messages: snap.docs.map((doc) => {
+    const data = doc.data() || {};
+    return { ...summaryOf(doc.id, data), confirmationVersion: confirmationVersion(doc.ref.path, data) };
+  }), max: MAX_MESSAGES };
 }
 
 async function loadAction({ db, body }) {
@@ -209,8 +214,12 @@ async function removeAction({ db, now, log, actor, body }) {
   if (errors.length > 0) throw invalid(errors);
   await requireWritable(db);
   const ref = db.collection(MESSAGES).doc(id);
-  if (!(await ref.get()).exists) throw new MessageError(404, 'not-found', 'This saved message does not exist. It may have been removed.');
-  await ref.delete();
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new MessageError(404, 'not-found', 'This saved message does not exist. It may have been removed.');
+    requireConfirmation(body.expectedVersion, ref.path, snap.data());
+    tx.delete(ref);
+  });
   await audit({ db, action: 'removeAnnouncementMessage', id, actor, now, log });
   return { removed: id };
 }
@@ -241,7 +250,7 @@ function createAnnouncementMessagesHandler({
       const result = await ACTION_HANDLERS[action]({ db, now, log, actor, body: req.body, newId });
       return res.status(200).json(result);
     } catch (err) {
-      if (err instanceof MessageError) return sendError(res, err.status, err.code, err.message);
+      if (err instanceof MessageError || err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error(`announcementMessages ${action} failed`, err);
       return internal(res, 'The saved messages are temporarily unavailable. Try again.');
     }

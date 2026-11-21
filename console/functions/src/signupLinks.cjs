@@ -1,5 +1,7 @@
 'use strict';
 
+const { confirmationVersion, requireConfirmation } = require('./confirmation.cjs');
+
 /**
  * Signup links (ADR 0007, amendment 2026-11-04): the only way in. An operator
  * issues one after an invoice is paid. It works once, for whoever opens it
@@ -99,6 +101,7 @@ async function listSignupLinks({ db, now = Date.now }, { user }) {
     const link = doc.data();
     return {
       id: doc.id,
+      confirmationVersion: confirmationVersion(doc),
       organizationName: link.organizationName,
       status: link.status === 'open' && !(toMillis(link.expiresAt) > at) ? 'expired' : link.status,
       createdAt: toIso(link.createdAt),
@@ -123,6 +126,7 @@ async function revokeSignupLink({ db, now = Date.now }, { body, user }) {
     if (snap.data().status !== 'open') {
       throw new ConsoleError(409, 'link-not-open', 'This link was already used or revoked. Reload the page to see it.');
     }
+    requireConfirmation(body.expectedVersion, snap);
     const at = new Date(now());
     tx.update(ref, { status: 'revoked' });
     tx.create(db.collection('console_audit').doc(), { action: 'revoke-signup-link', linkId, by: user.uid, at });

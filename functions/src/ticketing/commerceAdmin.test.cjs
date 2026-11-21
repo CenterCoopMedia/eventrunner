@@ -125,6 +125,34 @@ test('order reads redact attempt/session credentials and isolate account/event/m
   }
 });
 
+test('order confirmation refuses a changed ticket before cancellation or resend', async () => {
+  const db = dbFor();
+  const orderId = 'order-1';
+  const delivered = [];
+  const handler = admin(db, { sendConfirmations: async ({ confirmedOrder }) => {
+    delivered.push(confirmedOrder.tickets[0].email);
+    return { sent: 1 };
+  } });
+  const get = () => call(handler, { action: 'order', orderId });
+  const original = (await get()).body.confirmationVersion;
+  await db.collection('tickets').doc('ticket-1').update({ email: 'replacement@example.test' });
+  const before = db.writes.length;
+  const cancel = { action: 'cancelTickets', orderId, ticketIds: ['ticket-1'], confirmed: true, reason: 'Attendee requested cancellation.' };
+  const resend = { action: 'resend', orderId, requestId: 'resend-1' };
+  for (const body of [cancel, resend]) {
+    const stale = await call(handler, { ...body, expectedVersion: original });
+    assert.equal(stale.statusCode, 409);
+    assert.equal(stale.body.error.code, 'stale-confirmation');
+  }
+  assert.equal(db.writes.length, before);
+  assert.deepEqual(delivered, []);
+  const expectedVersion = (await get()).body.confirmationVersion;
+  assert.equal((await call(handler, { ...resend, expectedVersion })).statusCode, 200);
+  assert.deepEqual(delivered, ['replacement@example.test']);
+  assert.equal((await call(handler, { ...cancel, expectedVersion })).statusCode, 200);
+  assert.equal(db.read('tickets', 'ticket-1').status, 'cancelled');
+});
+
 test('refresh reports an incomplete payment check and returns current details on retry', async () => {
   const orderId = 'order-1';
   const db = dbFor();

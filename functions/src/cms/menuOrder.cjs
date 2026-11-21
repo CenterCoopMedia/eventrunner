@@ -1,9 +1,10 @@
 'use strict';
 
 const { badRequest, internal, sendError } = require('../core/errors.cjs');
+const { matchesConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { internals, isValidDocId, logAdminAction } = require('./store.cjs');
 
-async function publishMenuOrder({ db, ids, queueRef, actor, now, log, publish, res }) {
+async function publishMenuOrder({ db, ids, queueRef, actor, now, log, publish, res, expectedVersion }) {
   if (!Array.isArray(ids) || !ids.length || !ids.every(isValidDocId) || new Set(ids).size !== ids.length) {
     return badRequest(res, 'The menu order could not be read. Refresh the page and try again.');
   }
@@ -22,6 +23,8 @@ async function publishMenuOrder({ db, ids, queueRef, actor, now, log, publish, r
       const snapshots = [...live.docs, ...drafts.docs];
       const storedIds = new Set(snapshots.map((doc) => doc.id));
       if (storedIds.size !== ids.length || ids.some((id) => !storedIds.has(id))) return 'menu-list-changed';
+      const orderOf = ({ docs }) => Object.fromEntries(docs.map((doc) => [doc.id, doc.data().order ?? null]));
+      if (!matchesConfirmation(expectedVersion, orderOf(live), orderOf(drafts))) return 'stale';
 
       const changed = snapshots.filter((doc) => doc.data().order !== positions.get(doc.id));
       const published = live.docs.filter((doc) => doc.data().order !== positions.get(doc.id)).map((doc) => doc.id);
@@ -48,6 +51,10 @@ async function publishMenuOrder({ db, ids, queueRef, actor, now, log, publish, r
   }
   if (outcome === 'menu-list-changed') {
     return sendError(res, 409, outcome, 'The page list changed. Check the list, then publish the menu order again.');
+  }
+  if (outcome === 'stale') {
+    const conflict = new ConfirmationConflict();
+    return sendError(res, conflict.status, conflict.code, conflict.message);
   }
   if (outcome === 'menu-too-large') {
     return sendError(res, 400, outcome, 'This menu has too many changes to publish together. Contact support for help.');

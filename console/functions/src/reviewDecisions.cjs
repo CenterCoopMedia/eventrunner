@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation } = require('./confirmation.cjs');
+
 /**
  * The operator's one decision on a request (ADR 0007 §5):
  *
@@ -53,7 +55,7 @@ function requireNote(value) {
  *
  * @returns {Promise<object>} the request as it was before the change
  */
-async function transition({ db, now = Date.now }, { appId, user, from, to, revision = null, note = null, releaseName = false }) {
+async function transition({ db, now = Date.now }, { appId, user, from, to, revision = null, note = null, releaseName = false, expectedVersion }) {
   const ref = applicationRef(db, requireAppId(appId));
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -62,6 +64,7 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, revis
     const history = Array.isArray(app.history) ? app.history : [];
     if (!from.includes(app.status)) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
     if (revision !== null && revision !== history.length) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
+    requireConfirmation(expectedVersion, snap);
     const held = releaseName ? await heldNames(tx, db, app.id) : [];
     const at = new Date(now());
     tx.update(ref, {
@@ -121,7 +124,7 @@ function requireRevision(value) {
 async function decide(deps, { body, user }, spec) {
   await requireOperator(deps.db, user);
   const revision = requireRevision(body.revision);
-  const app = await transition(deps, { appId: body.appId, user, revision, ...spec });
+  const app = await transition(deps, { appId: body.appId, user, revision, expectedVersion: body.expectedVersion, ...spec });
   const mail = await notifyOwners(deps, app, { status: spec.to, note: spec.note ?? null });
   return { body: { application: { id: app.id, status: spec.to }, ...mail } };
 }
@@ -156,6 +159,7 @@ async function closeApplication(deps, { body, user }) {
     const current = { id: snap.id, ...snap.data() };
     const history = Array.isArray(current.history) ? current.history : [];
     if (!RETRY_STATUSES.includes(current.status) || revision !== history.length) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
+    requireConfirmation(body.expectedVersion, snap);
     if (!canRetryBuild(current, build, at.getTime())) {
       throw new ConsoleError(409, 'build-running', 'A build may still be running. Cancel its run, wait for it to stop, then close the request.');
     }

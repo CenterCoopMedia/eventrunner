@@ -154,22 +154,25 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
   return db.runTransaction(async (tx) => {
     if (respectDemoPolicy && !await writesAllowed(db, tx)) return { action: 'blocked' };
     const snap = await tx.get(ref);
-    const at = now();
-    if (!snap.exists) {
-      tx.set(ref, {
-        ...ticket,
-        claimedByUid: null,
-        claimedAt: null,
-        claimPromptSentAt: null,
-        createdAt: at,
-        updatedAt: at,
-      });
-      return { action: 'created', ticket };
-    }
-    const updated = ticketForUpdate(snap.data(), ticket, unmappedCsvFields);
-    tx.set(ref, { ...updated, updatedAt: at }, { merge: true });
-    return { action: 'updated', ticket: updated };
+    return writeTicket({ tx, snap, ticket, at: now(), unmappedCsvFields });
   });
+}
+
+function writeTicket({ tx, snap, ticket, at, unmappedCsvFields }) {
+  if (!snap.exists) {
+    tx.set(snap.ref, {
+      ...ticket,
+      claimedByUid: null,
+      claimedAt: null,
+      claimPromptSentAt: null,
+      createdAt: at,
+      updatedAt: at,
+    });
+    return { action: 'created', ticket };
+  }
+  const updated = ticketForUpdate(snap.data(), ticket, unmappedCsvFields);
+  tx.set(snap.ref, { ...updated, updatedAt: at }, { merge: true });
+  return { action: 'updated', ticket: updated };
 }
 
 /**
@@ -595,6 +598,7 @@ module.exports = {
   runFullSync,
   createTicketingSyncHandler,
   upsertTicket,
+  writeTicket,
   upsertTickets,
   ticketForUpdate,
   get handlers() {

@@ -9,6 +9,7 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
+const { confirmationVersion } = require('./confirmation.cjs');
 const { isOperator, validOrgId } = require('./access.cjs');
 
 // Every status an application can hold, with its writers: shared/consoleRequest.
@@ -39,7 +40,7 @@ function applicationRef(db, appId) {
 async function readApplication(db, appId) {
   const snap = await applicationRef(db, requireAppId(appId)).get();
   if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
-  return { id: snap.id, ...snap.data() };
+  return { id: snap.id, ...snap.data(), confirmationVersion: confirmationVersion(snap) };
 }
 
 /** The answers the review is about: the frozen copy, or the live answers before acceptance. */

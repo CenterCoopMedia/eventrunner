@@ -60,11 +60,10 @@
  *
  * EXPLICIT CONFIRMATION. A dry run answers with a digest of the type, the
  * mapping and the rows. A commit must send that digest back, so the commit
- * writes exactly the rows the person previewed. The digest does not cover
- * the stored records, and needs not: the commit plans each row again inside
- * its own transaction, against the record and key as they are then, so a
- * staff edit or delete made after the preview still wins (the result lists
- * the row's verdict at commit time).
+ * writes the rows the person previewed. Preview also returns the versions
+ * of the inputs to each row's plan. A commit that returns those versions
+ * checks the whole plan before its audit write, then rechecks each row
+ * inside its write transaction.
  *
  * One transaction per row: a 500-row import does not fit in one Firestore
  * transaction, and a row that fails must not undo the rows before it. A
@@ -73,6 +72,7 @@
  */
 
 const { createHash } = require('node:crypto');
+const { confirmationVersion, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 
@@ -335,11 +335,13 @@ function requestDigest({ type, mapping, rows }) {
  *
  * @returns {Promise<{ results: object[], summary: Record<string, number> }>}
  */
-async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now = Date.now, log = console, newId }) {
+async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now = Date.now, log = console, newId, expectedPlan }) {
   const context = importer.loadContext ? await importer.loadContext({ db }) : {};
   const seenAt = new Map();
   const claimed = new Set();
   const results = [];
+  const plan = Array(rows.length).fill(null);
+  const trackVersions = dryRun || expectedPlan !== undefined;
 
   for (let index = 0; index < rows.length; index += 1) {
     const tooLong = overLongCells(rows[index], mapping);
@@ -366,14 +368,29 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
     seenAt.set(externalId, index);
 
     const keyRef = db.collection(RECORD_IMPORTS).doc(importKeyId(type, externalId));
-    let plan;
+    let rowPlan;
     try {
-      plan = await db.runTransaction(async (tx) => {
-        const keySnap = await tx.get(keyRef);
+      rowPlan = await db.runTransaction(async (tx) => {
+        const reads = new Map();
+        const reader = trackVersions ? { async get(ref) {
+          const snap = await tx.get(ref);
+          for (const doc of snap.docs ?? [snap]) reads.set(doc.ref.path, doc.data() ?? null);
+          return snap;
+        } } : tx;
+        if (expectedPlan !== undefined && importer.loadContext) {
+          const currentContext = await importer.loadContext({ db, get: (ref) => tx.get(ref) });
+          if (confirmationVersion(currentContext) !== confirmationVersion(context)) throw new ConfirmationConflict();
+        }
+        const keySnap = await reader.get(keyRef);
         const key = keySnap.exists ? keySnap.data() : null;
         const planned = await importer.planRow({
-          db, tx, input: mapped.input, key, claimed, context, actor, now, newId,
+          db, tx: reader, input: mapped.input, key, claimed, context, actor, now, newId,
         });
+        if (trackVersions) {
+          const version = confirmationVersion(context, Object.fromEntries(reads), planned.verdict, planned.values);
+          if (expectedPlan !== undefined && expectedPlan[index] !== version) throw new ConfirmationConflict();
+          plan[index] = version;
+        }
         if (dryRun || planned.verdict === 'error') return planned;
         if (planned.write) await planned.write(tx);
         const at = new Date(now());
@@ -400,27 +417,28 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
         return planned;
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) throw err;
       log.error?.('importRecordsCsv row failed', err);
       results.push({ index, verdict: 'error', externalId, reasons: ['The row could not be imported. Try again.'] });
       continue;
     }
-    if (plan.verdict !== 'error') for (const claim of plan.claims ?? []) claimed.add(claim);
+    if (rowPlan.verdict !== 'error') for (const claim of rowPlan.claims ?? []) claimed.add(claim);
     results.push({
       index,
-      verdict: plan.verdict,
+      verdict: rowPlan.verdict,
       externalId,
-      label: plan.label ?? null,
-      docId: plan.docId ?? null,
-      changedFields: plan.changedFields ?? [],
-      matched: Boolean(plan.matched),
-      reasons: plan.reasons ?? [],
-      notes: plan.notes ?? [],
+      label: rowPlan.label ?? null,
+      docId: rowPlan.docId ?? null,
+      changedFields: rowPlan.changedFields ?? [],
+      matched: Boolean(rowPlan.matched),
+      reasons: rowPlan.reasons ?? [],
+      notes: rowPlan.notes ?? [],
     });
   }
 
   const summary = { create: 0, update: 0, unchanged: 0, error: 0 };
   for (const row of results) summary[row.verdict] += 1;
-  return { results, summary };
+  return { results, summary, plan };
 }
 
 /** Shared admin-POST preamble. Sends the response itself on failure. */
@@ -458,6 +476,22 @@ function createImportRecordsCsvHandler({ db, auth, getConfig, importers, now = D
         'The file or the column mapping changed after the preview. Preview the import again.',
       );
     }
+    const expectedPlan = dryRun ? undefined : req.body.expectedPlan;
+    const importArgs = { db, importer, type, mapping, rows, actor, now, log, newId };
+    if (expectedPlan !== undefined) {
+      if (!Array.isArray(expectedPlan) || expectedPlan.length !== rows.length ||
+          !expectedPlan.every((value) => value === null || (typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)))) {
+        return badRequest(res, 'expectedPlan: Confirm the plan returned by the import preview.');
+      }
+      try {
+        const current = await runImport({ ...importArgs, dryRun: true });
+        if (current.plan.some((version, index) => expectedPlan[index] !== version)) throw new ConfirmationConflict();
+      } catch (err) {
+        if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
+        log.error('importRecordsCsv could not check confirmed plan', err);
+        return internal(res, 'The import plan could not be checked. Try the preview again.');
+      }
+    }
 
     // The audit row is written, and awaited, BEFORE the first record write
     // (the exportAttendees rule): a commit that dies part way still leaves
@@ -482,8 +516,11 @@ function createImportRecordsCsvHandler({ db, auth, getConfig, importers, now = D
 
     let outcome;
     try {
-      outcome = await runImport({ db, importer, type, mapping, rows, dryRun, actor, now, log, newId });
+      outcome = await runImport({ ...importArgs, dryRun, expectedPlan });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) {
+        return sendError(res, 409, err.code, 'The import changed while it was running. Earlier rows may have been saved. Preview the import again.');
+      }
       log.error('importRecordsCsv failed', err);
       return internal(res, dryRun ? 'The import could not be checked. Keep this page open and contact support for help.' : 'The import could not be completed. Keep this page open and contact support for help.');
     }
@@ -504,6 +541,7 @@ function createImportRecordsCsvHandler({ db, auth, getConfig, importers, now = D
       total: rows.length,
       summary: outcome.summary,
       rows: outcome.results,
+      ...(dryRun ? { plan: outcome.plan } : {}),
     });
   };
 }

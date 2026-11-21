@@ -14,6 +14,7 @@
  */
 
 const { isOperator, requireMemberOrOperator, toIso, toMillis } = require('./access.cjs');
+const { confirmationVersion } = require('./confirmation.cjs');
 
 const NAME_MIN = 2;
 const NAME_MAX = 100;
@@ -57,7 +58,10 @@ async function readTeam(db, orgId, at) {
   const inviteSnap = await db.collection('invites').where('orgId', '==', orgId).where('status', '==', 'pending').get();
   const memberSnap = await orgRef.collection('members').get();
   const members = memberSnap.docs
-    .map((doc) => ({ uid: doc.id, email: doc.data().email, role: doc.data().role, joinedAt: toIso(doc.data().joinedAt) }))
+    .map((doc) => ({
+      uid: doc.id, email: doc.data().email, role: doc.data().role,
+      joinedAt: toIso(doc.data().joinedAt), confirmationVersion: confirmationVersion(doc),
+    }))
     .sort((a, b) => (ROLE_ORDER[a.role] - ROLE_ORDER[b.role]) || String(a.email).localeCompare(String(b.email)));
   const invites = inviteSnap.docs
     .filter((doc) => toMillis(doc.data().expiresAt) > at)

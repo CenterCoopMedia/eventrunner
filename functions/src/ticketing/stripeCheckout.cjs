@@ -181,6 +181,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
  */
 async function reserveCommerceOrder({
   db, provider, getConfig, actor, request, source = 'checkout', reason = '', now = () => new Date(), env = process.env,
+  expectedRevision,
 }) {
   const scope = providerScope(provider);
   const comp = source === 'comp';
@@ -241,7 +242,8 @@ async function reserveCommerceOrder({
     // The catalog is in this transaction's read set. A concurrent price or
     // policy save retries here before capacity, quota, or payment is written.
     // Existing orders returned above retain their original accepted terms.
-    if (!comp && request.catalogRevision !== catalog.revision) {
+    if ((!comp && request.catalogRevision !== catalog.revision) ||
+        (comp && expectedRevision !== undefined && expectedRevision !== catalog.revision)) {
       throw new CommerceError('catalog-changed', 'Ticket prices or terms have changed. Review the updated catalog before continuing.');
     }
     const form = hasAnswers ? readRegistrationForm(formSnap.exists ? formSnap.data() : null) : null;
@@ -498,7 +500,7 @@ function checkoutResponse(order) {
   };
 }
 
-async function createCompOrder({ db, provider, getConfig, actorUid, ticketTypeId, attendees, requestId, reason, formRevision, csvUpload = false, now, env }) {
+async function createCompOrder({ db, provider, getConfig, actorUid, ticketTypeId, attendees, requestId, reason, formRevision, csvUpload = false, expectedRevision, now, env }) {
   if (typeof actorUid !== 'string' || !actorUid || typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
     throw new CommerceError('invalid-comp', 'An organizer and a reason of at most 500 characters are required.', 400);
   }
@@ -523,7 +525,7 @@ async function createCompOrder({ db, provider, getConfig, actorUid, ticketTypeId
   }
   const result = await reserveCommerceOrder({
     db, provider, getConfig, actor: { uid: actorUid, email: null }, request,
-    source: 'comp', reason: reason.trim(), now, env,
+    source: 'comp', reason: reason.trim(), now, env, expectedRevision,
   });
   return { ...checkoutResponse(result.order), order: result.order, created: result.created };
 }

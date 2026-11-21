@@ -109,8 +109,8 @@ function mappingError(mapping) {
  * The track and place checks in validateSessionStructure read the config
  * again inside each write, so a settings change mid-import is still caught.
  */
-async function loadContext({ db }) {
-  const snap = await db.collection('config').doc('event').get();
+async function loadContext({ db, get = (ref) => ref.get() }) {
+  const snap = await get(db.collection('config').doc('event'));
   const event = snap.exists ? snap.data() : {};
   const list = (value) => (Array.isArray(value) ? value.filter((entry) => entry && typeof entry === 'object') : []);
   return {

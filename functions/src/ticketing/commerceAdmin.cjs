@@ -6,6 +6,7 @@ const { randomUUID } = require('node:crypto');
 const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
+const { confirmationVersion, requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { internals: { safeDocId, TICKETS } } = require('./index.cjs');
 const { listPromoCodes, savePromoCode, deletePromoCode, promoRef, releasedPromoUse } = require('./promoCodes.cjs');
 const { ORDERS, CATALOG, CONNECTION, INVENTORY, CommerceError, normalizeInventory, inventoryTransitionPatch } = require('./stripeCommerce.cjs');
@@ -104,15 +105,30 @@ function dashboardUrl(order) {
   return null;
 }
 
-async function readOrderDetail({ db, provider, orderId }) {
-  const order = requireOrder(await db.collection(ORDERS).doc(idOf(orderId, 'Order')).get(), provider);
+async function readOrderTickets(db, order, get) {
   const ids = Array.isArray(order.ticketIds) ? order.ticketIds.slice(0, 20) : [];
-  const ticketSnaps = await Promise.all(ids.map((id) => db.collection(TICKETS).doc(id).get()));
+  const snaps = await Promise.all(ids.map((id) => get(db.collection(TICKETS).doc(id))));
+  return snaps.filter((snap) => snap.exists && snap.data().orderId === order.id)
+    .map((snap) => ({ ...snap.data(), id: snap.id }));
+}
+
+async function confirmOrder({ db, tx, order, body }) {
+  if (body.expectedVersion === undefined) return undefined;
+  const tickets = await readOrderTickets(db, order, (ref) => tx.get(ref));
+  requireConfirmation(body.expectedVersion, order, tickets);
+  return { order, tickets };
+}
+
+async function readOrderDetail({ db, provider, orderId }) {
+  const { order, tickets } = await db.runTransaction(async (tx) => {
+    const order = requireOrder(await tx.get(db.collection(ORDERS).doc(idOf(orderId, 'Order'))), provider);
+    return { order, tickets: await readOrderTickets(db, order, (ref) => tx.get(ref)) };
+  });
   const logs = await db.collection(AUDIT).where('orderId', '==', order.id).orderBy('at', 'desc').limit(50).get();
   return {
+    confirmationVersion: confirmationVersion(order, tickets),
     order: publicOrder(order),
-    tickets: ticketSnaps.filter((snap) => snap.exists && snap.data().orderId === order.id)
-      .map((snap) => publicTicket(snap.data(), snap.id)),
+    tickets: tickets.map((ticket) => publicTicket(ticket, ticket.id)),
     audit: logs.docs.map((snap) => {
       const row = snap.data();
       return { id: snap.id, action: row.action, actorUid: row.actorUid || row.uid, at: iso(row.at), reason: row.reason || null, ticketIds: row.ticketIds || [] };
@@ -172,6 +188,9 @@ async function pauseSales({ db, provider, actor, body, now }) {
     const snap = await tx.get(ref);
     if (!snap.exists) fail(404, 'not-found', 'Set up the ticket catalog first.');
     const catalog = snap.data();
+    if (body.expectedRevision !== undefined && body.expectedRevision !== (catalog.revision || 0)) {
+      throw new ConfirmationConflict();
+    }
     tx.update(ref, { salesPaused: body.paused, revision: (catalog.revision || 0) + 1, updatedAt: now(), updatedBy: actor.uid });
     audit(tx, logRef, { action: body.paused ? 'sales-paused' : 'sales-resumed', actor, now, reason });
   });
@@ -275,6 +294,7 @@ async function correctAttendee({ db, provider, actor, body, now }) {
     const orderRef = db.collection(ORDERS).doc(orderId);
     const order = requireOrder(await tx.get(orderRef), provider);
     if (!order.ticketIds?.includes(ticketId)) fail(404, 'not-found', 'Ticket not found.');
+    await confirmOrder({ db, tx, order, body });
     if (email !== ticket.email && (ticket.claimedByUid || ticket.checkedInAt)) {
       fail(409, 'conflict', 'A claimed or checked-in ticket cannot change owners. Correct the name or use the organizer support process.');
     }
@@ -323,6 +343,7 @@ async function changeAdmission({ db, provider, actor, body, now, allocate = fals
     const refs = ids.map((id) => db.collection(TICKETS).doc(id));
     const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
     if (snaps.some((snap) => !snap.exists || snap.data().orderId !== orderId)) fail(404, 'not-found', 'A selected ticket could not be found.');
+    await confirmOrder({ db, tx, order, body });
     if (snaps.some((snap) => snap.data().checkedInAt) && actor.tier !== 'operator') fail(403, 'forbidden', 'An operator must change admission for a checked-in ticket.');
     let patch = { updatedAt: now() };
     if (allocate) {
@@ -374,6 +395,7 @@ async function releaseHold({ db, provider, actor, body, now }) {
     await requireWrites(db, tx);
     const orderRef = db.collection(ORDERS).doc(orderId);
     const order = requireOrder(await tx.get(orderRef), provider);
+    await confirmOrder({ db, tx, order, body });
     if (order.inventoryState !== 'held') fail(409, 'conflict', 'This order holds no seats.');
     if (order.paymentStatus === 'succeeded') fail(409, 'conflict', 'This order is paid. Reconcile it instead.');
     if (order.status !== 'exception') fail(409, 'conflict', 'Only an order that needs review is released by hand. Checkout releases other holds when they expire.');
@@ -424,7 +446,10 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
         confirm(body);
         const { createCompOrder } = require('./stripeCheckout.cjs');
         const csvUpload = action === 'issueCompCsv';
-        const created = await createCompOrder({ ...deps, actorUid: actor.uid, ticketTypeId: body.ticketTypeId, attendees: body.attendees, requestId: body.requestId, reason: reasonOf(body), csvUpload });
+        const created = await createCompOrder({
+          ...deps, actorUid: actor.uid, ticketTypeId: body.ticketTypeId, attendees: body.attendees,
+          requestId: body.requestId, reason: reasonOf(body), csvUpload, expectedRevision: body.expectedRevision,
+        });
         const orderId = created.orderId || created.id || created.order?.id;
         result = await readOrderDetail({ ...deps, orderId });
         if (csvUpload) result.reused = !created.created;
@@ -444,10 +469,14 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
       } else if (action === 'resend') {
         const orderId = idOf(body.orderId, 'Order');
         const requestId = idOf(body.requestId, 'Send request');
-        const order = requireOrder(await db.collection(ORDERS).doc(orderId).get(), provider);
-        if (order.inventoryState !== 'sold') fail(409, 'conflict', 'Confirm payment before sending ticket information.');
+        const orderRef = db.collection(ORDERS).doc(orderId);
+        const confirmedOrder = await db.runTransaction(async (tx) => {
+          const order = requireOrder(await tx.get(orderRef), provider);
+          if (order.inventoryState !== 'sold') fail(409, 'conflict', 'Confirm payment before sending ticket information.');
+          return confirmOrder({ db, tx, order, body });
+        });
         const send = sendConfirmations || require('./commerceEmail.cjs').sendOrderConfirmations;
-        result = await send({ db, getConfig, orderId, resendKey: `${actor.uid}:${requestId}`, actorUid: actor.uid, now, env });
+        result = await send({ db, getConfig, orderId, resendKey: `${actor.uid}:${requestId}`, actorUid: actor.uid, now, env, confirmedOrder });
       }
       return res.status(200).json(result);
     } catch (error) {

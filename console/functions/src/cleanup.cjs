@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation } = require('./confirmation.cjs');
+
 /**
  * Deleting requests (ADR 0007, Consequences):
  *
@@ -62,13 +64,14 @@ async function deleteWithConnections(deps, spec) {
  *
  * @returns {Promise<object[]|null>} its connected accounts, or null when it is kept
  */
-async function deleteApplication(db, { appId, by, action, at, check, onBuilt = 'skip' }) {
+async function deleteApplication(db, { appId, by, action, at, check, onBuilt = 'skip', expectedVersion }) {
   const ref = applicationRef(db, appId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const app = { id: snap.id, ...snap.data() };
     if (!check(app)) return null;
+    requireConfirmation(expectedVersion, snap);
     const held = await heldNames(tx, db, app.id);
     const connected = await readConnectedAccounts(tx, db, app.id);
     const build = await readBuild((r) => tx.get(r), db, app.id);
@@ -103,7 +106,7 @@ async function deleteSpamApplication(deps, { body, user }) {
     return true;
   };
   check(first);
-  await deleteWithConnections(deps, { appId, by: user.uid, action: 'delete-spam', at: new Date(now()), check, onBuilt: 'refuse' });
+  await deleteWithConnections(deps, { appId, by: user.uid, action: 'delete-spam', at: new Date(now()), check, onBuilt: 'refuse', expectedVersion: body.expectedVersion });
   return { body: { appId, deleted: true } };
 }
 

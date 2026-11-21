@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Content-block endpoints under the two-revision publish model
  * (spec §8.4 step 1, §4.1, issue #12).
@@ -714,6 +716,7 @@ function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, noti
         const pendingDraft = draft?.status === 'dirty';
         const source = asDraft && pendingDraft ? draft : live ?? draft;
         if (!source) throw new RequestError(404, 'not-found', 'This block is no longer available to move.');
+        requireConfirmation(req.body.expectedVersion, sourceLiveRef.path, live ?? null, draft ?? null);
         if (typeof source.field !== 'string' || !SECTION_FIELD_RE.test(source.field)) {
           throw new RequestError(400, 'bad-request', 'This block has an invalid saved address.');
         }
@@ -817,6 +820,7 @@ function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, noti
         const { status, code, message } = err.httpError;
         return sendError(res, status, code, message);
       }
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       if (isAlreadyExistsError(err)) {
         return sendError(res, 409, 'already-exists', 'That section already has a block at this address. Try another section.');
       }
@@ -854,6 +858,7 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
     // An organization takes its representatives' access and its queued
     // edit with it, in the same transaction (issue #334): a new
     // organization at the same address must not inherit either.
+    const deletion = { db, collection: target.collection, docId: target.docId, expectedVersion: req.body.expectedVersion };
     let paths;
     try {
       if (target.collection === 'cmsSchedule') {
@@ -866,7 +871,7 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
           // Read before any write: Firestore transactions need that order.
           const converted = await tx.get(db.collection('session_pitches').where('conversion.sessionId', '==', target.docId));
           const materials = await tx.get(db.collection('session_materials').where('sessionId', '==', target.docId));
-          const deleted = await deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+          const deleted = await deleteBoth({ ...deletion, tx });
           for (const pitch of converted.docs) {
             const revision = Number.isSafeInteger(pitch.data().reviewRevision) ? pitch.data().reviewRevision : 0;
             tx.update(pitch.ref, { conversion: null, reviewRevision: revision + 1 });
@@ -882,16 +887,17 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
       } else if (target.collection === ORGANIZATIONS_COLLECTION) {
         paths = await db.runTransaction(async (tx) => {
           const access = await readOrganizationAccess({ db, tx, organizationId: target.docId });
-          const deleted = await deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+          const deleted = await deleteBoth({ ...deletion, tx });
           removeOrganizationAccess({
             db, tx, organizationId: target.docId, access, actor, at: new Date(now()),
           });
           return { ...deleted, removedRepresentatives: access.grants.length, removedQueuedEdit: access.request.exists };
         });
       } else {
-        paths = await deleteBoth({ db, collection: target.collection, docId: target.docId });
+        paths = await deleteBoth(deletion);
       }
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       if (err?.httpError) {
         const { status, code, message } = err.httpError;
         return sendError(res, status, code, message);

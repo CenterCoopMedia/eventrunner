@@ -114,6 +114,19 @@ test('a preview renders the email and writes nothing', async () => {
   assert.equal(t.sent.length, 0);
 });
 
+test('a replacement recipient requires a new preview even if the wording is identical', async () => {
+  const t = setup();
+  await t.db.collection('speakers').doc('rae').update({ email: 'replacement@example.test' });
+  const before = t.db.writes.length;
+  const stale = await t.call(send());
+  assert.equal(stale.statusCode, 409);
+  assert.equal(t.db.writes.length, before);
+  assert.deepEqual(t.sent, []);
+  const expectedContent = await hashOf(t);
+  assert.equal((await t.call(send({ expectedContent }))).statusCode, 200);
+  assert.equal(t.sent[0].to, 'replacement@example.test');
+});
+
 test('a send records the queued claim, sends with the attempt key, and stores sent', async () => {
   const t = setup();
   const res = await t.call(send());

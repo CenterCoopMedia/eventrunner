@@ -1,5 +1,7 @@
 'use strict';
 
+const { ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Pages-as-data admin endpoints (spec §5.2, §8.4, issue #13).
  *
@@ -504,24 +506,24 @@ function createDeletePageHandler({ db, auth, getConfig, store, now = Date.now, l
       return badRequest(res, 'id: must be a valid page id');
     }
 
-    const [draftSnap, liveSnap] = await Promise.all([
-      db.collection(PAGES_DRAFTS).doc(id).get(),
-      db.collection(PAGES_COLLECTION).doc(id).get(),
-    ]);
-    if (!draftSnap.exists && !liveSnap.exists) return notFound(res, 'Page not found.');
-    // A page is a system page if EITHER revision says so — a draft edit must
-    // not be able to launder a system page into deletability.
-    const isSystem = (draftSnap.exists && draftSnap.data().systemPage === true) ||
-      (liveSnap.exists && liveSnap.data().systemPage === true);
-    if (isSystem) return forbidden(res, 'System pages cannot be deleted.');
-
     let deleted;
     try {
-      deleted = await store.deleteBoth({ db, collection: PAGES_COLLECTION, docId: id });
+      deleted = await db.runTransaction(async (tx) => {
+        const [draft, live] = await tx.getAll(
+          db.collection(PAGES_DRAFTS).doc(id),
+          db.collection(PAGES_COLLECTION).doc(id),
+        );
+        if (!draft.exists && !live.exists) return 'missing';
+        if (draft.data()?.systemPage === true || live.data()?.systemPage === true) return 'system';
+        return store.deleteBoth({ db, tx, collection: PAGES_COLLECTION, docId: id, expectedVersion: req.body.expectedVersion });
+      });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('cmsDeletePage failed', err);
       return internal(res, 'The page could not be deleted. Keep this page open and contact support for help.');
     }
+    if (deleted === 'missing') return notFound(res, 'Page not found.');
+    if (deleted === 'system') return forbidden(res, 'System pages cannot be deleted.');
     await writeAdminLog({ db, store, now, log }, {
       action: 'cmsDeletePage',
       docPath: `${PAGES_COLLECTION}/${id}`,

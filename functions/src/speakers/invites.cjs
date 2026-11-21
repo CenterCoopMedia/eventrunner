@@ -63,6 +63,7 @@
  */
 
 const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { eventPageUrl } = require('../core/config.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
@@ -166,7 +167,7 @@ function isoOrNull(value) {
  *                     speaker: object, expiresAt: Date } |
  *                    { ok: false, status: number, code: string, message: string }>}
  */
-async function applyMintInvite({ db, speakerId, inviteType, mode, actor, now = Date.now }) {
+async function applyMintInvite({ db, speakerId, inviteType, mode, actor, now = Date.now, expectedVersion }) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
@@ -196,6 +197,7 @@ async function applyMintInvite({ db, speakerId, inviteType, mode, actor, now = D
         throw err;
       }
       const stored = snap.data();
+      requireConfirmation(expectedVersion, speakerRef.path, stored);
 
       const email = typeof stored.email === 'string' ? stored.email.trim() : '';
       if (!email) {
@@ -398,7 +400,7 @@ async function sendInviteEmail({
  * @param {{ db: object, speakerId: unknown, actor: { uid: string, email: string },
  *           now?: () => number }} args
  */
-async function applyCancelInvite({ db, speakerId, actor, now = Date.now }) {
+async function applyCancelInvite({ db, speakerId, actor, now = Date.now, expectedVersion }) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
@@ -414,6 +416,7 @@ async function applyCancelInvite({ db, speakerId, actor, now = Date.now }) {
         throw err;
       }
       const stored = snap.data();
+      requireConfirmation(expectedVersion, speakerRef.path, stored);
       if (stored.status !== 'invited') {
         const err = new Error('BAD_STATUS');
         err.conflict = {
@@ -775,8 +778,8 @@ function createResendSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now 
  * @returns {Promise<{ ok: true, minted: object } |
  *   { ok: false, stage: 'mint'|'send', status: number, code: string, message: string, retryAfterMs?: number }>}
  */
-async function inviteSpeaker({ db, getConfig, sendEmail, speakerId, inviteType, mode, actor, now, log }) {
-  const minted = await applyMintInvite({ db, speakerId, inviteType, mode, actor, now });
+async function inviteSpeaker({ db, getConfig, sendEmail, speakerId, inviteType, mode, actor, now, log, expectedVersion }) {
+  const minted = await applyMintInvite({ db, speakerId, inviteType, mode, actor, now, expectedVersion });
   if (!minted.ok) return { ...minted, stage: 'mint' };
 
   await logAdminAction({
@@ -858,8 +861,10 @@ async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, act
   try {
     result = await inviteSpeaker({
       db, getConfig, sendEmail, speakerId: req.body?.speakerId, inviteType, mode, actor, now, log,
+      expectedVersion: req.body?.expectedVersion,
     });
   } catch (err) {
+    if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
     log.error(`${mode === 'send' ? 'sendSpeakerInvite' : 'resendSpeakerInvite'} failed`, err);
     return internal(res, 'The invitation could not be created. Keep this page open and contact support for help.');
   }
@@ -885,8 +890,9 @@ function createCancelSpeakerInviteHandler({ db, auth, getConfig, now = Date.now,
     if (!actor) return;
     let result;
     try {
-      result = await applyCancelInvite({ db, speakerId: req.body?.speakerId, actor, now });
+      result = await applyCancelInvite({ db, speakerId: req.body?.speakerId, actor, now, expectedVersion: req.body?.expectedVersion });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('cancelSpeakerInvite failed', err);
       return internal(res, 'The invitation could not be cancelled. Keep this page open and contact support for help.');
     }

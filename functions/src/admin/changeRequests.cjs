@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Change requests (issue #188): one store, two entry points. A signed-in
  * visitor sends a request from the public footer, a staff member from the
@@ -754,6 +756,7 @@ function createDeleteChangeRequestHandler({ db, auth, getConfig, now = Date.now,
       found = await db.runTransaction(async (tx) => {
         const snap = await tx.get(ref);
         if (!snap.exists) return false;
+        requireConfirmation(req.body.expectedVersion, ref.path, snap.data());
         tx.delete(ref);
         (snap.data()?.screenshotDigests ?? []).forEach((_, index) => tx.delete(screenshotRef(db, COLLECTION, id, index)));
         tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
@@ -765,6 +768,7 @@ function createDeleteChangeRequestHandler({ db, auth, getConfig, now = Date.now,
         return true;
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('deleteChangeRequest failed', err);
       return internal(res, 'The request could not be removed. Try again.');
     }

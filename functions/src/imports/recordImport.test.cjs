@@ -202,6 +202,24 @@ test('importRecordsCsv: a commit without the preview digest, or with another fil
   assert.equal(db.writes.length, 0);
 });
 
+test('record import refuses a changed target before creating any record or audit', async () => {
+  const db = makeDb();
+  const first = await callImport(db, SPEAKER_BODY);
+  await db.collection('speakers').doc('existing').set({
+    slug: 'grace-hopper', firstName: 'Grace', lastName: 'Hopper', status: 'draft',
+  });
+  const before = db.writes.length;
+  const commit = { ...SPEAKER_BODY, dryRun: false, confirmDigest: first.body.digest };
+  const stale = await callImport(db, { ...commit, expectedPlan: first.body.plan });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(db.writes.length, before);
+  const fresh = await callImport(db, SPEAKER_BODY);
+  const matched = await callImport(db, { ...commit, expectedPlan: fresh.body.plan });
+  assert.equal(matched.statusCode, 200);
+  assert.equal(matched.body.summary.create, 1);
+});
+
 test('importRecordsCsv: a commit writes one admin_logs row with the counts, and no mail or invitation', async () => {
   const db = makeDb();
   const { commit } = await previewAndCommit(db, SPEAKER_BODY);

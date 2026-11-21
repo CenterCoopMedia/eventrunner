@@ -43,6 +43,7 @@ const COMPARE = Object.freeze({
 function makeFakeDb(seed = {}) {
   /** @type {Map<string, object>} full document path -> data */
   const store = new Map(Object.entries(seed).map(([p, d]) => [p, clone(d)]));
+  const versions = new Map();
   const writes = [];
 
   function applyWrite(op) {
@@ -56,6 +57,7 @@ function makeFakeDb(seed = {}) {
     } else if (op.merge) store.set(op.path, { ...(store.get(op.path) || {}), ...clone(op.data) });
     else store.set(op.path, clone(op.data));
     writes.push({ type: op.type, path: op.path });
+    versions.set(op.path, writes.length + 1);
   }
 
   function snapshot(path) {
@@ -63,6 +65,7 @@ function makeFakeDb(seed = {}) {
     return {
       id: path.split('/').pop(),
       exists: data !== undefined,
+      updateTime: data === undefined ? undefined : { seconds: versions.get(path) ?? 1, nanoseconds: 0 },
       data: () => (data === undefined ? undefined : clone(data)),
       ref: docRef(path),
     };

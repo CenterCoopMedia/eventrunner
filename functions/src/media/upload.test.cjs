@@ -340,6 +340,31 @@ test('mediaDelete with force deletes a referenced asset and reports what it brok
   assert.deepEqual(db.ids('media_assets'), []);
 });
 
+test('mediaDelete refuses a newly referenced asset before removing the object or the row', async () => {
+  const db = seededLibrary();
+  const bucket = fakeBucket();
+  const path = `cms-images/${ASSET_ID}/hero.png`;
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const handler = createMediaDeleteHandler(deps(db, bucket));
+  async function call(extra) {
+    const res = fakeRes();
+    await handler(post({ assetId: ASSET_ID, ...extra }), res);
+    return res;
+  }
+  const reviewed = (await call({ preview: true })).body.confirmationVersion;
+  await db.collection('cmsPages').doc('home').set({ sections: [{ image: path }] });
+  const before = db.writes.length;
+  const stale = await call({ force: true, expectedVersion: reviewed });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(db.writes.length, before);
+  assert.deepEqual(bucket.deleted, []);
+  const expectedVersion = (await call({ preview: true })).body.confirmationVersion;
+  assert.equal((await call({ force: true, expectedVersion })).statusCode, 200);
+  assert.deepEqual(bucket.deleted, [path]);
+  assert.deepEqual(db.ids('media_assets'), []);
+});
+
 test('mediaDelete clears a row whose object is already gone', async () => {
   const db = seededLibrary();
   const res = fakeRes();

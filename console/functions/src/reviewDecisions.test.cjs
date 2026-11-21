@@ -3,6 +3,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { closeApplication, declineApplication, launchApplication } = require('./reviewDecisions.cjs');
+const { getApplicationForReview } = require('./reviewQueue.cjs');
+const { postEndpoint } = require('./http.cjs');
 const { makeFakeConnector, makeFakeSecrets } = require('./fakes.cjs');
 const { NOW, PUBLIC_URL, ana, application, deps, fakeMailer, ops, ops2, seeded } = require('./fakeReview.cjs');
 
@@ -69,6 +71,32 @@ test('a decision on a page opened before the request changed is refused', async 
   assert.equal(db.read('applications/a1').status, 'draft');
   await declineApplication(deps(db), { body: { appId: 'a1', revision: 3, note: 'No.' }, user: ops });
   assert.equal(db.read('applications/a1').status, 'declined');
+});
+
+test('a decision refuses edited answers with the same history revision before it writes or sends', async () => {
+  const db = draft();
+  const d = deps(db);
+  const ref = db.collection('applications').doc('a1');
+  const read = async () => (await getApplicationForReview(d, { body: { appId: 'a1' }, user: ops })).body.application;
+  const original = await read();
+  const app = db.read('applications/a1');
+  await ref.update({ answers: { ...app.answers, event: { ...app.answers.event, name: 'Revised summit' } } });
+  const before = db.writes.length;
+  const body = { appId: 'a1', revision: original.revision, note: 'Review complete.' };
+  const auth = { verifyIdToken: async () => ({ ...ops, email_verified: true }) };
+  const handler = postEndpoint({ auth }, (input) => declineApplication(d, input));
+  async function call(expectedVersion) {
+    const res = { statusCode: null, body: null, set() {}, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; } };
+    await handler({ method: 'POST', headers: { authorization: 'Bearer test-token' }, body: { ...body, expectedVersion } }, res);
+    return res;
+  }
+  const refused = await call(original.confirmationVersion);
+  assert.equal(refused.statusCode, 409);
+  assert.equal(refused.body.error.code, 'stale-confirmation');
+  assert.equal(db.writes.length, before);
+  assert.equal(d.mailer.sent.length, 0);
+  assert.equal((await call((await read()).confirmationVersion)).statusCode, 200);
+  assert.equal(d.mailer.sent.length, 2);
 });
 
 test('a decision needs the revision the operator saw', async () => {

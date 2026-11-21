@@ -70,8 +70,8 @@ function optionalForm(form) {
   };
 }
 
-async function loadContext({ db }) {
-  const formSnap = await db.collection('config').doc('registration_form').get();
+async function loadContext({ db, get = (ref) => ref.get() }) {
+  const formSnap = await get(db.collection('config').doc('registration_form'));
   const form = readRegistrationForm(formSnap.exists ? formSnap.data() : null);
   return {
     provider: (process.env.EVENT_TICKETING_PROVIDER || '').trim() || 'none',

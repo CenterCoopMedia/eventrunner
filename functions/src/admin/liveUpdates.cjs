@@ -51,6 +51,7 @@
  */
 
 const crypto = require('node:crypto');
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
@@ -200,15 +201,21 @@ function createDeleteLiveUpdateHandler({ db, auth, getConfig, now = Date.now, lo
     }
 
     const ref = db.collection(LIVE_UPDATES_COLLECTION).doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) return notFound(res, 'Live update not found.');
-
+    let deleted;
     try {
-      await ref.delete();
+      deleted = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return false;
+        requireConfirmation(req.body.expectedVersion, ref.path, snap.data());
+        tx.delete(ref);
+        return true;
+      });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('deleteLiveUpdate failed', err);
       return internal(res, 'The live update could not be deleted. Keep this page open and contact support for help.');
     }
+    if (!deleted) return notFound(res, 'Live update not found.');
     await logAdminAction({
       db,
       action: 'deleteLiveUpdate',

@@ -1,6 +1,7 @@
 'use strict';
 
 const { ConsoleError } = require('./http.cjs');
+const { confirmationVersion, requireConfirmation } = require('./confirmation.cjs');
 const { toIso, toMillis } = require('./access.cjs');
 const { requireOperator, readApplication, reviewedAnswers, siteNameOf } = require('./reviewAccess.cjs');
 const { BUILD_COLLECTION, canRetryBuild, readBuild } = require('./buildState.cjs');
@@ -41,6 +42,7 @@ async function listDeployments({ db, now = Date.now, deployments }, { user }) {
     const current = recent.find(active) || recent[0] || null;
     return {
       id: doc.id, eventName: reviewedAnswers(app)?.event?.name || siteNameOf(app) || doc.id,
+      confirmationVersion: confirmationVersion(doc),
       status: app.status, environment: environment || null, build: records.has(doc.id) ? readableBuild(build) : null,
       canRetry: canRetryBuild(app, build, now()), canStop: Boolean(runId(build, deployments.repository) &&
         ['running', 'failed', 'waiting'].includes(build.state) && (build.state === 'running' || recent.some(active))),
@@ -101,6 +103,7 @@ async function redeploySite({ db, deployments, now = Date.now }, { body, user })
     const [currentApp, currentBuild] = await Promise.all([tx.get(db.collection('applications').doc(app.id)), tx.get(ref)]);
     if (!currentApp.exists || !built(currentApp.data()) || target(currentBuild.data()) !== environment ||
         at - toMillis(currentBuild.data().redeployRequestedAt) < 60_000) throw conflict('A deploy was just requested or the site changed. Refresh in a minute.');
+    requireConfirmation(body.expectedVersion, currentApp);
     tx.update(ref, { redeployRequestedAt: new Date(at) });
     tx.create(db.collection('console_audit').doc(), { action: 'site-redeploy-requested', appId: app.id, by: user.uid, at: new Date(at), environment });
   });
