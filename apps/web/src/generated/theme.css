@@ -2203,12 +2203,32 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'serif-editorial fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 114.41%;
+  ascent-override: 90.55%;
+  descent-override: 29.28%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'sans-humanist fallback';
   font-weight: 400;
   src: local('Arial'), local('Liberation Sans');
   size-adjust: 92.09%;
   ascent-override: 111.19%;
   descent-override: 43.43%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'sans-humanist fallback';
+  font-weight: 700;
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  size-adjust: 90.61%;
+  ascent-override: 113.01%;
+  descent-override: 44.14%;
   line-gap-override: 0%;
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
@@ -2243,12 +2263,32 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'caslon-text fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 120.6%;
+  ascent-override: 80.43%;
+  descent-override: 21.56%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'baskerville fallback';
   font-weight: 400;
   src: local('Times New Roman'), local('Liberation Serif');
   size-adjust: 125.93%;
   ascent-override: 77.03%;
   descent-override: 21.44%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'baskerville fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 122.63%;
+  ascent-override: 79.1%;
+  descent-override: 22.02%;
   line-gap-override: 0%;
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
@@ -2273,12 +2313,32 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'fraunces fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 116.31%;
+  ascent-override: 84.09%;
+  descent-override: 21.92%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'newsreader fallback';
   font-weight: 400;
   src: local('Times New Roman'), local('Liberation Serif');
   size-adjust: 104.6%;
   ascent-override: 70.27%;
   descent-override: 25.33%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'newsreader fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 106.63%;
+  ascent-override: 68.93%;
+  descent-override: 24.85%;
   line-gap-override: 0%;
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
@@ -2293,9 +2353,29 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'plex-sans fallback';
+  font-weight: 700;
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  size-adjust: 97.8%;
+  ascent-override: 104.81%;
+  descent-override: 28.12%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'plex-mono fallback';
   font-weight: 400;
   src: local('Courier New'), local('Liberation Mono');
+  size-adjust: 99.98%;
+  ascent-override: 102.52%;
+  descent-override: 27.5%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'plex-mono fallback';
+  font-weight: 600;
+  src: local('Courier New Bold'), local('Liberation Mono Bold');
   size-adjust: 99.98%;
   ascent-override: 102.52%;
   descent-override: 27.5%;
@@ -2313,12 +2393,32 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'archivo-condensed fallback';
+  font-weight: 700;
+  src: local('Arial Narrow Bold'), local('Liberation Sans Narrow Bold');
+  size-adjust: 94.98%;
+  ascent-override: 92.44%;
+  descent-override: 22.11%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'cabin fallback';
   font-weight: 400;
   src: local('Arial'), local('Liberation Sans');
   size-adjust: 92.98%;
   ascent-override: 103.79%;
   descent-override: 26.89%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'cabin fallback';
+  font-weight: 700;
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  size-adjust: 88.61%;
+  ascent-override: 108.9%;
+  descent-override: 28.21%;
   line-gap-override: 0%;
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
@@ -2333,12 +2433,32 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'merriweather fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 114.85%;
+  ascent-override: 85.67%;
+  descent-override: 23.77%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'public-sans fallback';
   font-weight: 400;
   src: local('Arial'), local('Liberation Sans');
   size-adjust: 103.03%;
   ascent-override: 92.2%;
   descent-override: 21.84%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'public-sans fallback';
+  font-weight: 700;
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  size-adjust: 98.35%;
+  ascent-override: 96.59%;
+  descent-override: 22.88%;
   line-gap-override: 0%;
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
@@ -2393,12 +2513,32 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'besley fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 126.14%;
+  ascent-override: 99.1%;
+  descent-override: 33.69%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'vollkorn fallback';
   font-weight: 400;
   src: local('Times New Roman'), local('Liberation Serif');
   size-adjust: 106.67%;
   ascent-override: 89.24%;
   descent-override: 41.34%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'vollkorn fallback';
+  font-weight: 700;
+  src: local('Times New Roman Bold'), local('Liberation Serif Bold');
+  size-adjust: 109.05%;
+  ascent-override: 87.3%;
+  descent-override: 40.44%;
   line-gap-override: 0%;
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
@@ -2413,9 +2553,29 @@
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
 @font-face {
+  font-family: 'overpass fallback';
+  font-weight: 700;
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  size-adjust: 96.5%;
+  ascent-override: 91.51%;
+  descent-override: 39.69%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
   font-family: 'overpass-mono fallback';
   font-weight: 400;
   src: local('Courier New'), local('Liberation Mono');
+  size-adjust: 102.65%;
+  ascent-override: 86.02%;
+  descent-override: 37.31%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'overpass-mono fallback';
+  font-weight: 700;
+  src: local('Courier New Bold'), local('Liberation Mono Bold');
   size-adjust: 102.65%;
   ascent-override: 86.02%;
   descent-override: 37.31%;
@@ -2429,6 +2589,16 @@
   size-adjust: 103.05%;
   ascent-override: 93.74%;
   descent-override: 23.87%;
+  line-gap-override: 0%;
+  unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
+}
+@font-face {
+  font-family: 'libre-franklin fallback';
+  font-weight: 700;
+  src: local('Arial Bold'), local('Liberation Sans Bold');
+  size-adjust: 98.95%;
+  ascent-override: 97.63%;
+  descent-override: 24.86%;
   line-gap-override: 0%;
   unicode-range: U+20-7E,U+A0-AC,U+AE-FF,U+2013-2014,U+2018-2019,U+201C-201D,U+2026;
 }
