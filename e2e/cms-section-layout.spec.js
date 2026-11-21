@@ -40,11 +40,17 @@ test('section layout choices give their descriptions room at phone widths and en
   const cards = layout.locator('label');
   await expect(cards).toHaveCount(3);
 
-  for (const profile of [{ width: 320 }, { width: 720, rootSize: 32 }]) {
+  for (const profile of [
+    { width: 320, stackPicture: false },
+    { width: 720, rootSize: 32, stackPicture: false },
+    { width: 320, rootSize: 32, stackPicture: true },
+  ]) {
     await setReflowProfile(page, profile);
     await expectTextFits(layout);
     const geometry = await cards.evaluateAll((options) => options.map((card) => {
       const { width, height } = card.getBoundingClientRect();
+      const picture = card.querySelector('.admin-section-layout__picture').getBoundingClientRect();
+      const head = card.querySelector('.admin-section-layout__head').getBoundingClientRect();
       const name = card.querySelector('.admin-section-layout__name').getBoundingClientRect();
       const summary = card.querySelector('.admin-section-layout__summary').getBoundingClientRect();
       return {
@@ -52,10 +58,11 @@ test('section layout choices give their descriptions room at phone widths and en
         fits: card.scrollWidth - card.clientWidth <= 1,
         largeEnough: width >= 44 && height >= 44,
         summaryBelowName: summary.top >= name.bottom - 1,
+        pictureAboveText: picture.bottom <= head.top + 1 && Math.abs(picture.left - summary.left) <= 1,
       };
     }));
     expect(geometry).toEqual(Array.from({ length: 3 }, () => ({
-      fillsRow: true, fits: true, largeEnough: true, summaryBelowName: true,
+      fillsRow: true, fits: true, largeEnough: true, summaryBelowName: true, pictureAboveText: profile.stackPicture,
     })));
     await expectPageFits(page);
   }
@@ -63,6 +70,7 @@ test('section layout choices give their descriptions room at phone widths and en
   const wide = layout.getByRole('radio', { name: 'Wide', exact: true });
   await wide.press('Space');
   await expect(wide).toBeChecked();
+  await layout.screenshot({ path: 'test-results/admin-visual-evidence/section-layout-320-large-text.png' });
 });
 
 test.describe.serial('section layout chosen in the page editor', () => {
