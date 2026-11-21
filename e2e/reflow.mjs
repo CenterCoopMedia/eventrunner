@@ -9,6 +9,10 @@ export const REFLOW_PROFILES = [
 
 export async function setReflowProfile(page, { width, height = 800, rootSize }) {
   await page.setViewportSize({ width, height });
+  await setRootTextSize(page, rootSize);
+}
+
+export async function setRootTextSize(page, rootSize) {
   const html = page.locator('html');
   await html.evaluate((element, size) => {
     if (size) element.style.setProperty('font-size', `${size}px`, 'important');

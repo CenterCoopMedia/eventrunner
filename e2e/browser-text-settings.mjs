@@ -1,6 +1,6 @@
 /* global document, getComputedStyle, innerWidth, devicePixelRatio, visualViewport, screen, navigator */
 import { chromium, expect, test as base } from '@playwright/test';
-import { REFLOW_PROFILES, setReflowProfile } from './reflow.mjs';
+import { REFLOW_PROFILES, setReflowProfile, setRootTextSize } from './reflow.mjs';
 
 export const settingsTag = { tag: '@browser-text-settings' };
 
@@ -26,6 +26,23 @@ async function setChromeZoom(settings, factor) {
   await zoom.selectOption(String(factor));
   await expect(zoom).toHaveValue(String(factor));
 }
+
+// Chromium exposes the OS scale on desktop for documents that opt in. Use
+// a separate document so reading it does not change the route's rendering.
+const readOsTextScale = (page) => page.evaluate(async () => {
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'position: fixed; width: 1px; height: 1px; border: 0; visibility: hidden';
+  frame.srcdoc = '<meta name="text-scale" content="scale"><span style="font-size:calc(16px * env(preferred-text-scale, 0))">Scale</span>';
+  const loaded = new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
+  document.body.append(frame);
+  try {
+    await loaded;
+    const sample = frame.contentDocument.querySelector('span');
+    return Number.parseFloat(frame.contentWindow.getComputedStyle(sample).fontSize) / 16;
+  } finally {
+    frame.remove();
+  }
+});
 
 export const test = base.extend({
   textSettings: [null, { option: true }],
@@ -67,7 +84,7 @@ export const test = base.extend({
 
       const browser = page.context().browser()?.version() ?? await page.evaluate(() => navigator.userAgent);
       const baseline = { ...await readViewport(page), text: await measureText(sample), control: await measureText(control) };
-      const record = async (name, checkSetting, minimumTarget) => {
+      const record = async (name, checkSetting, minimumTarget, requireLargerText = false) => {
         await test.step(name, async () => {
           try {
             await checkSetting();
@@ -80,6 +97,9 @@ export const test = base.extend({
               }, null, 2),
               contentType: 'application/json',
             });
+            if (requireLargerText) {
+              expect(text.lineHeight, 'the larger text profile enlarges rendered glyphs').toBeGreaterThan(baseline.text.lineHeight);
+            }
             await check({ compact: viewport.innerWidth <= 639, minimumTarget });
           } catch (error) {
             await info.attach(`${name} screenshot`, { body: await page.screenshot(), contentType: 'image/png' });
@@ -112,8 +132,10 @@ export const test = base.extend({
         }
       } else if (textSettings === 'android-text') {
         const cdp = await page.context().newCDPSession(page);
+        expect(await readOsTextScale(page)).toBe(1);
         await record('Chromium Android OS text scale 200%', async () => {
           await cdp.send('Emulation.setEmulatedOSTextScale', { scale: 2 });
+          expect(await readOsTextScale(page)).toBe(2);
           expect(await readViewport(page)).toEqual({
             screenWidth: baseline.screenWidth, innerWidth: baseline.innerWidth,
             devicePixelRatio: baseline.devicePixelRatio, visualScale: baseline.visualScale,
@@ -121,10 +143,8 @@ export const test = base.extend({
         }, 44);
       } else {
         await record('WebKit iPhone default text', async () => {}, 44);
-        await record('WebKit iPhone 200% CSS text adjustment', async () => {
-          await page.addStyleTag({ content: 'html { -webkit-text-size-adjust: 200% !important; }' });
-          await expect(page.locator('html')).toHaveCSS('-webkit-text-size-adjust', '200%');
-        }, 44);
+        const rootSize = await page.locator('html').evaluate((html) => Number.parseFloat(getComputedStyle(html).fontSize));
+        await record('WebKit iPhone 200% root text stress', () => setRootTextSize(page, rootSize * 2), 44, true);
       }
     });
   },
