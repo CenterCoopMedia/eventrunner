@@ -133,7 +133,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
         err instanceof OtpRequestError
           ? err.message
           : 'Sign-in could not be confirmed. Try again.',
-      spanish: field === 'code' ? 'No se pudo verificar el código. Revisa el código o solicita otro.' : 'No se pudo completar el inicio de sesión. Inténtalo de nuevo.',
+      spanish: err?.spanish ?? (field === 'code' ? 'No se pudo verificar el código. Revisa el código o solicita otro.' : 'No se pudo completar el inicio de sesión. Inténtalo de nuevo.'),
     });
   }, []);
 
@@ -229,7 +229,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
           message: err instanceof OtpRequestError
             ? err.message
             : 'Google sign-in did not complete. Try again or use an emailed code.',
-          spanish: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo o usa un código por correo.',
+          spanish: err?.spanish ?? 'No se pudo iniciar sesión con Google. Inténtalo de nuevo o usa un código por correo.',
         });
       }
     } finally {

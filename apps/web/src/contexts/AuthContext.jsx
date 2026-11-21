@@ -72,8 +72,9 @@ const SIGN_IN_WAIT_MS = 15_000;
  * CORS-readable).
  */
 export class OtpRequestError extends Error {
-  constructor({ code, message, status, retryAfterSeconds = null }) {
+  constructor({ code, message, status, retryAfterSeconds = null, spanish = null }) {
     super(message);
+    this.spanish = spanish;
     this.name = 'OtpRequestError';
     this.code = code;
     this.status = status;
@@ -81,31 +82,36 @@ export class OtpRequestError extends Error {
   }
 }
 
-// Every sign-in action waits behind Firebase's startup, which has no time
-// limit (issue 1357). Wait for it at most SIGN_IN_WAIT_MS, then fail with a
-// message the form shows. Called before the code is sent for checking, so a
-// stalled page does not use up the emailed code.
-async function authStartup(auth) {
+// Every sign-in action waits for the Firebase module and then for its auth
+// startup, and neither has a time limit (issue 1357). Wait for both at most
+// SIGN_IN_WAIT_MS together, then fail with a reload message. Verification
+// calls this before the code is sent for checking, so a stalled page does not
+// use up the emailed code.
+function withinSignInWait(promise) {
   let timer;
   const stalled = new Promise((resolve, reject) => {
     timer = setTimeout(() => reject(new OtpRequestError({
       code: 'auth-not-ready',
       status: 0,
       message: 'Sign-in is not ready on this page. Reload the page and try again.',
+      spanish: 'El inicio de sesión no está listo en esta página. Vuelve a cargar la página e inténtalo de nuevo.',
     })), SIGN_IN_WAIT_MS);
   });
-  try {
-    await Promise.race([auth.authStateReady(), stalled]);
-  } finally {
-    clearTimeout(timer);
-  }
+  return Promise.race([promise, stalled]).finally(() => clearTimeout(timer));
+}
+
+function startedFirebase() {
+  return withinSignInWait(loadFirebase().then(async (sdk) => {
+    await sdk.auth.authStateReady();
+    return sdk;
+  }));
 }
 
 async function postJson(name, body) {
   let response;
   // Empty unless App Check is configured for this deployment; the server
   // only requires it when EVENT_APP_CHECK_ENFORCED is on (issue #45).
-  const attestation = await appCheckHeaders();
+  const attestation = await withinSignInWait(appCheckHeaders());
   try {
     response = await fetch(`${functionsOrigin()}/${name}`, {
       method: 'POST',
@@ -307,8 +313,7 @@ export function AuthProvider({ children }) {
 
   const signInWithGoogle = useCallback(
     async () => {
-      const { auth, signInWithPopup, GoogleAuthProvider } = await loadFirebase();
-      await authStartup(auth);
+      const { auth, signInWithPopup, GoogleAuthProvider } = await startedFirebase();
       return signInWithPopup(auth, new GoogleAuthProvider());
     },
     [],
@@ -325,8 +330,7 @@ export function AuthProvider({ children }) {
   // Step 2: one failure shape for every miss (no oracle), then the custom
   // token signs the browser in.
   const verifyOtpCode = useCallback(async ({ challengeId, email, code }) => {
-    const { auth, signInWithCustomToken } = await loadFirebase();
-    await authStartup(auth);
+    const { auth, signInWithCustomToken } = await startedFirebase();
     const requestUser = auth.currentUser;
     const { token } = await postJson('verifyOtpCode', {
       challengeId,
