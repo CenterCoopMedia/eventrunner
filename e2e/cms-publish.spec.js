@@ -14,7 +14,7 @@
 // history page, in a signed-in browser, reads the publish back as a
 // version with its time, its account, and the one field it changed.
 import { test, expect } from '@playwright/test';
-import hostingConfig from '../firebase.json';
+import hostingConfig from '../firebase.json' with { type: 'json' };
 import seed from '../scripts/lib/seed.cjs';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
 import { editorialId } from '../apps/web/src/admin/editorialId.js';
