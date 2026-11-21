@@ -14,6 +14,7 @@ const {
 } = require('./pages.cjs');
 const { PAGE_TEMPLATE_LAYOUTS } = require('./pageTemplates.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
+const { writeDraft } = require('./store.cjs');
 
 // ---------------------------------------------------------------- fixtures
 
@@ -73,6 +74,42 @@ test('navigation link drafts accept internal paths and HTTPS while keeping page 
   await createSavePageHandler(existing)(adminReq({ page: navigationLink, create: true }), collision);
   assert.equal(collision.statusCode, 409);
   assert.equal(existing.store.writes.length, 0);
+});
+
+test('saving a navigation link label keeps the latest draft destination, visibility and order', async () => {
+  const live = { ...navigationLink, revision: 2 };
+  const draft = { ...navigationLink, url: '/schedule', visible: false, order: 8, status: 'dirty' };
+  const d = deps({ db: fakeDb({ 'cmsPages/visitor-info': live, 'cmsPages_drafts/visitor-info': draft }) });
+  d.store.writeDraft = writeDraft;
+  const res = fakeRes();
+  await createSavePageHandler(d)(adminReq({ navigationLink: { id: navigationLink.id, label: '  Getting here  ' } }), res);
+
+  assert.equal(res.statusCode, 200);
+  const saved = d.db.read('cmsPages_drafts', navigationLink.id);
+  assert.equal(saved.label, 'Getting here');
+  assert.equal(saved.url, draft.url);
+  assert.equal(saved.visible, false);
+  assert.equal(saved.order, 8);
+  assert.deepEqual(d.db.read('cmsPages', navigationLink.id), live);
+  assert.equal(d.store.logs[0].docPath, 'cmsPages_drafts/visitor-info');
+});
+
+test('a partial navigation link edit refuses a bad destination, order edits and missing links', async () => {
+  const d = deps({ db: fakeDb({ 'cmsPages/visitor-info': navigationLink, 'cmsPages/scholarships': validPage() }) });
+  const handler = createSavePageHandler(d);
+  const cases = [
+    [{ id: 'visitor-info', url: 'http://example.org' }, 400],
+    [{ id: 'visitor-info', order: 4 }, 400],
+    [{ id: 'scholarships', label: 'Changed' }, 403],
+    [{ id: 'missing', label: 'Changed' }, 404],
+  ];
+  for (const [edit, status] of cases) {
+    const res = fakeRes();
+    await handler(adminReq({ navigationLink: edit }), res);
+    assert.equal(res.statusCode, status);
+  }
+  assert.equal(d.store.writes.length, 0);
+  assert.equal(d.store.logs.length, 0);
 });
 
 /** In-memory Firestore fake (get/set/where/batch) seeded as 'collection/id'. */

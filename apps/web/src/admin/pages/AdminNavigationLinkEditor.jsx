@@ -23,13 +23,14 @@ function NavigationLinkForm({ initial, rows, creating }) {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const reportDeleted = useDeletedRecord();
+  const [baseline] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [kind, setKind] = useState(navigationLinkUrl(initial.url).startsWith('https://') ? 'external' : 'internal');
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
   const saved = useRef(false);
   const rejectedIds = useRef(new Set());
-  const leave = useUnsavedNavigation(!saved.current && JSON.stringify(draft) !== JSON.stringify(initial), { blocked: busy !== null });
+  const leave = useUnsavedNavigation(!saved.current && JSON.stringify(draft) !== JSON.stringify(baseline), { blocked: busy !== null });
   const paths = new Map();
   for (const { current } of rows) {
     if (isNavigationLink(current)) continue;
@@ -51,7 +52,16 @@ function NavigationLinkForm({ initial, rows, creating }) {
       ? assignPageIds({ ...draft, url, order: nextStoredOrder(rows) }, { pageIds: [...rows.map((row) => row.id), ...rejectedIds.current] })
       : { ...draft, url };
     try {
-      await call('cmsSavePage', { page: toPagePayload(page), ...(creating ? { create: true } : {}) });
+      const payload = toPagePayload(page);
+      if (creating) {
+        await call('cmsSavePage', { page: payload, create: true });
+      } else {
+        const previous = toPagePayload({ ...baseline, url: navigationLinkUrl(baseline.url) });
+        const changes = Object.fromEntries(['label', 'url', 'visible']
+          .filter((field) => payload[field] !== previous[field])
+          .map((field) => [field, payload[field]]));
+        await call('cmsSavePage', { navigationLink: { id: payload.id, ...changes } });
+      }
       saved.current = true;
       showToast('Navigation link saved as a draft.');
       navigate(PAGES_PATH);
