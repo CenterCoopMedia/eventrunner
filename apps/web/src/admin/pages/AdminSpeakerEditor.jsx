@@ -203,6 +203,9 @@ export default function AdminSpeakerEditor({ mode }) {
       const next = { ...current.form };
       const baseline = { ...current.savedForm };
       for (const field of changed) {
+        // An unsaved status pick keeps the status it was made from, so the
+        // server refuses it rather than applying it over a teammate's move.
+        if (field === 'status' && next.status !== baseline.status) continue;
         if (next[field] === baseline[field]) next[field] = incoming[field];
         baseline[field] = incoming[field];
       }

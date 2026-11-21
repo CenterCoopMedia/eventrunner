@@ -552,6 +552,22 @@ describe('speaker editor', () => {
     expect(bodyOf(1)).toEqual({ speakerId: 'rae-okonkwo', speaker: { bio: 'Later bio.' } });
   });
 
+  it('sends an unsaved status pick against the status it was made from', async () => {
+    speakerDocs = [{ ...RAE, status: 'draft' }];
+    fetch.mockResolvedValueOnce(errorResponse(409, 'status-conflict', 'Someone changed this speaker’s status.'));
+    await renderAt('/admin/speakers/rae-okonkwo');
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
+    // A teammate sends an invitation before this pick is saved.
+    await act(async () => {
+      pushSpeakers([{ ...RAE, status: 'invited' }]);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toMatchObject({ speaker: { status: 'approved' }, expectedStatus: 'draft' });
+  });
+
   it('keeps an unsaved edit when a teammate changes the same field', async () => {
     speakerDocs = [RAE];
     await renderAt('/admin/speakers/rae-okonkwo');
