@@ -319,6 +319,15 @@ function sameUpdateTime(a, b) {
   return typeof a.isEqual === 'function' ? a.isEqual(b) : a === b;
 }
 
+function remainingPublishIds(docIds, progress) {
+  if (!Array.isArray(docIds) || docIds.length === 0) return [];
+  const finished = new Set(Array.isArray(progress?.published) ? progress.published : []);
+  if (Array.isArray(progress?.skipped)) {
+    for (const outcome of progress.skipped) finished.add(outcome?.docId);
+  }
+  return [...new Set(docIds)].filter((id) => !finished.has(id));
+}
+
 /**
  * Publish drafts to the live collection (spec §8.4 step 3).
  *
@@ -340,9 +349,8 @@ function sameUpdateTime(a, b) {
  * When `queueRef` (a cmsPublishQueue doc ref) is given, the
  * `progress.<collection>` record is written IN the same batch as the
  * chunk's doc writes — the row and the data can never disagree, so a
- * resume can trust it (docIds already listed are skipped on entry, and a
- * re-run after a mid-way failure completes the remainder without
- * double-bumping revisions).
+ * resume can trust it. A resumed run keeps both published and skipped
+ * outcomes and processes only the items the earlier run did not reach.
  *
  * Throws on a failed chunk commit; everything committed so far stays
  * committed and recorded. DocIds without a draft are reported in
@@ -359,17 +367,12 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
   await ensurePendingCounts({ db, now });
   const metaRef = pendingCountsRef(db);
 
-  let alreadyPublished = [];
-  if (queueRef) {
-    const queueSnap = await queueRef.get();
-    const recorded = queueSnap.exists ? queueSnap.data()?.progress?.[collection]?.published : null;
-    if (Array.isArray(recorded)) alreadyPublished = recorded;
-  }
-
-  const published = [...alreadyPublished];
-  const pending = [...new Set(docIds)].filter((id) => !alreadyPublished.includes(id));
-  const skipped = [];
-  let chunksCommitted = 0;
+  const queueSnap = queueRef ? await queueRef.get() : null;
+  const progress = queueSnap?.data()?.progress?.[collection];
+  const pending = remainingPublishIds(docIds, progress);
+  const published = Array.isArray(progress?.published) ? [...progress.published] : [];
+  const skipped = Array.isArray(progress?.skipped) ? [...progress.skipped] : [];
+  let chunksCommitted = Number.isInteger(progress?.chunksCommitted) ? progress.chunksCommitted : 0;
 
   for (let i = 0; i < pending.length; i += DOCS_PER_CHUNK) {
     let chunkIds = pending.slice(i, i + DOCS_PER_CHUNK);
@@ -542,6 +545,7 @@ module.exports = {
   deleteBoth,
   listDirty,
   publishDocs,
+  remainingPublishIds,
   ensurePendingCounts,
   logAdminAction,
   contentFieldsOf,
