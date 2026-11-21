@@ -586,14 +586,21 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    * The result for a key an earlier call claimed. A failure that call
    * recorded is reported again, marked `skipped`, so a caller that lost the
    * first answer still sees it. Otherwise the earlier call sent the message
-   * or is sending it now.
+   * or is sending it now. A read error leaves the result uncertain.
    */
   async function skippedResult(ref) {
     try {
       return claimedResult((await ref.get()).data());
     } catch (err) {
-      log.warn('email_claims read failed', err);
-      return claimedResult();
+      log.warn('email_claims read failed', { code: err?.code });
+      return {
+        providerMessageId: null,
+        status: 'failed',
+        skipped: true,
+        uncertain: true,
+        error: 'The earlier send result could not be read.',
+        retries: 0,
+      };
     }
   }
 
