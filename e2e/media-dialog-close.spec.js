@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
+import { expectControlFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 
 async function openPrimaryPicker(page) {
   await signIn(page, ADMIN_EMAIL);
@@ -62,6 +63,40 @@ test('the media close control keeps its hit area at phone widths', async ({ page
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(opener).toBeFocused();
+});
+
+test.describe('Media Library labels', () => {
+  test.use({ trace: 'off', screenshot: 'off' });
+
+  test('a narrow image picker shows the full title and filename', async ({ page }) => {
+    const title = 'Conference photos from the opening reception, west entrance';
+    const filename = 'conferenceOpeningReceptionWestEntrancePhotograph.png';
+    const assetPath = `branding/picker-label-proof/${filename}`;
+    const asset = adminDb().doc('media_assets/picker-label-proof');
+    await asset.set({
+      path: assetPath, folder: 'branding', filename, title, alt: '',
+      contentType: 'image/png', size: 1, uploadedBy: 'operator@example.test', createdAt: new Date(),
+    });
+    try {
+      await page.setViewportSize({ width: 320, height: 700 });
+      await openPrimaryPicker(page);
+      const dialog = page.getByRole('dialog', { name: 'Choose an image', exact: true });
+      const tile = dialog.getByRole('button', { pressed: false, name: title });
+      for (const profile of [{ width: 320 }, { width: 720, rootSize: 32 }]) {
+        await setReflowProfile(page, profile);
+        await expectTextFits(tile.getByText(title, { exact: true }));
+        await expectTextFits(tile.getByText(filename, { exact: true }));
+        await expectControlFits(tile);
+        await expect.poll(() => dialog.evaluate((node) => node.scrollWidth - node.clientWidth))
+          .toBeLessThanOrEqual(1);
+      }
+      await tile.click();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByRole('textbox', { name: 'Primary logo' })).toHaveValue(assetPath);
+    } finally {
+      await asset.delete();
+    }
+  });
 });
 
 test('Tab follows a media deletion consequence instead of returning to the dialog header', async ({ page }) => {
