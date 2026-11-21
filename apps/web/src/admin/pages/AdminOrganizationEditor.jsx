@@ -96,7 +96,7 @@ export default function AdminOrganizationEditor({ mode }) {
   const { showToast } = useToast();
   const { rows, loading, ready, error: listenerError, findRow } = useAdminOrganizations();
   const representatives = useOrganizationRepresentatives();
-  const [form, setForm] = useState(EMPTY);
+  const [{ form, savedForm }, setEditor] = useState({ form: EMPTY, savedForm: EMPTY });
   const [slugTouched, setSlugTouched] = useState(false);
   // The id this form created, once it has. From then on it only updates.
   const [createdId, setCreatedId] = useState(null);
@@ -108,10 +108,10 @@ export default function AdminOrganizationEditor({ mode }) {
   const [action, setAction] = useState(null);
   const saving = action !== null;
   const [status, setStatus] = useState('');
-  const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   const errorRef = useRef(null);
   const formRef = useRef(null);
   const adoptedRef = useRef(null);
+  const observedRef = useRef(null);
   const orderDefaultedRef = useRef(false);
   const tierListId = useId();
 
@@ -123,23 +123,43 @@ export default function AdminOrganizationEditor({ mode }) {
   // a row built before the drafts arrive is the live doc alone, and a form
   // filled from it and saved would replace the unpublished draft.
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current === docId || !ready || !row) return;
+    if (mode !== 'edit' || !ready || !row || saving) return;
+    const incoming = toForm(row);
+    const observed = observedRef.current;
+    observedRef.current = incoming;
+    if (adoptedRef.current === docId) {
+      // An unrelated snapshot can arrive before the echo of our own save.
+      // Only values that changed on the listener can replace our baseline.
+      const changed = Object.keys(incoming).filter((field) => incoming[field] !== observed[field]);
+      if (changed.length === 0) return;
+      setEditor((current) => {
+        const next = { ...current.form };
+        const baseline = { ...current.savedForm };
+        for (const field of changed) {
+          if (next[field] === baseline[field]) next[field] = incoming[field];
+          baseline[field] = incoming[field];
+        }
+        return { form: next, savedForm: baseline };
+      });
+      return;
+    }
     adoptedRef.current = docId;
-    setForm(toForm(row));
+    setEditor({ form: incoming, savedForm: incoming });
     setTouched(new Set());
     setAttempted(false);
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
-    setFeedbackSnapshot(null);
-  }, [mode, docId, ready, row]);
+  }, [mode, docId, ready, row, saving]);
 
   // A new organization joins the end of the wall unless the operator says
   // otherwise.
   useEffect(() => {
     if (mode !== 'create' || loading || orderDefaultedRef.current) return;
     orderDefaultedRef.current = true;
-    setForm((current) => (current.order === '' ? { ...current, order: String(nextOrganizationOrder(rows)) } : current));
+    setEditor((current) => (current.form.order === ''
+      ? { ...current, form: { ...current.form, order: String(nextOrganizationOrder(rows)) } }
+      : current));
   }, [mode, loading, rows]);
 
   useEffect(() => {
@@ -168,6 +188,11 @@ export default function AdminOrganizationEditor({ mode }) {
   // save, so a blank new form does not open on a column of errors.
   const errorFor = (field) =>
     ((attempted || touched.has(field)) ? localErrors.get(field) : undefined) ?? serverErrors.get(field);
+  const formFields = organizationFields(form);
+  const savedFields = organizationFields(savedForm);
+  const isUnsaved = (field) => formFields[field] !== savedFields[field];
+  const visibilityChanged = form.visible !== savedForm.visible;
+  const setForm = (update) => setEditor((current) => ({ ...current, form: update(current.form) }));
   const set = (field, value) => {
     setTouched((current) => (current.has(field) ? current : new Set(current).add(field)));
     setForm((current) => ({ ...current, [field]: value }));
@@ -187,11 +212,12 @@ export default function AdminOrganizationEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
-    const fields = organizationFields(form);
-    // The sponsors list owns order. An edit must not write the order this
-    // form loaded, or a later save undoes a reorder from another tab.
-    if (!creating) delete fields.order;
-    const body = { collection: COLLECTION, fields, visible: form.visible };
+    // The server merges onto the latest draft. The sponsors list owns order.
+    const fields = creating ? formFields : Object.fromEntries(
+      Object.entries(formFields).filter(([field, value]) => field !== 'order' && value !== savedFields[field]),
+    );
+    const body = { collection: COLLECTION, fields };
+    if (creating || visibilityChanged) body.visible = form.visible;
     let stage = 'save';
     try {
       let id = docId;
@@ -201,12 +227,16 @@ export default function AdminOrganizationEditor({ mode }) {
         // Created: this form never creates again, and the page moves to the
         // record's own address before the publish runs.
         adoptedRef.current = id;
+        observedRef.current = form;
         setCreatedId(id);
+        setEditor((current) => ({ ...current, savedForm: form }));
         navigate(`${ORGANIZATIONS_LIST}/${encodeURIComponent(id)}`, { replace: true });
       } else {
         await call('cmsUpdateContent', { ...body, docId: id });
+        const savedChanges = Object.fromEntries(Object.keys(fields).map((field) => [field, form[field]]));
+        if ('visible' in body) savedChanges.visible = body.visible;
+        setEditor((current) => ({ ...current, savedForm: { ...current.savedForm, ...savedChanges } }));
       }
-      setFeedbackSnapshot(JSON.stringify(form));
       if (publish) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: COLLECTION, docIds: [id] });
@@ -271,18 +301,17 @@ export default function AdminOrganizationEditor({ mode }) {
 
   const tiers = tiersInUse(rows);
 
-  // A representative's edit (issue #334) may not land on a field the form
-  // holds unsaved text for: the next save would put the typed text back.
-  const isUnsaved = (field) => field in form && form[field] !== textOf(row?.current?.[field]);
-  // Applied text is in the draft now. The form takes it, so the next save
-  // keeps it rather than writing back what the form loaded.
+  // Applied text is already in the draft. Keep any typing since Apply began.
   const adoptApplied = (fields) => {
-    setForm((current) => {
-      const next = { ...current };
+    setEditor((current) => {
+      const next = { ...current.form };
+      const baseline = { ...current.savedForm };
       for (const [field, value] of Object.entries(fields)) {
-        if (field in next) next[field] = textOf(value);
+        if (!Object.hasOwn(EMPTY, field) || baseline[field] !== savedForm[field]) continue;
+        if (next[field] === form[field]) next[field] = textOf(value);
+        baseline[field] = textOf(value);
       }
-      return next;
+      return { form: next, savedForm: baseline };
     });
   };
 
@@ -300,7 +329,7 @@ export default function AdminOrganizationEditor({ mode }) {
           state={!creating && row ? <RecordState state={row.state} /> : null}
           identifiers={null}
           description="Edit the details attendees see on the sponsors page."
-          feedback={status || error ? <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} /> : null}
+          feedback={status || error ? <EditorActionFeedback unsaved={visibilityChanged || Object.keys(formFields).some(isUnsaved)} status={status} error={error} errorTitle={errorTitle} /> : null}
           actions={
             <>
               {!creating ? (
