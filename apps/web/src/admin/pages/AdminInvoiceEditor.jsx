@@ -278,8 +278,8 @@ export default function AdminInvoiceEditor({ mode }) {
       // under this form's id, so the retry met its own save as a conflict.
       // The draft now opens at its own address, as an edit.
       if (mode === 'create') navigate(`${INVOICES_ROOT}/${encodeURIComponent(invoiceId)}`, { replace: true });
-    } catch {
-      setStatus('The saved invoice could not be loaded. Your edits are still here. Try again.');
+    } catch (err) {
+      setStatus(`${plannerError(err).message} Your edits are still here.`);
     } finally {
       setBusy(null);
     }

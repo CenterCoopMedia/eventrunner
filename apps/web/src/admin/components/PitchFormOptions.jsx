@@ -53,10 +53,13 @@ export default function PitchFormOptions({ settings, call }) {
   // A save from another tab replaces the form only while this one is unchanged.
   useEffect(() => {
     if (savedKey === baseline) return;
-    setForm((current) => (JSON.stringify(current) === JSON.stringify(formOf(JSON.parse(baseline)))
-      ? formOf(JSON.parse(savedKey)) : current));
     setBaseline(savedKey);
-  }, [savedKey, baseline]);
+    if (JSON.stringify(form) !== JSON.stringify(formOf(JSON.parse(baseline)))) return;
+    setForm(formOf(JSON.parse(savedKey)));
+    setErrors([]);
+    setServerError(null);
+    setResult('');
+  }, [savedKey, baseline, form]);
 
   const edit = (field) => (value) => {
     setForm((current) => ({ ...current, [field]: value }));
