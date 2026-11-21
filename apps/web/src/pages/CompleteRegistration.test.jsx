@@ -82,6 +82,27 @@ describe('CompleteRegistration', () => {
     expect(screen.getByRole('link', { name: /dashboard/i })).toHaveAttribute('href', '/dashboard');
   });
 
+  it('reattaches a stalled question read without treating it as an empty form', async () => {
+    currentForm = undefined;
+    vi.useFakeTimers();
+    let view;
+    try {
+      view = renderAt();
+      expect(screen.getByText('Loading your registration…')).toBeVisible();
+      act(() => vi.advanceTimersByTime(60_000));
+      const retry = screen.getByRole('button', { name: 'Try again' });
+      expect(screen.queryByRole('heading', { name: 'Nothing to answer' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'You need a ticket first' })).toBeNull();
+      currentForm = FORM;
+      await act(async () => fireEvent.click(retry));
+      expect(await screen.findByRole('heading', { name: 'Ticket: General for Ada Lovelace' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    } finally {
+      view?.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it('explains a ticket is needed when the account holds none', async () => {
     tickets = [TICKETS[2]];
     renderAt();

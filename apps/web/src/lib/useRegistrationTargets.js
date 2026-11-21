@@ -39,9 +39,10 @@ export function useRegistrationTargets(user) {
   // `asked` says whether this load ran for a form that asks something.
   const [load, setLoad] = useState({ status: 'loading', targets: [], saved: {}, error: null, asked: false });
   const [attempt, setAttempt] = useState(0);
+  const [formRead, setFormRead] = useState(0);
   const uid = user?.uid ?? null;
 
-  useEffect(() => subscribeRegistrationForm(setForm, () => setForm(null)), []);
+  useEffect(() => subscribeRegistrationForm(setForm, () => setForm(null)), [formRead]);
 
   // Tickets and saved answers are read only when the form asks something,
   // so a dashboard visit at an event with no questions costs nothing.
@@ -55,7 +56,7 @@ export function useRegistrationTargets(user) {
     let active = true;
     setLoad({ status: 'loading', targets: [], saved: {}, error: null, asked: true });
     (async () => {
-      const catalog = await readTicketingCatalog(eventConfig?.id);
+      const catalog = await (attempt ? ticketingRequest('ticketingCatalog') : readTicketingCatalog(eventConfig?.id));
       const provider = catalog?.provider;
       const tickets = provider === 'none' ? [] : await readAllTickets(user);
       const targets = answerTargets({ provider, tickets, uid: user.uid });
@@ -76,7 +77,10 @@ export function useRegistrationTargets(user) {
   const setSaved = useCallback((id, record) => {
     setLoad((previous) => ({ ...previous, saved: { ...previous.saved, [id]: record } }));
   }, []);
-  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  const retry = useCallback(() => {
+    if (form === undefined) setFormRead((value) => value + 1);
+    else setAttempt((value) => value + 1);
+  }, [form]);
 
   return {
     // Loading until the form is read, and, when it asks something, until the

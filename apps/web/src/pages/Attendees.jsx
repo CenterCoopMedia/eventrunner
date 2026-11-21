@@ -231,6 +231,7 @@ export default function Attendees() {
   const { features, badges: badgesConfig } = useEventConfig();
   const { uid, status, attendeeAccess } = useProfile();
   const [snapshot, setSnapshot] = useState({ key: null, profiles: null, failed: false });
+  const [readAttempt, setReadAttempt] = useState(0);
 
   const directoryEnabled = features.attendeeDirectory;
   // A signed-out visitor at an event with no public profiles has nothing to
@@ -267,7 +268,7 @@ export default function Attendees() {
       current = false;
       unsubscribe();
     };
-  }, [directoryScope]);
+  }, [directoryScope, readAttempt]);
 
   const sorted = useMemo(
     () =>
@@ -359,7 +360,8 @@ export default function Attendees() {
 
         {loading ? (
           <div className="mt-lg">
-            <LoadingState shape="directory" label="Loading the attendee directory…" />
+            <LoadingState shape="directory" label="Loading the attendee directory…" phase={directoryScope}
+              recover onRetry={() => setReadAttempt((value) => value + 1)} />
           </div>
         ) : failed ? (
           <div className="mt-lg">

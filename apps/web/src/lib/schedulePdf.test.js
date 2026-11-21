@@ -31,7 +31,7 @@ describe('downloadSchedulePdf', () => {
 
     await downloadSchedulePdf({ origin: 'https://functions.example', fetchImpl, documentRef: doc });
 
-    expect(fetchImpl).toHaveBeenCalledWith('https://functions.example/buildSchedulePdf');
+    expect(fetchImpl).toHaveBeenCalledWith('https://functions.example/buildSchedulePdf', { signal: undefined });
     expect(doc.anchor.download).toBe('schedule.pdf');
     expect(doc.anchor.click).toHaveBeenCalledTimes(1);
     expect(createObjectURL).toHaveBeenCalledWith(blob);
@@ -52,6 +52,23 @@ describe('downloadSchedulePdf', () => {
       downloadSchedulePdf({ origin: 'https://functions.example', fetchImpl, documentRef: fakeDocument() }),
     ).rejects.toBeInstanceOf(SchedulePdfError);
   });
+
+  it('never hands a superseded download to the browser when its bytes arrive late', async () => {
+    const controller = new AbortController();
+    let receiveBytes;
+    let readingBody;
+    const bodyStarted = new Promise((resolve) => { readingBody = resolve; });
+    const pendingBody = new Promise((resolve) => { receiveBytes = resolve; });
+    const fetchImpl = async () => ({ ok: true, blob() { readingBody(); return pendingBody; } });
+    const doc = fakeDocument();
+    const request = downloadSchedulePdf({ origin: 'https://functions.example', fetchImpl, documentRef: doc, signal: controller.signal });
+
+    await bodyStarted;
+    controller.abort();
+    receiveBytes(new Blob(['late-pdf-bytes']));
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    expect(doc.anchor.click).not.toHaveBeenCalled();
+  });
 });
 
 it('transports the selected locale in the public URL and the owner POST body', async () => {
@@ -62,7 +79,7 @@ it('transports the selected locale in the public URL and the owner POST body', a
   const user = { getIdToken: async () => 'fixture-token' };
   await expect(downloadMySchedulePdf({ ...options, user })).rejects.toBeInstanceOf(SchedulePdfError);
   expect(fetchImpl.mock.calls).toEqual([
-    ['https://functions.example.org/buildSchedulePdf?lang=es'],
+    ['https://functions.example.org/buildSchedulePdf?lang=es', { signal: undefined }],
     ['https://functions.example.org/buildMySchedulePdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fixture-token' },
