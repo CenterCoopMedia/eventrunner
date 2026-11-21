@@ -13,7 +13,7 @@ const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP
 const {
   createTicketingImportCsvHandler,
   createTicketingListTicketsHandler,
-  buildImportPreview,
+  processImport,
   validateImportRequest,
   mapRow,
   internals,
@@ -139,10 +139,10 @@ test('validateImportRequest: dryRun defaults true, only an explicit false commit
 });
 
 /* ---------------------------------------------------------------- */
-/* buildImportPreview                                                */
+/* processImport                                                     */
 /* ---------------------------------------------------------------- */
 
-test('buildImportPreview: classifies create, update, duplicate, and invalid rows', async () => {
+test('processImport: classifies create, update, duplicate, and invalid rows', async () => {
   const db = makeFakeDb({
     'tickets/ord-existing': { email: 'existing@example.com', provider: 'manual', status: 'valid' },
   });
@@ -152,15 +152,18 @@ test('buildImportPreview: classifies create, update, duplicate, and invalid rows
     { Email: 'c@example.com', 'Order ID': 'ord-new' }, // duplicate of row 0
     { Email: 'not-an-email', 'Order ID': 'ord-bad' }, // invalid
   ];
-  const preview = await buildImportPreview({ db, mapping: MAPPING, rows });
+  const preview = await processImport({ db, mapping: MAPPING, rows });
   assert.deepEqual(preview.summary, { create: 1, update: 1, duplicate: 1, invalid: 1 });
   assert.equal(preview.results.length, 4);
   assert.equal(preview.results[0].verdict, 'create');
   assert.equal(preview.results[1].verdict, 'update');
   assert.equal(preview.results[2].verdict, 'duplicate');
   assert.equal(preview.results[3].verdict, 'invalid');
-  // Only the surviving (non-duplicate, non-invalid) rows are candidates to write.
-  assert.equal(preview.validTickets.length, 2);
+  const committed = await processImport({ db, mapping: MAPPING, rows, commitAt: () => T0 });
+  assert.deepEqual(committed, preview);
+  assert.deepEqual(db.ids('tickets').sort(), ['ord-existing', 'ord-new']);
+  assert.equal(db.read('tickets', 'ord-new').email, 'a@example.com');
+  assert.equal(db.read('tickets', 'ord-existing').email, 'b@example.com');
 });
 
 /* ---------------------------------------------------------------- */
@@ -319,10 +322,14 @@ test('ticketingImportCsv: re-import preserves unmapped class and status in the s
   assert.equal(db.read('tickets', 'pending').status, 'pending_info');
   assert.equal(db.read('tickets', 'pending').ticketClassId, 'workshop-only');
   assert.equal(db.read('tickets', 'claimed').ticketClassId, 'workshop-only');
+  assert.equal(db.read('tickets', 'claimed').ticketClass, 'General');
+  assert.equal(db.read('tickets', 'claimed').orderId, 'ord-1');
   assert.equal(db.read('tickets', 'claimed').claimedByUid, 'uid-1');
   assert.equal(db.read('tickets', 'claimed').lastName, 'Byron');
   for (const id of ['other-event', 'other-provider', 'new']) {
     assert.equal(db.read('tickets', id).ticketClassId, null);
+    assert.equal(db.read('tickets', id).ticketClass, null);
+    assert.equal(db.read('tickets', id).orderId, id);
   }
   assert.equal(db.read('tickets', 'new').status, 'valid');
 
@@ -334,6 +341,90 @@ test('ticketingImportCsv: re-import preserves unmapped class and status in the s
   assert.equal(db.read('tickets', 'claimed').ticketClassId, null);
   assert.equal(db.read('tickets', 'pending').ticketClassId, 'day-pass');
   assert.equal(db.read('tickets', 'pending').status, 'valid');
+});
+
+test('ticketingImportCsv: each mapping projects the values a re-import stores', async (t) => {
+  const externalId = 'ticket-1';
+  const original = {
+    externalId, email: 'ada@example.com', orderId: 'order-1', firstName: 'Ada', lastName: 'Lovelace',
+    ticketClass: 'General', ticketClassId: 'general', purchasedAt: '2026-08-01',
+    status: 'pending_info', quantity: 2,
+  };
+  const required = { id: 'Ticket', email: 'Email' };
+  const cells = { Ticket: externalId, Email: original.email };
+  const cases = [
+    ['orderId', 'order-2', { orderId: 'order-2' }, { orderId: externalId }],
+    ['firstName', 'Grace', { firstName: 'Grace' }, { firstName: null }],
+    ['lastName', 'Hopper', { lastName: 'Hopper' }, { lastName: null }],
+    ['name', 'Grace Hopper', { firstName: 'Grace', lastName: 'Hopper' }, { firstName: null, lastName: null }],
+    ['ticketClass', 'Workshop', { ticketClass: 'Workshop' }, { ticketClass: null }],
+    ['ticketClassId', 'workshop', { ticketClassId: 'workshop' }, { ticketClassId: null }],
+    ['purchasedAt', '2026-08-02', { purchasedAt: '2026-08-02' }, { purchasedAt: null }],
+    ['status', 'Refunded', { status: 'refunded' }, { status: 'valid' }],
+  ];
+
+  async function verify(mapping, row, expected, overrides = {}) {
+    const before = ticket({ ...original, ...overrides, raw: { Previous: 'retained' } });
+    const db = makeFakeDb({ [`tickets/${externalId}`]: before });
+    const handler = createTicketingImportCsvHandler({ db, ...makeAuthDeps(), now: () => T0, log: QUIET });
+    const preview = makeRes();
+    await handler(req({ body: { mapping, rows: [row], dryRun: true } }), preview);
+    assert.equal(preview.statusCode, 200);
+    assert.deepEqual(db.read('tickets', externalId), before);
+
+    const commit = makeRes();
+    await handler(req({ body: { mapping, rows: [row], dryRun: false } }), commit);
+    assert.equal(commit.statusCode, 200);
+    assert.equal(commit.body.updated, 1);
+    assert.deepEqual(commit.body.rows, preview.body.rows);
+    assert.deepEqual(preview.body.rows, [{ index: 0, verdict: 'update', ...expected }]);
+    const stored = db.read('tickets', externalId);
+    for (const [field, value] of Object.entries(expected)) {
+      assert.equal(stored[field], value, field);
+    }
+    assert.deepEqual(stored.raw, { Previous: 'retained', ...row });
+  }
+
+  for (const [field, value, mapped, empty] of cases) {
+    await t.test(field, async () => {
+      await verify(required, { ...cells, Value: value }, original);
+      await verify({ ...required, [field]: 'Value' }, { ...cells, Value: value }, { ...original, ...mapped });
+      await verify({ ...required, [field]: 'Value' }, { ...cells, Value: '' }, { ...original, ...empty });
+    });
+  }
+
+  await t.test('email updates while the ticket ID selects the record', async () => {
+    await verify(required, { ...cells, Email: 'GRACE@example.com' }, { ...original, email: 'grace@example.com' });
+    const db = makeFakeDb({ [`tickets/${externalId}`]: original });
+    const handler = createTicketingImportCsvHandler({ db, ...makeAuthDeps(), log: QUIET });
+    for (const [field, column] of Object.entries(required)) {
+      const { [field]: omitted, ...mapping } = required;
+      for (const dryRun of [true, false]) {
+        const unmapped = makeRes();
+        await handler(req({ body: { mapping, rows: [cells], dryRun } }), unmapped);
+        assert.equal(unmapped.statusCode, 400, omitted);
+
+        const empty = makeRes();
+        await handler(req({ body: { mapping: required, rows: [{ ...cells, [column]: '' }], dryRun } }), empty);
+        assert.equal(empty.statusCode, 200);
+        assert.equal(empty.body.rows[0].verdict, 'invalid');
+      }
+    }
+    assert.deepEqual(db.read('tickets', externalId), original);
+    assert.deepEqual(db.ids('tickets'), [externalId]);
+  });
+
+  await t.test('full name is used only when both direct name cells are empty', async () => {
+    const mapping = { ...required, firstName: 'First', name: 'Full' };
+    await verify(mapping, { ...cells, First: 'Grace', Full: 'Katherine Johnson' }, { ...original, firstName: 'Grace' });
+    await verify(mapping, { ...cells, First: '', Full: 'Katherine Johnson' }, { ...original, firstName: 'Katherine', lastName: 'Johnson' });
+    await verify(mapping, { ...cells, First: '', Full: 'Katherine' }, { ...original, firstName: 'Katherine', lastName: null });
+  });
+
+  await t.test('a blank status cannot reactivate a cancelled ticket', async () => {
+    const cancelled = { status: 'cancelled' };
+    await verify({ ...required, status: 'Status' }, { ...cells, Status: '' }, { ...original, ...cancelled }, cancelled);
+  });
 });
 
 test('ticketingImportCsv: too many rows is refused with a clear cap message', async () => {

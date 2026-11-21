@@ -17,19 +17,11 @@
  * separate order concept, so `id` doubles as `orderId` unless the admin maps
  * a distinct order column.
  *
- * DRY RUN vs COMMIT. Both modes run the identical validate → normalize →
- * dedupe → classify pipeline (`buildImportPreview`) and differ only in
- * whether `upsertTickets` (sync.cjs) is then called. Update status is
- * projected from the preview read and recalculated in the write transaction.
- * The existence check (create vs. update) does one read per surviving row,
- * which is also why rows are capped (MAX_IMPORT_ROWS): an admin re-pasting
- * a 50,000-row platform export would otherwise spend that many reads on a
- * preview nobody asked to commit yet.
- *
- * The write path is NOT a new upsert: valid, non-duplicate rows are handed
- * to `upsertTickets` from sync.cjs unchanged, so a CSV import respects
- * exactly the same server-owned fields (claim state survives a re-import,
- * `createdAt` survives, §4.2) that every other ticketing write path does.
+ * Dry runs and commits share validation, normalization and deduplication.
+ * Both project the same ticket fields. A dry run reads each valid ticket
+ * once. A commit gets its result from the shared ticket upsert transaction,
+ * which reads the current state again and preserves claim state and creation
+ * time (§4.2).
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
@@ -38,7 +30,7 @@ const { logAdminAction } = require('../cms/store.cjs');
 const {
   internals: { TICKETS, isSafeDocId, TICKET_STATUSES },
 } = require('./index.cjs');
-const { ticketAccessFieldsForUpdate, upsertTickets } = require('./sync.cjs');
+const { ticketForUpdate, upsertTicket, internals: { normalizeTicket } } = require('./sync.cjs');
 const { iso } = require('./stripeCommerce.cjs');
 const { normalizeTicketClassId } = require('shared/ticketAccess');
 
@@ -141,7 +133,7 @@ function splitName(name) {
  * reasons it cannot be imported.
  *
  * @param {{ row: object, mapping: Record<string,string> }} args
- * @returns {{ ok: true, ticket: object } | { ok: false, reasons: string[] }}
+ * @returns {{ ok: true, ticket: object, unmappedCsvFields: string[] } | { ok: false, reasons: string[] }}
  */
 function mapRow({ row, mapping }) {
   const reasons = [];
@@ -160,7 +152,8 @@ function mapRow({ row, mapping }) {
 
   let firstName = mapping.firstName ? cell(row[mapping.firstName]) || null : null;
   let lastName = mapping.lastName ? cell(row[mapping.lastName]) || null : null;
-  if (!firstName && !lastName && mapping.name) {
+  const useFullName = !firstName && !lastName && Boolean(mapping.name);
+  if (useFullName) {
     const split = splitName(cell(row[mapping.name]));
     firstName = split.firstName;
     lastName = split.lastName;
@@ -172,9 +165,15 @@ function mapRow({ row, mapping }) {
   if (classIdCell && !ticketClassId) return { ok: false, reasons: ['ticket type ID is not usable as an identifier'] };
   const purchasedAt = mapping.purchasedAt ? cell(row[mapping.purchasedAt]) || null : null;
   const status = normalizeStatus(mapping.status ? cell(row[mapping.status]) : '');
+  const unmappedCsvFields = OPTIONAL_MAPPING_FIELDS.filter((field) =>
+    field !== 'name' && !mapping[field] && !(useFullName && (field === 'firstName' || field === 'lastName')),
+  );
+  // The CSV has no quantity column. One is the default for new tickets.
+  unmappedCsvFields.push('quantity');
 
   return {
     ok: true,
+    unmappedCsvFields,
     ticket: {
       externalId: rawId,
       orderId,
@@ -195,19 +194,15 @@ function mapRow({ row, mapping }) {
 }
 
 /**
- * Validate, dedupe, and classify every row — shared by dry-run and commit
- * so they can never disagree (see module doc).
+ * Validate and dedupe rows, then preview or apply each surviving row.
  *
- * @param {{ db: object, mapping: Record<string,string>, rows: object[], eventId?: string|null }} args
- * @returns {Promise<{ results: object[], summary: Record<string, number>, validTickets: object[], unmappedCsvFields: string[] }>}
+ * @param {{ db: object, mapping: Record<string,string>, rows: object[], eventId?: string|null, commitAt?: () => Date }} args
+ * @returns {Promise<{ results: object[], summary: Record<string, number> }>}
  */
-async function buildImportPreview({ db, mapping, rows, eventId = null }) {
+async function processImport({ db, mapping, rows, eventId = null, commitAt }) {
   const seenAt = new Map();
   const results = [];
   const candidates = [];
-  // An omitted column carries no new access decision for an existing ticket.
-  const unmappedCsvFields = ['ticketClassId', 'status'].filter((field) => !mapping[field]);
-  const scope = { provider: PROVIDER_NAME, eventId: normalizeTicketClassId(eventId) };
 
   rows.forEach((row, index) => {
     const mapped = mapRow({ row, mapping });
@@ -215,7 +210,7 @@ async function buildImportPreview({ db, mapping, rows, eventId = null }) {
       results.push({ index, verdict: 'invalid', reasons: mapped.reasons });
       return;
     }
-    const { ticket } = mapped;
+    const { ticket, unmappedCsvFields } = mapped;
     if (seenAt.has(ticket.externalId)) {
       results.push({
         index,
@@ -226,23 +221,34 @@ async function buildImportPreview({ db, mapping, rows, eventId = null }) {
       return;
     }
     seenAt.set(ticket.externalId, index);
-    candidates.push({ index, ticket });
+    candidates.push({ index, ticket: normalizeTicket(ticket, PROVIDER_NAME, eventId), unmappedCsvFields });
   });
 
-  // Sequential, one read per surviving row — bounded by MAX_IMPORT_ROWS, and
-  // the same cost class as upsertTickets' own per-row transaction below.
-  for (const { index, ticket } of candidates) {
-    const snap = await db.collection(TICKETS).doc(ticket.externalId).get();
-    const { status } = snap.exists
-      ? ticketAccessFieldsForUpdate(snap.data(), { ...ticket, ...scope }, unmappedCsvFields)
-      : ticket;
+  for (const { index, ticket, unmappedCsvFields } of candidates) {
+    let verdict;
+    let effective;
+    if (commitAt) {
+      const saved = await upsertTicket({ db, ticket, now: commitAt, unmappedCsvFields });
+      verdict = saved.action === 'updated' ? 'update' : 'create';
+      effective = saved.ticket;
+    } else {
+      const snap = await db.collection(TICKETS).doc(ticket.externalId).get();
+      verdict = snap.exists ? 'update' : 'create';
+      effective = snap.exists ? ticketForUpdate(snap.data(), ticket, unmappedCsvFields) : ticket;
+    }
     results.push({
       index,
-      verdict: snap.exists ? 'update' : 'create',
-      externalId: ticket.externalId,
-      email: ticket.email,
-      orderId: ticket.orderId,
-      status,
+      verdict,
+      externalId: effective.externalId,
+      email: effective.email,
+      orderId: effective.orderId,
+      firstName: effective.firstName,
+      lastName: effective.lastName,
+      ticketClass: effective.ticketClass,
+      ticketClassId: effective.ticketClassId,
+      purchasedAt: effective.purchasedAt,
+      status: effective.status,
+      quantity: effective.quantity,
     });
   }
 
@@ -250,7 +256,7 @@ async function buildImportPreview({ db, mapping, rows, eventId = null }) {
   const summary = { create: 0, update: 0, duplicate: 0, invalid: 0 };
   for (const row of results) summary[row.verdict] += 1;
 
-  return { results, summary, validTickets: candidates.map((c) => c.ticket), unmappedCsvFields };
+  return { results, summary };
 }
 
 /** Shared admin-POST preamble, mirroring speakers/invites.cjs's gateAdminPost. */
@@ -277,32 +283,21 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, eventId = null, 
     if (!validated.ok) return badRequest(res, validated.message);
     const { mapping, rows, dryRun } = validated;
 
-    let preview;
+    let result;
     try {
-      preview = await buildImportPreview({ db, mapping, rows, eventId });
+      result = await processImport({ db, mapping, rows, eventId, commitAt: dryRun ? undefined : () => new Date(now()) });
     } catch (err) {
-      log.error('ticketingImportCsv preview failed', err);
-      return internal(res, 'The import could not be checked. Keep this page open and contact support for help.');
+      log.error(`ticketingImportCsv ${dryRun ? 'preview' : 'commit'} failed`, err);
+      return internal(res, dryRun
+        ? 'The import could not be checked. Keep this page open and contact support for help.'
+        : 'The import could not be committed. Keep this page open and contact support for help.');
     }
 
     if (dryRun) {
       res.status(200).json({
-        ok: true, dryRun: true, total: rows.length, summary: preview.summary, rows: preview.results,
+        ok: true, dryRun: true, total: rows.length, summary: result.summary, rows: result.results,
       });
       return;
-    }
-
-    let counts;
-    try {
-      // `now` returns epoch milliseconds (the admin log's clock); the upsert
-      // stores what its clock returns, and a ticket date must be a Date.
-      counts = await upsertTickets({
-        db, tickets: preview.validTickets, providerName: PROVIDER_NAME, eventId, now: () => new Date(now()), log,
-        unmappedCsvFields: preview.unmappedCsvFields,
-      });
-    } catch (err) {
-      log.error('ticketingImportCsv commit failed', err);
-      return internal(res, 'The import could not be committed. Keep this page open and contact support for help.');
     }
 
     await logAdminAction({
@@ -318,10 +313,10 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, eventId = null, 
       ok: true,
       dryRun: false,
       total: rows.length,
-      summary: preview.summary,
-      created: counts.created,
-      updated: counts.updated,
-      rows: preview.results,
+      summary: result.summary,
+      created: result.summary.create,
+      updated: result.summary.update,
+      rows: result.results,
     });
   };
 }
@@ -456,7 +451,7 @@ function buildHandlers() {
 module.exports = {
   createTicketingImportCsvHandler,
   createTicketingListTicketsHandler,
-  buildImportPreview,
+  processImport,
   validateImportRequest,
   mapRow,
   get handlers() {
