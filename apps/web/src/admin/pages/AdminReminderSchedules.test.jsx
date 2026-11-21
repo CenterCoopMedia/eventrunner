@@ -322,8 +322,8 @@ describe('AdminReminderSchedules', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Scheduled speaker reminders' }));
     await waitFor(() => expect(screen.getByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are off.'));
-    expect(screen.getByLabelText('Reminder 1, days before')).toHaveValue('14');
-    expect(screen.queryByText('Each number of days may appear once.')).toBeNull();
+    expect(screen.getByLabelText('Reminder 1, days before')).toHaveValue(14);
+    expect(screen.queryAllByText('Each number of days may appear once.')).toHaveLength(0);
     expect(callsFor('speakers').map(([, { action }]) => action)).toEqual(['get', 'disable', 'get']);
   });
 
