@@ -13,6 +13,7 @@ const {
   internals,
 } = require('./content.cjs');
 const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
+const { createCmsPublishHandler } = require('./publish.cjs');
 const { publishDocs } = require('./store.cjs');
 const { BLOCK_TYPES } = require('./blockTypes.cjs');
 
@@ -655,6 +656,63 @@ const ORPHAN = {
 };
 const MOVE_REQUEST = { docId: 'removed__answer', pageId: 'test-page', section: 'faq' };
 const PUBLISHER_ENV = { EVENT_SITE_PUBLISHER_JOB: 'publisher-fixture', EVENT_FIREBASE_PROJECT_ID: 'project-fixture' };
+
+test('draft recovery preserves the public page until the ordinary Publish flow runs', async () => {
+  const db = makeFakeDb({
+    'cmsContent/faq__existing': { ...ORPHAN, section: 'faq', field: 'existing', answer: 'Use the east entrance.' },
+    'cmsContent/removed__answer': { ...ORPHAN, revision: 4 },
+    'cmsContent_drafts/removed__answer': { ...ORPHAN, answer: 'At ten.', status: 'dirty', basedOnRevision: 4 },
+    'cmsContent/removed__parking': { ...ORPHAN, field: 'parking', question: 'Where is parking?', answer: 'Lot B.' },
+    'cmsVersionHistory/source': { docPath: 'cmsContent/removed__answer', revision: 4 },
+    'config/launch': { comingSoon: true },
+  });
+  const readPublic = createGetSiteContentHandler(deps(db));
+  async function publicPageBlocks() {
+    const res = fakeRes();
+    await readPublic(req({ method: 'GET', token: null }), res);
+    assert.equal(res.statusCode, 200);
+    const { sections } = db.read('cmsPages', 'test-page');
+    return res.body.content.filter((block) => sections.some(({ id }) => id === block.section));
+  }
+  const before = await publicPageBlocks();
+  let publisherCalls = 0;
+  const move = createCmsMoveContentHandler(deps(db, {
+    asDraft: true, env: PUBLISHER_ENV, fetchImpl: async () => { publisherCalls += 1; },
+  }));
+  const edited = fakeRes();
+  await move(req({ body: MOVE_REQUEST }), edited);
+  assert.equal(edited.statusCode, 200);
+  assert.deepEqual(edited.body, { docId: 'faq__answer', status: 'dirty' });
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1);
+  const moved = db.read('cmsContent_drafts', 'faq__answer');
+  assert.equal(moved.answer, 'At ten.');
+  assert.equal(moved.status, 'dirty');
+  assert.equal(moved.basedOnRevision, null);
+  assert.equal(moved.order, 2);
+  assert.equal(db.read('cmsContent', 'removed__answer'), undefined);
+  assert.equal(db.read('cmsContent_drafts', 'removed__answer'), undefined);
+  assert.equal(db.read('cmsContent', 'faq__answer'), undefined);
+
+  const publishedOnly = fakeRes();
+  await move(req({ body: { ...MOVE_REQUEST, docId: 'removed__parking' } }), publishedOnly);
+  assert.equal(publishedOnly.statusCode, 200);
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 2);
+  assert.deepEqual(await publicPageBlocks(), before);
+  assert.deepEqual(db.ids('cmsPublishQueue'), []);
+  assert.deepEqual(db.ids('cmsVersionHistory'), ['source']);
+  assert.equal(db.read('config', 'launch').comingSoon, true);
+  assert.equal(publisherCalls, 0);
+
+  const published = fakeRes();
+  await createCmsPublishHandler(deps(db, { env: {} }))(req({ body: { all: true } }), published);
+  assert.equal(published.statusCode, 200);
+  assert.deepEqual(published.body.results.cmsContent.published, ['faq__answer', 'faq__parking']);
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 0);
+  assert.equal(db.read('cmsContent_drafts', 'faq__answer').status, 'clean');
+  assert.deepEqual((await publicPageBlocks()).map(({ id, answer }) => [id, answer]), [
+    ['faq__existing', 'Use the east entrance.'], ['faq__answer', 'At ten.'], ['faq__parking', 'Lot B.'],
+  ]);
+});
 
 test('cmsMoveContent publishes to the next available destination key and keeps edits private', async () => {
   const db = makeFakeDb({

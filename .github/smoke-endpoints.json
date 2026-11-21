@@ -8,6 +8,7 @@
     "cmsUpdateContent",
     "cmsDeleteContent",
     "cmsMoveContent",
+    "cmsMoveContentAsDraft",
     "cmsGetVersionHistory",
     "cmsSavePage",
     "cmsDeletePage",

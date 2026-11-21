@@ -8,7 +8,8 @@
  *   cmsUpdateContent  admin POST — merge onto the draft (forking one from
  *                     the live doc if only that exists); DRAFTS ONLY
  *   cmsDeleteContent  admin POST — removes live + draft in one transaction
- *   cmsMoveContent    admin POST — recovers a block into a page section
+ *   cmsMoveContent    admin POST — recovers and publishes a block
+ *   cmsMoveContentAsDraft admin POST — recovers a block as a dirty draft
  *   getSiteContent    PUBLIC GET — published cmsContent where visible==true
  *
  * cmsContent docs are keyed section+field (spec §4.1): the doc id is
@@ -17,8 +18,8 @@
  * collections address docs by explicit docId; cmsPages/cmsUpdates are out
  * of scope here (see GENERIC_COLLECTIONS).
  *
- * Saves write drafts only. Recovery publishes the moved block and keeps
- * any separate unpublished changes in its draft.
+ * Saves and draft recovery write drafts only. Immediate recovery publishes
+ * the moved block and keeps any separate unpublished changes in its draft.
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
@@ -688,8 +689,8 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
   };
 }
 
-/** @param {{ db, auth, getConfig, env?: object, fetchImpl?: typeof fetch, notifyOperator?: Function, now?: () => number, log?: Console }} deps */
-function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, notifyOperator, now = Date.now, log = console }) {
+/** @param {{ db, auth, getConfig, env?: object, fetchImpl?: typeof fetch, notifyOperator?: Function, now?: () => number, log?: Console, asDraft?: boolean }} deps */
+function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, notifyOperator, now = Date.now, log = console, asDraft = false }) {
   return async function cmsMoveContent(req, res) {
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
@@ -704,14 +705,15 @@ function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, noti
     const draftCollection = db.collection(draftCollectionFor(collection));
     const sourceLiveRef = liveCollection.doc(docId);
     const sourceDraftRef = draftCollection.doc(docId);
-    const queueRef = db.collection('cmsPublishQueue').doc();
+    const queueRef = asDraft ? null : db.collection('cmsPublishQueue').doc();
     let destinationId;
     try {
       destinationId = await db.runTransaction(async (tx) => {
         const [liveSnap, draftSnap] = await tx.getAll(sourceLiveRef, sourceDraftRef);
         const live = liveSnap.data();
         const draft = draftSnap.data();
-        const source = live ?? draft;
+        const pendingDraft = draft?.status === 'dirty';
+        const source = asDraft && pendingDraft ? draft : live ?? draft;
         if (!source) throw new RequestError(404, 'not-found', 'This block is no longer available to move.');
         if (typeof source.field !== 'string' || !SECTION_FIELD_RE.test(source.field)) {
           throw new RequestError(400, 'bad-request', 'This block has an invalid saved address.');
@@ -732,8 +734,7 @@ function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, noti
           throw new RequestError(409, 'conflict', 'This block already belongs to a page. Refresh Content and try again.');
         }
 
-        const pendingDraft = draft?.status === 'dirty';
-        const keepDraft = live && pendingDraft;
+        const keepDraft = !asDraft && live && pendingDraft;
         const blockTypes = keepDraft ? [live.blockType, draft.blockType] : [source.blockType];
         const sectionRule = await checkContentCreateSection({
           db, tx, collection, pageId, sectionId: section, blockTypes,
@@ -770,38 +771,43 @@ function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, noti
           return Number.isSafeInteger(value) ? Math.max(last, value) : last;
         }, 0) + 1;
         const moved = { section, field, order };
-        const publishedAt = new Date(now());
-        const revision = 1 + await storeInternals.maxHistoryRevision({ db, tx, docPath: `${collection}/${newId}` });
-        const publication = storeInternals.publicationOf({
-          collection, docId: newId, revision, publishedAt, actor,
-          draft: sanitizeRichTextFields(withoutSeedFlag({ ...source, ...moved })),
-        });
-        if (pendingDraft && !keepDraft) await writePendingDelta({ db, tx, collection, delta: -1, now });
+        const fields = sanitizeRichTextFields(withoutSeedFlag({ ...source, ...moved }));
 
         // The destination uses the normal section/field key so edits,
         // ordering and deletion keep working after the move.
-        tx.create(liveCollection.doc(newId), publication.live);
-        tx.create(draftCollection.doc(newId), {
-          ...(keepDraft ? withoutSeedFlag({ ...draft, ...moved }) : {
-            ...publication.version.fields,
-            visible: publication.live.visible,
-            status: 'clean',
+        if (asDraft) {
+          await writeDraft({
+            db, tx, collection, docId: newId, fields, visible: source.visible === true, actor, now,
+            createOnly: true, rejectLive: true, replacesDirtyDraft: pendingDraft,
+          });
+        } else {
+          const publishedAt = new Date(now());
+          const revision = 1 + await storeInternals.maxHistoryRevision({ db, tx, docPath: `${collection}/${newId}` });
+          const publication = storeInternals.publicationOf({ collection, docId: newId, revision, publishedAt, actor, draft: fields });
+          if (pendingDraft && !keepDraft) await writePendingDelta({ db, tx, collection, delta: -1, now });
+          tx.create(liveCollection.doc(newId), publication.live);
+          tx.create(draftCollection.doc(newId), {
+            ...(keepDraft ? withoutSeedFlag({ ...draft, ...moved }) : {
+              ...publication.version.fields,
+              visible: publication.live.visible,
+              status: 'clean',
+              updatedAt: publishedAt,
+              updatedBy: actor.email,
+            }),
+            basedOnRevision: revision,
+          });
+          tx.set(db.collection('cmsVersionHistory').doc(), publication.version);
+          tx.create(queueRef, {
+            status: 'done',
+            request: { [collection]: [newId] },
+            progress: { [collection]: { published: [newId], skipped: [], chunksCommitted: 1 } },
+            plannedChunks: 1,
+            requestedBy: actor.email,
+            requestedAt: publishedAt,
             updatedAt: publishedAt,
-            updatedBy: actor.email,
-          }),
-          basedOnRevision: revision,
-        });
-        tx.set(db.collection('cmsVersionHistory').doc(), publication.version);
-        tx.create(queueRef, {
-          status: 'done',
-          request: { [collection]: [newId] },
-          progress: { [collection]: { published: [newId], skipped: [], chunksCommitted: 1 } },
-          plannedChunks: 1,
-          requestedBy: actor.email,
-          requestedAt: publishedAt,
-          updatedAt: publishedAt,
-          finishedAt: publishedAt,
-        });
+            finishedAt: publishedAt,
+          });
+        }
         tx.set(sectionRule.lock.ref, sectionRule.lock.data);
         tx.delete(sourceLiveRef);
         tx.delete(sourceDraftRef);
@@ -818,9 +824,11 @@ function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, noti
       throw err;
     }
     await logAdminAction({
-      db, action: 'cms-move-content', docPath: `${collection}/${destinationId}`, actor, now, log,
+      db, action: asDraft ? 'cms-move-content-as-draft' : 'cms-move-content',
+      docPath: `${collection}/${destinationId}`, actor, now, log,
       details: { from: `${collection}/${docId}` },
     });
+    if (asDraft) return res.status(200).json({ docId: destinationId, status: 'dirty' });
     const publisher = await refreshSiteAfterPublish({ db, queueId: queueRef.id, env, fetchImpl, notifyOperator, now, log });
     res.status(200).json({ docId: destinationId, queueId: queueRef.id, publisher });
   };
@@ -975,6 +983,11 @@ function buildHandlers() {
     })),
     cmsMoveContent: onRequest({ region, secrets: publisherNotificationSecrets() }, withCors(['POST'], async (req, res) => {
       await createCmsMoveContentHandler(withPublisherNotifier(buildDeps()))(req, res);
+    })),
+    // A separate endpoint keeps draft recovery safe against older functions
+    // deployments that would publish immediately if handed a new request flag.
+    cmsMoveContentAsDraft: onRequest({ region }, withCors(['POST'], async (req, res) => {
+      await createCmsMoveContentHandler({ ...buildDeps(), asDraft: true })(req, res);
     })),
     getSiteContent: onRequest({ region }, withCors(['GET'], async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');

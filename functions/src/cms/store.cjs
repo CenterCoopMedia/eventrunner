@@ -133,19 +133,21 @@ function writeConfigVersion({ tx, ref, historyRef, docPath, fields, at, actor })
  *
  * Every read here happens before the write, so a caller may interleave its
  * own reads (Firestore requires all reads before all writes).
+ * A move that deletes an existing dirty draft in this transaction sets
+ * `replacesDirtyDraft` so the new draft takes its place in the pending count.
  *
  * @param {{ db: FirebaseFirestore.Firestore, tx?: FirebaseFirestore.Transaction,
  *           collection: string,
  *           docId: string, fields: object, visible?: boolean,
  *           actor: { uid: string, email: string }, now?: () => number,
- *           createOnly?: boolean, rejectLive?: boolean }} args
+ *           createOnly?: boolean, rejectLive?: boolean, replacesDirtyDraft?: boolean }} args
  * @returns {Promise<{ docPath: string, existed: boolean }>}
  */
-async function writeDraft({ db, tx = null, collection, docId, fields, visible, actor, now = Date.now, createOnly = false, rejectLive = false }) {
+async function writeDraft({ db, tx = null, collection, docId, fields, visible, actor, now = Date.now, createOnly = false, rejectLive = false, replacesDirtyDraft = false }) {
   const draftCol = draftCollectionFor(collection);
   if (!tx) {
     return db.runTransaction((ownedTx) => writeDraft({
-      db, tx: ownedTx, collection, docId, fields, visible, actor, now, createOnly, rejectLive,
+      db, tx: ownedTx, collection, docId, fields, visible, actor, now, createOnly, rejectLive, replacesDirtyDraft,
     }));
   }
   const ref = db.collection(draftCol).doc(docId);
@@ -188,7 +190,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     updatedBy: actor.email,
   };
   const wasDirty = draftSnap.exists && draftSnap.data()?.status === 'dirty';
-  await writePendingDelta({ db, tx, collection, delta: wasDirty ? 0 : 1, now });
+  await writePendingDelta({ db, tx, collection, delta: Number(!wasDirty) - Number(replacesDirtyDraft), now });
   if (createOnly) tx.create(ref, payload);
   else tx.set(ref, payload);
   return { docPath: `${draftCol}/${docId}`, existed: draftSnap.exists };
