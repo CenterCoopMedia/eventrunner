@@ -115,6 +115,17 @@ function normalizeTicket(record, providerName, eventId = null) {
   };
 }
 
+function ticketAccessFieldsForUpdate(current, ticket, unmappedCsvFields) {
+  const sameScope = current.provider === ticket.provider && (current.eventId ?? null) === ticket.eventId;
+  const keepClass = sameScope && unmappedCsvFields.includes('ticketClassId');
+  const keepStatus = sameScope && unmappedCsvFields.includes('status') && TICKET_STATUSES.includes(current.status);
+  const terminal = (status) => TICKET_TERMINAL_STATUSES.includes(status);
+  return {
+    ...(keepClass ? { ticketClassId: current.ticketClassId ?? null } : {}),
+    status: keepStatus || (terminal(current.status) && !terminal(ticket.status)) ? current.status : ticket.status,
+  };
+}
+
 /**
  * Upsert one ticket. Idempotent by construction and claim-preserving: the
  * claim fields (`claimedByUid`, `claimedAt`, `claimPromptSentAt`) are
@@ -131,10 +142,10 @@ function normalizeTicket(record, providerName, eventId = null) {
  * cannot restore access or hold ticket-derived revocation. Check inside
  * the transaction so a racing terminal write also survives a retry.
  *
- * @param {{ db: object, ticket: object, now?: () => Date }} deps
+ * @param {{ db: object, ticket: object, now?: () => Date, unmappedCsvFields?: string[] }} deps
  * @returns {Promise<{ action: 'created'|'updated' }>}
  */
-async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPolicy = false }) {
+async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPolicy = false, unmappedCsvFields = [] }) {
   const ref = db.collection(TICKETS).doc(ticket.externalId);
   return db.runTransaction(async (tx) => {
     if (respectDemoPolicy && !await writesAllowed(db, tx)) return { action: 'blocked' };
@@ -151,10 +162,8 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
       });
       return { action: 'created' };
     }
-    const currentStatus = snap.data()?.status;
-    const terminal = (status) => TICKET_TERMINAL_STATUSES.includes(status);
-    const status = terminal(currentStatus) && !terminal(ticket.status) ? currentStatus : ticket.status;
-    tx.set(ref, { ...ticket, status, updatedAt: at }, { merge: true });
+    const accessFields = ticketAccessFieldsForUpdate(snap.data(), ticket, unmappedCsvFields);
+    tx.set(ref, { ...ticket, ...accessFields, updatedAt: at }, { merge: true });
     return { action: 'updated' };
   });
 }
@@ -164,10 +173,10 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
  * skipped, never guessed at.
  *
  * @param {{ db: object, tickets: object[], providerName: string, eventId?: string|null,
- *           now?: () => Date, log?: Pick<Console,'warn'> }} deps
+ *           now?: () => Date, log?: Pick<Console,'warn'>, unmappedCsvFields?: string[] }} deps
  * @returns {Promise<{ created: number, updated: number, skipped: number }>}
  */
-async function upsertTickets({ db, tickets, providerName, eventId = null, now = () => new Date(), log = console, respectDemoPolicy = false }) {
+async function upsertTickets({ db, tickets, providerName, eventId = null, now = () => new Date(), log = console, respectDemoPolicy = false, unmappedCsvFields }) {
   let created = 0;
   let updated = 0;
   let skipped = 0;
@@ -178,7 +187,7 @@ async function upsertTickets({ db, tickets, providerName, eventId = null, now = 
       log.warn('ticketing: skipped a ticket with no usable externalId');
       continue;
     }
-    const { action } = await upsertTicket({ db, ticket: normalized, now, respectDemoPolicy });
+    const { action } = await upsertTicket({ db, ticket: normalized, now, respectDemoPolicy, unmappedCsvFields });
     if (action === 'blocked') return { created, updated, skipped, blocked: true };
     if (action === 'created') created += 1;
     else updated += 1;
@@ -583,6 +592,7 @@ module.exports = {
   createTicketingSyncHandler,
   upsertTicket,
   upsertTickets,
+  ticketAccessFieldsForUpdate,
   get handlers() {
     return buildHandlers();
   },

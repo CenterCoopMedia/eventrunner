@@ -19,9 +19,9 @@
  *
  * DRY RUN vs COMMIT. Both modes run the identical validate → normalize →
  * dedupe → classify pipeline (`buildImportPreview`) and differ only in
- * whether `upsertTickets` (sync.cjs) is then called — so a dry-run preview
- * can never show a different verdict than the commit that follows it. The
- * existence check (create vs. update) does one read per surviving row,
+ * whether `upsertTickets` (sync.cjs) is then called. Update status is
+ * projected from the preview read and recalculated in the write transaction.
+ * The existence check (create vs. update) does one read per surviving row,
  * which is also why rows are capped (MAX_IMPORT_ROWS): an admin re-pasting
  * a 50,000-row platform export would otherwise spend that many reads on a
  * preview nobody asked to commit yet.
@@ -38,7 +38,7 @@ const { logAdminAction } = require('../cms/store.cjs');
 const {
   internals: { TICKETS, isSafeDocId, TICKET_STATUSES },
 } = require('./index.cjs');
-const { upsertTickets } = require('./sync.cjs');
+const { ticketAccessFieldsForUpdate, upsertTickets } = require('./sync.cjs');
 const { iso } = require('./stripeCommerce.cjs');
 const { normalizeTicketClassId } = require('shared/ticketAccess');
 
@@ -120,8 +120,9 @@ function normalizeStatus(raw) {
   const key = raw.toLowerCase();
   if (STATUS_ALIASES[key]) return STATUS_ALIASES[key];
   if (TICKET_STATUSES.includes(key)) return key;
-  // Empty/unmapped → an admin importing a roster is asserting these
-  // tickets are good; an unrecognized non-empty value is treated the
+  // Empty values default to valid for new tickets and mapped updates.
+  // Unmapped updates keep the current known status in the same ticket scope.
+  // An unrecognized non-empty value is treated the
   // conservative way sync.cjs's normalizeTicket treats it — "we don't know
   // yet" confers no entitlement (§3.4).
   return raw ? 'pending_info' : 'valid';
@@ -197,13 +198,16 @@ function mapRow({ row, mapping }) {
  * Validate, dedupe, and classify every row — shared by dry-run and commit
  * so they can never disagree (see module doc).
  *
- * @param {{ db: object, mapping: Record<string,string>, rows: object[] }} args
- * @returns {Promise<{ results: object[], summary: Record<string, number>, validTickets: object[] }>}
+ * @param {{ db: object, mapping: Record<string,string>, rows: object[], eventId?: string|null }} args
+ * @returns {Promise<{ results: object[], summary: Record<string, number>, validTickets: object[], unmappedCsvFields: string[] }>}
  */
-async function buildImportPreview({ db, mapping, rows }) {
+async function buildImportPreview({ db, mapping, rows, eventId = null }) {
   const seenAt = new Map();
   const results = [];
   const candidates = [];
+  // An omitted column carries no new access decision for an existing ticket.
+  const unmappedCsvFields = ['ticketClassId', 'status'].filter((field) => !mapping[field]);
+  const scope = { provider: PROVIDER_NAME, eventId: normalizeTicketClassId(eventId) };
 
   rows.forEach((row, index) => {
     const mapped = mapRow({ row, mapping });
@@ -229,13 +233,16 @@ async function buildImportPreview({ db, mapping, rows }) {
   // the same cost class as upsertTickets' own per-row transaction below.
   for (const { index, ticket } of candidates) {
     const snap = await db.collection(TICKETS).doc(ticket.externalId).get();
+    const { status } = snap.exists
+      ? ticketAccessFieldsForUpdate(snap.data(), { ...ticket, ...scope }, unmappedCsvFields)
+      : ticket;
     results.push({
       index,
       verdict: snap.exists ? 'update' : 'create',
       externalId: ticket.externalId,
       email: ticket.email,
       orderId: ticket.orderId,
-      status: ticket.status,
+      status,
     });
   }
 
@@ -243,7 +250,7 @@ async function buildImportPreview({ db, mapping, rows }) {
   const summary = { create: 0, update: 0, duplicate: 0, invalid: 0 };
   for (const row of results) summary[row.verdict] += 1;
 
-  return { results, summary, validTickets: candidates.map((c) => c.ticket) };
+  return { results, summary, validTickets: candidates.map((c) => c.ticket), unmappedCsvFields };
 }
 
 /** Shared admin-POST preamble, mirroring speakers/invites.cjs's gateAdminPost. */
@@ -272,7 +279,7 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, eventId = null, 
 
     let preview;
     try {
-      preview = await buildImportPreview({ db, mapping, rows });
+      preview = await buildImportPreview({ db, mapping, rows, eventId });
     } catch (err) {
       log.error('ticketingImportCsv preview failed', err);
       return internal(res, 'The import could not be checked. Keep this page open and contact support for help.');
@@ -291,6 +298,7 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, eventId = null, 
       // stores what its clock returns, and a ticket date must be a Date.
       counts = await upsertTickets({
         db, tickets: preview.validTickets, providerName: PROVIDER_NAME, eventId, now: () => new Date(now()), log,
+        unmappedCsvFields: preview.unmappedCsvFields,
       });
     } catch (err) {
       log.error('ticketingImportCsv commit failed', err);
