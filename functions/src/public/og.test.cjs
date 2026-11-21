@@ -518,6 +518,8 @@ const SITE_EVENT = {
   },
 };
 
+const SHORT_ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=15, must-revalidate';
+
 function siteConfig(overrides = {}) {
   return {
     event: SITE_EVENT,
@@ -710,6 +712,46 @@ test('routeMeta: translations in a public section body make a page eligible for 
   assert.match(translated.sent, /hreflang="es" href="https:\/\/example.org\/travel\?lang=es"/);
 });
 
+test('routeMeta: a failed translation read shortens fallback caching and recovery restores the Spanish alternate', async () => {
+  const event = { ...SITE_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const db = makeFakeDb({
+    ...SITE_DOCS,
+    'cmsPages/travel': { ...SITE_DOCS['cmsPages/travel'], sections: [{ id: 'travel-details' }] },
+    'cmsContent/travel-details__intro': {
+      section: 'travel-details', visible: true, blockType: 'text', value: 'Travel details',
+      translations: { es: { value: 'Detalles del viaje' } },
+    },
+  });
+  const collection = db.collection.bind(db);
+  let blocksUnavailable = true;
+  db.collection = (name) => {
+    if (name === 'cmsContent' && blocksUnavailable) throw new Error('Translated blocks unavailable');
+    return collection(name);
+  };
+  const errors = [];
+  const handler = createRouteMetaHandler({
+    db, getConfig: async () => siteConfig({ event }), fetchTemplateFn,
+    log: { error: (...args) => errors.push(args) },
+  });
+  const request = { method: 'GET', path: '/travel', originalUrl: '/travel?lang=es' };
+  const fallback = fakeRes();
+  await handler(request, fallback);
+  assert.equal(fallback.statusCode, 200);
+  assert.equal(fallback.headers['Cache-Control'], SHORT_ROUTE_CACHE_CONTROL);
+  assert.match(fallback.sent, /<title>Travel and venue ·/);
+  assert.doesNotMatch(fallback.sent, /noindex|hreflang=/);
+  assert.equal(errors.length, 1);
+
+  blocksUnavailable = false;
+  const recovered = fakeRes();
+  await handler(request, recovered);
+  assert.equal(recovered.statusCode, 200);
+  assert.equal(recovered.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
+  assert.match(recovered.sent, /rel="canonical" href="https:\/\/example.org\/travel\?lang=es"/);
+  assert.match(recovered.sent, /hreflang="es" href="https:\/\/example.org\/travel\?lang=es"/);
+  assert.equal(errors.length, 1);
+});
+
 // ------------------------------------------------------ requestedRoutePath
 
 test('requestedRoutePath: normalizes the trailing slash, the query, and repeated separators', () => {
@@ -859,6 +901,7 @@ test('routeMeta: a route with no page doc still returns the plain shell', async 
   const res = await getRoute(routeHandler(), '/no-such-page');
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Content-Type'], 'text/html; charset=utf-8');
+  assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
   assert.ok(res.sent.includes('<title>[Fixture] Harborlight Media Summit</title>'));
   assert.ok(res.sent.includes('/assets/index-abc123.js')); // the shell itself is intact
   assert.ok(res.sent.includes('<meta name="robots" content="noindex">'));
@@ -1188,6 +1231,7 @@ test('routeMeta: a config read that fails serves the shell, and never a 500, whi
   });
   const res = await getRoute(handler, '/travel');
   assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], SHORT_ROUTE_CACHE_CONTROL);
   assert.ok(res.sent.includes('/assets/index-abc123.js'));
   assert.ok(!res.sent.includes('noindex'));
   assert.equal(errors.length, 1);
@@ -1233,6 +1277,7 @@ test('routeMeta: a lookup failure still serves the shell — the whole site sits
   });
   const res = await getRoute(handler, '/travel');
   assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], SHORT_ROUTE_CACHE_CONTROL);
   assert.ok(res.sent.includes('/assets/index-abc123.js'));
   assert.ok(res.sent.includes('[Fixture] Harborlight Media Summit'));
   // A read that failed is not a route that does not exist: an outage must

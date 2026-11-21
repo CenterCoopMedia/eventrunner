@@ -604,13 +604,15 @@ client already past step 3 never needs it again.
 - **What each kind of file is cached for.** Hashed files under `/assets/` are kept for a year, because a changed file gets a new name. A hashed file that a deploy removed answers 404, not the page: the page kept for a year at that address would break whoever asked for it. Fonts keep a stable name, so they are kept for 30 days and a changed font can take that long to reach a returning reader. Pages revalidate on every load, in the console as well.
 - **What `routeMeta` costs, and the cache header that bounds it.** Every public route that is not a
   static file now reaches a function on its first uncached load, rather than being rewritten
-  straight to `index.html`. Three things bound that. The response carries
+  straight to `index.html`. Three things bound that. A healthy response carries
   `Cache-Control: public, max-age=0, s-maxage=300, must-revalidate`, so the Hosting CDN — not the
   function — answers repeat traffic for the same URL, while `max-age=0, must-revalidate` keeps a
   reader's own browser from holding, or falling back to, a shell that names asset files a later
   deploy removed: `max-age=0` alone still lets a cache serve a stale copy under pressure. There is
-  deliberately no `stale-while-revalidate` for the same reason. The template is the revalidated
-  per-container copy above, so
+  deliberately no `stale-while-revalidate` for the same reason. If a config or metadata lookup
+  fails, the function serves the fallback with `s-maxage=15` so the CDN can absorb repeat
+  requests during the outage and visitors can pick up recovered metadata sooner. The template
+  is the revalidated per-container copy above, so
   a warm container transfers no body between deploys. And the config read is `core/config.cjs`'s
   shared 5-minute container cache, which `s-maxage` matches: a publish reaches search and social
   previews within that window instead of at the next cold start, and a hosting deploy clears the

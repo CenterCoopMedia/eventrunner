@@ -409,6 +409,8 @@ function createUpdatesMetaHandler({
  * next cold start.
  */
 const ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=300, must-revalidate';
+// A short shared cache absorbs repeated requests during a metadata outage.
+const DEGRADED_ROUTE_CACHE_CONTROL = 'public, max-age=0, s-maxage=15, must-revalidate';
 
 /** Ceiling on a request path before it is even parsed. */
 // Allow percent-encoded organization IDs within the CMS document-ID limit.
@@ -997,11 +999,8 @@ function createRouteMetaHandler({
     }
 
     try {
-      // Each of the three reads below can fail on its own, and none of
-      // them is worth a 5xx for the whole site: the shell alone still
-      // boots the app, which fetches its own configuration. `degraded`
-      // records that a route WOULD have had tags, so it is not marked
-      // noindex the way a route that genuinely does not exist is.
+      // The shell still boots the app when metadata reads fail. Mark the
+      // response as degraded to keep it indexable and shorten its cache lifetime.
       let config = null;
       let address;
       let degraded = false;
@@ -1050,14 +1049,17 @@ function createRouteMetaHandler({
       }
 
       const spanishSections = await readRouteSpanishSections({ db, event: config?.event, path, subject })
-        .catch((err) => { log.error('routeMeta could not resolve translated page blocks', err); });
+        .catch((err) => {
+          degraded = true;
+          log.error('routeMeta could not resolve translated page blocks', err);
+        });
       const meta = resolveRouteMeta({
         config, subject, path, address, requestedLanguage: requestedContentLanguage(req), spanishSections, homeBlocks, degraded,
       });
       res.status(200);
       res.set('Content-Type', 'text/html; charset=utf-8');
       res.set('Content-Language', meta.language);
-      res.set('Cache-Control', ROUTE_CACHE_CONTROL);
+      res.set('Cache-Control', degraded ? DEGRADED_ROUTE_CACHE_CONTROL : ROUTE_CACHE_CONTROL);
       res.send(buildRouteHtml({ template, meta }));
     } catch (err) {
       log.error('routeMeta failed', err);
