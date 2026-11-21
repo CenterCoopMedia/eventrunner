@@ -153,11 +153,16 @@ function createGetTicketingStatusHandler({ db, provider, auth, getConfig, now })
       res.status(verdict.status).json({ error: { code: verdict.code, message: verdict.message } });
       return;
     }
-    const [status, credentialCheck] = await Promise.all([
+    const [status, credentialCheck, chargesEnabled] = await Promise.all([
       readTicketingStatus({ db, provider, getConfig, now }),
       provider.checkCredential?.(),
+      provider.checkChargesEnabled?.(),
     ]);
-    res.status(200).json({ ...status, ...(credentialCheck ? { credentialCheck } : {}) });
+    res.status(200).json({
+      ...status,
+      ...(credentialCheck ? { credentialCheck } : {}),
+      ...(chargesEnabled !== undefined ? { chargesEnabled } : {}),
+    });
   };
 }
 

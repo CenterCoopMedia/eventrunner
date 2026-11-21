@@ -265,6 +265,35 @@ describe('AdminTicketing', () => {
     expect(screen.getByLabelText('Ticket code for check-in')).toBeInTheDocument();
   });
 
+  it('shows Stripe charge availability for paid sales and updates it on refresh', async () => {
+    let chargesEnabled = false;
+    callMock.mockImplementation(async (name, body) => {
+      if (name === 'getTicketingStatus') return { ...STATUS, provider: 'stripe', chargesEnabled };
+      if (body.action === 'catalog') return { mode: 'test', catalog: {
+        published: true, salesPaused: false, currency: 'usd',
+        ticketTypes: [{ id: 'general', name: 'General', visibility: 'public', active: true, unitAmount: 5000 }],
+      } };
+      if (body.action === 'orders') return { orders: [], nextCursor: null };
+      if (body.action === 'tickets') return { tickets: [], nextCursor: null };
+      throw new Error(`unexpected call: ${name}`);
+    });
+    render(<AdminTicketing />);
+    expect(await screen.findByText('Paid sales unavailable')).toBeVisible();
+    expect(screen.getByText(/Stripe has disabled payments on this account/)).toBeVisible();
+    expect(screen.getByLabelText('Ticket code for check-in')).toBeInTheDocument();
+    expect(screen.queryByText('New sales enabled')).not.toBeInTheDocument();
+
+    chargesEnabled = null;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText('Paid sales unverified')).toBeVisible();
+    expect(screen.queryByText(/Stripe has disabled payments on this account/)).not.toBeInTheDocument();
+
+    chargesEnabled = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText('New sales enabled')).toBeVisible();
+    expect(screen.queryByText('Paid sales unverified')).not.toBeInTheDocument();
+  });
+
   it('retries an initial Stripe catalog failure in place and clears the stale error', async () => {
     let catalogCalls = 0;
     let resolveCatalog;

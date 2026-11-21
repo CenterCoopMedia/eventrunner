@@ -236,6 +236,52 @@ test('getTicketingStatus is admin-gated', async () => {
   assert.equal(checks, 1);
 });
 
+test('getTicketingStatus reads Stripe charge availability for the configured account', async () => {
+  const { createStripeProvider } = require('./providers/stripe.cjs');
+  const env = {
+    EVENT_TICKETING_EVENT_ID: 'sample-event',
+    EVENT_STRIPE_ACCOUNT_ID: 'acct_Sample',
+    EVENT_STRIPE_MODE: 'test',
+  };
+  const cases = [
+    [{ id: 'acct_Sample', charges_enabled: false }, false],
+    [{ id: 'acct_Sample', charges_enabled: true }, true],
+    [{ id: 'acct_Sample' }, null],
+    [{ id: 'acct_Other', charges_enabled: true }, null],
+    [new Error('private-provider-detail'), null],
+  ];
+  const calls = [];
+  const provider = createStripeProvider({
+    env,
+    stripeClient: { accounts: {
+      async retrieve(...args) {
+        const [account] = cases[calls.length];
+        calls.push(args);
+        if (account instanceof Error) throw account;
+        return account;
+      },
+    } },
+  });
+  const handler = createGetTicketingStatusHandler({
+    db: makeFakeDb(), provider, auth, now: () => T0,
+    getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN] } }),
+  });
+
+  const attendee = makeRes();
+  await handler({ method: 'GET', headers: { authorization: 'Bearer ada' } }, attendee);
+  assert.equal(attendee.statusCode, 403);
+  assert.deepEqual(calls, []);
+
+  for (const [, expected] of cases) {
+    const res = makeRes();
+    await handler({ method: 'GET', headers: { authorization: 'Bearer admin' } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.chargesEnabled, expected);
+    assert.doesNotMatch(JSON.stringify(res.body), /acct_Sample|acct_Other|private-provider-detail/);
+  }
+  assert.deepEqual(calls, cases.map(() => [null, {}, { timeout: 3_000, maxNetworkRetries: 0 }]));
+});
+
 test('getTicketingStatus reports Eventbrite credential rejection separately from an unavailable check', async () => {
   const { createEventbriteProvider } = require('./providers/eventbrite.cjs');
   const cases = [
