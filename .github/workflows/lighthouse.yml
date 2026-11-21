@@ -40,6 +40,11 @@ concurrency:
 
 jobs:
   lighthouse:
+    name: lighthouse (${{ matrix.scenario }})
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [clean-1, clean-2, clean-3, long-task]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -52,6 +57,8 @@ jobs:
           fetch-depth: 0
       - name: Test web input selection
         run: node --test scripts/ci/lighthouse-changes.test.cjs
+      - name: Test route reports
+        run: node --test scripts/ci/lighthouse-report.test.cjs
       - name: Select web input changes
         id: inputs
         env:
@@ -72,12 +79,20 @@ jobs:
       - name: Build the demo at the root path
         if: steps.inputs.outputs.measure == 'true'
         run: node scripts/build-demo.cjs --base / --out .lighthouse-site
+      - name: Record the demo's file checksums
+        if: steps.inputs.outputs.measure == 'true'
+        run: find .lighthouse-site -type f -print0 | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/lighthouse-demo.sha256"
+      - name: Inject a post-paint main-thread task on Home
+        if: steps.inputs.outputs.measure == 'true' && matrix.scenario == 'long-task'
+        run: node scripts/ci/lighthouse-proof-fixture.cjs
       - name: Collect mobile runs per route
         if: steps.inputs.outputs.measure == 'true'
         run: npm exec --yes --ignore-scripts --package=@lhci/cli@0.16.1 -- lhci collect --config=scripts/ci/lighthouserc.cjs
       - name: Summarize route medians
         if: always() && steps.inputs.outputs.measure == 'true'
-        run: node scripts/ci/lighthouse-report.cjs
+        run: |
+          cp "$RUNNER_TEMP/lighthouse-demo.sha256" .lighthouseci/demo.sha256
+          node scripts/ci/lighthouse-report.cjs
       - name: Assert performance limits
         if: steps.inputs.outputs.measure == 'true'
         run: npm exec --yes --ignore-scripts --package=@lhci/cli@0.16.1 -- lhci assert --config=scripts/ci/lighthouserc.cjs
@@ -85,7 +100,7 @@ jobs:
         if: always() && steps.inputs.outputs.measure == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          name: lighthouse-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
           path: .lighthouseci/
           include-hidden-files: true
           if-no-files-found: error
