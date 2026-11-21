@@ -142,7 +142,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features, vis
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-xs">
+        <div className="flex min-w-0 flex-wrap items-center gap-xs">
           <ReorderControls
             label={label}
             index={index}

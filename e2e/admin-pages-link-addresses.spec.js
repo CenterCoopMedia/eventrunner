@@ -6,7 +6,7 @@ import { expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 
 test.use({ trace: 'off', screenshot: 'off' });
 
-test('the Pages list shows the full destination of a custom navigation link', async ({ page }) => {
+test('the Pages list keeps navigation link addresses readable and move controls within the row', async ({ page }) => {
   const id = 'navigation-address-reflow';
   const label = 'Parking directions';
   const url = 'https://example.test/parking/accessibilityInstructionsForTheWestEntranceAndOverflowLot';
@@ -34,6 +34,22 @@ test('the Pages list shows the full destination of a custom navigation link', as
       await expectPageFits(page);
       await row.screenshot({ path: path.join(evidence, `pages-link-address-${profile.width}.png`), animations: 'disabled' });
     }
+
+    await setReflowProfile(page, { width: 320, rootSize: 32 });
+    await expectPageFits(page);
+    const moveButtons = row.getByRole('button', { name: new RegExp(`^(Drag|Move) ${label}`) });
+    await expect(moveButtons).toHaveCount(3);
+    const outOfBounds = await moveButtons.evaluateAll((buttons) => buttons.flatMap((button) => {
+      const rowBounds = button.closest('li').getBoundingClientRect();
+      const bounds = button.getBoundingClientRect();
+      return bounds.left < rowBounds.left || bounds.right > rowBounds.right
+        || bounds.width < 44 || bounds.height < 44 ? [button.getAttribute('aria-label')] : [];
+    }));
+    expect(outOfBounds, 'move controls fit within the row and keep their touch targets').toEqual([]);
+    await row.screenshot({ path: path.join(evidence, 'pages-link-reorder-320-200pct.png'), animations: 'disabled' });
+    await row.getByRole('button', { name: `Move ${label} up` }).click();
+    await expect(page.getByText(`${label} moved to position`)).toBeAttached();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
     await title.press('Enter');
     await expect(page.getByRole('textbox', { name: 'HTTPS URL' })).toHaveValue(url);
