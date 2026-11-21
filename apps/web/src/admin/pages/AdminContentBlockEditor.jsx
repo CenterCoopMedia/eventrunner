@@ -283,6 +283,24 @@ function plainTextAsParagraph(value) {
   return `<p>${escaped}</p>`;
 }
 
+function shortTextAsRichText(shortText) {
+  const spanish = shortText.translations?.es?.value;
+  return {
+    ...shortText,
+    blockType: 'richtext',
+    values: { ...shortText.values, value: plainTextAsParagraph(shortText.values?.value) },
+    ...(typeof spanish === 'string' && spanish
+      ? { translations: { ...shortText.translations, es: { ...shortText.translations.es, value: plainTextAsParagraph(spanish) } } }
+      : {}),
+  };
+}
+
+function textDraftKey(form) {
+  if (!form) return null;
+  const { values, translations } = contentEditSnapshot('', form);
+  return JSON.stringify({ values, translations });
+}
+
 export default function AdminContentBlockEditor({ mode }) {
   const { pageId, sectionId, field: fieldParam } = useParams();
   const newBlockHref = useHref('../_new', { relative: 'path' });
@@ -335,9 +353,8 @@ export default function AdminContentBlockEditor({ mode }) {
   // the last successful save) — the reference point for clearing a PRIOR
   // type's stale fields when the operator switches types and saves again.
   const savedBlockTypeRef = useRef(null);
-  // The Short text form as it was when the operator switched away from it,
-  // so switching back restores the words and translations (issue #1184).
-  const shortTextRef = useRef(null);
+  // Keep the words and translations from each text type while trying another type.
+  const textDraftsRef = useRef({ text: null, richtext: null });
   // The type the editor adopted or last saved, for the picker: a live
   // update from another session does not move it (issue #1184).
   const [baseType, setBaseType] = useState(null);
@@ -364,7 +381,7 @@ export default function AdminContentBlockEditor({ mode }) {
     setSavedEdit(contentEditSnapshot(nextField, editable));
     savedBlockTypeRef.current = doc?.blockType ?? null;
     setBaseType(doc?.blockType ?? null);
-    shortTextRef.current = null;
+    textDraftsRef.current = { text: null, richtext: null };
   }, [mode, sectionId, fieldParam, existingRow, contentReady]);
 
   useEffect(() => {
@@ -491,25 +508,32 @@ export default function AdminContentBlockEditor({ mode }) {
   const currentFieldId = isExisting ? fieldParam ?? fieldId : fieldId;
 
   function changeBlockType(nextType) {
-    if (content.blockType === 'text' && nextType !== 'text') shortTextRef.current = content;
-    const shortText = shortTextRef.current;
-    setContent((current) => {
-      const placement = { order: current.order, visible: current.visible };
-      if (shortText && nextType === 'text') return { ...shortText, ...placement };
-      // Keep the Short text words and translation even if the organizer
-      // tried another block type before choosing Text.
-      if (shortText && nextType === 'richtext') {
-        const spanish = shortText.translations?.es?.value;
-        return {
-          ...shortText,
-          ...placement,
-          blockType: 'richtext',
-          values: { ...shortText.values, value: plainTextAsParagraph(shortText.values?.value) },
-          ...(typeof spanish === 'string' && spanish
-            ? { translations: { ...shortText.translations, es: { ...shortText.translations.es, value: plainTextAsParagraph(spanish) } } }
-            : {}),
+    if (content.blockType === nextType) return;
+    const drafts = textDraftsRef.current;
+    if (content.blockType === 'text') {
+      const richText = drafts.richtext;
+      if (richText) {
+        // A save can clear the Short text snapshot while a newer Text draft survives.
+        const previousShort = drafts.text ?? (savedEdit?.blockType === 'text' ? savedEdit : null);
+        // Only the language edited in Short text supersedes its Text draft.
+        const englishChanged = content.values.value !== (previousShort?.values.value ?? '');
+        const spanishChanged = content.translations?.es?.value !== previousShort?.translations?.es?.value;
+        const converted = shortTextAsRichText(content);
+        drafts.richtext = {
+          ...richText,
+          values: englishChanged ? converted.values : richText.values,
+          ...(spanishChanged ? { translations: converted.translations } : {}),
         };
       }
+      drafts.text = content;
+    } else if (content.blockType === 'richtext') {
+      drafts.richtext = content;
+    }
+    const restored = nextType === 'richtext' ? drafts.richtext ?? (drafts.text && shortTextAsRichText(drafts.text))
+      : nextType === 'text' ? drafts.text : null;
+    setContent((current) => {
+      const placement = { order: current.order, visible: current.visible };
+      if (restored) return { ...restored, ...placement };
       return {
         ...blankContent(nextType),
         ...placement,
@@ -530,16 +554,7 @@ export default function AdminContentBlockEditor({ mode }) {
   }
 
   async function save({ publish }) {
-    // Short text edited while this save runs keeps its own undo; the same
-    // words cached again by a round trip of switches do not.
-    // Only the words and translations: a restore takes order and
-    // visibility from the current form.
-    const shortTextKey = (form) => {
-      if (!form) return null;
-      const { values, translations } = contentEditSnapshot('', form);
-      return JSON.stringify({ values, translations });
-    };
-    const shortTextAtSave = shortTextKey(shortTextRef.current);
+    const textDraftsAtSave = { ...textDraftsRef.current };
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -611,9 +626,11 @@ export default function AdminContentBlockEditor({ mode }) {
       loadedKeyRef.current = `${sectionId}__${nextFieldId}`;
       savedBlockTypeRef.current = savedContent.blockType;
       setBaseType(savedContent.blockType);
-      // A saved type change is the new starting point: an undo goes no
-      // further back than the last save.
-      if (shortTextKey(shortTextRef.current) === shortTextAtSave) shortTextRef.current = null;
+      // A successful save clears cached drafts, preserving words entered while it ran.
+      const drafts = textDraftsRef.current;
+      for (const [type, draftAtSave] of Object.entries(textDraftsAtSave)) {
+        if (textDraftKey(drafts[type]) === textDraftKey(draftAtSave)) drafts[type] = null;
+      }
       setSavedEdit(contentEditSnapshot(nextFieldId, savedContent));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
@@ -704,7 +721,7 @@ export default function AdminContentBlockEditor({ mode }) {
               allowed={allowed}
               // Unsaved short text kept for a switch back keeps the option
               // too, even after a save of another type lands.
-              savedType={shortTextRef.current ? 'text' : baseType ?? undefined}
+              savedType={textDraftsRef.current.text ? 'text' : baseType ?? undefined}
               sectionName={section?.label}
               onChange={changeBlockType}
               error={errorFor('blockType')}

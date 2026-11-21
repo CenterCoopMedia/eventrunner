@@ -104,6 +104,12 @@ const BODY_BLOCK_DRAFT = {
   updatedAt: 'ignored',
 };
 
+const SHORT_TEXT_BLOCK_DRAFT = {
+  id: 'intro__note', section: 'intro', field: 'note', blockType: 'text',
+  value: 'Fees & deadlines <2027>', order: 3, visible: true, status: 'clean', revision: 1,
+  translations: { es: { value: 'Cuotas & plazos <2027>' } },
+};
+
 // A block type NOT in the 'intro' section's allowedBlocks, loaded as an
 // existing doc — the block-type picker's "widen to show a mismatched
 // existing type" path, and the fixture for switching types (label/url/
@@ -971,11 +977,7 @@ describe('creating and editing a block', () => {
     { route: 'after trying another type', intermediateType: 'Number' },
   ])('keeps the words when a Short text block becomes Text $route', async ({ intermediateType }) => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
-    sources.cmsContent_drafts = [{
-      id: 'intro__note', section: 'intro', field: 'note', blockType: 'text',
-      value: 'Fees & deadlines <2027>', order: 3, visible: true, status: 'clean', revision: 1,
-      translations: { es: { value: 'Cuotas & plazos <2027>' } },
-    }];
+    sources.cmsContent_drafts = [SHORT_TEXT_BLOCK_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__note', status: 'dirty' }));
 
     await renderAt('/admin/content/scholarships/intro/note');
@@ -1003,24 +1005,112 @@ describe('creating and editing a block', () => {
     });
   });
 
-  it('restores the Short text words when a switch to Text is undone', async () => {
+  it('restores edits in both Text languages after trying Number', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
-    sources.cmsContent_drafts = [{
-      id: 'intro__note', section: 'intro', field: 'note', blockType: 'text',
-      value: 'Fees and deadlines', order: 3, visible: true, status: 'clean', revision: 1,
-    }];
+    sources.cmsContent_drafts = [SHORT_TEXT_BLOCK_DRAFT];
+
+    await renderAt('/admin/content/scholarships/intro/note');
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
+    await chooseBlockType('Text');
+    fireEvent.click(screen.getByRole('button', { name: 'Spanish translation' }));
+    await replaceRichText(await findRichText(), '<p><strong>Updated fees</strong></p>', 'Updated fees');
+    await replaceRichText(await findRichText('Spanish Text'), '<p>Cuotas actualizadas</p>', 'Cuotas actualizadas');
+
+    await chooseBlockType('Number');
+    expect(screen.getByRole('textbox', { name: 'Figure' })).toBeInTheDocument();
+    await chooseBlockType('Text');
+
+    expect((await findRichText()).innerHTML).toBe('<p><strong>Updated fees</strong></p>');
+    expect((await findRichText('Spanish Text')).innerHTML).toBe('<p>Cuotas actualizadas</p>');
+  });
+
+  it('restores the original Short text in both languages when returning from edited Text', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [SHORT_TEXT_BLOCK_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__note', status: 'dirty' }));
 
     await renderAt('/admin/content/scholarships/intro/note');
     fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
-    const picker = screen.getByRole('group', { name: 'Block type' });
-    fireEvent.click(within(picker).getByRole('radio', { name: 'Text' }));
-    fireEvent.click(within(picker).getByRole('radio', { name: 'Short text' }));
-    expect(screen.getByRole('textbox', { name: 'Text' })).toHaveValue('Fees and deadlines');
+    await chooseBlockType('Text');
+    fireEvent.click(screen.getByRole('button', { name: 'Spanish translation' }));
+    await replaceRichText(await findRichText(), '<p>Updated fees</p>', 'Updated fees');
+    await replaceRichText(await findRichText('Spanish Text'), '<p>Cuotas actualizadas</p>', 'Cuotas actualizadas');
+    await chooseBlockType('Short text');
+    expect(screen.getByRole('textbox', { name: 'Text' })).toHaveValue('Fees & deadlines <2027>');
+    expect(screen.getByRole('textbox', { name: 'Spanish Text' })).toHaveValue('Cuotas & plazos <2027>');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).fields).toMatchObject({ blockType: 'text', value: 'Fees and deadlines' });
+    expect(bodyOf(0).fields).toMatchObject({
+      blockType: 'text', value: 'Fees & deadlines <2027>',
+      translations: { es: { value: 'Cuotas & plazos <2027>' } },
+    });
+  });
+
+  it.each([
+    { field: 'Text', value: 'Fees for 2027', english: '<p>Fees for 2027</p>', spanish: '<p>Cuotas actualizadas</p>' },
+    { field: 'Spanish Text', value: 'Cuotas de 2027', english: '<p><strong>Updated fees</strong></p>', spanish: '<p>Cuotas de 2027</p>' },
+  ])('uses the newer Short text edit in $field while keeping the other Text language', async ({ field, value, english, spanish }) => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [SHORT_TEXT_BLOCK_DRAFT];
+
+    await renderAt('/admin/content/scholarships/intro/note');
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
+    await chooseBlockType('Text');
+    fireEvent.click(screen.getByRole('button', { name: 'Spanish translation' }));
+    await replaceRichText(await findRichText(), '<p><strong>Updated fees</strong></p>', 'Updated fees');
+    await replaceRichText(await findRichText('Spanish Text'), '<p>Cuotas actualizadas</p>', 'Cuotas actualizadas');
+
+    await chooseBlockType('Short text');
+    fireEvent.change(screen.getByRole('textbox', { name: field }), { target: { value } });
+    await chooseBlockType('Text');
+
+    expect((await findRichText()).innerHTML).toBe(english);
+    expect((await findRichText('Spanish Text')).innerHTML).toBe(spanish);
+  });
+
+  it('keeps newer Short text and Text edits when a Short text save finishes', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [SHORT_TEXT_BLOCK_DRAFT];
+    let finishSave;
+    fetch.mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve; }));
+
+    await renderAt('/admin/content/scholarships/intro/note');
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
+    await chooseBlockType('Text');
+    await chooseBlockType('Short text');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    await chooseBlockType('Text');
+    fireEvent.click(screen.getByRole('button', { name: 'Spanish translation' }));
+    await replaceRichText(await findRichText('Spanish Text'), '<p>Cuotas actualizadas</p>', 'Cuotas actualizadas');
+    await chooseBlockType('Short text');
+    await act(async () => finishSave(okResponse({ docId: 'intro__note', status: 'dirty' })));
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text' }), { target: { value: 'Fees for 2027' } });
+    await chooseBlockType('Text');
+    expect((await findRichText()).innerHTML).toBe('<p>Fees for 2027</p>');
+    expect((await findRichText('Spanish Text')).innerHTML).toBe('<p>Cuotas actualizadas</p>');
+  });
+
+  it('restores both languages after trying Number on a block that started as Text', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [{
+      ...BODY_BLOCK_DRAFT,
+      translations: { es: { value: '<p>Las becas abren en primavera.</p>' } },
+    }];
+
+    await renderAt('/admin/content/scholarships/intro/body');
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit block settings' }));
+    expect(screen.getByRole('radio', { name: 'Text' })).toBeChecked();
+    await chooseBlockType('Number');
+    expect(screen.getByRole('textbox', { name: 'Figure' })).toBeInTheDocument();
+    await chooseBlockType('Text');
+    fireEvent.click(screen.getByRole('button', { name: 'Spanish translation' }));
+
+    expect((await findRichText()).innerHTML).toBe('<p>Scholarships open in spring.</p>');
+    expect((await findRichText('Spanish Text')).innerHTML).toBe('<p>Las becas abren en primavera.</p>');
   });
 
   it('clears the old block type’s stale fields when switching types', async () => {
