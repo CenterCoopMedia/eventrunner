@@ -5,6 +5,7 @@ const { createHmac } = require('node:crypto');
 const STRIPE_ROUTE_COLLECTION = 'console_stripe_routes';
 const STRIPE_WEBHOOK_FUNCTION = 'stripeConnectWebhook';
 const STRIPE_WEBHOOK_SECRET = 'CONSOLE_STRIPE_WEBHOOK_SECRET';
+const STRIPE_DEAUTHORIZED = 'account.application.deauthorized';
 const routeSecretId = (appId) => `stripe-webhook-${appId}`;
 const accountIdValid = (id) => typeof id === 'string' && /^acct_[A-Za-z0-9]+$/.test(id);
 
@@ -86,17 +87,26 @@ function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.n
       return fail('signature', 400, 'Invalid webhook signature');
     }
     if (!accountIdValid(event?.account) || typeof event.livemode !== 'boolean') return fail('account-mode', 400, 'Live connected account required');
-    if (event.livemode === false) {
+    const deauthorized = event.type === STRIPE_DEAUTHORIZED;
+    if (deauthorized && (!Number.isSafeInteger(event.created) || event.created <= 0)) {
+      return fail('event-time', 400, 'Invalid event time');
+    }
+    if (event.livemode === false && !deauthorized) {
       log.warn('stripe Connect webhook ignored', {
         category: 'test-mode', status: 200, accountId: event.account,
         ...(typeof event.id === 'string' && /^evt_[A-Za-z0-9]+$/.test(event.id) ? { eventId: event.id } : {}),
       });
       return res.status(200).send('ignored');
     }
-    let stage = 'route-read';
+    let stage = 'connection-state';
     try {
-      const route = (await db.collection(STRIPE_ROUTE_COLLECTION).doc(event.account).get()).data();
+      // Keep routes available for retries and payment delivery. The site owns its checkout state.
+      const found = deauthorized && await require('./connections.cjs').recordStripeDeauthorization(db, event);
+      stage = 'route-read';
+      const route = event.livemode
+        ? (await db.collection(STRIPE_ROUTE_COLLECTION).doc(event.account).get()).data() : null;
       if (!route) {
+        if (found) return res.status(200).send('Received');
         // Retries for an unbuilt or retired site can disable the shared endpoint.
         log.warn('stripe Connect webhook ignored', {
           category: 'unrouted-account', status: 200, accountId: event.account,

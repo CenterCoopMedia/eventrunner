@@ -6,6 +6,7 @@ const { parseEventPublicBase } = require('shared/config/publicBase');
 const { joinEventPath } = require('shared/config/publicPath');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../../core/demoWrites.cjs');
 
+const STRIPE_DEAUTHORIZED = 'account.application.deauthorized';
 const WEBHOOK_EVENTS = [
   'checkout.session.completed', 'checkout.session.expired',
   'checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed',
@@ -234,8 +235,24 @@ function createStripeProvider({ env = process.env, db, stripeClient, now = () =>
       const secret = env.TICKETING_WEBHOOK_SECRET?.trim();
       if (typeof signature !== 'string' || !secret) return { valid: false, reason: 'verification_failed' };
       let event;
-      try { event = sdk().webhooks.constructEvent(rawBody, signature, secret); }
+      try { event = require('stripe').webhooks.constructEvent(rawBody, signature, secret); }
       catch { return { valid: false, reason: 'verification_failed' }; }
+      if (event.type === STRIPE_DEAUTHORIZED) {
+        if (event.account !== scope.stripeAccountId || event.livemode !== scope.livemode) {
+          return { valid: false, reason: 'wrong_event' };
+        }
+        const deliveryId = safeId(event.id);
+        if (!deliveryId || !paymentCredentials) return { valid: true, eventType: 'ignored', deliveryId };
+        // Check the current credential. A delayed delivery must leave a working
+        // replacement key alone, and the revoked key cannot retrieve the event.
+        try {
+          await readAccount({ timeout: 3_000, maxNetworkRetries: 0 });
+          return { valid: true, eventType: 'ignored', deliveryId };
+        } catch (err) {
+          if (err?.statusCode !== 401) throw err;
+          return { valid: true, eventType: STRIPE_DEAUTHORIZED, deliveryId };
+        }
+      }
       if (!WEBHOOK_EVENTS.includes(event.type)) return { valid: true, eventType: 'ignored', deliveryId: safeId(event.id) };
       if (event.livemode !== scope.livemode || (event.account && event.account !== scope.stripeAccountId)) {
         return { valid: false, reason: 'wrong_event' };
@@ -411,6 +428,6 @@ function createStripeProvider({ env = process.env, db, stripeClient, now = () =>
 }
 
 module.exports = {
-  createStripeProvider, stripeScope,
+  createStripeProvider, stripeScope, STRIPE_DEAUTHORIZED,
   internals: { WEBHOOK_EVENTS, scopeMatches, metadataMatches, objectId, safeId, allProviderPages, isInvoiceCheckoutRequest },
 };

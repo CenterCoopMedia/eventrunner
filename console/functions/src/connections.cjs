@@ -228,6 +228,29 @@ function withoutProvider(connections, provider) {
   return rest;
 }
 
+/** Stripe already revoked the token. Clear matching Console state without touching secrets. */
+async function recordStripeDeauthorization(db, { account, livemode, created }) {
+  const accounts = db.collection(ACCOUNT_COLLECTION).where('stripe.accountId', '==', account);
+  return db.runTransaction(async (tx) => {
+    const matches = (await tx.get(accounts)).docs.filter((doc) => doc.data().stripe.livemode === livemode);
+    if (!matches.length) return false;
+    const apps = await tx.getAll(...matches.map((doc) => db.collection('applications').doc(doc.id)));
+    for (const [index, app] of apps.entries()) {
+      if (!app.exists) continue;
+      const { connections } = app.data();
+      const connection = connections?.stripe;
+      if (!connection) continue;
+      const changedAt = connection.change
+        ? toMillis(connection.change.until) - CHANGE_MS : toMillis(connection.connectedAt);
+      // Stripe retries out of order and reports event times in whole seconds.
+      if (Math.floor(changedAt / 1000) > created) continue;
+      tx.update(app.ref, { connections: withoutProvider(connections, 'stripe') });
+      tx.set(matches[index].ref, withoutProvider(matches[index].data(), 'stripe'));
+    }
+    return true;
+  });
+}
+
 /** One provider's state before a change: what members read, and the private row. */
 function previousOf(data, accounts, provider) {
   return { connection: liveConnection(data.connections, provider), account: accounts[provider] || null };
@@ -654,6 +677,7 @@ module.exports = {
   listEventbriteEvents,
   readConnectedAccounts,
   readStoredConnection,
+  recordStripeDeauthorization,
   recordTokenDeletion,
   retryTokenDeletions,
   startConnection,
