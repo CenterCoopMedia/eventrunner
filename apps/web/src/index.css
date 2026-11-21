@@ -2140,10 +2140,11 @@
       max-inline-size: 100%;
       object-position: left center;
     }
-    /* The banner takes at least half the row, so actions that share it
-       wrap below instead of squeezing the logo. */
-    .site-header-treatment :is(.site-header-identity, .site-masthead__identity):has(.site-logo--banner) {
-      flex-basis: 50%;
+    /* The banner's item grows into the row and takes at least half of
+       it, so actions that share the row wrap below instead of squeezing
+       the logo. */
+    .site-header-treatment :is(.site-header-identity, .site-masthead__identity, .nameplate__name):has(.site-logo--banner) {
+      flex: 1 1 50%;
     }
     /* Menu centres on the banner rather than on its bottom edge. */
     .site-header-identity-row:has(.site-logo--banner) > * { align-self: center; }
