@@ -167,17 +167,22 @@ async function readTickets(db, order) {
   return snaps.filter((snap) => snap.exists).map((snap) => snap.data());
 }
 
-async function finishException({ db, orderId, leaseId, exception, now }) {
-  const ref = db.collection(ORDERS).doc(orderId);
-  await db.runTransaction(async (tx) => {
-    if (!await writesAllowed(db, tx)) return;
-    const snap = await tx.get(ref);
-    if (!snap.exists || snap.data().reconciliationLease?.id !== leaseId) return;
+function ownsReconciliation(current, order, provider, leaseId) {
+  return scopeMatches(current, provider) && current.reconciliationLease?.id === leaseId &&
+    current.stripeSessionId === order.stripeSessionId && current.attemptId === order.attemptId;
+}
+
+async function finishException({ db, ref, order, provider, leaseId, exception, now }) {
+  return db.runTransaction(async (tx) => {
+    if (!await writesAllowed(db, tx)) return false;
+    const current = (await tx.get(ref)).data();
+    if (!ownsReconciliation(current, order, provider, leaseId)) return false;
     tx.set(ref, {
       reconciliationException: exception, reconciliationLease: null,
-      ...(exception && snap.data().paymentStatus !== 'succeeded' ? { status: 'exception' } : {}),
+      ...(exception && current.paymentStatus !== 'succeeded' ? { status: 'exception' } : {}),
       updatedAt: now(),
     }, { merge: true });
+    return true;
   });
 }
 
@@ -185,8 +190,9 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
   if (!db || !safeId(orderId)) throw new Error('An internal order identifier and database are required.');
   const ref = db.collection(ORDERS).doc(orderId);
   const leaseId = randomUUID();
-  const blocked = { orderId, externalEventId: provider.externalEventId, complete: false,
-    retryWithoutAttempt: true, writeBlocked: true, tickets: [] };
+  const retry = { orderId, externalEventId: provider.externalEventId, complete: false,
+    retryWithoutAttempt: true, tickets: [] };
+  const blocked = { ...retry, writeBlocked: true };
   const acquired = await db.runTransaction(async (tx) => {
     if (!await writesAllowed(db, tx)) return { blocked: true };
     const snap = await tx.get(ref);
@@ -198,13 +204,14 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
   });
   if (acquired.blocked) return blocked;
   if (acquired.missing) return { orderId, externalEventId: provider.externalEventId, complete: true, tickets: [] };
-  if (acquired.busy) return { orderId, externalEventId: provider.externalEventId, complete: false, retryWithoutAttempt: true, tickets: [] };
+  if (acquired.busy) return retry;
   let order = acquired.order;
   try {
     // Zero-payment orders are fulfilled atomically by commerce itself.
     if (order.totalAmount === 0 && order.paymentStatus === 'succeeded' && order.inventoryState === 'sold') {
       const tickets = await readTickets(db, order);
-      await finishException({ db, orderId, leaseId, exception: order.reconciliationException || null, now });
+      const finished = await finishException({ db, ref, order, provider, leaseId, exception: order.reconciliationException || null, now });
+      if (!finished) return retry;
       return { orderId, externalEventId: provider.externalEventId, complete: true, tickets, status: order.status };
     }
     if (!order.stripeSessionId) {
@@ -215,7 +222,8 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
         const exception = order.status === 'exception'
           ? { code: 'checkout-outcome-unknown', message: 'Checkout creation is unresolved. Capacity remains reserved until an organizer confirms the outcome.' }
           : null;
-        await finishException({ db, orderId, leaseId, exception, now });
+        const finished = await finishException({ db, ref, order, provider, leaseId, exception, now });
+        if (!finished) return retry;
         return { orderId, externalEventId: provider.externalEventId, complete: Boolean(exception), tickets: [], exception };
       }
     }
@@ -226,10 +234,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
       if (!await writesAllowed(db, tx)) return blocked;
       const snap = await tx.get(ref);
       const current = snap.data();
-      if (!scopeMatches(current, provider) || current.reconciliationLease?.id !== leaseId ||
-          current.stripeSessionId !== state.session.id || current.attemptId !== order.attemptId) {
-        return { complete: false, retryWithoutAttempt: true, tickets: [] };
-      }
+      if (!ownsReconciliation(current, order, provider, leaseId)) return retry;
       // Re-read refund allocations after the API calls; they are human
       // decisions, not provider-owned fields. Ticket cancellations are read
       // with the tickets below.
@@ -298,7 +303,8 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
   } catch (err) {
     if (err instanceof ReconciliationMismatch) {
       const exception = { code: err.code, message: err.message };
-      await finishException({ db, orderId, leaseId, exception, now });
+      const finished = await finishException({ db, ref, order, provider, leaseId, exception, now });
+      if (!finished) return retry;
       return { orderId, externalEventId: provider.externalEventId, complete: true,
         tickets: await readTickets(db, order), exception };
     }
