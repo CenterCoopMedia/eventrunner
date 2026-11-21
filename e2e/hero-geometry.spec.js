@@ -93,7 +93,7 @@ test('published hero artwork skips the manifest and preserves the box and crop',
   const saved = await imageRef.get();
   const snapshot = { [original]: { width: 1280, sizes: [{ width: 320, path: copy }] } };
   const [originalImage, copyImage] = await Promise.all([1280, 320].map((width) => sharp({
-    create: { width, height: width / 2, channels: 3, background: '#000080' },
+    create: { width, height: width / 2, channels: 3, background: { r: 0, g: 0, b: 128 } },
   }).webp().toBuffer()));
   const requests = [];
   let published = false;
@@ -133,7 +133,8 @@ test('published hero artwork skips the manifest and preserves the box and crop',
     await page.goto(path, { waitUntil: 'domcontentloaded' });
     await expect.poll(() => artwork.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
     if (artworkBlock.url === original) {
-      expect(requests).toEqual(published ? [copy] : [manifest, copy]);
+      // Routing disables caching, so a remounted figure can request the same URL again.
+      expect([...new Set(requests)]).toEqual(published ? [copy] : [manifest, copy]);
     } else {
       expect(requests).toEqual([]);
       await expect(artwork).not.toHaveAttribute('srcset');
@@ -142,15 +143,18 @@ test('published hero artwork skips the manifest and preserves the box and crop',
     const boxes = [];
     for (const viewport of [320, 768, 1280]) {
       await page.setViewportSize({ width: viewport, height: 800 });
-      const geometry = await artwork.evaluate((image) => {
-        const { width, height } = image.getBoundingClientRect();
-        const { objectFit, objectPosition } = globalThis.getComputedStyle(image);
-        return { width, height, objectFit, objectPosition };
-      });
-      expect(geometry.width).toBeGreaterThan(0);
-      expect(geometry.height).toBeGreaterThan(0);
+      let geometry;
+      await expect.poll(async () => {
+        geometry = await artwork.evaluate((image) => {
+          const { width, height } = image.getBoundingClientRect();
+          const { objectFit, objectPosition } = globalThis.getComputedStyle(image);
+          return image.complete && image.naturalWidth > 0 ? { width, height, objectFit, objectPosition } : null;
+        });
+        return geometry && geometry.width > 0 && geometry.height > 0;
+      }, { message: `Rendered artwork on ${path} at ${viewport}px` }).toBe(true);
       boxes.push({ viewport, ...geometry });
     }
+    if (usePublishedSizes) expect(requests).not.toContain(manifest);
     return boxes;
   }
   try {
