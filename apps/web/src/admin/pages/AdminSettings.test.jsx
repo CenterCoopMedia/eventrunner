@@ -138,6 +138,7 @@ async function renderAt(path) {
     // outrun the default budget on a loaded machine.
     { timeout: 20_000 },
   );
+  if (path === '/admin/features') await screen.findByRole('heading', { name: 'Features' });
   return result;
 }
 
@@ -190,7 +191,7 @@ describe('event settings', () => {
     await act(async () => finish(okResponse({ docPath: 'config/event' })));
     expect(screen.getByLabelText('Event name')).toHaveValue('New unsaved name');
     expect(screen.queryByText('Saved. The site picks the change up live.')).not.toBeInTheDocument();
-    expect(bodyOf(0).event.name).toBe('Submitted name');
+    expect(bodyOf(0).event.changes.name).toBe('Submitted name');
   });
   it('organizes the settings into named groups without moving fields out of their save form', async () => {
     await renderAt('/admin/settings');
@@ -230,13 +231,10 @@ describe('event settings', () => {
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/updateEventConfig$/);
-    const payload = bodyOf(0).event;
-    expect(payload.name).toBe('Community Media Summit 2027');
-    expect(payload.days).toEqual(LIVE_EVENT.days);
-    // Read-only, deploy-mirrored, and verification fields are never sent.
-    expect(payload).not.toHaveProperty('slug');
-    expect(payload).not.toHaveProperty('providers');
-    expect(payload.sender).not.toHaveProperty('domainVerified');
+    expect(bodyOf(0).event).toEqual({
+      changes: { name: 'Community Media Summit 2027' },
+      expected: { name: LIVE_EVENT.name },
+    });
 
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
     // The whole settings page — three forms, every panel — renders twice
@@ -266,20 +264,18 @@ describe('event settings', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.speakerResources).toEqual({
+    expect(bodyOf(0).event.changes.speakerResources).toEqual({
       slideTemplate: {
-        label: 'Presentation template',
         url: 'https://slides.example.org/current',
       },
     });
-    expect(bodyOf(0).event).toHaveProperty('venue');
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.change(screen.getByLabelText('Slide template label'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('Slide template URL'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(bodyOf(1).event.speakerResources).toEqual({ slideTemplate: null });
+    expect(bodyOf(1).event.changes.speakerResources).toEqual({ slideTemplate: null });
   }, 20000);
 
   it('lets a staff admin save the content and leaves the sender out, shown read-only (issue 186)', async () => {
@@ -302,12 +298,9 @@ describe('event settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    const payload = bodyOf(0).event;
+    const payload = bodyOf(0).event.changes;
     expect(payload.name).toBe('Community Media Summit 2027');
-    // The whole editable slice minus the one block staff cannot change.
-    expect(payload).not.toHaveProperty('sender');
-    expect(payload).toHaveProperty('venue');
-    expect(payload).toHaveProperty('registration');
+    expect(payload).toEqual({ name: 'Community Media Summit 2027' });
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
   }, 20000);
 
@@ -323,7 +316,7 @@ describe('event settings', () => {
     fireEvent.change(screen.getByLabelText('Sender name'), { target: { value: 'The Summit desk' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.sender).toEqual({ name: 'The Summit desk', replyTo: null });
+    expect(bodyOf(0).event.changes.sender).toEqual({ name: 'The Summit desk' });
   }, 20000);
 
   // The event's concurrent tracks (design brief §4.6): a letter and a name,
@@ -345,7 +338,7 @@ describe('event settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.tracks).toEqual([
+    expect(bodyOf(0).event.changes.tracks).toEqual([
       { letter: 'A', name: 'Practice' },
       { letter: 'B', name: 'Sustainability' },
     ]);
@@ -370,7 +363,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.timezone).toBe('America/Los_Angeles');
+    expect(bodyOf(0).event.changes.timezone).toBe('America/Los_Angeles');
   });
 
   // Issue #475: a new day gets its id from the form, the saved day keeps
@@ -397,8 +390,8 @@ describe('event settings', () => {
       LIVE_EVENT.days[0],
       { id: 'day-2', label: 'Day two', date: '2026-10-16', startTime: '09:00', endTime: '16:00' },
     ];
-    expect(bodyOf(0).event.days).toEqual(expected);
-    expect(bodyOf(1).event.days).toEqual(expected);
+    expect(bodyOf(0).event.changes.days).toEqual(expected);
+    expect(bodyOf(1).event.changes.days).toEqual(expected);
   });
 
   it('states what removing a day does to the sessions on it before it goes', async () => {
@@ -418,7 +411,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.days).toEqual(LIVE_EVENT.days);
+    expect(bodyOf(0).event.changes).toEqual({});
   });
 
   // Codex review on #527: a new day id and a removal are judged against the
@@ -451,7 +444,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.days.map((day) => day.id)).toEqual(['day-1', 'day-3']);
+    expect(bodyOf(0).event.changes.days.map((day) => day.id)).toEqual(['day-1', 'day-3']);
   });
 
   // Codex review on #527: a letter typed while a save is running is not
@@ -499,9 +492,9 @@ describe('event settings', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    const venue = bodyOf(0).event.venue;
+    const venue = bodyOf(0).event.changes.venue;
     expect(venue.places[1]).toEqual({ id: 'studio', name: 'Editing studio', floor: '2' });
-    expect(venue.movements[0].walkingMinutes).toBe(0);
+    expect(venue).not.toHaveProperty('movements');
   });
 
   it('sends the venue map, its alt text, and a marker as numbers', async () => {
@@ -528,9 +521,7 @@ describe('event settings', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     // Percentages go over the wire as numbers, which is what the shared
     // validator and the public renderer both expect.
-    expect(bodyOf(0).event.venue.map).toEqual({
-      image: 'cms-images/a/plan.png',
-      alt: 'A plan.',
+    expect(bodyOf(0).event.changes.venue.map).toEqual({
       markers: [{ placeId: 'main-hall', x: 25, y: 75 }],
     });
   });
@@ -581,7 +572,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.venue.map.markers[0]).toEqual({
+    expect(bodyOf(0).event.changes.venue.map.markers[0]).toEqual({
       placeId: 'main-hall',
       x: 40,
       y: 50,
@@ -619,11 +610,11 @@ describe('event settings', () => {
     expect(fetch).not.toHaveBeenCalled();
 
     // Fixed, and the same control saves.
-    fireEvent.change(name, { target: { value: 'Main hall' } });
+    fireEvent.change(name, { target: { value: 'Main hall stage' } });
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.venue.places[0].name).toBe('Main hall');
+    expect(bodyOf(0).event.changes.venue.places[0].name).toBe('Main hall stage');
   });
 
   it('refuses a stored movement whose endpoint names no place', async () => {
@@ -658,7 +649,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.venue.movements[0].from).toBe('main-hall');
+    expect(bodyOf(0).event.changes.venue.movements[0].from).toBe('main-hall');
   });
 
   it('drops the server\u2019s rejection before the map\u2019s own refusal takes focus', async () => {
@@ -848,8 +839,8 @@ describe('event settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    const registration = bodyOf(0).event.registration;
-    expect(registration.externalUrl).toBe('https://register.example.org/summit');
+    const registration = bodyOf(0).event.changes.registration;
+    expect(registration).not.toHaveProperty('externalUrl');
     // Emptied means "clear this", which is null — never a stored blank that
     // would draw a control with no words on it.
     expect(registration.actionLabel).toBeNull();
@@ -923,8 +914,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.social).toEqual({
-      hashtag: '#EventName',
+    expect(bodyOf(0).event.changes.social).toEqual({
       handles: [
         { platform: 'Mastodon', handle: '@eventname', url: 'https://example.org/@eventname' },
         { platform: 'Video', url: 'https://example.org/channel' },
@@ -935,7 +925,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(bodyOf(1).event.social.handles).toEqual([
+    expect(bodyOf(1).event.changes.social.handles).toEqual([
       { platform: 'Video', url: 'https://example.org/channel' },
     ]);
   }, 20000);
@@ -976,7 +966,7 @@ describe('event settings', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.social.handles).toEqual([
+    expect(bodyOf(0).event.changes.social.handles).toEqual([
       { platform: 'Mastodon', url: 'https://example.org/@eventname' },
     ]);
   }, 20000);
@@ -1022,7 +1012,7 @@ describe('event settings', () => {
 
     await screen.findByRole('alert');
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(bodyOf(0).event.legal.supportEmail).toBe('not an address');
+    expect(bodyOf(0).event.changes.legal.supportEmail).toBe('not an address');
     expect(screen.getByLabelText('Support email')).toHaveAttribute('aria-invalid', 'true');
   });
 
@@ -1052,11 +1042,7 @@ describe('event settings', () => {
   });
 });
 
-// Every one of these forms seeds itself once and then saves its document
-// whole (or as a merge over it). If a form seeds from the BUILD-TIME snapshot
-// because a sibling config doc reported first, its next save writes those
-// snapshot values over production — so each must key its adoption on its OWN
-// document's arrival, never on the aggregate 'live' flag.
+// Each form adopts the live values from its own document.
 describe('per-document adoption', () => {
   it('features: a config/event doc arriving first does not freeze the form on snapshot flags', async () => {
     await renderAt('/admin/features');
@@ -1070,9 +1056,7 @@ describe('per-document adoption', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    // The snapshot has schedule: true. Saving it would have silently
-    // re-enabled a flag production had turned off.
-    expect(bodyOf(0).features.schedule).toBe(false);
+    expect(bodyOf(0).features).toEqual({ changes: {}, expected: {} });
   });
 
   it('event: a config/features doc arriving first does not freeze the form on snapshot values', async () => {
@@ -1143,7 +1127,7 @@ describe('feature flags', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('sends every known flag with its current value', async () => {
+  it('sends the edited flag and its loaded value', async () => {
     await renderAt('/admin/features');
     await pushConfig('features', { schedule: true, speakers: false });
 
@@ -1156,19 +1140,27 @@ describe('feature flags', () => {
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/updateFeatures$/);
-    const payload = bodyOf(0).features;
-    expect(payload.speakers).toBe(true);
-    expect(payload.schedule).toBe(true);
-    // Untouched flags keep their defaults.
-    expect(payload.badges).toBe(false);
-    expect(payload.coreWebVitals).toBe(true);
-    expect(Object.keys(payload).sort()).toEqual([...KNOWN_FEATURE_KEYS].sort());
-    expect(Object.values(payload).every((v) => typeof v === 'boolean')).toBe(true);
+    expect(bodyOf(0).features).toEqual({ changes: { speakers: true }, expected: { speakers: false } });
+  });
+
+  it('keeps the edited switch and names the next step after a conflict', async () => {
+    await renderAt('/admin/features');
+    await pushConfig('features', { schedule: true, speakers: false });
+    const speakers = screen.getByRole('switch', { name: 'Speaker directory' });
+    fireEvent.click(speakers);
+    fetch.mockResolvedValueOnce(errorResponse(409, 'settings-conflict',
+      'features.speakers: changed since you opened these settings.; Open this page in a new tab to review the latest settings. Reapply your edits there and save.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Speaker directory changed');
+    expect(alert).toHaveTextContent('Open this page in a new tab');
+    expect(speakers).toBeChecked();
+    expect(bodyOf(0).features).toEqual({ changes: { speakers: true }, expected: { speakers: false } });
   });
 
   // Joe, November 10, 2026: no client admin can turn on the unfinished
   // attendee feed (#205) until #788, #789, #510 and #511 are accepted.
-  it.each([false, true])('offers no Attendee feed switch and saves the stored socialFeed value (%s) unchanged', async (stored) => {
+  it.each([false, true])('offers no Attendee feed switch and omits socialFeed when it is %s', async (stored) => {
     await renderAt('/admin/features');
     await pushConfig('features', { schedule: true, attendeeDirectory: true, socialFeed: stored });
 
@@ -1181,8 +1173,7 @@ describe('feature flags', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Speaker directory' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).features.socialFeed).toBe(stored);
-    expect(bodyOf(0).features.speakers).toBe(true);
+    expect(bodyOf(0).features).toEqual({ changes: { speakers: true }, expected: { speakers: null } });
   });
 
   it('names missing calendar prerequisites before saving and allows correction', async () => {
@@ -1196,7 +1187,7 @@ describe('feature flags', () => {
     fireEvent.click(document.querySelector('input[name="icsExport"]'));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).features).toMatchObject({ calendarSync: true, schedule: true, sessionBookmarks: true, icsExport: true });
+    expect(bodyOf(0).features).toEqual({ changes: { icsExport: true }, expected: { icsExport: false } });
   });
 
   it('names the offending flag when the server rejects one', async () => {
@@ -1301,7 +1292,7 @@ describe('milestones and the registration goal', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.milestones).toEqual([{ label: 'Programme announced', date: '2026-09-01' }]);
+    expect(bodyOf(0).event.changes.milestones).toEqual([{ label: 'Programme announced', date: '2026-09-01' }]);
 
     // …and to "Add milestone" when none is left. An empty list is sent, and clears.
     fireEvent.click(screen.getByRole('button', { name: 'Remove milestone 1' }));
@@ -1311,10 +1302,10 @@ describe('milestones and the registration goal', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(bodyOf(1).event.milestones).toEqual([]);
+    expect(bodyOf(1).event.changes.milestones).toEqual([]);
   }, 20000);
 
-  it('sends a new milestone trimmed, beside the rest of the event', async () => {
+  it('sends only the new milestone with its label trimmed', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
     expect(screen.getByText('No milestones yet.')).toBeInTheDocument();
@@ -1324,9 +1315,8 @@ describe('milestones and the registration goal', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    const payload = bodyOf(0).event;
-    expect(payload.milestones).toEqual([{ label: 'Doors open', date: '2026-10-15' }]);
-    expect(payload.name).toBe(LIVE_EVENT.name);
+    const payload = bodyOf(0).event.changes;
+    expect(payload).toEqual({ milestones: [{ label: 'Doors open', date: '2026-10-15' }] });
   });
 
   it('stops adding at twenty milestones and says why, without ever disabling the control', async () => {
@@ -1409,13 +1399,13 @@ describe('milestones and the registration goal', () => {
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.registration.goal).toBe(750);
+    expect(bodyOf(0).event.changes.registration.goal).toBe(750);
 
     fireEvent.change(goal, { target: { value: '' } });
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(bodyOf(1).event.registration.goal).toBeNull();
+    expect(bodyOf(1).event.changes.registration.goal).toBeNull();
 
     // Not a number: sent as typed, never as NaN (which JSON would turn into
     // null and so clear the goal), and the server's refusal marks the field.
@@ -1443,7 +1433,7 @@ describe('milestones and the registration goal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    const payload = bodyOf(0).event;
+    const payload = bodyOf(0).event.changes;
     expect(payload.milestones).toEqual([{ label: 'Doors open', date: '2026-10-15' }]);
     expect(payload.registration.goal).toBe(300);
     expect(payload).not.toHaveProperty('sender');
@@ -1470,16 +1460,14 @@ describe('feature switches on the pages that use them', () => {
     fireEvent.click(toggle);
     await screen.findByText(`${label} setting saved.`);
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/updateFeatures$/);
-    const enabled = new Set(['schedule', 'coreWebVitals', key]);
-    expect(bodyOf(0).features).toEqual(Object.fromEntries(KNOWN_FEATURE_KEYS.map((feature) => [feature, enabled.has(feature)])));
+    expect(bodyOf(0).features).toEqual({ changes: { [key]: true }, expected: { [key]: false } });
     expect(toggle).not.toBeChecked();
-    await pushConfig('features', { ...bodyOf(0).features });
+    await pushConfig('features', { schedule: true, speakers: false, [key]: true });
     expect(toggle).toBeChecked();
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
     fireEvent.click(toggle);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(bodyOf(1).features[key]).toBe(false);
-    expect(bodyOf(1).features.schedule).toBe(true);
+    expect(bodyOf(1).features).toEqual({ changes: { [key]: false }, expected: { [key]: true } });
   });
 
   it.each([

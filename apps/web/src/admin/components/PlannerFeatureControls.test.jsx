@@ -26,13 +26,23 @@ describe('page feature switches', () => {
     rerender(<PlannerFeatureControls choices={choices} />);
     expect(screen.queryByRole('switch')).toBeNull();
   });
-  it('retains other flags and an earlier change before the listener catches up', async () => {
-    render(<PlannerFeatureControls choices={choices} />);
-    fireEvent.click(screen.getByRole('switch', { name: 'Public schedule' }));
-    await waitFor(() => expect(screen.getByRole('switch', { name: 'Save sessions' })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('switch', { name: 'Save sessions' }));
+  it('waits for live confirmation of each saved switch and leaves other switches available', async () => {
+    const { rerender } = render(<PlannerFeatureControls choices={choices} />);
+    const schedule = screen.getByRole('switch', { name: 'Public schedule' });
+    const bookmarks = screen.getByRole('switch', { name: 'Save sessions' });
+    fireEvent.click(schedule);
+    await waitFor(() => expect(bookmarks).not.toBeDisabled());
+    expect(schedule).toBeDisabled();
+    fireEvent.click(bookmarks);
     await waitFor(() => expect(call).toHaveBeenCalledTimes(2));
-    expect(call.mock.calls[1]).toEqual(['updateFeatures', { features: { schedule: true, sessionBookmarks: true, speakers: true, customBadges: false } }]);
+    expect(call.mock.calls[1]).toEqual(['updateFeatures', {
+      features: { changes: { sessionBookmarks: true }, expected: { sessionBookmarks: false } },
+    }]);
+    await act(async () => {});
+    features = { ...features, schedule: true };
+    rerender(<PlannerFeatureControls choices={choices} />);
+    expect(schedule).not.toBeDisabled();
+    expect(bookmarks).toBeDisabled();
   });
   it('blocks a second write while saving and reports a refusal without changing values', async () => {
     let reject;

@@ -27,7 +27,6 @@ import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
 import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
-import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
@@ -63,6 +62,7 @@ const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'), 
 // one link, exactly like the session editor above, so it is loaded when
 // somebody asks for it.
 const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'), 'AdminEventSettings');
+const AdminFeatureSettings = lazy(() => import('./pages/AdminFeatureSettings.jsx'), 'AdminFeatureSettings');
 // Lazy, as the other large pages: with its sync and account actions the page
 // put the admin entry chunk over the lazy-chunk budget.
 const AdminTicketing = lazy(() => import('./pages/AdminTicketing.jsx'), 'AdminTicketing');
@@ -338,7 +338,7 @@ export default function AdminApp({ routeAttempt }) {
               </DeferredAdminPage>
             }
           />
-          <Route path="features" element={<StaticAdminPage><AdminFeatureSettings /></StaticAdminPage>} />
+          <Route path="features" element={<DeferredAdminPage label="features"><AdminFeatureSettings /></DeferredAdminPage>} />
           <Route path="badges" element={<DeferredAdminPage label="badges"><AdminBadgeSettings /></DeferredAdminPage>} />
           <Route path="registration-form" element={<DeferredAdminPage label="registration form"><AdminRegistrationForm /></DeferredAdminPage>} />
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
