@@ -141,6 +141,7 @@ describe('admin Sessions workspace', () => {
   it('groups the session into content, time, location, and publishing cards without changing field order', async () => {
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });
+    await screen.findByLabelText('Speaker to add');
     const form = screen.getByLabelText('Public title').closest('form');
     const layout = form.querySelector('.admin-editor-layout--session');
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
