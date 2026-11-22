@@ -390,6 +390,7 @@ async function saveNavigationLinkEdit(context, res, gate, edit) {
     });
     if (failure) return sendError(res, failure.status, failure.code, failure.message);
   } catch (err) {
+    if (err?.httpError) return sendError(res, err.httpError.status, err.httpError.code, err.httpError.message);
     log.error('cmsSavePage draft write failed', err);
     return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
   }
@@ -479,6 +480,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
       if (result.code) return sendError(res, result.status, result.code, result.message);
       return finishPageSave(context, res, gate, page.id, result.draftRevision);
     } catch (err) {
+      if (err?.httpError) return sendError(res, err.httpError.status, err.httpError.code, err.httpError.message);
       if (creating && isAlreadyExistsError(err)) {
         return sendError(res, 409, 'already-exists', `id: '${page.id}' already belongs to a page`);
       }

@@ -26,6 +26,7 @@ const { draftCollectionFor } = require('./blockTypes.cjs');
 const { requireConfirmation } = require('../core/confirmation.cjs');
 const { collectionVariantErrors } = require('shared/contentLanguages');
 const { sanitizeRichTextVariants } = require('./richText.cjs');
+const { requireAvailableMediaReferences } = require('../media/referenceWrites.cjs');
 const {
   countsAfterPublish,
   ensurePendingCounts,
@@ -195,6 +196,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     updatedAt: new Date(now()),
     updatedBy: actor.email,
   };
+  await requireAvailableMediaReferences({ db, tx, fields: payload });
   const wasDirty = draftSnap.exists && draftSnap.data()?.status === 'dirty';
   await writePendingDelta({ db, tx, collection, delta: Number(!wasDirty) - Number(replacesDirtyDraft), now });
   if (createOnly) tx.create(ref, payload);

@@ -21,6 +21,7 @@ const profilePhoto = require('./src/media/profilePhoto.cjs');
 const mediaUpload = require('./src/media/upload.cjs');
 const mediaMetadata = require('./src/media/metadata.cjs');
 const mediaUsage = require('./src/media/usage.cjs');
+const mediaReplacementDeletion = require('./src/media/replacementDeletion.cjs');
 const mediaImageSizes = require('./src/media/imageSizes.cjs');
 const adminConfig = require('./src/admin/config.cjs');
 const adminCustomBadges = require('./src/admin/customBadges.cjs');
@@ -104,6 +105,7 @@ module.exports = {
   ...mediaUpload.handlers,
   ...mediaMetadata.handlers,
   ...mediaUsage.handlers,
+  ...mediaReplacementDeletion.handlers,
   ...mediaImageSizes.handlers,
   ...adminConfig.handlers,
   ...adminCustomBadges.handlers,

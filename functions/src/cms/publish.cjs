@@ -34,7 +34,7 @@ const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/e
 const { confirmationVersion, matchesConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { PUBLISHABLE_COLLECTIONS, draftCollectionFor } = require('./blockTypes.cjs');
 const { listDirty, publishDocs, remainingPublishIds, logAdminAction, isValidDocId, isAlreadyExistsError, internals } = require('./store.cjs');
-const { publisherNotificationSecrets, refreshSiteAfterPublish, requestSitePublish, withPublisherNotifier } = require('./publisher.cjs');
+const { publisherNotificationSecrets, refreshSiteAfterPublish, requestSitePublish, resolvePublisherConfig, withPublisherNotifier } = require('./publisher.cjs');
 const { runMediaReplacement } = require('../media/replace.cjs');
 const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
 const { isComingSoon } = require('./launch.cjs');
@@ -176,6 +176,7 @@ function createCmsPublishHandler({
     const replace = (queueRef, body) => runMediaReplacement({
       db, getBucket, queueRef, body, actor, now, log, res,
       publish: publishSnapshot,
+      publisherAvailable: resolvePublisherConfig(env).configured,
     });
     if (mediaReplacement !== undefined) {
       if (!requestId) return badRequest(res, 'An image replacement requires a requestId.');

@@ -10,6 +10,7 @@ const { TIMELINE_COLLECTION } = require('../cms/timeline.cjs');
 const { scanReplacementUsage } = require('./usage.cjs');
 const { replaceImageFields } = require('./replacementPlacements.cjs');
 const { internals: { isBrandingAsset, referencedByBranding, BRANDING_REFUSAL } } = require('./upload.cjs');
+const { deleteReplacedOriginal } = require('./replacementDeletion.cjs');
 
 function assetDescription(row) {
   if (row?.deleting === true) return null;
@@ -108,9 +109,9 @@ function needsDescription({ docPath, field }) {
 }
 
 async function prepare({ db, bucket, body, actor, res }) {
-  const { assetId, replacementId, keepDescription = false, references } = body || {};
+  const { assetId, replacementId, keepDescription = false, deleteOriginal = false, references } = body || {};
   if (!isValidDocId(assetId) || !isValidDocId(replacementId) || assetId === replacementId
-    || typeof keepDescription !== 'boolean' || !Array.isArray(references)
+    || typeof keepDescription !== 'boolean' || typeof deleteOriginal !== 'boolean' || !Array.isArray(references)
     || !references.every((ref) => typeof ref?.docPath === 'string' && typeof ref?.field === 'string')) {
     badRequest(res, 'Choose a different library image and check where it will be used.');
     return null;
@@ -142,7 +143,8 @@ async function prepare({ db, bucket, body, actor, res }) {
     return null;
   }
   return {
-    assetId, replacementId, keepDescription, source, target: { path: target.path, alt: target.alt },
+    assetId, replacementId, keepDescription, deleteOriginal, source, target: { path: target.path, alt: target.alt },
+    ...(deleteOriginal ? { deleteRequestedByUid: actor.uid } : {}),
     places, operatorOnly, completed: {},
   };
 }
@@ -150,7 +152,7 @@ async function prepare({ db, bucket, body, actor, res }) {
 /** A regular publish receipt also tracks which replacement groups committed.
  * Each group's live/draft changes and progress commit together. The normal
  * site publisher refreshes the committed public snapshot when it finishes. */
-async function runMediaReplacement({ db, getBucket, queueRef, body, actor, now, log, publish, res }) {
+async function runMediaReplacement({ db, getBucket, queueRef, body, actor, now, log, publish, publisherAvailable, res }) {
   try {
     const bucket = getBucket();
     let row = (await queueRef.get()).data();
@@ -177,7 +179,8 @@ async function runMediaReplacement({ db, getBucket, queueRef, body, actor, now, 
     if (!plan) return notFound(res, 'No image replacement was found.');
     if (plan.operatorOnly && actor.tier !== 'operator') return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
     if (body && (plan.assetId !== body.assetId || plan.replacementId !== body.replacementId
-      || plan.keepDescription !== (body.keepDescription === true))) {
+      || plan.keepDescription !== (body.keepDescription === true)
+      || (plan.deleteOriginal === true) !== (body.deleteOriginal === true))) {
       return sendError(res, 409, 'request-id-in-use', 'This request already belongs to another image replacement.');
     }
     const targetExists = row.status === 'done' || checkedPath === plan.target.path
@@ -222,8 +225,14 @@ async function runMediaReplacement({ db, getBucket, queueRef, body, actor, now, 
       const action = finished ? 'mediaReplace' : 'mediaReplaceFailed';
       await logAdminAction({ db, action, docPath: queueRef.path, actor, now, log });
     }
-    const publisher = finished && publishLive ? await publish(queueRef.id) : undefined;
-    return res.status(200).json({ queueId: queueRef.id, ...result, ...(publisher ? { publisher } : {}) });
+    // The deployed snapshot can still name the source even if the current
+    // Firestore uses were all drafts. An opted-in deletion needs its own refresh.
+    const needsRefresh = publishLive || (plan.deleteOriginal === true && result.failed.length === 0);
+    const publisher = finished && needsRefresh ? await publish(queueRef.id) : undefined;
+    const deletion = plan.deleteOriginal === true ? await deleteReplacedOriginal({
+      db, bucket, queueRef, publisherAvailable, now, log,
+    }) : undefined;
+    return res.status(200).json({ queueId: queueRef.id, ...result, ...(publisher ? { publisher } : {}), ...(deletion ? { deletion } : {}) });
   } catch (err) {
     if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
     log.error('Image replacement failed', err);

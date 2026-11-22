@@ -65,6 +65,7 @@ const { isDeepStrictEqual } = require('node:util');
 const { requireAdmin } = require('../core/auth.cjs');
 const { getTierA } = require('../core/config.cjs');
 const { logAdminAction, writeConfigVersion } = require('../cms/store.cjs');
+const { requireAvailableMediaReferences } = require('../media/referenceWrites.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const {
   validateEventConfig,
@@ -657,9 +658,11 @@ async function applyConfigWrite({ db, docId, payload, expected, actor, now = Dat
           ]);
         }
       }
+      if (docId === 'theme' || docId === 'event') await requireAvailableMediaReferences({ db, tx, fields: written });
       writeConfigVersion({ tx, ref, historyRef, docPath, fields: written, at, actor });
     });
   } catch (err) {
+    if (err?.httpError) return { ok: false, ...err.httpError };
     if (err instanceof MergedConfigInvalidError) {
       return { ok: false, status: 400, code: 'bad-request', message: err.message };
     }

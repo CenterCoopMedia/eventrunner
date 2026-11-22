@@ -94,7 +94,13 @@ function stringLeaves(value, prefix = '') {
 function referencesPath(text, objectPath) {
   if (typeof text !== 'string' || text.length === 0) return false;
   if (text.includes(objectPath)) return true;
-  return text.includes(encodeURIComponent(objectPath));
+  return decodedReferenceText(text).includes(objectPath);
+}
+
+function decodedReferenceText(text) {
+  return text.replace(/(?:%[\da-f]{2})+/gi, (encoded) => {
+    try { return decodeURIComponent(encoded); } catch { return encoded; }
+  });
 }
 
 /**
@@ -128,6 +134,7 @@ function referencesInDoc(data, docPath, paths) {
  */
 async function scanUsage({
   db,
+  transaction,
   paths,
   collections = USAGE_COLLECTIONS,
   configDocs = USAGE_CONFIG_DOCS,
@@ -149,13 +156,12 @@ async function scanUsage({
   // "unused" list: a reference past the cap would look like no use, and the
   // delete path relies on the uncapped scan to prove that.
   const capped = Number.isInteger(maxDocs) && maxDocs > 0;
+  const read = (ref) => transaction ? transaction.get(ref) : ref.get();
   for (const name of collections) {
     let snapshot;
     try {
       const source = db.collection(name);
-      snapshot = capped
-        ? await source.limit(maxDocs + 1).get()
-        : await source.get();
+      snapshot = await read(capped ? source.limit(maxDocs + 1) : source);
     } catch (err) {
       // A collection that does not exist yet reads as empty in Firestore, so
       // a throw here is a real failure (permissions, transport) and must not
@@ -173,7 +179,7 @@ async function scanUsage({
   }
 
   for (const docId of configDocs) {
-    const snap = await db.collection('config').doc(docId).get();
+    const snap = await read(db.collection('config').doc(docId));
     if (!snap.exists) continue;
     record(findReferences(snap.data() || {}, `config/${docId}`, paths));
   }
@@ -261,6 +267,7 @@ module.exports = {
   internals: {
     stringLeaves,
     referencesPath,
+    decodedReferenceText,
     referencesInDoc,
     resolveScanPaths,
     USAGE_COLLECTIONS,

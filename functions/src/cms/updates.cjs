@@ -193,6 +193,7 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
         if (deletedRef) tx.delete(deletedRef);
       });
     } catch (err) {
+      if (err?.httpError) return sendError(res, err.httpError.status, err.httpError.code, err.httpError.message);
       if (err instanceof DeletedUpdate) return notFound(res, 'Update not found.');
       if (restore === true && isAlreadyExistsError(err)) {
         return sendError(res, 409, 'already-exists', 'This update already exists. Open its version history to choose a version to restore.');
