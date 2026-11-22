@@ -125,7 +125,7 @@ function NavigationLinkForm({ initial, rows, creating }) {
           ) : (
             <TextField label="HTTPS URL" help="Copy the full address, starting with https://."
               type="url" value={draft.url} maxLength={2048} required disabled={busy !== null}
-              hint="Visitors open this link in a new tab."
+              hint="This link opens in the current tab."
               onChange={(url) => setDraft((current) => ({ ...current, url }))} />
           )}
           <CheckboxField label="Show in the navigation" help="Clear this to keep the link in Pages and hide it from the site menu."
