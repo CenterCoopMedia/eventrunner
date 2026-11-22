@@ -11,6 +11,7 @@
 // the same id, so a publish that fails after a create is retried as an
 // update rather than as a second entry or a refusal.
 //
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -94,8 +95,6 @@ export default function AdminTimelineEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [action, setAction] = useState(null);
-  const saving = action !== null;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
@@ -105,11 +104,13 @@ export default function AdminTimelineEditor({ mode }) {
   const creating = mode === 'create' && !createdId;
   const docId = mode === 'edit' ? entryId : (createdId ?? newId);
   const row = mode === 'edit' || createdId ? findRow(docId) : null;
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline, isCurrentRecord } = useAdminSaveState(null, docId);
+  const saving = action !== null || unconfirmedSave;
 
   // Start from the merged row and keep untouched fields current as the
   // listeners report newer values.
   useEffect(() => {
-    if (mode !== 'edit' || !ready || !row || saving) return;
+    if (mode !== 'edit' || !ready || !row || (adoptedRef.current === docId && saving)) return;
     const incoming = toForm(row);
     const observed = observedRef.current;
     observedRef.current = incoming;
@@ -175,7 +176,7 @@ export default function AdminTimelineEditor({ mode }) {
       setFocusRequest((count) => count + 1);
       return;
     }
-    setAction(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -190,28 +191,32 @@ export default function AdminTimelineEditor({ mode }) {
       if (creating) {
         await call('cmsCreateContent', body);
         // Created: this form never creates again.
-        adoptedRef.current = docId;
-        observedRef.current = form;
-        setCreatedId(docId);
+        if (isCurrentRecord()) {
+          adoptedRef.current = docId;
+          observedRef.current = form;
+          setCreatedId(docId);
+        }
       } else {
         await call('cmsUpdateContent', body);
       }
-      setEditor((current) => ({ ...current, savedForm: form }));
+      if (isCurrentRecord()) setEditor((current) => ({ ...current, savedForm: form }));
+      let message = 'Draft saved. It is not live until you publish it.';
       if (publish) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: COLLECTION, docIds: [docId] });
         const verdict = summarizePublish(response, COLLECTION, [docId], 'timeline entries');
         if (!verdict.ok) throw Object.assign(new Error(verdict.message), { contentPublishResult: true });
-        setStatus('Published.');
-        if (mode === 'create') showToast('Published.', { announce: false });
-      } else {
-        setStatus('Draft saved. It is not live until you publish it.');
-        if (mode === 'create') showToast('Draft saved. It is not live until you publish it.', { announce: false });
+        message = 'Published.';
       }
+      if (!isCurrentRecord()) return;
+      setStatus(message);
       if (mode === 'create') {
+        showToast(message, { announce: false });
         navigate(`${TIMELINE_LIST}/${encodeURIComponent(docId)}`, { replace: true });
       }
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
+      if (!isCurrentRecord()) return;
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(contentError(err, { fallback: stage === 'publish' ? 'Publishing did not finish. Your draft is saved. Try again.' : undefined, labels: FIELD_LABELS }));
     } finally {
@@ -225,8 +230,10 @@ export default function AdminTimelineEditor({ mode }) {
     setErrorTitle(undefined);
     try {
       const deleted = await call('cmsDeleteContent', { collection: COLLECTION, docId });
+      if (!isCurrentRecord()) return;
       reportDeleted({ ...deleted, collection: COLLECTION, docId, editorPath: `${TIMELINE_LIST}/${encodeURIComponent(docId)}` }, TIMELINE_LIST);
     } catch (err) {
+      if (!isCurrentRecord()) return;
       setErrorTitle('Could not delete. Try again.');
       setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: FIELD_LABELS }));
     } finally {
@@ -246,7 +253,7 @@ export default function AdminTimelineEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading entry…" />;
+    return <AdminLoadingState recover label="Loading entry…" />;
   }
   if (mode === 'edit' && createdId !== docId && !row) {
     return (
@@ -263,7 +270,7 @@ export default function AdminTimelineEditor({ mode }) {
   }
 
   if (mode === 'edit' && adoptedRef.current !== docId) {
-    return <AdminLoadingState label="Loading entry…" />;
+    return <AdminLoadingState recover label="Loading entry…" />;
   }
 
   return (
@@ -302,6 +309,7 @@ export default function AdminTimelineEditor({ mode }) {
         }
       />
 
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/timeline' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
       <Panel help="Use the year and title to tell readers which past edition this was." title="Entry">

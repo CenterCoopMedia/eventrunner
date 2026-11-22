@@ -14,6 +14,7 @@
 // The picture and the content blocks an update may carry are not edited
 // here. They go back to the server unchanged on every save
 // (admin/updatesDoc.js toUpdatePayload).
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { UPDATE_CATEGORY_MAX, validUpdateCategory } from 'shared/update';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -112,8 +113,6 @@ export default function AdminUpdateEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [action, setAction] = useState(null);
-  const saving = action !== null;
   const [status, setStatus] = useState('');
   const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   // The id this form created, once its first save lands. The route then
@@ -124,6 +123,9 @@ export default function AdminUpdateEditor({ mode }) {
   const [createdId, setCreatedId] = useState(null);
   const newIdRef = useRef(null);
   if (newIdRef.current === null) newIdRef.current = mintUpdateId();
+  const id = mode === 'create' ? newIdRef.current : updateId;
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline, isCurrentRecord } = useAdminSaveState(null, id);
+  const saving = action !== null || unconfirmedSave;
   // The record the form was filled from. It is filled once, and only after
   // BOTH listeners have reported: they report in no fixed order, and a row
   // built before the drafts arrive is the live doc alone, so a form filled
@@ -174,8 +176,6 @@ export default function AdminUpdateEditor({ mode }) {
   const errorFor = (field) => (attempted ? localErrors.get(field) : undefined) ?? serverErrors.get(field);
   const set = (patch) => setForm((current) => ({ ...current, ...patch }));
 
-  const id = mode === 'create' ? newIdRef.current : updateId;
-
   async function save({ publish = false } = {}) {
     if (saving) return;
     setAttempted(true);
@@ -188,7 +188,7 @@ export default function AdminUpdateEditor({ mode }) {
       setFocusRequest((count) => count + 1);
       return;
     }
-    setAction(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -199,9 +199,9 @@ export default function AdminUpdateEditor({ mode }) {
         update: toUpdatePayload(form, row, timeZone),
         visible: form.visible,
       });
-      if (mode === 'create') setCreatedId(id);
+      if (mode === 'create' && isCurrentRecord()) setCreatedId(id);
       let message = 'Draft saved. It is not live until you publish it.';
-      setFeedbackSnapshot(JSON.stringify(form));
+      if (isCurrentRecord()) setFeedbackSnapshot(JSON.stringify(form));
       if (publish) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: 'cmsUpdates', docIds: [id] });
@@ -209,12 +209,15 @@ export default function AdminUpdateEditor({ mode }) {
         if (!verdict.ok) throw Object.assign(new Error(verdict.message), { contentPublishResult: true });
         message = 'Published.';
       }
+      if (!isCurrentRecord()) return;
       setStatus(message);
       if (mode === 'create') {
         showToast(message, { announce: false });
         navigate(`${UPDATES_ROOT}/${encodeURIComponent(id)}`, { replace: true });
       }
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
+      if (!isCurrentRecord()) return;
       if (stage === 'publish') {
         setErrorTitle('The draft is saved, and it is not published');
         if (mode === 'create') {
@@ -233,8 +236,10 @@ export default function AdminUpdateEditor({ mode }) {
     setErrorTitle(undefined);
     try {
       const deleted = await call('cmsDeleteUpdate', { id: updateId });
+      if (!isCurrentRecord()) return;
       reportDeleted({ ...deleted, collection: 'cmsUpdates', docId: updateId, editorPath: `${UPDATES_ROOT}/${encodeURIComponent(updateId)}` }, UPDATES_ROOT);
     } catch (err) {
+      if (!isCurrentRecord()) return;
       setErrorTitle('Could not delete. Try again.');
       setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: { title: 'Title', body: 'Text', publishAt: 'Date', category: 'Category' } }));
     } finally {
@@ -277,7 +282,7 @@ export default function AdminUpdateEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading update…" />;
+    return <AdminLoadingState recover label="Loading update…" />;
   }
 
   return (
@@ -331,6 +336,7 @@ export default function AdminUpdateEditor({ mode }) {
 
       <FeatureSwitch featureKeys={['updates']} />
 
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/updates' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
       <Panel help="Write the news and date attendees should see on the Updates page." title="Public update">

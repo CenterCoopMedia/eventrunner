@@ -237,10 +237,12 @@ describe('admin route gating', () => {
       expect(stage('Checking your access…')).toHaveAttribute('data-loading-stage', 'active');
       act(() => vi.advanceTimersByTime(9_000));
       await act(async () => pendingProbe.resolve({ docs: [], metadata: { fromCache: false } }));
-      expect(stage('Loading overview…')).toHaveAttribute('data-loading-stage', 'slow');
+      const retry = screen.getByRole('link', { name: 'Try again in a new tab' });
+      expect(retry).toHaveAttribute('href', '/admin/overview');
+      expect(retry).toHaveAttribute('target', '_blank');
       await act(async () => { overviewRenderPending = null; finishOverview(); });
       expect(screen.getByRole('heading', { name: 'Overview', exact: true })).toBeInTheDocument();
-      expect(screen.queryByText('Loading overview…', { selector: '.loading-status__label' })).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Try again in a new tab' })).toBeNull();
     } finally {
       view?.unmount();
       adminRoute.Component = original;

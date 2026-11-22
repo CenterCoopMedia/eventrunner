@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AdminPendingSave, { useAdminSaveState } from './AdminPendingSave.jsx';
 import { DEFAULT_TICKET_BUTTON_LABEL, MAX_TICKET_BUTTON_LABEL_LENGTH } from 'shared/registration';
 import BusyLabel from '../../components/BusyLabel.jsx';
 import { ticketButtonClass } from '../../components/controlClasses.js';
@@ -17,7 +18,7 @@ export default function TicketButtonSettings({ call }) {
   const registration = eventConfig?.registration;
   const [draft, setDraft] = useState({});
   const [expected, setExpected] = useState({});
-  const [saving, setSaving] = useState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
   const label = draft.ticketButtonLabel ?? registration?.ticketButtonLabel ?? '';
@@ -34,7 +35,7 @@ export default function TicketButtonSettings({ call }) {
   async function save(event) {
     event.preventDefault();
     if (saving || Object.keys(draft).length === 0) return;
-    setSaving(true);
+    if (!beginSave(true)) return;
     setError(null);
     const patch = { ...draft };
     if ('ticketButtonLabel' in patch) patch.ticketButtonLabel = label.trim() || null;
@@ -46,6 +47,7 @@ export default function TicketButtonSettings({ call }) {
       setDraft({});
       setExpected({});
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(settingsConflict(err)?.message
         ?? plannerMessage(err?.message ?? 'The ticket button could not be saved.'));
     } finally {
@@ -71,10 +73,11 @@ export default function TicketButtonSettings({ call }) {
           </span>
         </div>
         <div>
-          <button type="submit" className={primaryButtonClass} disabled={saving || Object.keys(draft).length === 0}>
+          <button type="submit" className={primaryButtonClass} disabled={saving || unconfirmed || Object.keys(draft).length === 0}>
             <BusyLabel busy={saving} pending="Saving ticket button…">Save ticket button</BusyLabel>
           </button>
         </div>
+        <AdminPendingSave busy={saving} unconfirmed={unconfirmed} offline={offline} />
         {saved ? <Notice tone="ok" message="Ticket button saved." /> : null}
         {error ? <Notice tone="error" message={error} /> : null}
       </form>

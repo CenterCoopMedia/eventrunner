@@ -29,6 +29,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
   const accountResultRef = useRef(null);
   const runRef = useRef(0);
   const busyRef = useRef(false);
+  const pendingCursor = useRef(null);
   const activeRef = useRef(true);
   const isOrders = kind === 'orders';
   const label = isOrders ? 'Orders' : 'Admission tickets';
@@ -40,8 +41,9 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
     setAccountResult(message);
   }, []);
 
-  const search = useCallback(async (criteria, appendCursor = null) => {
-    if (appendCursor && busyRef.current) return;
+  const search = useCallback(async (criteria, appendCursor = null, retry = false) => {
+    if (appendCursor && busyRef.current && !retry) return;
+    pendingCursor.current = appendCursor;
     const run = ++runRef.current;
     busyRef.current = true;
     setBusy(true);
@@ -79,7 +81,8 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
     </form>
     {error ? <Notice tone="error" message={error} /> : null}
     {accountResult ? <div ref={accountResultRef} tabIndex={-1} className="mb-sm"><Notice tone="ok" message={accountResult} /></div> : null}
-    {rows === null && !error ? <AdminLoadingState label={`Loading ${label.toLowerCase()}…`} /> : rows?.length === 0 ? <AdminEmptyState title={`No ${label.toLowerCase()} found`} description="Adjust the filters to find another record." /> : rows?.length ? <>
+    {busy ? <AdminLoadingState label={`Loading ${label.toLowerCase()}…`} quiet={rows !== null} onRetry={() => search(submitted, pendingCursor.current, true)} /> : null}
+    {rows?.length === 0 ? <AdminEmptyState title={`No ${label.toLowerCase()} found`} description="Adjust the filters to find another record." /> : rows?.length ? <>
       <p role="status" className="mb-xs text-admin-sm text-admin-ink-secondary">Showing {rows.length} {isOrders ? 'orders' : 'tickets'}{cursor ? '; more are available' : ''}.</p>
       <TicketingTable label={label}>
         <thead><tr>{(isOrders ? ['Order', 'Purchaser', 'Payment', 'Refund', 'Total', 'Created'] : ['Ticket code', 'Attendee', 'Email', 'Type', 'Admission', 'Claim', 'Check-in', 'Order']).map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>

@@ -1,3 +1,5 @@
+import AdminPendingSave, { useAdminSaveState } from '../AdminPendingSave.jsx';
+import { AdminLoadingState } from '../adminChrome.jsx';
 import HelpTooltip from '../HelpTooltip.jsx';
 // Asset detail modal: the file's facts, its editable description, where it
 // is used, and delete. Admin-only (design brief §5.2, admin story part 2
@@ -67,7 +69,7 @@ function UsageList({ references, error, onRetry }) {
     );
   }
   if (references === null) {
-    return <p role="status" className="flex items-center gap-xs text-admin-sm text-admin-ink-secondary"><span className="admin-busy-mark" aria-hidden="true" />Checking usage…</p>;
+    return <AdminLoadingState label="Checking usage…" onRetry={onRetry} />;
   }
   if (references.length === 0) {
     return (
@@ -118,7 +120,7 @@ export default function AssetModal({
   const [status, setStatus] = useState('');
   const [saveError, setSaveError] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
-  const [action, setAction] = useState('');
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState('');
   const pending = useRef(false);
   const busy = Boolean(action);
   const [confirming, setConfirming] = useState(false);
@@ -158,14 +160,15 @@ export default function AssetModal({
       setStatus('No changes to save.');
       return;
     }
+    if (!beginSave('save')) return;
     pending.current = true;
-    setAction('save');
     setStatus('');
     try {
       await updateMetadata({ assetId: asset.id, ...patch });
       savedText.current = text;
       setStatus('Description saved.');
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setSaveError(mediaErrorMessage(err, 'The description could not be saved. Try again.'));
     } finally {
       pending.current = false;
@@ -221,10 +224,11 @@ export default function AssetModal({
           <TextField help="Give this file a name staff can recognize in the media library." label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} disabled={busy} />
           <TextAreaField help="Write a caption for places on the event site that use this image." label="Caption (optional)" value={caption} onChange={(value) => { setCaption(value); setStatus(''); }} rows={2} maxLength={MAX_CAPTION_LENGTH} disabled={busy} />
           <TextField help="Name the photographer or source. The event site shows this as a credit under the image." label="Credit (optional)" value={credit} onChange={(value) => { setCredit(value); setStatus(''); }} maxLength={MAX_CREDIT_LENGTH} disabled={busy} />
+          <AdminPendingSave busy={action === 'save'} unconfirmed={unconfirmed} to="/admin/media" offline={offline} />
           {status ? <SaveStatus message={status} /> : null}
           {saveError ? <Notice tone="error" message={saveError} /> : null}
           <div className="flex flex-wrap gap-xs">
-            <button type="submit" className={primaryButtonClass} aria-disabled={busy || undefined} aria-busy={action === 'save' || undefined}>
+            <button type="submit" className={primaryButtonClass} aria-disabled={busy || unconfirmed || undefined} aria-busy={action === 'save' || undefined}>
               {action === 'save' ? <span className="admin-busy-mark" aria-hidden="true" /> : null}
               <BusyLabel busy={action === 'save'} pending="Saving the file details…">Save</BusyLabel>
             </button>

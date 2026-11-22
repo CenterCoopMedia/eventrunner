@@ -2,6 +2,7 @@
 //
 // The editor sends only changed flags. The shared schema supplies the flag
 // list. The attendee feed has no switch until SOCIAL_FEED_RELEASED (#507).
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { KNOWN_FEATURE_KEYS, validateFeatures } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -117,7 +118,7 @@ export default function AdminFeatureSettings() {
 
   const [form, setForm] = useState(() => toForm(features));
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const { action: saving, set: setSaving, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(false);
   const [status, setStatus] = useSavedMessage(form);
   const errorRef = useRef(null);
   const adoptedRef = useRef(sources.features === 'live');
@@ -161,7 +162,7 @@ export default function AdminFeatureSettings() {
       });
       return;
     }
-    setSaving(true);
+    if (!beginSave(true)) return;
     setError(null);
     setStatus('');
     try {
@@ -172,6 +173,7 @@ export default function AdminFeatureSettings() {
       setStatus('Features saved.');
       showToast('Features saved.', { announce: false });
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       const labels = Object.fromEntries(KNOWN_FEATURE_KEYS.map((key) => [`features.${key}`, FEATURE_CHOICES[key]?.label ?? 'This feature']));
       setError(settingsConflict(err, labels)
         ?? contentError(err, { labels, fallback: 'Features could not be saved. Try again.' }));
@@ -186,12 +188,13 @@ export default function AdminFeatureSettings() {
         title="Features"
         description="Choose what visitors can use on your event site."
         actions={
-          <button type="submit" className={primaryButtonClass} aria-disabled={saving || undefined} aria-busy={saving || undefined}>
+          <button type="submit" className={primaryButtonClass} aria-disabled={saving || unconfirmedSave || undefined} aria-busy={saving || undefined}>
             <BusyLabel busy={saving} pending="Saving features…">Save</BusyLabel>
           </button>
         }
       />
 
+      <AdminPendingSave busy={saving} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 

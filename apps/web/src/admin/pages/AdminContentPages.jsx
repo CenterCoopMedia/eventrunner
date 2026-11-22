@@ -89,7 +89,7 @@ export default function AdminContentPages() {
       ) : null}
 
       {loading ? (
-        <AdminLoadingState label="Loading pages…" />
+        <AdminLoadingState recover label="Loading pages…" />
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title={ready ? 'No pages yet' : 'The page list is not available yet'}

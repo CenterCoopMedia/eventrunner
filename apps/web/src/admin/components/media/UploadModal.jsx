@@ -9,7 +9,8 @@
 // The file limits shown are the same constants storage.rules and
 // functions/src/media/upload.cjs enforce; this form checks them before
 // spending a slow upload on a file the server will refuse.
-import { useRef, useState } from 'react';
+import AdminPendingSave, { useAdminSaveState } from '../AdminPendingSave.jsx';
+import { useState } from 'react';
 import {
   MEDIA_FOLDERS,
   MEDIA_MAX_BYTES,
@@ -36,8 +37,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
   const [alt, setAlt] = useState('');
   const [title, setTitle] = useState('');
   const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const pending = useRef(false);
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed, offline } = useAdminSaveState(false);
 
   function fileProblem(chosen) {
     if (chosen && !accepted.includes(chosen.type)) return `This file type is not supported. Choose ${accepted.map(typeLabel).join(', ')}.`;
@@ -53,22 +53,20 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
 
   async function submit(event) {
     event.preventDefault();
-    if (pending.current) return;
     const problem = fileProblem(file);
     if (problem) {
       setError(problem);
       return;
     }
-    pending.current = true;
-    setBusy(true);
+    if (!beginSave(true)) return;
     setError(null);
     try {
       const asset = await upload({ file, folder, alt: alt.trim(), title: title.trim() });
       onUploaded(asset);
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
       setError(mediaErrorMessage(err, 'The file could not be uploaded. Try again.'));
     } finally {
-      pending.current = false;
       setBusy(false);
     }
   }
@@ -122,10 +120,11 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
         {/* The one thing on this surface that can be rejected, so it carries
             the announcement a ServerErrorSummary would carry on a page with
             several fields. */}
+        <AdminPendingSave busy={busy} unconfirmed={unconfirmed} to="/admin/media" offline={offline} />
         <FieldError id="media-upload-error" role="alert" message={error} />
 
         <div className="flex flex-wrap gap-xs">
-          <button type="submit" className={primaryButtonClass} disabled={busy}>
+          <button type="submit" className={primaryButtonClass} disabled={busy || unconfirmed}>
             {busy ? <span className="admin-busy-mark" aria-hidden="true" /> : null}
             {busy ? 'Uploading…' : 'Upload'}
           </button>

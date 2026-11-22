@@ -207,7 +207,7 @@ export default function AdminSpeakersList() {
       ) : null}
 
       {loading ? (
-        <AdminLoadingState label="Loading speakers…" />
+        <AdminLoadingState recover label="Loading speakers…" />
       ) : speakers.length === 0 ? (
         <AdminEmptyState
           title="No speakers yet"

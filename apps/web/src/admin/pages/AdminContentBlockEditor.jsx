@@ -16,6 +16,7 @@
 // AdminPageEditor's block-type picker uses), and a section already at its
 // cap has no "Add block" link pointing here in the first place.
 import { sectionBlockTypes } from 'shared/page';
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useHref, useParams, useSearchParams } from 'react-router';
@@ -335,7 +336,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const [content, setContent] = useState(() => blankContent());
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'delete'
+  const { action: busy, set: setBusy, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
   const [status, setStatus] = useState('');
   const [savedDocId, setSavedDocId] = useState(null);
   const [resumeQueueId, setResumeQueueId] = useState(null);
@@ -464,7 +465,7 @@ export default function AdminContentBlockEditor({ mode }) {
       );
     }
     if (pagesLoading || !contentReady || existingRow) {
-      return <AdminLoadingState label="Loading block…" />;
+      return <AdminLoadingState recover label="Loading block…" />;
     }
   }
   if (mode === 'create' && !contentReady) {
@@ -476,7 +477,7 @@ export default function AdminContentBlockEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading block…" />;
+    return <AdminLoadingState recover label="Loading block…" />;
   }
   if (!pagesLoading && (!page || !section)) {
     return (
@@ -572,6 +573,7 @@ export default function AdminContentBlockEditor({ mode }) {
   }
 
   async function save({ publish }) {
+    if (busy !== null || unconfirmedSave) return;
     const textDraftsAtSave = { ...textDraftsRef.current };
     setError(null);
     setErrorTitle(undefined);
@@ -612,7 +614,7 @@ export default function AdminContentBlockEditor({ mode }) {
       savedContent = { ...savedContent, order: nextStoredOrder(siblings) };
       setContent(savedContent);
     }
-    setBusy(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     const endpoint = isExisting ? 'cmsUpdateContent' : 'cmsCreateContent';
     // cmsUpdateContent merges submitted fields onto the prior draft/live
     // doc's fields (functions/src/cms/content.cjs), so switching block
@@ -669,6 +671,7 @@ export default function AdminContentBlockEditor({ mode }) {
       reportPublish(publishResponse, [docId]);
     } catch (err) {
       if (!mountedRef.current) return;
+      if (captureUnconfirmed(err)) return;
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(contentError(err, { fallback: stage === 'publish' ? 'Publishing did not finish. Your draft is saved. Try again.' : undefined, labels: Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)])) }));
       if (err?.queueId) setResumeQueueId(err.queueId);
@@ -826,13 +829,13 @@ export default function AdminContentBlockEditor({ mode }) {
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to section
             </Link>
-            <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
+            <button type="submit" className={secondaryButtonClass} disabled={unconfirmedSave || busy !== null} aria-busy={busy === 'draft' || undefined}>
               <BusyLabel busy={busy === 'draft'} pending="Saving the draft…">Save draft</BusyLabel>
             </button>
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={busy !== null}
+              disabled={unconfirmedSave || busy !== null}
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
@@ -842,6 +845,7 @@ export default function AdminContentBlockEditor({ mode }) {
         }
       />
 
+      <AdminPendingSave busy={busy === 'draft' || busy === 'publish'} to={mode === 'create' ? `/admin/content/${encodeURIComponent(pageId)}/${encodeURIComponent(sectionId)}` : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary
         error={error}
         errorRef={errorRef}

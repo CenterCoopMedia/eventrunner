@@ -29,7 +29,7 @@ export default function AdminContentSections() {
   const page = findRow(pageId);
   const sections = Array.isArray(page?.current?.sections) ? page.current.sections : [];
 
-  if (pagesLoading && !page) return <AdminLoadingState label="Loading page…" />;
+  if (pagesLoading && !page) return <AdminLoadingState recover label="Loading page…" />;
   if (!page) {
     return (
       <AdminEmptyState

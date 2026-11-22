@@ -123,7 +123,7 @@ const AdminAnnouncements = lazy(() => import('./pages/AdminAnnouncements.jsx'), 
 function DeferredAdminPage({ children, label }) {
   const routeAttempt = useRouteLoadingAttempt();
   return (
-    <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} routeAttempt={routeAttempt} />}>
+    <Suspense fallback={<AdminLoadingState recover label={`Loading ${label}…`} routeAttempt={routeAttempt} />}>
       <RouteLoadingReady>{children}</RouteLoadingReady>
     </Suspense>
   );

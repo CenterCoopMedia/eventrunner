@@ -1,3 +1,4 @@
+import AdminPendingSave from './AdminPendingSave.jsx';
 import { plannerMessage } from '../plannerErrors.js';
 import '../plannerFields.css';
 import AdminIconControl from './AdminIconControl.jsx';
@@ -140,6 +141,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   return (
     <Panel title="Ticket catalog" description="One currency, full-event admission, and prices that include every amount the attendee will pay. Early-bird types share the event’s total capacity.">
       <form className="space-y-md" onSubmit={save} noValidate>
+        <AdminPendingSave busy={busy && !reloading} to="/admin/ticketing" />
         {recoveryRequired || revisionChanged ? <div className="space-y-sm"><Notice tone="caution" message={recoveryRequired ? 'The save could not be confirmed. Your unsaved edits are still here. Reload the saved catalog to check the current version before saving again.' : 'The saved catalog has changed. Your unsaved edits are still here; reload to use the current saved version.'} /><button type="button" className={secondaryButtonClass} aria-busy={reloading} aria-disabled={busy} onClick={reloadCatalog}>{reloading ? 'Reloading saved catalog…' : 'Discard unsaved edits and reload catalog'}</button></div> : null}
         <div className="planner-fields grid gap-md sm:grid-cols-2">
           {data.catalog ? <p className="text-admin-base text-admin-ink"><span className="font-semibold">Currency</span> {draft.currency.toUpperCase()}</p> : <SelectField label="Currency" value={draft.currency.toLowerCase()} onChange={(value) => changed('currency', value)} options={['usd', 'cad', 'eur', 'gbp', 'aud', 'nzd'].map((currency) => ({ value: currency, label: currency.toUpperCase() }))} />}

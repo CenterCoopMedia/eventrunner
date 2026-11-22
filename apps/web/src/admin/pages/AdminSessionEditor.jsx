@@ -1,3 +1,4 @@
+import AdminPendingSave, { useAdminSaveState } from '../components/AdminPendingSave.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
 import PlannerSwitch from '../components/PlannerSwitch.jsx';
@@ -132,8 +133,10 @@ export default function AdminSessionEditor({ mode }) {
   const [speakerToAdd, setSpeakerToAdd] = useState('');
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [action, setAction] = useState(null);
-  const saving = action !== null;
+  // Keep the creation lock through the edit route that creation opens.
+  const saveScope = currentId === createdId ? null : currentId;
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline, isCurrentRecord } = useAdminSaveState(null, saveScope);
+  const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
@@ -147,7 +150,7 @@ export default function AdminSessionEditor({ mode }) {
   const unsaved = savedForm !== null && (
     Boolean(availableChoice) || editorSnapshot(form) !== editorSnapshot(savedForm)
   );
-  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving });
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: action !== null });
 
   useEffect(() => {
     if (mode !== 'edit' || adoptedRef.current === currentId || !ready || !row) return;
@@ -268,7 +271,7 @@ export default function AdminSessionEditor({ mode }) {
     setSpeakerToAdd('');
     const docId = creating ? nextForm.id : currentId;
     const endpoint = creating ? 'cmsCreateContent' : 'cmsUpdateContent';
-    setAction(publish ? 'publish' : 'draft');
+    if (!beginSave(publish ? 'publish' : 'draft')) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -289,11 +292,14 @@ export default function AdminSessionEditor({ mode }) {
         fields,
         visible: nextForm.visible,
       });
-      if (creating) {
-        adoptedRef.current = docId;
-        setCreatedId(docId);
+      if (isCurrentRecord()) {
+        if (creating) {
+          adoptedRef.current = docId;
+          setCreatedId(docId);
+        }
+        setSavedForm(nextForm);
       }
-      setSavedForm(nextForm);
+      let message = 'Draft saved. It is not live until you publish it.';
       if (publish) {
         stage = 'publish';
         // Use the fields just saved. `row` still has the parent from before
@@ -303,16 +309,17 @@ export default function AdminSessionEditor({ mode }) {
         const response = await call('cmsPublish', { collection: 'cmsSchedule', docIds: ids });
         const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');
         if (!verdict.ok) throw new Error(verdict.message);
-        setStatus(verdict.message);
-        if (mode === 'create') showToast(verdict.message, { announce: false });
-      } else {
-        setStatus('Draft saved. It is not live until you publish it.');
-        if (mode === 'create') showToast('Session draft saved.', { announce: false });
+        message = verdict.message;
       }
+      if (!isCurrentRecord()) return;
+      setStatus(message);
       if (mode === 'create') {
+        showToast(publish ? message : 'Session draft saved.', { announce: false });
         navigate(`/admin/sessions/${encodeURIComponent(docId)}`, { replace: true });
       }
     } catch (err) {
+      if (captureUnconfirmed(err)) return;
+      if (!isCurrentRecord()) return;
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(plannerError(err));
     } finally {
@@ -326,8 +333,10 @@ export default function AdminSessionEditor({ mode }) {
     setErrorTitle(undefined);
     try {
       const deleted = await call('cmsDeleteContent', { collection: 'cmsSchedule', docId: currentId });
+      if (!isCurrentRecord()) return;
       reportDeleted({ ...deleted, collection: 'cmsSchedule', docId: currentId, editorPath: `${SESSIONS_LIST}/${encodeURIComponent(currentId)}` }, SESSIONS_LIST);
     } catch (err) {
+      if (!isCurrentRecord()) return;
       setErrorTitle('The session was not deleted');
       setError(plannerError(err));
     } finally {
@@ -354,7 +363,7 @@ export default function AdminSessionEditor({ mode }) {
         />
       );
     }
-    return <AdminLoadingState label="Loading session…" />;
+    return <AdminLoadingState recover label="Loading session…" />;
   }
 
   return (
@@ -413,6 +422,7 @@ export default function AdminSessionEditor({ mode }) {
         }
       />
 
+      <AdminPendingSave busy={action === 'draft' || action === 'publish'} to={mode === 'create' ? '/admin/sessions' : '.'} unconfirmed={unconfirmedSave} offline={offline} />
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog

@@ -16,7 +16,7 @@ export default function AdminOfflineNotice() {
   if (online !== false) return null;
   return (
     <div className="px-md py-sm">
-      <Notice tone="caution" message="You’re offline. Connect to finish loading saved content. Views still waiting for the server remain unavailable; content already loaded stays visible." />
+      <Notice tone="caution" message="You’re offline. Reconnect to load saved content or submit changes. Content already loaded stays visible." />
     </div>
   );
 }
