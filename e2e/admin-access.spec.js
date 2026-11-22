@@ -92,19 +92,30 @@ test.describe.serial('admin tiers and the Access page', () => {
       expect(refused.body.error.message).toBe('Operator access required.');
     }
     // Event settings are content — but a CHANGE to the sender block is the
-    // operator's. A save that carries the stored sender unchanged, which is
-    // what the Event form sends, goes through for staff.
+    // operator's. A save that carries the stored sender unchanged goes
+    // through for staff.
     const stored = (await adminDb().doc('config/event').get()).data();
+    const storedSender = { email: stored.sender.email, name: stored.sender.name ?? null, replyTo: stored.sender.replyTo ?? null };
     const unchanged = await callFunction('updateEventConfig', {
-      event: { tagline: `Set by staff ${Date.now()}`, sender: { email: stored.sender.email, name: stored.sender.name ?? null, replyTo: stored.sender.replyTo ?? null } },
+      event: {
+        changes: { tagline: `Set by staff ${Date.now()}`, sender: storedSender },
+        expected: { tagline: stored.tagline ?? null, sender: storedSender },
+      },
     }, staffToken);
     expect(unchanged.status, JSON.stringify(unchanged.body)).toBe(200);
-    const sender = await callFunction('updateEventConfig', { event: { sender: { email: 'x@example.test' } } }, staffToken);
+    const sender = await callFunction('updateEventConfig', {
+      event: { changes: { sender: { email: 'x@example.test' } }, expected: { sender: { email: stored.sender.email } } },
+    }, staffToken);
     expect(sender.status).toBe(403);
     expect(sender.body.error.message).toBe('To send from a different address, contact us.');
     // The social sharing card is branding: pointing it elsewhere is refused
     // the same way, and the stored value stands.
-    const card = await callFunction('updateEventConfig', { event: { seo: { defaultOgImagePath: 'cms-images/x/card.png' } } }, staffToken);
+    const card = await callFunction('updateEventConfig', {
+      event: {
+        changes: { seo: { defaultOgImagePath: 'cms-images/x/card.png' } },
+        expected: { seo: { defaultOgImagePath: stored.seo?.defaultOgImagePath ?? null } },
+      },
+    }, staffToken);
     expect(card.status).toBe(403);
     expect(card.body.error.message).toBe('seo.defaultOgImagePath: operator access required');
 

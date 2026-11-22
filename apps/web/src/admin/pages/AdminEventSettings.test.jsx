@@ -20,8 +20,9 @@ let tier = 'operator';
 vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ adminTier: tier }) }));
 
 let eventConfig;
+let source;
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({
-  useEventConfig: () => ({ eventConfig, sources: { event: 'live' } }),
+  useEventConfig: () => ({ eventConfig, sources: { event: source } }),
 }));
 
 vi.mock('../adminSource.js', () => ({ subscribeAdminCollection: () => () => {} }));
@@ -63,17 +64,18 @@ function save() {
 
 function sentEvent() {
   const call = callMock.mock.calls.find(([name]) => name === 'updateEventConfig');
-  return call?.[1].event;
+  return call?.[1].event.changes;
 }
 
 function sentEvents() {
-  return callMock.mock.calls.filter(([name]) => name === 'updateEventConfig').map(([, body]) => body.event);
+  return callMock.mock.calls.filter(([name]) => name === 'updateEventConfig').map(([, body]) => body.event.changes);
 }
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-11-09T15:00:00Z'));
   tier = 'operator';
+  source = 'live';
   eventConfig = storedEvent();
   callMock.mockReset();
   callMock.mockResolvedValue({ ok: true });
@@ -188,6 +190,29 @@ describe('AdminEventSettings: announce and archive', () => {
     save();
     await waitFor(() => expect(within(panel()).getAllByText(/needs an announce date/).length).toBe(1));
     expect(screen.getByRole('alert').textContent).toMatch(/needs an announce date/);
+  });
+
+  it('keeps the edited value and explains how to recover from a conflict', async () => {
+    source = 'snapshot';
+    const view = render(<AdminEventSettings />);
+    const name = screen.getByLabelText('Event name');
+    fireEvent.change(name, { target: { value: 'My new name' } });
+    eventConfig = storedEvent({ name: 'Name from another operator' });
+    source = 'live';
+    view.rerender(<AdminEventSettings />);
+    callMock.mockRejectedValueOnce(new AdminApiError({
+      code: 'settings-conflict',
+      status: 409,
+      message: 'name: changed since you opened these settings.; Open this page in a new tab to review the latest settings. Reapply your edits there and save.',
+    }));
+    save();
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/Name.*changed since you opened/);
+    expect(alert.textContent).toMatch(/Open this page in a new tab/);
+    expect(name.value).toBe('My new name');
+    expect(callMock).toHaveBeenCalledWith('updateEventConfig', {
+      event: { changes: { name: 'My new name' }, expected: { name: 'Example Summit' } },
+    });
   });
 
   it('shows staff the dates as text and leaves them out of the save', async () => {

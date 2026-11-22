@@ -127,7 +127,10 @@ describe('AdminTicketing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save ticket button' }));
     expect(await screen.findByText('Ticket button saved.')).toBeInTheDocument();
     expect(callMock).toHaveBeenCalledWith('updateEventConfig', {
-      event: { registration: { ticketButtonLabel: 'Reserve your seat', ticketButtonStyle: 'outline' } },
+      event: {
+        changes: { registration: { ticketButtonLabel: 'Reserve your seat', ticketButtonStyle: 'outline' } },
+        expected: { registration: { ticketButtonLabel: null, ticketButtonStyle: null } },
+      },
     });
   });
 

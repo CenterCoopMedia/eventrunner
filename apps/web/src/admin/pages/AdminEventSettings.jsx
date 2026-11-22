@@ -23,6 +23,7 @@ import { getEventPhase } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { applySettingsChanges, settingsChanges } from '../settingsChanges.js';
 import { useSavedMessage } from '../useSavedMessage.js';
 import {
   FieldError,
@@ -283,27 +284,8 @@ function toPayload(form, { includeSender = true, includeLifecycle = true } = {})
   };
 }
 
-/** The announce and archive dates as the form would send them. */
-function lifecycleOf(form) {
-  return { announcedAt: orNull(form.announcedAt), archivedAt: orNull(form.archivedAt) };
-}
-
-/**
- * The payload without the lifecycle dates this form did not change. The
- * form adopts the live config once, so an untouched date can be stale:
- * another operator may have announced or archived the event since. A key
- * left out is kept as stored by the server's merge.
- */
-function withoutUntouchedLifecycle(payload, baseline) {
-  const sent = { ...payload };
-  for (const key of Object.keys(baseline)) {
-    if (key in sent && sent[key] === baseline[key]) delete sent[key];
-  }
-  return sent;
-}
-
 export default function AdminEventSettings() {
-  const { eventConfig, sources } = useEventConfig();
+  const { eventConfig, liveEventConfig, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
   // The sender block is the operator's (issue #186): staff read it here and
@@ -331,26 +313,19 @@ export default function AdminEventSettings() {
   const errorRef = useRef(null);
   // Submit reaches into the form to find the first field it marked invalid.
   const formRef = useRef(null);
-  // Adopt runtime config once CONFIG/EVENT itself arrives (the snapshot
-  // renders first), then stop — later listener echoes must not overwrite
-  // in-progress edits. Keyed on this document's own readiness, not the
-  // aggregate `source`: a sibling doc (theme, badges) reporting first would
-  // otherwise freeze the form on snapshot values, and this form's save is a
-  // merge over the stored doc — seeded-from-snapshot values would overwrite
-  // production ones field by field.
+  // Adopt the first event document. Later listener values can arrive while
+  // the operator is editing, so the transaction checks against this baseline.
   const adoptedRef = useRef(sources.event === 'live');
-  // The lifecycle dates the form adopted, then the ones the last save sent.
-  // A save sends a date only when the form differs from this.
-  const lifecycleBaseline = useRef(null);
-  if (lifecycleBaseline.current === null) lifecycleBaseline.current = lifecycleOf(form);
+  const baseline = useRef({ form, stored: liveEventConfig ?? eventConfig });
 
   useEffect(() => {
     if (adoptedRef.current || sources.event !== 'live') return;
     adoptedRef.current = true;
+    if (JSON.stringify(toPayload(form)) !== JSON.stringify(toPayload(baseline.current.form))) return;
     const adopted = toForm(eventConfig);
-    lifecycleBaseline.current = lifecycleOf(adopted);
+    baseline.current = { form: adopted, stored: liveEventConfig ?? eventConfig };
     setForm(adopted);
-  }, [sources.event, eventConfig]);
+  }, [sources.event, eventConfig, liveEventConfig, form]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -512,12 +487,12 @@ export default function AdminEventSettings() {
     // values afterwards, not with anything typed while the save runs.
     const sentLetters = submittedTrackLetters(form.tracks);
     const sentPlaceIds = new Set(form.venue.places.map((place) => String(place.id ?? '').trim()));
-    const payload = withoutUntouchedLifecycle(toPayload(form, payloadOptions), lifecycleBaseline.current);
+    const loaded = baseline.current;
+    const edit = settingsChanges(toPayload(loaded.form, payloadOptions), toPayload(form, payloadOptions), loaded.stored);
     try {
-      await call('updateEventConfig', { event: payload });
-      // The sent dates are now stored. The next save is measured from them.
-      for (const key of Object.keys(lifecycleBaseline.current)) {
-        if (key in payload) lifecycleBaseline.current = { ...lifecycleBaseline.current, [key]: payload[key] };
+      await call('updateEventConfig', { event: edit });
+      if (baseline.current === loaded) {
+        baseline.current = { form, stored: applySettingsChanges(loaded.stored, edit.changes) };
       }
       setForm((current) => ({
         ...current,

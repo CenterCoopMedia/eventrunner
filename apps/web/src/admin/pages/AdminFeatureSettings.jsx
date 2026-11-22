@@ -1,17 +1,13 @@
 // Feature flags (issue #14), wired to updateFeatures.
 //
-// config/features is a whole-document replace, so this form always sends
-// every known key with its resolved value. The key list comes
-// from the shared schema (KNOWN_FEATURE_KEYS), which is the same list the
-// server validates against, so a new flag appears here the moment it is added
-// there. Until SOCIAL_FEED_RELEASED (#507 acceptance), the attendee feed has
-// no switch here, so no client admin can turn on the unfinished feed; its
-// stored value is still sent back unchanged.
+// The editor sends only changed flags. The shared schema supplies the flag
+// list. The attendee feed has no switch until SOCIAL_FEED_RELEASED (#507).
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { KNOWN_FEATURE_KEYS, validateFeatures } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { applySettingsChanges, settingsChanges, settingsConflict } from '../settingsChanges.js';
 import { useSavedMessage } from '../useSavedMessage.js';
 import {
   FieldError,
@@ -115,7 +111,7 @@ function toForm(features) {
 }
 
 export default function AdminFeatureSettings() {
-  const { features, sources } = useEventConfig();
+  const { features, liveFeatures, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -124,18 +120,17 @@ export default function AdminFeatureSettings() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useSavedMessage(form);
   const errorRef = useRef(null);
-  // Keyed on CONFIG/FEATURES' own readiness. The aggregate `source` flips as
-  // soon as any config doc reports, so seeding on it would let a config/event
-  // snapshot arriving first freeze this form on the build-time flags — and
-  // config/features is a whole-doc replace, so saving that would silently
-  // revert every production flag.
   const adoptedRef = useRef(sources.features === 'live');
+  const baseline = useRef({ form, stored: liveFeatures ?? features });
 
   useEffect(() => {
     if (adoptedRef.current || sources.features !== 'live') return;
     adoptedRef.current = true;
-    setForm(toForm(features));
-  }, [sources.features, features]);
+    if (form !== baseline.current.form) return;
+    const adopted = toForm(features);
+    baseline.current = { form: adopted, stored: liveFeatures ?? features };
+    setForm(adopted);
+  }, [sources.features, features, liveFeatures, form]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -152,7 +147,9 @@ export default function AdminFeatureSettings() {
   async function submit(event) {
     event.preventDefault();
     if (saving) return;
-    const validation = validateFeatures(form);
+    const loaded = baseline.current;
+    const edit = settingsChanges(loaded.form, form, loaded.stored);
+    const validation = validateFeatures({ ...toForm(features), ...edit.changes });
     if (!validation.ok) {
       setError({
         clientValidation: true,
@@ -168,11 +165,16 @@ export default function AdminFeatureSettings() {
     setError(null);
     setStatus('');
     try {
-      await call('updateFeatures', { features: form });
+      await call('updateFeatures', { features: edit });
+      if (baseline.current === loaded) {
+        baseline.current = { form, stored: applySettingsChanges(loaded.stored, edit.changes) };
+      }
       setStatus('Features saved.');
       showToast('Features saved.', { announce: false });
     } catch (err) {
-      setError(contentError(err, { labels: Object.fromEntries(KNOWN_FEATURE_KEYS.map((key) => [`features.${key}`, FEATURE_CHOICES[key]?.label ?? 'this feature'])), fallback: 'Features could not be saved. Try again.' }));
+      const labels = Object.fromEntries(KNOWN_FEATURE_KEYS.map((key) => [`features.${key}`, FEATURE_CHOICES[key]?.label ?? 'This feature']));
+      setError(settingsConflict(err, labels)
+        ?? contentError(err, { labels, fallback: 'Features could not be saved. Try again.' }));
     } finally {
       setSaving(false);
     }

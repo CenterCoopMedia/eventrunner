@@ -155,6 +155,10 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
       features: overlay.features
         ? { ...FEATURE_DEFAULTS, ...overlay.features }
         : snapshotFeatures,
+      // Settings compare against stored values, including keys the runtime
+      // document omitted and the UI filled from defaults.
+      liveEventConfig: overlay.event,
+      liveFeatures: overlay.features,
       theme: effectiveDemoTheme
         ? effectiveDemoTheme
         : overlay.theme
