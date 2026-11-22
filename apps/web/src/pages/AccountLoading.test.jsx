@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import DeferredPage from '../components/DeferredPage.jsx';
 import MyTickets from './MyTickets.jsx';
@@ -45,6 +45,24 @@ function tree({ Page, path, sharedWait }) {
     </MemoryRouter>
   );
 }
+
+it('announces only the error when refreshing a loaded ticket list fails', async () => {
+  const page = CASES[0];
+  render(tree(page));
+  act(() => vi.advanceTimersByTime(1000));
+  await act(async () => finish(page.result));
+  expect(screen.getByRole('status')).toHaveTextContent(page.completion);
+
+  let failRefresh;
+  state.tickets.mockReturnValueOnce(new Promise((_, reject) => { failRefresh = reject; }));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh tickets' }));
+  act(() => vi.advanceTimersByTime(1000));
+  await act(async () => failRefresh(new Error('Could not refresh tickets.')));
+
+  expect(screen.getByRole('alert')).toHaveTextContent('Could not refresh tickets.');
+  expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  expect(screen.getByText(page.ready, { exact: true })).toBeInTheDocument();
+});
 
 describe.each(CASES)('$name loading feedback', (page) => {
   it('names the wait, escalates outside the busy content and removes the indicator when the read resolves', async () => {

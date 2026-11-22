@@ -85,7 +85,7 @@ export default function MyTickets({ routeAttempt }) {
     <LoadingState
       active={loadingTickets || busy}
       label={loadingTickets ? 'Loading your tickets…' : 'Updating your tickets…'}
-      completion={tickets ? (tickets.length ? 'Your tickets are ready.' : 'You have no tickets for this account.') : ''}
+      completion={!error && tickets ? (tickets.length ? 'Your tickets are ready.' : 'You have no tickets for this account.') : ''}
       rows={0}
       routeAttempt={routeAttempt}
       recover
