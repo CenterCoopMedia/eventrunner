@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api.js';
 import { application, callsTo, serveApi } from '../../test/application.js';
 import { renderSetup } from '../../test/setupPage.jsx';
+import { keepAnswer, readKeptAnswer } from '../../setup/keptAnswers.js';
 
 vi.mock('../../api.js', async (importOriginal) => ({ ...(await importOriginal()), callApi: vi.fn() }));
 
@@ -32,7 +33,12 @@ describe('Agreement step', () => {
     expect(article.querySelector('b')).toBeNull();
   });
 
-  it('accepts the version on the page and opens the status page', async () => {
+  it('accepts the version on the page, clears its drafts, and opens the status page', async () => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    const otherRequest = { ...scope, appId: 'a2' };
+    const draft = { step: 'email', answers: { senderName: 'Unfinished sender' } };
+    keepAnswer(scope, draft);
+    keepAnswer(otherRequest, draft);
     serveApi({
       getAgreement: { agreement: AGREEMENT, accepted: null },
       acceptAgreement: { status: 'approved', acceptanceId: 'r1', copySent: true, buildStarted: true },
@@ -46,6 +52,8 @@ describe('Agreement step', () => {
     expect(callsTo('acceptAgreement')).toEqual([{
       orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', version: 3,
     }]);
+    expect(readKeptAnswer(scope, 'email')).toBeNull();
+    expect(readKeptAnswer(otherRequest, 'email')).toEqual(draft);
   });
 
   it('shows a refused name at the field', async () => {

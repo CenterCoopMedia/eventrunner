@@ -25,6 +25,69 @@ function setupViewport(wide) {
 }
 
 describe('Setup', () => {
+  it('keeps only setup fields before any save or page lifecycle callback', async () => {
+    const app = application();
+    const event = app.answers.event;
+    app.answers.event = {
+      ...event,
+      password: 'synthetic password',
+      days: event.days.map((day) => ({ ...day, card: 'synthetic card' })),
+      venue: { ...event.venue, key: 'synthetic key', token: 'synthetic token' },
+    };
+    serveApi({ getApplication: { application: app } });
+    renderSetup('event');
+    fireEvent.change(await screen.findByLabelText('Event name'), { target: { value: 'Unfinished event' } });
+
+    expect(callsTo('saveApplicationStep')).toHaveLength(0);
+    const stored = window.sessionStorage.getItem('console.setup.ana:["o1","a1","event"]');
+    expect(JSON.parse(stored)).toEqual({ step: 'event', answers: { ...event, name: 'Unfinished event' } });
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it('offers a partial older answer and keeps fields that were absent from the copy', async () => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    keepAnswer(scope, { step: 'event', answers: { name: 'Older draft', venue: { name: 'Kept venue' } } });
+    renderSetup('event');
+    const use = await screen.findByRole('button', { name: 'Use kept answer' });
+    expect(screen.getByLabelText('Event name')).toHaveValue('NC Local News Summit');
+    expect(screen.getByLabelText('Venue name')).toHaveValue('City Hall');
+    expect(callsTo('saveApplicationStep')).toHaveLength(0);
+
+    fireEvent.click(use);
+    expect(await screen.findByText('Draft restored.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Event name')).toHaveValue('Older draft');
+    expect(screen.getByLabelText('Venue name')).toHaveValue('Kept venue');
+    expect(screen.getByLabelText('Venue address')).toHaveValue('2 Main Street');
+    expect(screen.getByLabelText('Date')).toHaveValue('2027-05-13');
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
+    await screen.findByRole('heading', { name: 'Your web address' });
+    expect(readKeptAnswer(scope, 'event')).toBeNull();
+  });
+
+  it('keeps the latest edit when a save from before a page remount finishes', async () => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    let finish;
+    serveApi({ saveApplicationStep: (body) => new Promise((resolve) => {
+      if (!finish) finish = () => resolve({ step: body.step, saved: true, errors: {} });
+    }) });
+    const first = renderSetup('organization');
+    fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'First edit' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
+    await waitFor(() => expect(finish).toBeTypeOf('function'));
+    first.unmount();
+
+    const second = renderSetup('organization');
+    await screen.findByRole('button', { name: 'Use kept answer' });
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Latest edit' } });
+    await act(async () => finish());
+    expect(readKeptAnswer(scope, 'organization')?.answers.name).toBe('Latest edit');
+    second.unmount();
+
+    renderSetup('organization');
+    fireEvent.click(await screen.findByRole('button', { name: 'Use kept answer' }));
+    expect(screen.getByLabelText('Organization name')).toHaveValue('Latest edit');
+  });
+
   it.each(['use', 'discard'])('offers a failed answer after reload and lets the reader %s it explicitly', async (choice) => {
     const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
     serveApi({ saveApplicationStep: () => { throw new Error('Offline'); } });
