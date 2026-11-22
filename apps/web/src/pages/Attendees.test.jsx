@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent } from '@testing-library/react';
 import { act, render, screen, within } from '@testing-library/react';
 import { flushSync } from 'react-dom';
-import { MemoryRouter } from 'react-router';
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router';
 
 let features;
 let badgesConfig;
@@ -48,6 +48,7 @@ function pushProfiles(profiles) {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   features = { attendeeDirectory: true, publicAttendeeProfiles: false, badges: false };
   badgesConfig = null;
   profileValue = { status: 'ready', attendeeAccess: true, profile: null, needsProfileSetup: false };
@@ -423,6 +424,70 @@ describe('directory search and organization filter', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear organization filter' }));
     expect(screen.getByText('Ana Costa')).toBeInTheDocument();
+  });
+
+  it('restores the directory search and organization after going back or reloading', async () => {
+    const routes = [
+      { path: '/attendees', element: <Attendees /> },
+      { path: '/attendees/:id', element: <h1>Attendee profile</h1> },
+    ];
+    const router = createMemoryRouter(routes, { initialEntries: ['/attendees'] });
+    const view = render(<RouterProvider router={router} />);
+    pushProfiles(PEOPLE);
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search the directory' }), { target: { value: 'ana' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Acme News (2)' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Ana Costa' }));
+    expect(await screen.findByRole('heading', { name: 'Attendee profile' })).toBeVisible();
+
+    await act(() => router.navigate(-1));
+    pushProfiles(PEOPLE);
+    expect(screen.getByRole('searchbox', { name: 'Search the directory' })).toHaveValue('ana');
+    expect(screen.getByRole('checkbox', { name: 'Acme News (2)' })).toBeChecked();
+    const { pathname, search, hash } = router.state.location;
+    expect(`${pathname}${search}${hash}`).toBe('/attendees');
+
+    view.unmount();
+    const freshRouter = createMemoryRouter(routes, { initialEntries: [pathname] });
+    render(<RouterProvider router={freshRouter} />);
+    pushProfiles(PEOPLE);
+    expect(screen.getByRole('searchbox', { name: 'Search the directory' })).toHaveValue('ana');
+    expect(screen.getByRole('checkbox', { name: 'Acme News (2)' })).toBeChecked();
+    expect(screen.getByRole('link', { name: 'Ana Costa' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Amara Diallo' })).toBeNull();
+  });
+
+  it('does not show a prior account’s filters after sign-out or an account change', () => {
+    features.publicAttendeeProfiles = true;
+    profileValue.uid = 'first';
+    const view = renderPage();
+    pushProfiles(PEOPLE);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search the directory' }), { target: { value: 'ana' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Acme News (2)' }));
+
+    profileValue = { status: 'signed-out', uid: null, attendeeAccess: false };
+    view.rerender(<MemoryRouter><Attendees /></MemoryRouter>);
+    pushProfiles(PEOPLE);
+    expect(screen.getByRole('searchbox', { name: 'Search the directory' })).toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: 'Acme News (2)' })).not.toBeChecked();
+
+    view.unmount();
+    profileValue = { status: 'ready', uid: 'second', attendeeAccess: true };
+    renderPage();
+    pushProfiles(PEOPLE);
+    expect(screen.getByRole('searchbox', { name: 'Search the directory' })).toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: 'Acme News (2)' })).not.toBeChecked();
+  });
+
+  it('ignores a saved organization filter when that organization is gone', () => {
+    const view = renderPage();
+    pushProfiles(PEOPLE);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Acme News (2)' }));
+
+    view.unmount();
+    renderPage();
+    pushProfiles([{ id: 'u2', displayName: 'Zeke Alvarez' }]);
+    expect(screen.getByRole('link', { name: 'Zeke Alvarez' })).toBeVisible();
   });
 
   it('an empty result states what was searched', () => {
