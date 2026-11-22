@@ -158,13 +158,14 @@ function browserFamily(userAgent) {
  */
 function toSummary(doc) {
   const data = doc.data() || {};
+  const firstSeenAt = toMillis(data.createdAt);
   return {
     id: doc.id,
     kind: typeof data.kind === 'string' && SAFE_KIND_RE.test(data.kind) ? data.kind : 'unknown',
     route: routeOf(data.url),
     browser: browserFamily(data.userAgent),
-    firstSeenAt: toMillis(data.createdAt),
-    lastSeenAt: toMillis(data.lastSeenAt),
+    firstSeenAt,
+    lastSeenAt: toMillis(data.lastSeenAt) ?? firstSeenAt,
     open: data.resolved !== true,
   };
 }

@@ -588,7 +588,7 @@ test('getSystemError: an operator gets only the safe fields of one row', async (
   assert.deepEqual(res.body, {
     row: {
       id: 'AbCdEf0123456789wxyz', kind: 'client-error', route: '/speakers/*', browser: 'safari',
-      firstSeenAt: 1000, lastSeenAt: null, open: false,
+      firstSeenAt: 1000, lastSeenAt: 1000, open: false,
     },
   });
   const raw = JSON.stringify(res.body);
