@@ -84,3 +84,10 @@ test('hashed files stay for a year, and nothing else is immutable', () => {
   assert.ok(cacheRules.some(([source, value]) => source === '/assets/**' && value.includes('max-age=31536000')));
   assert.ok(cacheRules.some(([source]) => source === '/fonts/**'));
 });
+
+test('the public offline worker and kill switch always revalidate from Hosting', () => {
+  for (const source of ['/sw.js', '/offline-policy.json']) {
+    const rule = config.hosting.headers.find((candidate) => candidate.source === source);
+    assert.equal(rule?.headers.find(({ key }) => key === 'Cache-Control')?.value, 'no-store');
+  }
+});

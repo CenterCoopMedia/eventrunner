@@ -20,6 +20,7 @@ import { criticalFontTags } from './criticalFonts.js';
 import { snapshotHtml } from './snapshotHtml.js';
 import { specimenBoundary } from './specimenBoundary.js';
 import { isDemoModeFlag } from './src/lib/demoModeFlag.js';
+import { offlineBundle } from './offlineBundle.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
@@ -98,7 +99,13 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       order: 'pre',
       handler: () => criticalFontTags(readFileSync(path.join(generatedDir, 'theme.css'), 'utf8')),
     },
-  }, nonBlockingEntry(), snapshotHtml(), specimenBoundary(), buildVersion(process.env.EVENT_BUILD_COMMIT)],
+  }, nonBlockingEntry(), snapshotHtml(), specimenBoundary(), buildVersion(process.env.EVENT_BUILD_COMMIT),
+  offlineBundle({
+    root: here,
+    generatedDir,
+    project: isDemoModeFlag(loadEnv(mode, here, 'VITE_DEMO_MODE').VITE_DEMO_MODE)
+      ? null : loadEnv(mode, here, 'VITE_FIREBASE_PROJECT_ID').VITE_FIREBASE_PROJECT_ID,
+  })],
   // `shared` is a linked workspace package whose ESM entries re-export CJS
   // sources; linked deps skip prebundling by default, which would break the
   // dev server's CJS interop. Builds and vitest handle it either way.

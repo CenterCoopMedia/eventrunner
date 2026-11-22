@@ -7,6 +7,7 @@
 // free of Firestore types.
 import { subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
+import { confirmPublicRead, readSavedPublicBuild } from './savedPublicBuild.js';
 
 /**
  * Subscribe to one config/{docId} document. Calls onNext(data) on every
@@ -30,8 +31,10 @@ export function subscribeConfigDoc(docId, onNext, onStatus) {
   return subscribeToFirebase(({ db, doc, onSnapshot }) => {
     const next = (snapshot) => {
       if (snapshot.exists()) {
-        onNext(snapshot.data());
-        onStatus?.(snapshot.metadata?.fromCache === false ? 'confirmed' : 'cached');
+        const fromCache = snapshot.metadata?.fromCache;
+        if (fromCache !== true || !readSavedPublicBuild()) onNext(snapshot.data());
+        if (fromCache === false) confirmPublicRead(`config/${docId}`);
+        onStatus?.(fromCache === false ? 'confirmed' : 'cached');
       } else {
         onStatus?.('gone');
       }
