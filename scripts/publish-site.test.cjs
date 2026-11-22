@@ -486,6 +486,7 @@ test('live publisher and generated snapshot use the same block-only language alt
     'pagesData.js': { pagesData: pages },
     'scheduleData.js': { scheduleData: live.sessions, speakers: live.speakers },
     'organizationsData.js': { organizationsData: live.organizations },
+    'updatesData.js': { updatesData: live.updates, snapshotGeneratedAt: null },
     'siteContent.js': { siteContent: { [block.id]: block } },
   };
   const snapshot = await readGeneratedSnapshot({ generatedDir: '/fixture', importModule: async (_dir, file) => modules[file] });

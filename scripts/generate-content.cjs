@@ -40,6 +40,7 @@ const { emitAll } = require('./lib/emit.cjs');
 const { demoSnapshot } = require('./lib/demo-event.cjs');
 const { assertNoPitchPageCollisions } = require('./lib/pitch-route-check.cjs');
 const { imageSizePaths, readImageSizeManifest } = require('shared/imageSizes');
+const { isPublicPage } = require('shared/page');
 const { isMediaLibraryPath, storageObjectPath } = require('shared/venueFields');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -189,6 +190,10 @@ async function readDeployment({ db, storageBucket, fetchImpl = fetch }) {
   assertNoPitchPageCollisions([...allPages, ...draftPaths.docs.map((doc) => doc.data())]);
   // Hidden page bodies are inspected for collisions, never emitted.
   const pages = allPages.filter((page) => page.visible === true);
+  const updates = launch?.comingSoon !== true
+    && isPublicPage(pages.find((page) => page.id === 'updates'), config.features)
+    ? await readVisibleCollection('cmsUpdates')
+    : [];
   // `speakerId` on the projection is the document id under another name;
   // the emitted snapshot addresses speakers by `id` like every other
   // collection, so carrying both would be two spellings of one value.
@@ -207,6 +212,8 @@ async function readDeployment({ db, storageBucket, fetchImpl = fetch }) {
     organizations,
     timeline,
     speakers,
+    updates,
+    snapshotGeneratedAt: new Date().toISOString(),
   };
 }
 

@@ -10,7 +10,7 @@
 // attached for this provider session; a source switch replaces every handle.
 //
 // Overlay semantics, per collection:
-//   - cmsContent / cmsPages / cmsSchedule / cmsOrganizations / cmsTimeline:
+//   - cmsContent / cmsPages / cmsUpdates / cmsSchedule / cmsOrganizations / cmsTimeline:
 //     any successful live result — including an empty array — replaces the
 //     snapshot wholesale. The published set is the truth: once a listener has
 //     actually reported in, an empty result means staff unpublished
@@ -20,8 +20,6 @@
 //     still-connecting listener) or a listener error (fail soft:
 //     rules-denied/offline reads must not blank the page) keeps the
 //     snapshot / last-known live values.
-//   - cmsUpdates: live-only; there is no snapshot module, so the default is
-//     an empty list.
 //   - speakers_public: same wholesale-replace semantics, from its own
 //     subscription (spec §4.3). It is not under the publish model — no
 //     `_drafts` sibling, no `visible` field — so it needs neither the
@@ -52,6 +50,7 @@ import snapshotScheduleData, { speakers as snapshotSpeakers } from '@generated/s
 import snapshotOrganizationsData from '@generated/organizationsData.js';
 import snapshotTimelineData from '@generated/timelineData.js';
 import snapshotPages from '@generated/pagesData.js';
+import { updatesData as snapshotUpdates } from '@generated/updatesData.js';
 import { isPublicPage } from 'shared/page';
 import { subscribeContentCollection, subscribeSpeakersPublic } from '../lib/contentSource.js';
 import { IS_DEMO } from '../lib/demoMode.js';
@@ -195,7 +194,9 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
     const pages = (overlay.cmsPages != null ? overlay.cmsPages.map(publicContentDoc) : snapshotPages)
       .slice()
       .sort(byOrder);
-    const updates = (overlay.cmsUpdates ?? []).slice().sort(byOrder);
+    const updates = (overlay.cmsUpdates ?? (readSource === 'published' ? snapshotUpdates : []))
+      .slice()
+      .sort(byOrder);
     const scheduleData = overlay.cmsSchedule != null ? overlay.cmsSchedule : snapshotScheduleData;
     const organizationsData =
       overlay.cmsOrganizations != null

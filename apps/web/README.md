@@ -38,6 +38,7 @@ the committed **synthetic snapshot** in `src/generated/`:
 | `pagesData.js` | pages-as-data, routed at each page's own root-level `path` |
 | `scheduleData.js` | schedule sessions and public speakers |
 | `organizationsData.js` | sponsors |
+| `updatesData.js` | visible public Updates and the deployment snapshot generation time |
 | `timelineData.js` | past editions for the home page's History section |
 
 Four providers then overlay live Firestore data on top of that snapshot,

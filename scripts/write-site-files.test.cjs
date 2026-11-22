@@ -29,6 +29,10 @@ function fakeImporter(modules) {
 
 const MODULES = {
   'organizationsData.js': { organizationsData: [{ id: 'beacon', visible: true }] },
+  'updatesData.js': {
+    updatesData: [{ id: 'notice', visible: true }],
+    snapshotGeneratedAt: '2026-05-14T09:00:00.000Z',
+  },
   'eventConfig.js': {
     eventConfig: { name: 'Harborlight Summit', shortName: 'HARBOR' },
     features: { schedule: true, speakers: true, sponsors: true, attendeeDirectory: true, updates: false },
@@ -58,8 +62,8 @@ test('readGeneratedSnapshot maps the generated files into buildSiteArtifacts sha
   assert.deepEqual(snapshot.sessions, [{ id: 'keynote', visible: true }]);
   assert.deepEqual(snapshot.speakers, [{ slug: 'rae-okonkwo' }]);
   assert.deepEqual(snapshot.organizations, [{ id: 'beacon', visible: true }]);
-  // cmsUpdates has no build-time snapshot at all — see the module docstring.
-  assert.deepEqual(snapshot.updates, []);
+  assert.deepEqual(snapshot.updates, [{ id: 'notice', visible: true }]);
+  assert.equal(snapshot.snapshotGeneratedAt, '2026-05-14T09:00:00.000Z');
 });
 
 test('readGeneratedSnapshot tolerates a scheduleData.js with no speakers export', async () => {
@@ -116,7 +120,7 @@ function writeFixtureGeneratedDir({ theme = {} } = {}) {
   fs.writeFileSync(
     path.join(dir, 'eventConfig.js'),
     "export const eventConfig = { name: 'Fixture Event', shortName: 'FIX' };\n"
-    + "export const features = { schedule: true, speakers: true, sponsors: true, attendeeDirectory: true, updates: false };\n"
+    + "export const features = { schedule: true, speakers: true, sponsors: true, attendeeDirectory: true, updates: true };\n"
     + `export const theme = ${JSON.stringify(theme)};\n`,
   );
   fs.writeFileSync(
@@ -125,6 +129,8 @@ function writeFixtureGeneratedDir({ theme = {} } = {}) {
     + "{ id: 'home', path: '/', order: 0, visible: true, systemPage: true },"
     + "{ id: 'schedule', path: '/schedule', order: 1, visible: true, systemPage: true },"
     + "{ id: 'sponsors', path: '/sponsors', order: 3, visible: true, systemPage: true },"
+    + "{ id: 'updates', path: '/updates', order: 4, visible: true, systemPage: true },"
+    + "{ id: 'attendees', path: '/attendees', order: 5, visible: true, systemPage: true },"
     + '];\n',
   );
   fs.writeFileSync(
@@ -133,6 +139,9 @@ function writeFixtureGeneratedDir({ theme = {} } = {}) {
     + "export const speakers = [{ slug: 'rae-okonkwo' }];\n",
   );
   fs.writeFileSync(path.join(dir, 'organizationsData.js'), "export const organizationsData = [{ id: 'beacon', visible: true }];\n");
+  fs.writeFileSync(path.join(dir, 'updatesData.js'),
+    "export const snapshotGeneratedAt = '2026-05-14T09:00:00.000Z';\n"
+    + "export const updatesData = [{ id: 'notice', visible: true }, { id: 'hidden', visible: false }];\n");
   return dir;
 }
 
@@ -150,6 +159,8 @@ test('a full run reads a real generated directory and writes all three files', a
     assert.match(sitemap, /<loc>https:\/\/example\.org\/<\/loc>/);
     assert.match(sitemap, /<loc>https:\/\/example\.org\/schedule<\/loc>/);
     assert.match(sitemap, /<loc>https:\/\/example\.org\/sponsors\/beacon<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/example\.org\/updates\/notice<\/loc>/);
+    assert.doesNotMatch(sitemap, /\/(updates\/hidden|attendees)<\/loc>/);
 
     const robots = fs.readFileSync(path.join(distDir, 'robots.txt'), 'utf8');
     assert.match(robots, /^Sitemap: https:\/\/example\.org\/sitemap\.xml$/m);
@@ -349,6 +360,8 @@ test('the refusal names the reserved segment and the page that took it', async (
   );
 
   fs.writeFileSync(path.join(generatedDir, 'organizationsData.js'), 'export const organizationsData = [];\n');
+  fs.writeFileSync(path.join(generatedDir, 'updatesData.js'),
+    'export const snapshotGeneratedAt = null;\nexport const updatesData = [];\n');
   const errors = [];
   const code = await main(
     ['--dist', distDir, '--public-url', 'https://example.org', '--generated', generatedDir],

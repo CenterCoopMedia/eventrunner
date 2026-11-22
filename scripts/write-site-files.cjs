@@ -31,11 +31,7 @@
  *
  * apps/web/src/generated/*.js are ES modules — Vite's own source, not
  * Node's — so they are loaded with dynamic `import()` here rather than
- * `require()`. cmsUpdates has no generated-snapshot counterpart at all
- * (Updates.jsx reads it through a live Firestore listener, never the
- * build-time snapshot — see scripts/lib/emit.cjs), so update detail
- * routes are always empty from this path; only the Cloud Run publisher,
- * which does have a live read, can list them.
+ * `require()`.
  *
  * One route is refused outright: the specimen book at /specimen is a review
  * surface that ships only in the demo build and in a development server, so
@@ -198,14 +194,15 @@ async function importGenerated(dir, file) {
  * @param {{ generatedDir: string, importModule?: typeof importGenerated }} args
  * @returns {Promise<{ event: object, features: object, theme: object,
  *                     pages: object[], sessions: object[], speakers: object[], organizations: object[],
- *                     updates: object[], blocks: object[] }>}
+ *                     updates: object[], blocks: object[], snapshotGeneratedAt: string|null }>}
  */
 async function readGeneratedSnapshot({ generatedDir, importModule = importGenerated }) {
-  const [eventConfigMod, pagesMod, scheduleMod, organizationsMod] = await Promise.all([
+  const [eventConfigMod, pagesMod, scheduleMod, organizationsMod, updatesMod] = await Promise.all([
     importModule(generatedDir, 'eventConfig.js'),
     importModule(generatedDir, 'pagesData.js'),
     importModule(generatedDir, 'scheduleData.js'),
     importModule(generatedDir, 'organizationsData.js'),
+    importModule(generatedDir, 'updatesData.js'),
   ]);
   const event = eventConfigMod.eventConfig || {};
   const siteContent = contentLanguages(event).available.includes('es')
@@ -219,9 +216,8 @@ async function readGeneratedSnapshot({ generatedDir, importModule = importGenera
     speakers: scheduleMod.speakers || [],
     organizations: organizationsMod.organizationsData || [],
     blocks: Object.values(siteContent ?? {}),
-    // No build-time snapshot exists for cmsUpdates — see the module
-    // docstring above.
-    updates: [],
+    updates: updatesMod.updatesData,
+    snapshotGeneratedAt: updatesMod.snapshotGeneratedAt,
   };
 }
 
