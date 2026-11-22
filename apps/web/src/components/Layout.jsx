@@ -77,7 +77,6 @@ import { brandingSrc, uploadedBrandingSrc } from '../lib/mediaSource.js';
 import useAccountViews from '../hooks/useAccountViews.js';
 import BackToTop from './BackToTop.jsx';
 import FooterLinkGroups, { FOOTER_SECTION_ID, footerLinkGroups } from './FooterLinkGroups.jsx';
-import ExternalLink from './ExternalLink.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
@@ -183,7 +182,11 @@ function navClass({ isActive }) {
 
 function HeaderNavLink({ item, onClick }) {
   if (item.external) {
-    return <ExternalLink href={item.to} rel="noopener noreferrer" className={navClass({ isActive: false })} lang={item.language} onClick={onClick}>{item.label}</ExternalLink>;
+    return (
+      <a href={item.to} rel="noreferrer" className={navClass({ isActive: false })} lang={item.language} onClick={onClick}>
+        {item.label}
+      </a>
+    );
   }
   if (item.custom) {
     return <Link to={item.to} className={navClass({ isActive: false })} lang={item.language} onClick={onClick}>{item.label}</Link>;

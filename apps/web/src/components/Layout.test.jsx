@@ -561,22 +561,25 @@ describe('Layout navigation (built from page documents)', () => {
     expect(side.container.querySelector('header')).toContainElement(signIn);
   });
 
-  it('puts external navigation links in More and the side rail but keeps them out of the footer', async () => {
+  it('opens external navigation links in the same tab from More and the side rail', async () => {
     const pageDocs = [...MANY_PAGES, { id: 'help-desk', label: 'Help desk', url: 'https://example.org/help', order: 20,
       visible: true, systemPage: false }];
     const top = renderShell({}, { pageDocs });
     const more = top.getByRole('navigation', { name: 'Main' }).querySelector('details.site-nav-more');
-    const link = within(more).getByRole('link', { name: 'Help desk (opens in a new tab)' });
+    const link = within(more).getByRole('link', { name: 'Help desk' });
     expect(link).toHaveAttribute('href', 'https://example.org/help');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(link).not.toHaveAttribute('target');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
     expect(within(await top.findByRole('navigation', { name: 'Site pages' })).queryByText(/Help desk/)).toBeNull();
     top.unmount();
 
     const side = renderShell({}, { pageDocs, themeDoc: { navPlacement: 'side' } });
     const nav = side.getByRole('navigation', { name: 'Main' });
     expect(nav.querySelector('details.site-nav-more')).toBeNull();
-    expect(within(nav).getByRole('link', { name: 'Help desk (opens in a new tab)' })).toBeInTheDocument();
+    const sideLink = within(nav).getByRole('link', { name: 'Help desk' });
+    expect(sideLink).toHaveAttribute('href', 'https://example.org/help');
+    expect(sideLink).not.toHaveAttribute('target');
+    expect(sideLink).toHaveAttribute('rel', 'noreferrer');
   });
 
   it('marks the language of custom link labels in Spanish navigation', () => {
@@ -591,9 +594,7 @@ describe('Layout navigation (built from page documents)', () => {
     });
     const nav = within(view.getByRole('navigation', { name: 'Principal' }));
     expect(nav.getByRole('link', { name: 'Directions' })).toHaveAttribute('lang', 'en');
-    const external = nav.getByRole('link', { name: 'Help desk (se abre en una pestaña nueva)' });
-    expect(external).toHaveAttribute('lang', 'en');
-    expect(within(external).getByText('(se abre en una pestaña nueva)')).toHaveAttribute('lang', 'es');
+    expect(nav.getByRole('link', { name: 'Help desk' })).toHaveAttribute('lang', 'en');
   });
 
   it('still gates a system page on its feature flag', () => {
