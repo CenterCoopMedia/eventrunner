@@ -360,6 +360,8 @@ test('the refusal names the reserved segment and the page that took it', async (
   );
 
   fs.writeFileSync(path.join(generatedDir, 'organizationsData.js'), 'export const organizationsData = [];\n');
+  fs.writeFileSync(path.join(generatedDir, 'updatesData.js'),
+    'export const snapshotGeneratedAt = null;\nexport const updatesData = [];\n');
   const errors = [];
   const code = await main(
     ['--dist', distDir, '--public-url', 'https://example.org', '--generated', generatedDir],
