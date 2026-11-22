@@ -39,6 +39,14 @@ function fixture() {
     'cmsUpdates/arrival': { title: 'Arrival', featuredImage: { url: hostedOld, alt: 'Feature alt' },
       content: [{ type: 'image', image: { url: source, alt: 'Body alt' } }], revision: 1, visible: true },
     'cmsOrganizations/patron': { name: 'Patron', logoPath: source, tier: 'gold', revision: 1, visible: true },
+    'cmsTimeline/first-edition': {
+      year: 2024, title: 'First edition', url: '/first-edition', image: source, alt: 'Live timeline photo',
+      revision: 2, visible: true, seeded: true,
+    },
+    'cmsTimeline_drafts/first-edition': {
+      year: 2024, title: 'First edition', url: '/first-edition', image: source, alt: 'Draft timeline photo',
+      description: 'Unpublished text', basedOnRevision: 2, status: 'dirty',
+    },
     'config/theme': {
       logos: { primary: source, footer: 'branding/another.png' }, preset: 'zine',
       footerLogo: true, logoAlt: 'Old footer logo', headerLogo: 'both', heroLogo: 'above',
@@ -64,7 +72,8 @@ test('replacement usage finds actual image slots across revisions and leaves ima
   assert.deepEqual(refs.map(({ docPath, field }) => `${docPath}:${field}`).sort(), [
     'cmsContent/hero__image:url', 'cmsContent/travel-arrival__gallery:images.1.url',
     'cmsContent/travel-arrival__photo:url', 'cmsContent_drafts/hero__image:url',
-    'cmsOrganizations/patron:logoPath', 'cmsUpdates/arrival:content.0.image.url', 'cmsUpdates/arrival:featuredImage.url',
+    'cmsOrganizations/patron:logoPath', 'cmsTimeline/first-edition:image', 'cmsTimeline_drafts/first-edition:image',
+    'cmsUpdates/arrival:content.0.image.url', 'cmsUpdates/arrival:featuredImage.url',
     'config/event:venue.map.image', 'config/theme:logos.primary',
   ]);
   assert.equal(refs.find(({ docPath }) => docPath === 'cmsContent/travel-arrival__photo').label, 'travel-arrival · photo');
@@ -124,6 +133,18 @@ test('replacement resumes committed groups through the publish receipt without p
   assert.equal(db.read('cmsUpdates', 'arrival').content[0].image.url, target);
   assert.equal(db.read('cmsUpdates', 'arrival').featuredImage.url, target);
   assert.equal(db.read('cmsOrganizations', 'patron').logoPath, target);
+  const timeline = db.read('cmsTimeline', 'first-edition');
+  assert.deepEqual([timeline.image, timeline.alt, timeline.url, timeline.description, timeline.revision, timeline.seeded],
+    [target, 'Replacement alt', '/first-edition', undefined, 3, undefined]);
+  const timelineDraft = db.read('cmsTimeline_drafts', 'first-edition');
+  assert.deepEqual([
+    timelineDraft.image, timelineDraft.alt, timelineDraft.description, timelineDraft.basedOnRevision, timelineDraft.status,
+  ],
+    [target, 'Replacement alt', 'Unpublished text', 3, 'dirty']);
+  const timelineVersion = db.ids('cmsVersionHistory').map((id) => db.read('cmsVersionHistory', id))
+    .find(({ docPath }) => docPath === 'cmsTimeline/first-edition');
+  assert.deepEqual([timelineVersion.revision, timelineVersion.fields.image, timelineVersion.fields.description],
+    [3, target, undefined]);
   assert.equal(db.read('config', 'theme').logos.primary, target);
   assert.equal(db.read('config', 'theme').logos.footer, 'branding/another.png');
   const theme = db.read('config', 'theme');
@@ -148,6 +169,38 @@ test('keeping descriptions retains authored text and pins the old inherited text
   assert.deepEqual(db.read('config', 'event').venue.map.descriptionOverride, inherited);
   assert.equal(db.read('config', 'theme').logoAlt, 'Old footer logo');
   assert.deepEqual(db.read('cmsContent', 'travel-arrival__gallery').images[1], { url: target, alt: 'Gallery photo' });
+  const timeline = db.read('cmsTimeline', 'first-edition');
+  const timelineDraft = db.read('cmsTimeline_drafts', 'first-edition');
+  assert.deepEqual([timeline.image, timeline.alt], [target, 'Live timeline photo']);
+  assert.deepEqual([timelineDraft.image, timelineDraft.alt], [target, 'Draft timeline photo']);
+});
+
+test('a timeline image without replacement alt text refuses the whole request before any writes', async () => {
+  const { db, call } = fixture();
+  const timelineSource = 'cms-images/old/edition.png';
+  await db.collection('media_assets').doc('old').update({ path: timelineSource });
+  await db.collection('media_assets').doc('new').update({ alt: '' });
+  await db.collection('cmsTimeline').doc('first-edition').update({ image: timelineSource });
+  await db.collection('cmsOrganizations').doc('patron').update({ logoPath: timelineSource });
+  const references = (await scanReplacementUsage({ db, paths: [timelineSource], bucket: bucketName }))[timelineSource];
+  assert.deepEqual(references.map(({ docPath }) => docPath), ['cmsOrganizations/patron', 'cmsTimeline/first-edition']);
+  const writesBefore = db.writes.length;
+  const result = await call({ requestId, mediaReplacement: { assetId: 'old', replacementId: 'new', references } });
+  assert.equal(result.code, 400);
+  assert.equal(result.body.error.code, 'missing-image-description');
+  assert.equal(db.writes.length, writesBefore);
+});
+
+test('a replacement that exceeds the timeline alt limit leaves both timeline revisions intact', async () => {
+  const { db, call } = fixture();
+  await db.collection('media_assets').doc('new').update({ alt: 'a'.repeat(241) });
+  const references = (await scanReplacementUsage({ db, paths: [source], bucket: bucketName }))[source];
+  const result = await call({ requestId, mediaReplacement: { assetId: 'old', replacementId: 'new', references } });
+  const timelineFailures = result.body.failed.filter(({ docPath }) => docPath.startsWith('cmsTimeline'));
+  assert.equal(timelineFailures.length, 2);
+  assert.ok(timelineFailures.every(({ reason }) => /describe the image in 240 characters/.test(reason)));
+  assert.equal(db.read('cmsTimeline', 'first-edition').image, source);
+  assert.equal(db.read('cmsTimeline_drafts', 'first-edition').image, source);
 });
 
 test('a gallery that already contains the replacement keeps its images and reports the conflict', async () => {

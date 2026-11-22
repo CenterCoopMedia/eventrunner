@@ -4,6 +4,7 @@ const { THEME_LOGO_SLOTS, THEME_LOGO_ALT_MAX } = require('shared/theme');
 const { storageObjectPath } = require('shared/venue');
 const { imageCaptionAssetId } = require('shared/imageCaption');
 const { galleryErrors } = require('../cms/blockTypes.cjs');
+const { TIMELINE_COLLECTION, validateTimelineFields } = require('../cms/timeline.cjs');
 
 const DESCRIPTION_FIELDS = ['alt', 'caption', 'credit'];
 
@@ -32,6 +33,9 @@ function imagePlacements(collection, id, doc) {
       break;
     case 'cmsOrganizations':
       add(['logoPath']);
+      break;
+    case TIMELINE_COLLECTION:
+      add(['image'], 'alt');
       break;
     case 'config':
       if (id === 'theme') {
@@ -143,8 +147,11 @@ function replaceImageFields({ collection, id, doc, expected, source, target, buc
       }
     }
   }
-  if (changed.length > 0 && collection === 'cmsContent') {
-    if (next.blockType === 'gallery') {
+  if (changed.length > 0 && (collection === 'cmsContent' || collection === TIMELINE_COLLECTION)) {
+    if (collection === TIMELINE_COLLECTION) {
+      const verdict = validateTimelineFields(next);
+      if (!verdict.ok) failed.push({ field: 'image', reason: verdict.errors.join('; ') });
+    } else if (next.blockType === 'gallery') {
       const [galleryError] = galleryErrors(next);
       if (galleryError) failed.push({ field: changed[0], reason: galleryError });
     }
