@@ -9,9 +9,10 @@
  *   listSystemErrors    { includeResolved?, limit?, cursor? } → { rows, nextCursor }
  *   resolveSystemErrors { id, expectedLastSeenAt? } |
  *                       { kind } → per-target verdict, audit-logged
+ *   getSystemError      { id } → one row's safe summary (see toSummary)
  *
  * `system_errors` is server-only (firestore.rules: allow read, write: if
- * false) — these two endpoints are the ONLY way an operator ever sees or
+ * false) — these endpoints are the ONLY way an operator ever sees or
  * changes a row, mirroring how admin/config.cjs is the only writer of
  * config/*.
  *
@@ -49,11 +50,30 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
-const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { sendError, badRequest, methodNotAllowed, internal, notFound } = require('../core/errors.cjs');
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 const KIND_SWEEP_PAGE_SIZE = 200;
+// Every system_errors id: a Firestore auto id (20), an auth.otp sha256 (64)
+// or invoice_review_<40 hex>. Checked before any read.
+const ERROR_ID_RE = /^[A-Za-z0-9_-]{8,128}$/;
+// Firestore reserves ids of the form __...__.
+const RESERVED_ID_RE = /^__.*__$/;
+// A reporter controls the path depth; deeper segments collapse into one `*`.
+const MAX_ROUTE_SEGMENTS = 4;
+const SAFE_KIND_RE = /^[a-z0-9-]{1,80}$/;
+// Route names a page URL may report, copied from apps/web/src/routes.jsx and
+// admin/AdminApp.jsx. logClientError is unauthenticated, so any other segment
+// could be text a caller chose; it prints as `*`. A route added to the app and
+// not here only loses detail.
+const PUBLIC_ROUTES = new Set(['schedule', 'speakers', 'sponsors', 'updates', 'pitch', 'signin', 'speaker',
+  'ticket', 'tickets', 'registration', 'profile', 'dashboard', 'attendees', 'admin']);
+const ADMIN_SECTIONS = new Set(['access', 'announcements', 'attendees', 'badges', 'branding', 'change-requests',
+  'content', 'data-export', 'email-log', 'features', 'feed-moderation', 'feedback', 'import', 'invoices',
+  'live-updates', 'materials', 'media', 'organizations', 'overview', 'pages', 'pitches', 'registration-form',
+  'reminders', 'sessions', 'settings', 'setup', 'speakers', 'system-errors', 'ticketing', 'timeline',
+  'unpublished', 'updates', 'versions', 'web-address']);
 
 function isPlainObject(v) {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
@@ -97,6 +117,82 @@ function toRow(doc) {
     createdAt: toMillis(data.createdAt),
     resolvedAt: toMillis(data.resolvedAt),
     resolvedBy: typeof data.resolvedBy === 'string' ? data.resolvedBy : null,
+  };
+}
+
+/**
+ * The page a row came from, as a route shape. A known first segment and, under
+ * /admin, a known section name are kept; every other segment prints as `*`
+ * (a uid, a speaker slug, a CMS page or caller text). No host, query or fragment.
+ * @param {unknown} url @returns {string|null}
+ */
+function routeOf(url) {
+  if (typeof url !== 'string' || !url) return null;
+  let pathname;
+  try {
+    pathname = new URL(url, 'https://route.invalid').pathname;
+  } catch {
+    return null;
+  }
+  let segments = pathname.split('/').filter(Boolean);
+  if (segments.length > MAX_ROUTE_SEGMENTS) segments = segments.slice(0, MAX_ROUTE_SEGMENTS);
+  const known = (segment, i) => (i === 0 && PUBLIC_ROUTES.has(segment))
+    || (i === 1 && segments[0] === 'admin' && ADMIN_SECTIONS.has(segment));
+  return `/${segments.map((segment, i) => (known(segment, i) ? segment : '*')).join('/')}`;
+}
+
+/** Browser family from a user agent string. Order matters: Edge and Chrome both say Safari. */
+function browserFamily(userAgent) {
+  if (typeof userAgent !== 'string' || !userAgent) return null;
+  if (/\bEdg(?:A|iOS)?\//.test(userAgent)) return 'edge';
+  if (/\b(?:Firefox|FxiOS)\//.test(userAgent)) return 'firefox';
+  if (/\b(?:Chrome|CriOS)\//.test(userAgent)) return 'chrome';
+  if (/\bSafari\//.test(userAgent)) return 'safari';
+  return 'other';
+}
+
+/**
+ * One row for an agent lookup by errorId: structured fields only. Message,
+ * errors, stack, context, ipHash, resolver and the full URL never leave.
+ * Rows store no occurrence count or app version, so neither is returned.
+ */
+function toSummary(doc) {
+  const data = doc.data() || {};
+  const firstSeenAt = toMillis(data.createdAt);
+  return {
+    id: doc.id,
+    kind: typeof data.kind === 'string' && SAFE_KIND_RE.test(data.kind) ? data.kind : 'unknown',
+    route: routeOf(data.url),
+    browser: browserFamily(data.userAgent),
+    firstSeenAt,
+    lastSeenAt: toMillis(data.lastSeenAt) ?? firstSeenAt,
+    open: data.resolved !== true,
+  };
+}
+
+/**
+ * @param {{ db: FirebaseFirestore.Firestore, auth, getConfig, log?: Console }} deps
+ */
+function createGetSystemErrorHandler({ db, auth, getConfig, log = console }) {
+  return async function getSystemError(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const id = req.body?.id;
+    if (typeof id !== 'string' || !ERROR_ID_RE.test(id) || RESERVED_ID_RE.test(id)) {
+      return badRequest(res, 'id must be an error id from an operator alert.');
+    }
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'operator' });
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+
+    let snap;
+    try {
+      snap = await db.collection('system_errors').doc(id).get();
+    } catch (err) {
+      // A fixed message and the SDK status only: the exception text is not logged.
+      log.error('getSystemError read failed', { code: typeof err?.code === 'number' || typeof err?.code === 'string' ? err.code : null });
+      return internal(res, 'The error log is temporarily unavailable. Try again.');
+    }
+    if (!snap.exists) return notFound(res, 'No error record has that id.');
+    res.status(200).json({ row: toSummary(snap) });
   };
 }
 
@@ -265,7 +361,7 @@ function createResolveSystemErrorsHandler({ db, auth, getConfig, now = Date.now,
   };
 }
 
-/** Deployable exports (spec §1.3): listSystemErrors, resolveSystemErrors. */
+/** Deployable exports (spec §1.3): listSystemErrors, resolveSystemErrors, getSystemError. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
@@ -295,14 +391,16 @@ function buildHandlers() {
   return {
     listSystemErrors: expose(createListSystemErrorsHandler),
     resolveSystemErrors: expose(createResolveSystemErrorsHandler),
+    getSystemError: expose(createGetSystemErrorHandler),
   };
 }
 
 module.exports = {
+  createGetSystemErrorHandler,
   createListSystemErrorsHandler,
   createResolveSystemErrorsHandler,
   get handlers() {
     return buildHandlers();
   },
-  internals: { toRow, toMillis, resolveOne, isValidListCursor, DEFAULT_LIMIT, MAX_LIMIT, KIND_SWEEP_PAGE_SIZE },
+  internals: { toRow, toSummary, routeOf, browserFamily, toMillis, resolveOne, isValidListCursor, DEFAULT_LIMIT, MAX_LIMIT, KIND_SWEEP_PAGE_SIZE },
 };
