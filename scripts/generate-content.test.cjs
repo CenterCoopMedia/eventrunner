@@ -65,6 +65,39 @@ function readFake({ config = {}, collections = {}, failing = [] } = {}) {
 
 const CONFIG = { event: { name: 'x' }, features: {}, theme: { colors: {} } };
 
+test('deployment emits visible public Updates with their display date and generation time', async () => {
+  const path = '/updates';
+  const publicPage = { __id: 'updates', path, visible: true };
+  const config = { ...CONFIG, features: { updates: true } };
+  const publishAt = '2026-05-14T09:00:00.000Z';
+  const collections = {
+    cmsPages: [publicPage],
+    cmsUpdates: [
+      { __id: 'notice', title: 'Published notice', visible: true, publishedBy: 'INTERNAL_AUTHOR',
+        publishAt: { toMillis: () => Date.parse(publishAt) } },
+      { __id: 'hidden', title: 'HIDDEN_NOTICE', visible: false },
+    ],
+    cmsUpdates_drafts: [{ __id: 'notice', title: 'DRAFT_NOTICE', visible: true }],
+  };
+  const before = Date.now();
+  const snapshot = await readDeployment({ db: readFake({ config, collections }) });
+  const { emitAll } = require('./lib/emit.cjs');
+  const source = emitAll(snapshot)['updatesData.js'];
+  const { updatesData, snapshotGeneratedAt } = await import(`data:text/javascript,${encodeURIComponent(source)}`);
+  assert.deepEqual(updatesData, [
+    { id: 'notice', title: 'Published notice', publishAt, visible: true },
+  ]);
+  assert.ok(Date.parse(snapshotGeneratedAt) >= before && Date.parse(snapshotGeneratedAt) <= Date.now());
+
+  for (const input of [
+    { config: CONFIG, collections },
+    { config: { ...config, launch: { comingSoon: true } }, collections },
+    { config, collections: { ...collections, cmsPages: [{ ...publicPage, visible: false }] } },
+  ]) {
+    assert.deepEqual((await readDeployment({ db: readFake(input) })).updates, []);
+  }
+});
+
 test('deployment reads include approved paired text and never private draft translations', async () => {
   const translations = { es: { label: 'Texto publicado' } };
   const unpublished = { es: { label: 'PRIVATE_UNPUBLISHED_TRANSLATION' } };

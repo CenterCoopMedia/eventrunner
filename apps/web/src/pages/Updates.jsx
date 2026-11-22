@@ -1,6 +1,6 @@
-// Updates list — /updates (issue #27 follow-up). Renders the already-live
-// cmsUpdates data ContentContext already subscribes to; nothing new to wire
-// up to Firestore here. Feature-gated by config/features.updates, same
+// Updates list — /updates (issue #27 follow-up). Renders the published
+// snapshot and live cmsUpdates overlay from ContentContext.
+// Feature-gated by config/features.updates, same
 // direct-navigation-bypasses-nav gate as every other optional route
 // (Sponsors.jsx, SessionDetail.jsx). This is also the page updatesMeta's
 // self-fetched SSR meta describes when no specific post id is requested.
