@@ -94,7 +94,13 @@ function stringLeaves(value, prefix = '') {
 function referencesPath(text, objectPath) {
   if (typeof text !== 'string' || text.length === 0) return false;
   if (text.includes(objectPath)) return true;
-  return text.includes(encodeURIComponent(objectPath));
+  return decodedReferenceText(text).includes(objectPath);
+}
+
+function decodedReferenceText(text) {
+  return text.replace(/(?:%[\da-f]{2})+/gi, (encoded) => {
+    try { return decodeURIComponent(encoded); } catch { return encoded; }
+  });
 }
 
 /**
@@ -261,6 +267,7 @@ module.exports = {
   internals: {
     stringLeaves,
     referencesPath,
+    decodedReferenceText,
     referencesInDoc,
     resolveScanPaths,
     USAGE_COLLECTIONS,

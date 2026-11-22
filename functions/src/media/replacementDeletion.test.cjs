@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { createCmsPublishHandler } = require('../cms/publish.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { writeDraft } = require('../cms/store.cjs');
 const { createReplacementPublicationHandler } = require('./replacementDeletion.cjs');
 const { scanReplacementUsage } = require('./usage.cjs');
 
@@ -13,7 +14,7 @@ const bucketName = 'fixture.appspot.com';
 const requestId = '12d4b840-52b0-4af5-8f88-d40836151a48';
 const operator = { uid: 'owner', email: 'owner@example.test', email_verified: true };
 
-function fixture({ live = true, env = {}, fetchImpl } = {}) {
+function fixture({ live = true, publisher = true, beforeDelete = async () => {} } = {}) {
   const image = { blockType: 'image', url: source, alt: 'Original', section: 'hero', field: 'image' };
   const db = makeFakeDb({
     'config/bootstrap': { adminEmails: [operator.email] },
@@ -30,6 +31,7 @@ function fixture({ live = true, env = {}, fetchImpl } = {}) {
     file: (path) => ({
       exists: async () => [files.has(path)],
       delete: async () => {
+        await beforeDelete(db);
         deletions.push({ path, live: db.read('cmsContent', 'hero__image')?.url, draft: db.read('cmsContent_drafts', 'hero__image')?.url });
         files.delete(path);
       },
@@ -37,7 +39,11 @@ function fixture({ live = true, env = {}, fetchImpl } = {}) {
   };
   const handler = createCmsPublishHandler({
     db, auth: { verifyIdToken: async () => operator }, getConfig: async () => ({}),
-    getBucket: () => bucket, env, fetchImpl, log: { warn() {}, error() {} },
+    getBucket: () => bucket, log: { warn() {}, error() {} },
+    env: publisher ? { EVENT_SITE_PUBLISHER_JOB: 'site-publisher', EVENT_FIREBASE_PROJECT_ID: 'fixture' } : {},
+    fetchImpl: async (url) => ({ ok: true, json: async () => url.includes('metadata.google.internal')
+      ? { access_token: 'fixture-token' }
+      : { metadata: { name: 'fixture-execution' } } }),
   });
   const onPublication = createReplacementPublicationHandler({ db, getBucket: () => bucket, log: { warn() {}, error() {} } });
   async function call(body) {
@@ -71,9 +77,13 @@ test('replacement keeps the original file by default', async () => {
   assert.deepEqual(deletions, []);
 });
 
-test('an opted-in draft-only replacement deletes the original after the draft moves', async () => {
-  const { db, replace, call, files, deletions } = fixture({ live: false });
-  assert.equal((await replace({ deleteOriginal: true })).deletion.status, 'deleted');
+test('an opted-in draft-only move refreshes the public site before deleting the original', async () => {
+  const { db, replace, call, files, deletions, finishPublication } = fixture({ live: false });
+  const outcome = await replace({ deleteOriginal: true });
+  assert.equal(outcome.publisher.status, 'invoked');
+  assert.equal(outcome.deletion.status, 'waiting-for-site');
+  assert.ok(files.has(source));
+  await finishPublication('done');
   assert.equal((await call({ queueId: requestId })).deletion.status, 'deleted');
   assert.deepEqual(deletions, [{ path: source, live: undefined, draft: target }]);
   assert.equal(db.read('media_assets', 'old'), undefined);
@@ -103,7 +113,7 @@ test('a new link outside the replacement placements blocks deletion', async (t) 
 });
 
 test('a failed move keeps the file and a successful resume can finish deleting it', async (t) => {
-  const { db, replace, call, files, deletions } = fixture({ live: false });
+  const { replace, call, files, deletions, db, finishPublication } = fixture({ live: false });
   t.mock.method(db, 'runTransaction', async () => { throw new Error('Commit unavailable'); }, { times: 1 });
   const outcome = await replace({ deleteOriginal: true });
   assert.equal(outcome.status, 'failed');
@@ -113,27 +123,25 @@ test('a failed move keeps the file and a successful resume can finish deleting i
   assert.deepEqual(deletions, []);
 
   const resumed = await call({ queueId: requestId });
-  assert.equal(resumed.deletion.status, 'deleted');
+  assert.equal(resumed.deletion.status, 'waiting-for-site');
+  await finishPublication('done');
   assert.deepEqual(deletions, [{ path: source, live: undefined, draft: target }]);
 });
 
-test('published content keeps the original when a public site refresh cannot be verified', async () => {
-  const { replace, files, deletions } = fixture();
-  const outcome = await replace({ deleteOriginal: true });
-  assert.equal(outcome.changed.length, 2);
-  assert.equal(outcome.deletion.status, 'kept');
-  assert.match(outcome.deletion.message, /public site may still use/);
-  assert.ok(files.has(source));
-  assert.deepEqual(deletions, []);
-});
+for (const live of [false, true]) {
+  test(`${live ? 'Published' : 'Draft-only'} replacement keeps the original without a verified refresh`, async () => {
+    const { replace, files, deletions } = fixture({ live, publisher: false });
+    const outcome = await replace({ deleteOriginal: true });
+    assert.equal(outcome.changed.length, live ? 2 : 1);
+    assert.equal(outcome.deletion.status, 'kept');
+    assert.match(outcome.deletion.message, /public site may still use/);
+    assert.ok(files.has(source));
+    assert.deepEqual(deletions, []);
+  });
+}
 
 test('the publisher completing deletes the original even after the organizer leaves', async () => {
-  const { db, replace, call, files, deletions, finishPublication } = fixture({
-    env: { EVENT_SITE_PUBLISHER_JOB: 'site-publisher', EVENT_FIREBASE_PROJECT_ID: 'fixture' },
-    fetchImpl: async (url) => ({ ok: true, json: async () => url.includes('metadata.google.internal')
-      ? { access_token: 'fixture-token' }
-      : { metadata: { name: 'fixture-execution' } } }),
-  });
+  const { db, replace, call, files, deletions, finishPublication } = fixture();
   const outcome = await replace({ deleteOriginal: true });
   assert.equal(outcome.deletion.status, 'waiting-for-site');
   assert.ok(files.has(source));
@@ -144,4 +152,44 @@ test('the publisher completing deletes the original even after the organizer lea
   assert.equal(db.read('media_assets', 'old'), undefined);
   assert.equal((await call({ queueId: requestId })).deletion.status, 'deleted');
   assert.deepEqual(deletions, [{ path: source, live: target, draft: target }]);
+});
+
+test('a draft cannot add the original during or after Storage deletion', async () => {
+  const saveNewReference = (db) => writeDraft({
+    db, collection: 'cmsContent', docId: 'travel__image', actor: operator,
+    fields: { blockType: 'image', url: `https://fixture.example.test/${encodeURIComponent(source)}` },
+  });
+  const conflict = (err) => err.httpError?.code === 'media-unavailable';
+  const { db, replace, files, finishPublication } = fixture({ beforeDelete: async (db) => {
+    assert.ok(files.has(source));
+    assert.equal(db.read('media_assets', 'old').deleting, true);
+    await assert.rejects(saveNewReference(db), conflict);
+  } });
+  await replace({ deleteOriginal: true });
+  await finishPublication('done');
+  assert.ok(!files.has(source));
+  await assert.rejects(saveNewReference(db), conflict);
+  assert.equal(db.read('cmsContent_drafts', 'travel__image'), undefined);
+});
+
+test('an initial usage scan failure leaves a deletion retry on the receipt', async (t) => {
+  const { db, replace, call, files } = fixture();
+  const collection = db.collection.bind(db);
+  let failed = false;
+  t.mock.method(db, 'collection', (name) => {
+    const ref = collection(name);
+    if (!failed && name === 'cmsPages' && db.read('cmsPublishQueue', requestId)?.status === 'done') {
+      failed = true;
+      ref.get = async () => { throw new Error('Read unavailable'); };
+    }
+    return ref;
+  });
+  const outcome = await replace({ deleteOriginal: true });
+  assert.equal(outcome.deletion.status, 'retry');
+  assert.deepEqual(db.read('cmsPublishQueue', requestId).mediaReplacement.deletion, outcome.deletion);
+  assert.ok(files.has(source));
+
+  await db.collection('cmsPublishQueue').doc(requestId).set({ publisher: { status: 'done' } }, { merge: true });
+  assert.equal((await call({ queueId: requestId })).deletion.status, 'deleted');
+  assert.ok(!files.has(source));
 });

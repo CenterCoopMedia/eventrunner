@@ -4,6 +4,7 @@ const { storageObjectPath } = require('shared/venue');
 const { logAdminAction } = require('../cms/store.cjs');
 const { scanUsage } = require('./usage.cjs');
 const { removeMediaFile } = require('./upload.cjs');
+const { guardableMediaPath } = require('./referenceWrites.cjs');
 
 async function deleteReplacedOriginal({ db, bucket, queueRef, publisherAvailable, now, log }) {
   try {
@@ -24,6 +25,9 @@ async function deleteReplacedOriginal({ db, bucket, queueRef, publisherAvailable
       };
 
       const { path } = plan.source;
+      if (!guardableMediaPath(path, plan.assetId)) {
+        return record({ status: 'kept', message: 'The original file was kept because its media library path could not be verified.' });
+      }
       const ref = db.collection('media_assets').doc(plan.assetId);
       const asset = (await transaction.get(ref)).data();
       if (storageObjectPath(asset?.path) !== path || (asset.deleting && previous?.status !== 'removing')) {
@@ -37,8 +41,7 @@ async function deleteReplacedOriginal({ db, bucket, queueRef, publisherAvailable
         return record({ status: 'kept', message: 'The original file was kept because it is still used in your event.' });
       }
 
-      const publishLive = plan.places.some(({ docPath }) => !docPath.split('/')[0].endsWith('_drafts'));
-      if (publishLive && queue.publisher?.status !== 'done') {
+      if (queue.publisher?.status !== 'done') {
         const publisherFailed = queue.publisher?.status === 'failed' || queue.publisher?.invoke?.status === 'failed';
         if (!publisherAvailable || publisherFailed) {
           return record({ status: 'kept', message: 'The original file was kept because the public site may still use it.' });
@@ -61,7 +64,24 @@ async function deleteReplacedOriginal({ db, bucket, queueRef, publisherAvailable
     return deleted;
   } catch (err) {
     log.error('Image replacement could not confirm deletion of the original', err);
-    return { status: 'retry', message: 'The original file’s deletion could not be confirmed. Try again.' };
+    const retry = { status: 'retry', message: 'The original file’s deletion could not be confirmed. Try again.' };
+    try {
+      return await db.runTransaction(async (transaction) => {
+        const plan = (await transaction.get(queueRef)).data()?.mediaReplacement;
+        const previous = plan?.deletion;
+        if (previous?.status === 'deleted' || previous?.status === 'kept') return previous;
+        if (plan?.deleteOriginal === true) {
+          // A Storage request may have reached the bucket even if its
+          // response was lost. Keep the writer reservation until confirmed.
+          const deletion = previous?.status === 'removing' ? { ...retry, status: 'removing' } : retry;
+          transaction.set(queueRef, { mediaReplacement: { deletion } }, { merge: true });
+        }
+        return retry;
+      });
+    } catch (recordError) {
+      log.error('Image replacement could not record the deletion retry', recordError);
+      return retry;
+    }
   }
 }
 
@@ -69,7 +89,7 @@ function createReplacementPublicationHandler({ db, getBucket, now = Date.now, lo
   return async function onReplacementPublication({ data }) {
     const after = data?.after?.data();
     const status = after?.publisher?.status;
-    if (after?.mediaReplacement?.deletion?.status !== 'waiting-for-site'
+    if (!['waiting-for-site', 'retry', 'removing'].includes(after?.mediaReplacement?.deletion?.status)
       || !['done', 'failed'].includes(status) || status === data.before.data()?.publisher?.status) return;
 
     const deletion = await deleteReplacedOriginal({ db, bucket: getBucket(), queueRef: data.after.ref, publisherAvailable: true, now, log });

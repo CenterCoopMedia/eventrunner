@@ -93,11 +93,13 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
   }
 
   useEffect(() => {
-    if (!result?.queueId || result.deletion?.status !== 'waiting-for-site') return undefined;
+    if (!result?.queueId || !['waiting-for-site', 'retry'].includes(result.deletion?.status)) return undefined;
     return subscribeAdminDoc(`cmsPublishQueue/${result.queueId}`, (row) => {
       const deletion = row?.mediaReplacement?.deletion;
-      if (!['deleted', 'kept'].includes(deletion?.status)) return;
-      const outcome = { ...result, deletion };
+      if (!deletion?.message) return;
+      const status = deletion.status === 'removing' ? 'retry' : deletion.status;
+      if (status === result.deletion.status && deletion.message === result.deletion.message) return;
+      const outcome = { ...result, deletion: { ...deletion, status } };
       setResult(outcome);
       onChanged(outcome);
     });
@@ -143,7 +145,7 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
           <CheckboxField label="Keep the current description" checked={keepDescription} onChange={setKeepDescription}
             help="Keep the alt text, caption, and credit at each place. Clear the checkbox to use the replacement image’s description." disabled={busy || confirmed} />
           <CheckboxField label="Also delete the original file" checked={deleteOriginal} onChange={setDeleteOriginal}
-            hint="The original stays in the library if this is unchecked or if it is still in use." disabled={busy || confirmed} />
+            help="The original stays in the library if this is unchecked or if it is still in use." disabled={busy || confirmed} />
         </>
       ) : null}
       {result?.changed?.length > 0 ? (

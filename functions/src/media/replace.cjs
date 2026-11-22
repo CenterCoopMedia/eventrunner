@@ -225,7 +225,10 @@ async function runMediaReplacement({ db, getBucket, queueRef, body, actor, now, 
       const action = finished ? 'mediaReplace' : 'mediaReplaceFailed';
       await logAdminAction({ db, action, docPath: queueRef.path, actor, now, log });
     }
-    const publisher = finished && publishLive ? await publish(queueRef.id) : undefined;
+    // The deployed snapshot can still name the source even if the current
+    // Firestore uses were all drafts. An opted-in deletion needs its own refresh.
+    const needsRefresh = publishLive || (plan.deleteOriginal === true && result.failed.length === 0);
+    const publisher = finished && needsRefresh ? await publish(queueRef.id) : undefined;
     const deletion = plan.deleteOriginal === true ? await deleteReplacedOriginal({
       db, bucket, queueRef, publisherAvailable, now, log,
     }) : undefined;

@@ -18,7 +18,7 @@ export default function RunRow({ row, timeZone, busyKey, controlProps, notice, r
   const key = `resume:${row.id}`;
   const failed = row.status === 'failed';
   const deletion = row.mediaReplacement?.deletion;
-  const finishDeletion = row.status === 'done' && (deletion?.status === 'removing'
+  const finishDeletion = row.status === 'done' && (['removing', 'retry'].includes(deletion?.status)
     || (deletion?.status === 'waiting-for-site' && ['done', 'failed'].includes(row.publisher?.status)));
   const when = formatPublishedAt(toMillis(row.requestedAt), timeZone);
   return (
