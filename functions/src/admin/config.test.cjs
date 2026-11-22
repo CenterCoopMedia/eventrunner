@@ -81,11 +81,11 @@ function fakeDb(seed = {}) {
       },
     };
   }
-  function queryRef(col, field, value, max = Infinity) {
+  function queryRef(col, field, operator, value, max = Infinity) {
     return {
-      _query: { col, field, value, max },
+      _query: { col, field, operator, value, max },
       limit(limitValue) {
-        return queryRef(col, field, value, limitValue);
+        return queryRef(col, field, operator, value, limitValue);
       },
     };
   }
@@ -103,8 +103,8 @@ function fakeDb(seed = {}) {
           return docRef(name, id === undefined ? `auto${autoId}` : id);
         },
         where(field, operator, value) {
-          if (operator !== '==') throw new Error(`unsupported operator ${operator}`);
-          return queryRef(name, field, value);
+          if (operator !== '==' && operator !== 'in') throw new Error(`unsupported operator ${operator}`);
+          return queryRef(name, field, operator, value);
         },
       };
     },
@@ -118,9 +118,13 @@ function fakeDb(seed = {}) {
         const tx = {
           async get(ref) {
             if (ref._query) {
-              const { col, field, value, max } = ref._query;
+              const { col, field, operator, value, max } = ref._query;
               const matches = [...docs.entries()]
-                .filter(([key, data]) => key.startsWith(`${col}/`) && data?.[field] === value)
+                .filter(([key, data]) => {
+                  if (!key.startsWith(`${col}/`)) return false;
+                  const actual = field.split('.').reduce((record, segment) => record?.[segment], data);
+                  return operator === 'in' ? value.includes(actual) : actual === value;
+                })
                 .slice(0, max);
               for (const [key] of matches) reads.set(key, versionOf(key));
               return {
@@ -738,6 +742,22 @@ test('venue map caption placement resets without clearing the image or its other
   await save(makeReq({ event: { venue: { map: { captionAlign: null } } } }), res);
   assert.equal(res.statusCode, 200);
   assert.deepEqual(deps.db.docs.get('config/event').venue.map, map);
+});
+
+test('a venue map cannot add an image whose replacement has reserved deletion', async () => {
+  const image = 'cms-images/a/plan.png';
+  const event = { ...validEvent(), ...STORED_EXTRAS };
+  const deps = makeDeps({
+    'config/event': event,
+    'cmsPublishQueue/replacement': { mediaReplacement: {
+      assetId: 'a', source: { path: image }, deletion: { status: 'removing' },
+    } },
+  });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { venue: { map: { image, alt: 'Floor plan', markers: [] } } } }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'media-unavailable');
+  assert.deepEqual(deps.db.docs.get('config/event'), event);
 });
 
 test('the shared validator runs on the MERGED result, not the partial payload', async () => {

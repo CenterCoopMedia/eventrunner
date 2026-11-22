@@ -125,10 +125,12 @@ export default function AssetModal({
   const busy = Boolean(action);
   const [confirming, setConfirming] = useState(false);
   const [replacing, setReplacing] = useState(false);
-  const [originalDeleted, setOriginalDeleted] = useState(false);
+  const [replacementDeletionStatus, setReplacementDeletionStatus] = useState(null);
   const replaceTrigger = useRef(null);
   const usageHeading = useRef(null);
   const locked = !operator && (isBrandingAsset(asset) || referencedByBranding(references));
+  const originalDeleted = replacementDeletionStatus === 'deleted';
+  const replacementDeleting = replacing && ['waiting-for-site', 'retry'].includes(replacementDeletionStatus);
 
   useEffect(() => {
     let active = true;
@@ -250,8 +252,8 @@ export default function AssetModal({
             renderPicker={renderReplacementPicker}
             onBusy={(value) => { pending.current = value; setAction(value ? 'replace' : ''); }}
             onChanged={(outcome) => {
-              if (outcome.deletion?.status === 'deleted') setOriginalDeleted(true);
-              else setScanAttempt((attempt) => attempt + 1);
+              setReplacementDeletionStatus(outcome.deletion?.status ?? null);
+              if (outcome.deletion?.status !== 'deleted') setScanAttempt((attempt) => attempt + 1);
             }}
             onClose={() => {
               if (originalDeleted) return onClose();
@@ -271,7 +273,7 @@ export default function AssetModal({
             it is. */}
         <div className="mt-sm flex flex-wrap gap-xs">
           {deleteError ? <Notice tone="error" message={deleteError} /> : null}
-          {locked || replacing ? null : confirming || (references?.length ?? 0) > 0 ? (
+          {locked || originalDeleted || replacementDeleting ? null : confirming || (references?.length ?? 0) > 0 ? (
             <DestructiveConfirm
               trigger="Delete this file anyway"
               triggerIcon="delete"
