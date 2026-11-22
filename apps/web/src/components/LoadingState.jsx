@@ -16,6 +16,8 @@ export function LoadingStateView({
   stage = 'initial',
   onRetry,
   recover,
+  recoveryMessage,
+  retryLabel,
   placeholder,
   figure,
   still,
@@ -41,11 +43,11 @@ export function LoadingStateView({
         data-loading-shape={active ? layout : undefined}
       >
         <LoadingStatus label={label} stage={stage} figure={figure} still={still} clock={clock} announce={announce} active={active && !showPlaceholder} completion={completion}
-          stalledMessage={stalled ? text('This is taking longer than a minute. Check your connection and try again.', 'Esto está tardando más de un minuto. Comprueba tu conexión e inténtalo de nuevo.') : undefined} />
+          stalledMessage={stalled ? recoveryMessage ?? text('This is taking longer than a minute. Check your connection and try again.', 'Esto está tardando más de un minuto. Comprueba tu conexión e inténtalo de nuevo.') : undefined} />
         {retryAvailable ? (
           <div className={stalled ? 'mt-sm' : 'loading-state__actions mt-sm'}>
             <button type="button" className={secondaryActionClass} onClick={onRetry}>
-              {stalled ? text('Try again', 'Inténtalo de nuevo') : 'Try loading again'}
+              {retryLabel ?? (stalled ? text('Try again', 'Inténtalo de nuevo') : 'Try loading again')}
             </button>
           </div>
         ) : null}

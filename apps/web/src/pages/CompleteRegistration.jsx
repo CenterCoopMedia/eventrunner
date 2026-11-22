@@ -24,6 +24,7 @@ import RegistrationQuestionFields from '../components/registration/RegistrationQ
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { saveRegistrationAnswers } from '../lib/registrationAnswersApi.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import useLoadingStage from '../lib/useLoadingStage.js';
 import { useRegistrationTargets } from '../lib/useRegistrationTargets.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 
@@ -90,10 +91,22 @@ export default function CompleteRegistration() {
   const [notice, setNotice] = useState('');
   const [failure, setFailure] = useState('');
   const [closed, setClosed] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(null);
+  const [saveUnconfirmed, setSaveUnconfirmed] = useState(null);
   const [errorTick, setErrorTick] = useState(0);
   const formRef = useRef(null);
+  const saveRef = useRef(null);
+  const currentStep = useRef(stepSlug);
+  currentStep.current = stepSlug;
+  const { stage: saveStage } = useLoadingStage({ active: Boolean(saving), phase: saving, action: true, report: false });
+  const saveUnknown = saveUnconfirmed ?? (saveStage === 'prolonged' ? saving?.attempt : null);
   const form = pinnedForm ?? data.form;
+
+  useEffect(() => {
+    setSaving(null);
+    setSaveUnconfirmed(null);
+    return () => { saveRef.current = null; };
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!pinnedForm && data.form) setPinnedForm(data.form);
@@ -201,26 +214,34 @@ export default function CompleteRegistration() {
     setErrorTick((value) => value + 1);
   }
 
-  async function goNext() {
-    if (saving || review) return;
-    const { target } = step;
-    setFailure('');
-    const checked = checkAnswers(pick(valuesFor(target), form), form);
-    if (!checked.ok) { showErrors(target, checked.errors); return; }
-    setSaving(true);
+  async function sendSave(attempt) {
+    const { target, request, submittedForm, submittedStep, next } = attempt;
+    const send = { attempt };
+    saveRef.current = send;
+    setSaving(send);
+    setSaveUnconfirmed(null);
     try {
-      const formRevision = readRegistrationForm(form).revision;
-      const result = await saveRegistrationAnswers({
-        user, ticketId: target.ticketId, account: target.account, formRevision, answers: checked.answers, language,
-      });
-      const answers = result?.answers ?? checked.answers;
-      // Keep the questions as answered, as the stored record does, so Review
-      // still reads this answer if the form changes later on this page.
-      data.setSaved(target.id, { answers, formRevision: result?.formRevision ?? formRevision, questions: answeredQuestions(form, answers) });
+      const result = await saveRegistrationAnswers(request);
+      if (saveRef.current !== send) return;
+      // A connection can drop after the response headers. The API client
+      // returns an empty object when it cannot parse a successful response.
+      if (result?.formRevision !== request.formRevision || result.answerRevision !== (request.expectedAnswerRevision ?? 0) + 1
+          || !result.answers || typeof result.answers !== 'object' || Array.isArray(result.answers)) {
+        setSaveUnconfirmed(attempt);
+        return;
+      }
+      const { answers, formRevision, answerRevision } = result;
+      // Keep the questions as answered even if the live form has changed.
+      data.setSaved(target.id, { answers, formRevision, answerRevision, questions: answeredQuestions(submittedForm, answers) });
       setErrors((previous) => ({ ...previous, [target.id]: {} }));
       setNotice('');
-      navigate(hrefFor(steps[current + 1]));
+      if (currentStep.current === submittedStep) navigate(next);
     } catch (error) {
+      if (saveRef.current !== send) return;
+      if (error?.code === 'network' || error?.status >= 500) {
+        setSaveUnconfirmed(attempt);
+        return;
+      }
       if (error?.code === 'form-changed') {
         setNotice(FORM_CHANGED_NOTE);
         setFormStale(true);
@@ -232,8 +253,28 @@ export default function CompleteRegistration() {
         setFailure(`${error?.message || 'Your answers could not be saved.'} Your answers are still here.`);
       }
     } finally {
-      setSaving(false);
+      if (saveRef.current === send) {
+        saveRef.current = null;
+        setSaving(null);
+      }
     }
+  }
+
+  function goNext() {
+    if (saveRef.current || saveUnconfirmed || review) return;
+    const { target } = step;
+    setFailure('');
+    const checked = checkAnswers(pick(valuesFor(target), form), form);
+    if (!checked.ok) { showErrors(target, checked.errors); return; }
+    const record = saved[target.id];
+    sendSave({
+      target, submittedForm: form, submittedStep: stepSlug, next: hrefFor(steps[current + 1]),
+      request: {
+        user, ticketId: target.ticketId, account: target.account, answers: checked.answers, language,
+        formRevision: readRegistrationForm(form).revision, requestId: crypto.randomUUID(),
+        expectedAnswerRevision: record ? (record.answerRevision ?? 0) : null,
+      },
+    });
   }
 
   return (
@@ -244,9 +285,20 @@ export default function CompleteRegistration() {
           <StepHeading index={current} total={steps.length} title={step.title} headingRef={headingRef} headingId="registration-step-heading" />
           {notice ? <p role="status" className={noteClass}>{notice}</p> : null}
           {failure ? <p role="alert" className="font-data text-caption text-danger">{failure}</p> : null}
+          {saveUnknown ? (
+            <div className="space-y-xs">
+              <p role="status" className={noteClass}>We don’t know whether your answers were saved. Your entries are still on this page.</p>
+              <button type="button" className={secondaryActionClass} onClick={() => {
+                if (saveRef.current === saving) sendSave(saveUnknown);
+              }}>Try saving again</button>
+              {saveUnknown.target.ticketId ? (
+                <Link to="/tickets/mine" target="_blank" rel="noopener" className={secondaryActionClass}>View your tickets (opens in a new tab)</Link>
+              ) : null}
+            </div>
+          ) : null}
           {review ? (
             <div className="space-y-lg">
-              {allSaved ? <p role="status" className={noteClass}>Your answers are saved. You can change them until registration closes.</p> : null}
+              {allSaved && !saveUnknown ? <p role="status" className={noteClass}>Your answers are saved. You can change them until registration closes.</p> : null}
               {steps.filter((item) => item.target).map((item) => (
                 <section key={item.slug} className="space-y-sm">
                   {targets.length > 1 ? <h3 className="font-heading text-h3 font-semibold text-text-primary">{item.target.label}</h3> : null}
@@ -254,7 +306,7 @@ export default function CompleteRegistration() {
                     <AnswerList form={form} record={saved[item.target.id]} />
                   ) : (
                     <p className="text-body text-text-secondary">
-                      Not saved yet. <Link to={hrefFor(item)} className="font-medium text-accent hover:underline">Answer these questions</Link>
+                      {saveUnknown ? 'No saved answers shown.' : 'Not saved yet.'} <Link to={hrefFor(item)} className="font-medium text-accent hover:underline">Answer these questions</Link>
                     </p>
                   )}
                 </section>
@@ -262,7 +314,7 @@ export default function CompleteRegistration() {
             </div>
           ) : (
             <form ref={formRef} noValidate onSubmit={(event) => { event.preventDefault(); goNext(); }}>
-              <fieldset disabled={saving} className="min-w-0">
+              <fieldset disabled={Boolean(saving || saveUnconfirmed)} className="min-w-0">
                 <RegistrationQuestionFields
                   key={step.slug}
                   form={form}
@@ -275,12 +327,13 @@ export default function CompleteRegistration() {
           )}
           <StepPager
             previous={steps[current - 1]}
-            next={review ? null : steps[current + 1]}
+            next={review || saving || saveUnconfirmed ? null : steps[current + 1]}
             hrefFor={hrefFor}
             backClass={secondaryActionClass}
             nextClass={primaryActionClass}
             onNext={goNext}
-            last={review ? <Link to="/dashboard" className={primaryActionClass}>Back to your dashboard</Link> : null}
+            last={review ? <Link to="/dashboard" className={primaryActionClass}>Back to your dashboard</Link>
+              : saving && !saveUnknown ? <p role="status">Saving your answers…</p> : null}
           />
         </section>
       </div>

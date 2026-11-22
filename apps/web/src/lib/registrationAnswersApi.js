@@ -29,11 +29,12 @@ export function answerTargets({ provider, tickets, uid }) {
     });
 }
 
-/** @returns {Promise<{ ticketId: string, answers: object, formRevision: number }>} */
-export function saveRegistrationAnswers({ user, ticketId, account, formRevision, answers, language }) {
+/** @returns {Promise<{ ticketId: string|null, answers: object, formRevision: number, answerRevision?: number }>} */
+export function saveRegistrationAnswers({ user, ticketId, account, formRevision, answers, language, requestId, expectedAnswerRevision }) {
   const target = account ? { account: true } : { ticketId };
   return callAdminEndpoint('saveTicketAnswers', {
     ...target, formRevision, answers, ...(language ? { lang: language } : {}),
+    requestId, expectedAnswerRevision,
   }, idTokenGetter(user));
 }
 

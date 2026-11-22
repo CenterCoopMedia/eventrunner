@@ -62,6 +62,17 @@ describe('saveRegistrationAnswers', () => {
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ account: true, formRevision: 1, answers: {} });
   });
 
+  it('sends the request key and explicit empty-record baseline on a replayable save', async () => {
+    fetch.mockResolvedValueOnce(response(200, { ticketId: 't1', answers: {}, formRevision: 1, answerRevision: 1 }));
+    const result = await saveRegistrationAnswers({
+      user, ticketId: 't1', formRevision: 1, answers: {}, requestId: 'first-save', expectedAnswerRevision: null,
+    });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      ticketId: 't1', formRevision: 1, answers: {}, requestId: 'first-save', expectedAnswerRevision: null,
+    });
+    expect(result.answerRevision).toBe(1);
+  });
+
   it('passes the server’s error code on', async () => {
     fetch.mockResolvedValueOnce(response(409, { error: { code: 'form-changed', message: 'The questions changed.' } }));
     await expect(saveRegistrationAnswers({ user, ticketId: 't1', formRevision: 1, answers: {} }))

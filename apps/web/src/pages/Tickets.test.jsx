@@ -579,6 +579,34 @@ describe('attendee ticket selection', () => {
     await screen.findByText(`Location: /tickets/status?orderId=${error.existingOrderId}`);
     expect(JSON.parse(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a'))).toEqual({ requestId: null, orderId: error.existingOrderId });
   });
+  it('repeats a held checkout with its original request ID and attendee details', async () => {
+    let finishFirst;
+    ticketingRequest.mockImplementation((name) => {
+      if (name === 'ticketingCatalog') return Promise.resolve(CATALOG);
+      if (checkoutCalls().length === 1) return new Promise((resolve) => { finishFirst = resolve; });
+      return Promise.resolve({ orderId: 'order-synthetic', checkoutUrl: null });
+    });
+    mount();
+    await fill();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+      expect(screen.getByRole('button', { name: 'Opening your order…' })).toBeVisible();
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(screen.getByText(/We don’t know whether checkout was completed/)).toBeVisible();
+      const first = checkoutCalls()[0][1];
+      expect(screen.getByRole('link', { name: /Check my order/ })).toHaveAttribute('href', `/tickets/status?requestId=${first.body.requestId}`);
+      fireEvent.click(screen.getByRole('button', { name: 'Resume existing checkout' }));
+      const [, [, retry]] = checkoutCalls();
+      expect(retry.body).toEqual(first.body);
+      expect(first.signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    await act(async () => finishFirst({ orderId: 'stale-order', checkoutUrl: null }));
+    expect(screen.getByText('Location: /tickets/status?orderId=order-synthetic')).toBeVisible();
+  });
   it('resumes a saved order reference without inventing a new request id or attendee body', async () => {
     sessionStorage.setItem('eventrunner.ticket-checkout.purchaser-a', JSON.stringify({ orderId: 'ord_1234567890abcdef1234567890abcdef12345678' }));
     mount();
@@ -852,6 +880,66 @@ describe('promo codes on the review step', () => {
     await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
     expect(checkoutCalls()).toHaveLength(1);
     expect(checkoutCalls()[0][1].body.promoCode).toBe('EARLY');
+  });
+
+  it('keeps a held promo code without repeating its rate-limited check', async () => {
+    let finish;
+    ticketingRequest.mockImplementation((name) => {
+      if (name === 'ticketingCatalog') return Promise.resolve(CATALOG);
+      if (name === 'ticketingPromoPreview') return new Promise((resolve) => { finish = resolve; });
+      throw new Error('Unexpected checkout');
+    });
+    mount();
+    await fill(2);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      await apply('EARLY');
+      expect(screen.getByRole('button', { name: 'Checking code…' })).toBeVisible();
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(screen.getByText(/We don’t know whether the promo code applies/)).toBeVisible();
+      expect(screen.getByLabelText('Promo code')).toHaveValue('EARLY');
+      const orderHelp = screen.getByRole('link', { name: 'How to find an earlier order (opens in a new tab)' });
+      expect(orderHelp).toHaveAttribute('href', '/tickets/status');
+      expect(orderHelp).toHaveAttribute('target', '_blank');
+      expect(screen.queryByRole('button', { name: 'Apply code' })).toBeNull();
+      fireEvent.keyDown(screen.getByLabelText('Promo code'), { key: 'Enter' });
+      fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+      expect(previewCalls()).toHaveLength(1);
+      expect(checkoutCalls()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+    await act(async () => finish(PREVIEW));
+    expect(screen.getByText('Promo code EARLY')).toBeVisible();
+  });
+
+  it('uses the order read after a promoted checkout stalls to avoid spending a second code check', async () => {
+    ticketingRequest.mockImplementation((name) => {
+      if (name === 'ticketingCatalog') return Promise.resolve(CATALOG);
+      if (name === 'ticketingPromoPreview') return Promise.resolve(PREVIEW);
+      return new Promise(() => {});
+    });
+    mount();
+    await fill(2);
+    await apply('EARLY');
+    const pay = await screen.findByRole('button', { name: 'Continue to Stripe — $40.00' });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      fireEvent.click(pay);
+      expect(screen.getByRole('button', { name: 'Opening your order…' })).toBeVisible();
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(screen.getByText(/We don’t know whether checkout was completed/)).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Resume existing checkout' })).toBeNull();
+      const orderPath = `/tickets/status?requestId=${checkoutCalls()[0][1].body.requestId}`;
+      const orderStatus = screen.getByRole('link', { name: 'Check my order' });
+      expect(orderStatus).toHaveAttribute('href', orderPath);
+      expect(orderStatus).not.toHaveAttribute('target');
+      fireEvent.click(orderStatus);
+      expect(screen.getByText(`Location: ${orderPath}`)).toBeVisible();
+      expect(checkoutCalls()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows a refused code by the field and sends no code', async () => {
