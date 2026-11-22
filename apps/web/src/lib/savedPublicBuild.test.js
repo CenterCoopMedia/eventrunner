@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { clearPublicReads, hasStalePublicReads, recordPublicRead } from './savedPublicBuild.js';
+import { hasStalePublicReads, recordPublicRead } from './savedPublicBuild.js';
 import { isNetworkOnlyPath, needsNetworkDocument } from './offlineRoutes.js';
 
 it('tracks current server confirmation for each dataset and ages interrupted reads', () => {
@@ -22,7 +22,8 @@ it('tracks current server confirmation for each dataset and ages interrupted rea
     expect(hasStalePublicReads(['cmsUpdates'])).toBe(true);
     expect(hasStalePublicReads(['cmsSchedule'], start - 1)).toBe(true);
   } finally {
-    clearPublicReads();
+    recordPublicRead('cmsSchedule', 'cache');
+    recordPublicRead('cmsUpdates', 'cache');
     vi.useRealTimers();
     marker.remove();
   }

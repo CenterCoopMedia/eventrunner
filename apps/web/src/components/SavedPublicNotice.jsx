@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { quietActionClass } from './controlClasses.js';
 import { publicSubscriptionsForRoute } from '../lib/publicSubscriptions.js';
-import { clearPublicReads, hasStalePublicReads, readSavedPublicBuild } from '../lib/savedPublicBuild.js';
+import { hasStalePublicReads, readSavedPublicBuild } from '../lib/savedPublicBuild.js';
 
 const TYPES = {
   document: 'public-offline-document',
@@ -116,15 +116,14 @@ export default function SavedPublicNotice() {
 
   useEffect(() => {
     if (!savedId) return undefined;
-    const offline = () => {
-      clearPublicReads();
-      setTick((tick) => tick + 1);
-    };
-    const timer = setInterval(() => setTick((tick) => tick + 1), 1000);
-    globalThis.addEventListener('offline', offline);
+    const refresh = () => setTick((tick) => tick + 1);
+    const timer = setInterval(refresh, 1000);
+    globalThis.addEventListener('offline', refresh);
+    globalThis.addEventListener('online', refresh);
     return () => {
       clearInterval(timer);
-      globalThis.removeEventListener('offline', offline);
+      globalThis.removeEventListener('offline', refresh);
+      globalThis.removeEventListener('online', refresh);
     };
   }, [savedId]);
 
@@ -190,7 +189,9 @@ export default function SavedPublicNotice() {
         <p>Saved copy. Updates have not been confirmed.</p>
         {savedAt && <p>Saved on this device <time dateTime={saved.savedAt}>{savedAt}</time>.</p>}
         {generatedAt && <p>Snapshot generated <time dateTime={saved.generatedAt}>{generatedAt}</time>.</p>}
-        {hasStalePublicReads(datasets) && <p>This information may have changed. Check times and locations with event staff.</p>}
+        {(navigator.onLine === false || hasStalePublicReads(datasets)) && (
+          <p>This information may have changed. Check times and locations with event staff.</p>
+        )}
       </>}
       {disabled ? <>
         <p>Saved copies are turned off.</p>

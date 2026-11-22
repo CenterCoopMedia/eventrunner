@@ -49,6 +49,8 @@ function verifyBuild(dist, base, manifest) {
   for (const source of ['src/pages/MySchedule.jsx', 'src/pages/UpdateDetail.jsx', 'src/components/SavedPublicNotice.jsx']) {
     assert.ok(offline.files.includes(chunks[source]?.file), `offline set must contain ${source}`);
   }
+  const sdk = Object.values(chunks).find(({ file }) => /^assets\/firebase-sdk-/.test(file));
+  assert.ok(sdk && offline.files.includes(sdk.file), 'offline My schedule needs the shared Firebase runtime');
   for (const source of ['src/admin/AdminApp.jsx', 'src/pages/Tickets.jsx', 'src/pages/SharedSchedule.jsx']) {
     assert.ok(!offline.files.includes(chunks[source]?.file), `offline set must exclude ${source}`);
   }

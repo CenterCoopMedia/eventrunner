@@ -24,10 +24,6 @@ export function recordPublicRead(dataset, status) {
   }
 }
 
-export function clearPublicReads() {
-  confirmations.clear();
-}
-
 export function hasStalePublicReads(datasets, now = Date.now()) {
   return datasets.some((dataset) => {
     const { at, current } = confirmations.get(dataset) ?? {};

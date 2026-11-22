@@ -11,7 +11,8 @@ const PUBLIC_MODULES = new Set([
   'PublicLanguageRuntime.jsx', 'LanguageChoice.jsx', 'FooterPageLinks.jsx', 'TimelineDetails.jsx',
   'LatestUpdatesBlock.jsx', 'MapBlock.jsx', 'QuoteBlock.jsx', 'FaqItemBlock.jsx', 'LinkGroupBlock.jsx',
   'SponsorPackageBlock.jsx', 'GalleryBlock.jsx', 'TimelineBlock.jsx', 'CaptionedImageFigure.jsx',
-  'SavedPublicNotice.jsx', 'FeedbackModal.jsx', 'busyControlFigures.js', 'leaflet-src.js',
+  // A saved My schedule still starts the shared SDK before showing device saves.
+  'firebase.js', 'SavedPublicNotice.jsx', 'FeedbackModal.jsx', 'busyControlFigures.js', 'leaflet-src.js',
 ]);
 
 export function offlineBundle({ root, generatedDir, project }) {
