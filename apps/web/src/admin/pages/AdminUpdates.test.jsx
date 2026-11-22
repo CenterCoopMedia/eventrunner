@@ -614,6 +614,59 @@ describe('the update editor', () => {
     expect(screen.getByLabelText('Text')).toHaveValue(saved.body);
   });
 
+  it.each(['late success', 'late lost reply', 'already lost reply'])(
+    'keeps each update’s save state separate after a %s',
+    async (outcome) => {
+      await renderAt('/admin/updates/edited', <>
+        <Link to="/admin/updates/published">Open published update</Link>
+        <Link to="/admin/updates/edited">Open edited update</Link>
+      </>);
+      pushUpdates([PUBLISHED, EDITED_LIVE], [PUBLISHED_CLEAN, EDITED_DRAFT]);
+      await screen.findByRole('heading', { level: 1, name: EDITED_DRAFT.title });
+
+      let finishFirstSave;
+      const firstSave = new Promise((resolve, reject) => {
+        finishFirstSave = outcome === 'late success'
+          ? () => resolve(response({ id: EDITED_DRAFT.id, status: 'dirty' }))
+          : () => reject(new TypeError('Failed to fetch'));
+      });
+      fetch.mockReturnValueOnce(firstSave);
+      const saveButton = () => screen.getByRole('button', { name: 'Save', exact: true });
+      const unknownMessage = /The save result is unknown/;
+      const savedMessage = 'Draft saved. It is not live until you publish it.';
+
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
+      expect(screen.getByRole('button', { name: 'Saving the update…', exact: true })).toBeDisabled();
+      if (outcome === 'already lost reply') {
+        await act(async () => finishFirstSave());
+        expect(screen.getByText(unknownMessage)).toBeInTheDocument();
+        expect(saveButton()).toBeDisabled();
+      }
+
+      fireEvent.click(screen.getByRole('link', { name: 'Open published update' }));
+      await screen.findByRole('heading', { level: 1, name: PUBLISHED.title });
+      expect(saveButton()).toBeEnabled();
+      expect(screen.queryByText(unknownMessage)).not.toBeInTheDocument();
+
+      if (outcome !== 'already lost reply') await act(async () => finishFirstSave());
+      expect(saveButton()).toBeEnabled();
+      expect(screen.queryByText(unknownMessage)).not.toBeInTheDocument();
+      expect(screen.queryByText(savedMessage)).not.toBeInTheDocument();
+
+      fetch.mockResolvedValueOnce(response({ id: PUBLISHED.id, status: 'dirty' }));
+      fireEvent.click(saveButton());
+      await screen.findByText(savedMessage, { selector: '[role="status"]' });
+      expect(callsTo('cmsSaveUpdate').map((call) => bodyOf(call).id)).toEqual([EDITED_DRAFT.id, PUBLISHED.id]);
+
+      if (outcome !== 'late success') {
+        fireEvent.click(screen.getByRole('link', { name: 'Open edited update' }));
+        expect(await screen.findByText(unknownMessage)).toBeInTheDocument();
+        expect(saveButton()).toBeDisabled();
+      }
+    },
+  );
+
   it('closes the form when a loaded update is deleted, so a save cannot write it back', async () => {
     await renderAt('/admin/updates/published');
     pushUpdates([PUBLISHED], [PUBLISHED_CLEAN]);

@@ -4,34 +4,39 @@ import { useBusyLate } from '../../components/BusyLabel.jsx';
 import { Notice, linkButtonClass } from './formControls.jsx';
 
 /** Keep a write locked while awaiting its reply or after losing its reply. */
-export function useAdminSaveState(idle) {
-  const [action, setAction] = useState(idle);
-  const [unconfirmed, setUnconfirmed] = useState(false);
-  const [offline, setOffline] = useState(false);
-  const current = useRef(idle);
-  const lostReply = useRef(false);
+export function useAdminSaveState(idle, recordId) {
+  const [saves, setSaves] = useState(() => new Map());
+  const current = useRef(saves);
+  const { action = idle, unconfirmed = false, offline = false } = saves.get(recordId) ?? {};
+
+  function update(changes) {
+    const saves = new Map(current.current);
+    const next = { action: idle, ...saves.get(recordId), ...changes };
+    if (next.action === idle && !next.unconfirmed && !next.offline) saves.delete(recordId);
+    else saves.set(recordId, next);
+    current.current = saves;
+    setSaves(saves);
+  }
 
   function set(next) {
-    current.current = next;
-    setAction(next);
+    update({ action: next });
   }
 
   function begin(next) {
-    if (current.current !== idle || lostReply.current) return false;
+    const save = current.current.get(recordId);
+    if (save && (save.action !== idle || save.unconfirmed)) return false;
     if (navigator.onLine === false) {
-      setOffline(true);
+      update({ offline: true });
       return false;
     }
-    setOffline(false);
-    set(next);
+    update({ action: next, offline: false });
     return true;
   }
 
   function capture(error) {
     if (error?.queueId || !(error?.code === 'network' || error?.status === 408
       || error?.status === 502 || error?.status === 504)) return false;
-    lostReply.current = true;
-    setUnconfirmed(true);
+    update({ unconfirmed: true });
     return true;
   }
 
