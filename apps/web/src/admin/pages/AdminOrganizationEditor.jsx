@@ -106,8 +106,6 @@ export default function AdminOrganizationEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const { action: action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline } = useAdminSaveState(null);
-  const saving = action !== null || unconfirmedSave;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
@@ -119,12 +117,16 @@ export default function AdminOrganizationEditor({ mode }) {
   const creating = mode === 'create' && !createdId;
   const docId = mode === 'edit' ? organizationId : createdId;
   const row = docId ? findRow(docId) : null;
+  // Keep the creation lock through the edit route that creation opens.
+  const saveScope = docId === createdId ? null : docId;
+  const { action, set: setAction, begin: beginSave, capture: captureUnconfirmed, unconfirmed: unconfirmedSave, offline, isCurrentRecord } = useAdminSaveState(null, saveScope);
+  const saving = action !== null || unconfirmedSave;
 
   // Each record is adopted only after BOTH listeners have reported:
   // a row built before the drafts arrive is the live doc alone, and a form
   // filled from it and saved would replace the unpublished draft.
   useEffect(() => {
-    if (mode !== 'edit' || !ready || !row || saving) return;
+    if (mode !== 'edit' || !ready || !row || (adoptedRef.current === docId && saving)) return;
     const incoming = toForm(row);
     const observed = observedRef.current;
     observedRef.current = incoming;
@@ -227,30 +229,33 @@ export default function AdminOrganizationEditor({ mode }) {
         await call('cmsCreateContent', { ...body, docId: id });
         // Created: this form never creates again, and the page moves to the
         // record's own address before the publish runs.
-        adoptedRef.current = id;
-        observedRef.current = form;
-        setCreatedId(id);
-        setEditor((current) => ({ ...current, savedForm: form }));
-        navigate(`${ORGANIZATIONS_LIST}/${encodeURIComponent(id)}`, { replace: true });
+        if (isCurrentRecord()) {
+          adoptedRef.current = id;
+          observedRef.current = form;
+          setCreatedId(id);
+          setEditor((current) => ({ ...current, savedForm: form }));
+          navigate(`${ORGANIZATIONS_LIST}/${encodeURIComponent(id)}`, { replace: true });
+        }
       } else {
         await call('cmsUpdateContent', { ...body, docId: id });
         const savedChanges = Object.fromEntries(Object.keys(fields).map((field) => [field, form[field]]));
         if ('visible' in body) savedChanges.visible = body.visible;
-        setEditor((current) => ({ ...current, savedForm: { ...current.savedForm, ...savedChanges } }));
+        if (isCurrentRecord()) setEditor((current) => ({ ...current, savedForm: { ...current.savedForm, ...savedChanges } }));
       }
+      let message = 'Draft saved. It is not live until you publish it.';
       if (publish) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: COLLECTION, docIds: [id] });
         const verdict = summarizePublish(response, COLLECTION, [id], 'organizations');
         if (!verdict.ok) throw new Error(verdict.message);
-        setStatus(verdict.message);
-        if (creating) showToast(verdict.message, { announce: false });
-      } else {
-        setStatus('Draft saved. It is not live until you publish it.');
-        if (creating) showToast('Organization draft saved.', { announce: false });
+        message = verdict.message;
       }
+      if (!isCurrentRecord()) return;
+      setStatus(message);
+      if (creating) showToast(publish ? message : 'Organization draft saved.', { announce: false });
     } catch (err) {
       if (captureUnconfirmed(err)) return;
+      if (!isCurrentRecord()) return;
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(plannerError(err));
     } finally {
@@ -264,8 +269,10 @@ export default function AdminOrganizationEditor({ mode }) {
     setErrorTitle(undefined);
     try {
       const deleted = await call('cmsDeleteContent', { collection: COLLECTION, docId });
+      if (!isCurrentRecord()) return;
       reportDeleted({ ...deleted, collection: COLLECTION, docId, editorPath: `${ORGANIZATIONS_LIST}/${encodeURIComponent(docId)}` }, ORGANIZATIONS_LIST);
     } catch (err) {
+      if (!isCurrentRecord()) return;
       setErrorTitle('The organization was not deleted');
       setError(plannerError(err));
     } finally {

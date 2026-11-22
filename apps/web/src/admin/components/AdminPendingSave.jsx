@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useBusyLate } from '../../components/BusyLabel.jsx';
 import { Notice, linkButtonClass } from './formControls.jsx';
 
@@ -7,7 +7,17 @@ import { Notice, linkButtonClass } from './formControls.jsx';
 export function useAdminSaveState(idle, recordId) {
   const [saves, setSaves] = useState(() => new Map());
   const current = useRef(saves);
+  const active = useRef(null);
   const { action = idle, unconfirmed = false, offline = false } = saves.get(recordId) ?? {};
+
+  useLayoutEffect(() => {
+    active.current = { recordId };
+    return () => { active.current = null; };
+  }, [recordId]);
+
+  function isCurrentRecord() {
+    return active.current !== null && active.current.recordId === recordId;
+  }
 
   function update(changes) {
     const saves = new Map(current.current);
@@ -40,7 +50,7 @@ export function useAdminSaveState(idle, recordId) {
     return true;
   }
 
-  return { action, set, begin, capture, unconfirmed, offline };
+  return { action, set, begin, capture, unconfirmed, offline, isCurrentRecord };
 }
 
 /** Check the server in a fresh view while the submitting editor stays intact. */
