@@ -92,6 +92,57 @@ describe('AdminDataExport', () => {
     );
   });
 
+  it.each([
+    {
+      buttonName: 'Export sessions',
+      exportName: 'sessions spreadsheet',
+      request: callMock,
+      response: { filename: 'sessions.csv', csv: '', rowCount: 1 },
+      finished: 'Exported 1 session to sessions.csv.',
+    },
+    {
+      buttonName: 'Download event data package',
+      exportName: 'event data package',
+      request: downloadMock,
+      response: { filename: 'event.zip', bytes: 2048 },
+      finished: 'Downloaded event.zip.',
+    },
+  ])('explains a slow $exportName download without losing focus or repeating the request', async ({
+    buttonName, exportName, request, response, finished,
+  }) => {
+    vi.useFakeTimers();
+    try {
+      tier = 'operator';
+      let finish;
+      request.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      renderPage();
+      const button = screen.getByRole('button', { name: buttonName });
+      act(() => button.focus());
+      fireEvent.click(button);
+      const status = screen.getByRole('status');
+      expect(status).toHaveTextContent(`Preparing the ${exportName}…`);
+
+      act(() => vi.advanceTimersByTime(9999));
+      expect(status).toHaveTextContent(`Preparing the ${exportName}…`);
+      expect(status).not.toHaveTextContent('Still');
+
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByRole('status')).toBe(status);
+      expect(status).toHaveTextContent(`Still preparing the ${exportName}… Keep this page open for the download.`);
+      expect(button).toHaveFocus();
+      fireEvent.click(button);
+      expect(request).toHaveBeenCalledTimes(1);
+
+      await act(async () => finish(response));
+      expect(screen.getByRole('status')).toBe(status);
+      expect(status).toHaveTextContent(finished);
+      expect(button).not.toHaveAttribute('aria-busy');
+      expect(button).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('states a refusal in the server’s words and saves nothing', async () => {
     callMock.mockRejectedValueOnce(new Error('dataset: only an operator can export orders.'));
     tier = 'operator';
