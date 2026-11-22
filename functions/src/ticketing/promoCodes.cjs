@@ -6,6 +6,7 @@
  * actions and the checkout preview.
  */
 const { randomUUID } = require('node:crypto');
+const { confirmationVersion, requireConfirmation } = require('../core/confirmation.cjs');
 const { normalizePromoCode } = require('shared/ticketCommerce');
 const { validatePromoCode } = require('shared/promoCodes');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
@@ -75,6 +76,7 @@ async function listPromoCodes({ db }) {
   const codes = snap.docs.map((doc) => {
     const data = doc.data();
     return {
+      confirmationVersion: confirmationVersion(doc.ref.path, data),
       code: doc.id, kind: data.kind, value: data.value, ticketTypeIds: data.ticketTypeIds || [],
       maxUses: data.maxUses ?? null, maxPerOrder: data.maxPerOrder ?? null,
       startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, active: data.active === true,
@@ -123,6 +125,7 @@ async function deletePromoCode({ db, actor, body, now }) {
     const ref = promoRef(db, code);
     const snap = await tx.get(ref);
     if (!snap.exists) throw new CommerceError('not-found', 'This code no longer exists. Reload the list.', 404);
+    requireConfirmation(body.expectedVersion, ref.path, snap.data());
     if ((snap.data().used || 0) > 0) {
       throw new CommerceError('conflict', 'This code has been used. Make it inactive instead.', 409);
     }

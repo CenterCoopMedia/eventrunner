@@ -23,6 +23,7 @@
  */
 
 const { draftCollectionFor } = require('./blockTypes.cjs');
+const { requireConfirmation } = require('../core/confirmation.cjs');
 const { collectionVariantErrors } = require('shared/contentLanguages');
 const { sanitizeRichTextVariants } = require('./richText.cjs');
 const {
@@ -232,11 +233,11 @@ function isAlreadyExistsError(err) {
  *           collection: string, docId: string, now?: () => number }} args
  * @returns {Promise<{ livePath: string, draftPath: string, publishedRevision: number|null }>}
  */
-async function deleteBoth({ db, tx = null, collection, docId, now = Date.now }) {
+async function deleteBoth({ db, tx = null, collection, docId, now = Date.now, expectedVersion }) {
   const draftCol = draftCollectionFor(collection);
   if (!tx) {
     return db.runTransaction((ownedTx) => deleteBoth({
-      db, tx: ownedTx, collection, docId, now,
+      db, tx: ownedTx, collection, docId, now, expectedVersion,
     }));
   }
   const liveRef = db.collection(collection).doc(docId);
@@ -247,6 +248,7 @@ async function deleteBoth({ db, tx = null, collection, docId, now = Date.now }) 
   const revision = liveSnap.exists ? liveSnap.data()?.revision : null;
   const publishedRevision = Number.isSafeInteger(revision) && revision > 0 ? revision : null;
   const draftSnap = await tx.get(draftRef);
+  requireConfirmation(expectedVersion, liveRef.path, liveSnap.data() ?? null, draftSnap.data() ?? null);
   const wasDirty = draftSnap.exists && draftSnap.data()?.status === 'dirty';
   await writePendingDelta({ db, tx, collection, delta: wasDirty ? -1 : 0, now });
   tx.delete(liveRef);
@@ -367,7 +369,7 @@ function remainingPublishIds(docIds, progress) {
  * @returns {Promise<{ published: string[], skipped: Array<{docId: string, reason: string}>,
  *                     chunksCommitted: number }>}
  */
-async function publishDocs({ db, collection, docIds, actor, now = Date.now, queueRef }) {
+async function publishDocs({ db, collection, docIds, actor, now = Date.now, queueRef, expectedVersions }) {
   const draftCol = draftCollectionFor(collection);
   await ensurePendingCounts({ db, now });
   const metaRef = pendingCountsRef(db);
@@ -390,6 +392,9 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
       const liveRefs = chunkIds.map((id) => db.collection(collection).doc(id));
       const draftSnaps = await db.getAll(...draftRefs);
       const liveSnaps = await db.getAll(...liveRefs);
+      if (expectedVersions) {
+        draftSnaps.forEach((snap, j) => requireConfirmation(expectedVersions[chunkIds[j]], draftRefs[j].path, snap.data()));
+      }
 
       const batch = db.batch();
       const chunkPublished = [];

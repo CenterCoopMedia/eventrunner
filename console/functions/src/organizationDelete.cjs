@@ -1,6 +1,7 @@
 'use strict';
 
 const { ConsoleError } = require('./http.cjs');
+const { confirmationVersion, requireConfirmation } = require('./confirmation.cjs');
 const { validOrgId } = require('./access.cjs');
 const { requireOperator } = require('./reviewAccess.cjs');
 const { connectionChanging } = require('./connectionState.cjs');
@@ -30,7 +31,8 @@ async function deleteOrganization(deps, { body, user }) {
   await requireOperator(db, user);
   const { orgId } = body;
   if (!validOrgId(orgId)) throw new ConsoleError(400, 'bad-request', 'Choose an organization.');
-  if (body.confirm !== true) throw new ConsoleError(400, 'confirm-required', 'Confirm that you want to delete this organization.');
+  const preview = body.preview === true;
+  if (!preview && body.confirm !== true) throw new ConsoleError(400, 'confirm-required', 'Confirm that you want to delete this organization.');
   const orgRef = db.collection('organizations').doc(orgId);
   const at = new Date(now());
   const cleanup = await db.runTransaction(async (tx) => {
@@ -48,6 +50,7 @@ async function deleteOrganization(deps, { body, user }) {
     // Acceptance records survive request retention, so past approval still blocks deletion.
     if (!acceptances.empty) throw new ConsoleError(409, 'organization-in-use', USED_MESSAGE);
     const linked = new Map(links.docs.map((doc) => [doc.ref.path, doc.ref]));
+    const reviewed = [org, ...[applications, members, invites, states, names, links].flatMap((snap) => snap.docs)];
     const accounts = [];
     for (const app of applications.docs) {
       const data = app.data();
@@ -59,13 +62,22 @@ async function deleteOrganization(deps, { body, user }) {
         tx.get(db.collection('signup_links').where('appId', '==', app.id)),
       ]);
       if (build.exists) throw new ConsoleError(409, 'organization-in-use', USED_MESSAGE);
+      reviewed.push(...held.docs, ...appLinks.docs);
       for (const doc of [...held.docs, ...appLinks.docs]) linked.set(doc.ref.path, doc.ref);
       if (validOrgId(data.signupLinkId)) {
         const link = await tx.get(db.collection('signup_links').doc(data.signupLinkId));
-        if (link.exists && (link.data().orgId === orgId || link.data().appId === app.id)) linked.set(link.ref.path, link.ref);
+        if (link.exists && (link.data().orgId === orgId || link.data().appId === app.id)) {
+          linked.set(link.ref.path, link.ref);
+          reviewed.push(link);
+        }
       }
       accounts.push({ appId: app.id, connected });
     }
+    if (preview) return {
+      orgId, name: org.data().name, confirmationVersion: confirmationVersion(...reviewed),
+      requests: applications.size, members: members.size, invites: invites.size, signupLinks: linked.size,
+    };
+    requireConfirmation(body.expectedVersion, ...reviewed);
     // All reads precede writes. A refusal or a concurrent acceptance leaves everything intact.
     for (const snap of [applications, members, invites, states, names]) {
       for (const doc of snap.docs) tx.delete(doc.ref);
@@ -79,6 +91,7 @@ async function deleteOrganization(deps, { body, user }) {
     tx.create(db.collection('console_audit').doc(), { action: 'delete-organization', orgId, by: user.uid, at });
     return accounts;
   });
+  if (preview) return { body: cleanup };
   // Reuse durable token cleanup: failures stay findable for the retention job.
   for (const { appId, connected } of cleanup) {
     await deleteRecordedTokens(deps, appId, connected)

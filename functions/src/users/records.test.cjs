@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
+const { confirmationVersion } = require('../core/confirmation.cjs');
 const {
   ORGANIZER_OWNED_FIELDS,
   PER_ACCOUNT_STORES,
@@ -336,9 +337,9 @@ function deps(db, { auth = makeAuth({ 'uid-ada': 'ada@example.com', 'uid-bo': 'b
   return { db, auth, bucket: files, getConfig, getBucket: () => files, now: () => T0, log: QUIET };
 }
 
-async function remove(d, uid = 'uid-ada', token = 'admin') {
+async function remove(d, uid = 'uid-ada', token = 'admin', expectedVersion) {
   const res = makeRes();
-  await createDeleteAttendeeHandler(d)(req(token, { uid }), res);
+  await createDeleteAttendeeHandler(d)(req(token, { uid, ...(expectedVersion === undefined ? {} : { expectedVersion }) }), res);
   return res;
 }
 
@@ -687,6 +688,28 @@ for (const [step, breakIt] of [
     assert.equal(adminLogs(d.db).length, 2);
   });
 }
+
+test('a confirmed account delete rejects replacement content and can resume cleanup after a failure', async () => {
+  const d = deps(await fullySeeded());
+  const uid = 'uid-ada';
+  const oldVersion = confirmationVersion(`users/${uid}`, d.db.read('users', uid));
+  await d.db.collection('users').doc(uid).update({ displayName: 'Revised name' });
+  const before = d.db.writes.length;
+  const stale = await remove(d, uid, 'admin', oldVersion);
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(d.db.writes.length, before);
+  assert.ok(d.auth.users.has(uid));
+
+  const expectedVersion = confirmationVersion(`users/${uid}`, d.db.read('users', uid));
+  d.auth.failDeleteOnce = true;
+  const first = await remove(d, uid, 'admin', expectedVersion);
+  assert.equal(first.body.error.code, 'delete-incomplete');
+  assert.equal(d.db.read('users', uid), undefined);
+  const resumed = await remove(d, uid, 'admin', expectedVersion);
+  assert.equal(resumed.statusCode, 200);
+  assert.ok(!d.auth.users.has(uid));
+});
 
 test('404 only when no account, sign-in, saved session, note, notification, or photo remains', async () => {
   const d = deps(makeFakeDb(), { auth: makeAuth({}), bucket: makeBucket([]) });

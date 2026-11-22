@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 const { isMediaLibraryPath, storageObjectPath } = require('shared/venue');
 const { MAX_CAPTION_LENGTH, MAX_CREDIT_LENGTH } = require('shared/imageCaption');
 const { badRequest, internal, notFound, sendError } = require('../core/errors.cjs');
@@ -9,6 +11,7 @@ const { replaceImageFields } = require('./replacementPlacements.cjs');
 const { internals: { isBrandingAsset, referencedByBranding, BRANDING_REFUSAL } } = require('./upload.cjs');
 
 function assetDescription(row) {
+  if (row?.deleting === true) return null;
   const path = storageObjectPath(row?.path);
   if (!isMediaLibraryPath(path)) return null;
   const text = (value) => typeof value === 'string' ? value.trim() : '';
@@ -131,6 +134,7 @@ async function prepare({ db, bucket, body, actor, res }) {
     res.status(409).json({ error: { code: 'usage-changed', message: 'The image uses changed. Review the updated list.' }, usage: places });
     return null;
   }
+  requireConfirmation(body.expectedVersion, oldSnap.ref.path, source, newSnap.ref.path, target, referenceKeys(places));
   if (!keepDescription && !target.alt && places.some(needsDescription)) {
     sendError(res, 400, 'missing-image-description', 'Add an image description to the replacement or keep the current one.');
     return null;
@@ -219,6 +223,7 @@ async function runMediaReplacement({ db, getBucket, queueRef, body, actor, now, 
     const publisher = finished && publishLive ? await publish(queueRef.id) : undefined;
     return res.status(200).json({ queueId: queueRef.id, ...result, ...(publisher ? { publisher } : {}) });
   } catch (err) {
+    if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
     log.error('Image replacement failed', err);
     return internal(res, 'The replacement could not finish. Try again to continue.');
   }

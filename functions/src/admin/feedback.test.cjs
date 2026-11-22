@@ -62,6 +62,7 @@ function fakeDb() {
       return fn({
         get: async (ref) => ref.get(),
         set: (ref, data) => { store.set(key(ref.__c, ref.__id), data); },
+        update: (ref, patch) => ref.update(patch),
         create: (ref, data) => {
           if (store.has(key(ref.__c, ref.__id))) throw new Error(`ALREADY_EXISTS: document ${ref.__c}/${ref.__id} already exists`);
           store.set(key(ref.__c, ref.__id), data);

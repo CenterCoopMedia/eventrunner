@@ -1,5 +1,7 @@
 'use strict';
 
+const { confirmationVersion, requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * `mediaUpload` and `mediaDelete` (spec §1.3 media/, §8.5) — the server
  * half of the media library.
@@ -393,6 +395,8 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
     const assetId = typeof req.body?.assetId === 'string' ? req.body.assetId.trim() : '';
     if (!assetId || assetId.includes('/')) return badRequest(res, 'assetId: required');
     const force = req.body?.force === true;
+    const preview = req.body?.preview === true;
+    const expectedVersion = req.body?.expectedVersion;
 
     const ref = db.collection('media_assets').doc(assetId);
     let snap;
@@ -403,7 +407,8 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
       return internal(res, 'The file could not be deleted. Keep this page open and contact support for help.');
     }
     if (!snap.exists) return notFound(res, 'That asset is not in the media library.');
-    const stored = snap.data() || {};
+    const { deleting, ...stored } = snap.data() || {};
+    const guarded = expectedVersion !== undefined || deleting === true;
     const path = typeof stored.path === 'string' ? stored.path : '';
     const operator = gate.tier === 'operator';
     if (isBrandingAsset(stored) && !operator) return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
@@ -419,13 +424,17 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
         // first. Only --force gets past it, and only for an operator — a
         // staff member cannot prove the asset is not a theme slot's.
         log.error('mediaDelete usage scan failed', err);
-        if (!force || !operator) return internal(res, 'The file could not be checked for usage. Keep this page open and contact support for help.');
+        if (preview || guarded || !force || !operator) return internal(res, 'The file could not be checked for usage. Keep this page open and contact support for help.');
       }
     }
     // A theme slot's asset is branding whatever folder it sits in, and
     // force does not change whose it is.
     if (!operator && referencedByBranding(references)) {
       return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
+    }
+    const reviewedUsage = references.map(({ docPath, field }) => JSON.stringify([docPath, field])).sort();
+    if (preview) {
+      return res.status(200).json({ assetId, path, usage: references, confirmationVersion: confirmationVersion(ref.path, stored, reviewedUsage) });
     }
     if (references.length > 0 && !force) {
       return res.status(409).json({
@@ -440,6 +449,18 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
     }
 
     try {
+      if (guarded) {
+        requireConfirmation(expectedVersion, ref.path, stored, reviewedUsage);
+        const reviewed = expectedVersion === undefined ? confirmationVersion(ref.path, stored, reviewedUsage) : expectedVersion;
+        await db.runTransaction(async (tx) => {
+          const current = await tx.get(ref);
+          if (!current.exists) throw new ConfirmationConflict();
+          const { deleting: reserved, ...asset } = current.data();
+          requireConfirmation(reviewed, ref.path, asset, reviewedUsage);
+          // The row stays available for an idempotent retry if Storage fails.
+          if (reserved !== true) tx.update(ref, { deleting: true });
+        });
+      }
       if (path) {
         // ignoreNotFound: an object already gone (a half-finished earlier
         // delete) must not strand its row in the library forever.
@@ -450,6 +471,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
       batch.delete(db.collection('media_captions').doc(assetId));
       await batch.commit();
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('mediaDelete failed', err);
       return internal(res, 'The file could not be deleted. Keep this page open and contact support for help.');
     }

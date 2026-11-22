@@ -9,6 +9,7 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
+const { requireConfirmation } = require('./confirmation.cjs');
 const { ROLES, requireOwner, validOrgId } = require('./access.cjs');
 
 const LAST_OWNER = 'An organization needs at least one Owner. Make another member an Owner first.';
@@ -19,7 +20,7 @@ const LAST_OWNER = 'An organization needs at least one Owner. Make another membe
  * `change` buffers the write and returns the member list as it will be
  * after it. A throw after that aborts the transaction, so nothing is written.
  */
-async function withTeam(db, { orgId, uid, user }, change) {
+async function withTeam(db, { orgId, uid, user, expectedVersion }, change) {
   await requireOwner(db, orgId, user);
   if (!validOrgId(uid)) throw new ConsoleError(400, 'bad-request', 'Choose a member.');
   const membersRef = db.collection('organizations').doc(orgId).collection('members');
@@ -30,6 +31,7 @@ async function withTeam(db, { orgId, uid, user }, change) {
     if (!me || me.role !== 'owner') throw new ConsoleError(403, 'forbidden', 'Only an Owner can change the team.');
     const target = members.find((m) => m.uid === uid);
     if (!target) throw new ConsoleError(404, 'not-found', 'That person is not on the team.');
+    requireConfirmation(expectedVersion, snap.docs.find((doc) => doc.id === uid));
     const after = change({ tx, ref: membersRef.doc(uid), members, target });
     if (!after.some((m) => m.role === 'owner')) throw new ConsoleError(409, 'last-owner', LAST_OWNER);
   });
@@ -48,7 +50,7 @@ async function changeMemberRole({ db }, { body, user }) {
 
 async function removeMember({ db }, { body, user }) {
   const { orgId, uid } = body;
-  await withTeam(db, { orgId, uid, user }, ({ tx, ref, members }) => {
+  await withTeam(db, { orgId, uid, user, expectedVersion: body.expectedVersion }, ({ tx, ref, members }) => {
     const after = members.filter((m) => m.uid !== uid);
     tx.delete(ref);
     return after;

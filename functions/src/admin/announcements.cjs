@@ -5,6 +5,7 @@
  * mutations use authenticated Functions endpoints and write admin_logs.
  */
 const crypto = require('node:crypto');
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
@@ -216,6 +217,7 @@ function createDeleteAnnouncementHandler({ db, auth, getConfig, now = Date.now, 
       outcome = await db.runTransaction(async (tx) => {
         const existing = await tx.get(ref);
         if (!existing.exists) return 'missing';
+        requireConfirmation(req.body.expectedVersion, ref.path, existing.data());
         await tx.get(publicDoc(db));
         const snap = await tx.get(activeAnnouncementQuery(db, at));
         const announcements = projectAnnouncements(
@@ -228,6 +230,7 @@ function createDeleteAnnouncementHandler({ db, auth, getConfig, now = Date.now, 
         return 'deleted';
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('deleteAnnouncement failed', err);
       return internal(res, 'The announcement could not be deleted. Keep this page open and contact support for help.');
     }

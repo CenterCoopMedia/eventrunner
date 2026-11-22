@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 const { randomUUID } = require('node:crypto');
 
 /**
@@ -552,7 +554,7 @@ async function updateSessionMaterial({ db, materialId, patch, actor, now = Date.
  *           now?: () => number }} args
  * @returns {Promise<{ sessionId: string }>}
  */
-async function deleteSessionMaterial({ db, materialId, actor, now = Date.now }) {
+async function deleteSessionMaterial({ db, materialId, actor, now = Date.now, expectedVersion }) {
   const materialRef = db.collection(MATERIALS).doc(materialId);
   const result = await db.runTransaction(async (tx) => {
     const snap = await tx.get(materialRef);
@@ -562,6 +564,7 @@ async function deleteSessionMaterial({ db, materialId, actor, now = Date.now }) 
     const isOwner = !actor.isAdmin && actor.speakerId != null && actor.speakerId === current.submittedBySpeakerId;
     if (!actor.isAdmin && !isOwner) throw new NotAuthorizedError();
 
+    requireConfirmation(expectedVersion, materialRef.path, current);
     const sessionRef = db.collection(SESSIONS).doc(current.sessionId);
     const sessionSnap = await tx.get(sessionRef);
     tx.delete(materialRef);
@@ -581,6 +584,7 @@ async function deleteSessionMaterial({ db, materialId, actor, now = Date.now }) 
  * below so the error shape (spec: `{ error: { code, message } }`) stays
  * consistent across create/update/delete. */
 function sendStoreError(res, err, log) {
+  if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
   if (err instanceof SessionNotFoundError || err instanceof MaterialNotFoundError) {
     return notFound(res, 'Not found.');
   }
@@ -719,7 +723,7 @@ function buildHandlers() {
             return badRequest(res, 'materialId: must be a non-empty string');
           }
           try {
-            const result = await deleteSessionMaterial({ db, materialId, actor });
+            const result = await deleteSessionMaterial({ db, materialId, actor, expectedVersion: req.body.expectedVersion });
             res.status(200).json(result);
           } catch (err) {
             sendStoreError(res, err, console);

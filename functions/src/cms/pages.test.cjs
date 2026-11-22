@@ -823,7 +823,10 @@ test('cmsDeletePage deletes both revisions of a non-system page and logs', async
   const res = fakeRes();
   await createDeletePageHandler(d)(adminReq({ id: 'extra' }), res);
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(d.store.deletes[0], { db, collection: 'cmsPages', docId: 'extra' });
+  const { tx, expectedVersion, ...target } = d.store.deletes[0];
+  assert.deepEqual(target, { db, collection: 'cmsPages', docId: 'extra' });
+  assert.equal(typeof tx.get, 'function');
+  assert.equal(expectedVersion, undefined);
   assert.equal(d.store.logs[0].action, 'cmsDeletePage');
   assert.equal(d.store.logs[0].docPath, 'cmsPages/extra');
 });

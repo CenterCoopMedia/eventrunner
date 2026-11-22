@@ -34,6 +34,7 @@ const { READINESS_ITEMS } = require('shared/speakerReadiness');
 const { DEFAULT_OFFSETS, MAX_OFFSET_DAYS, QUIET_HOURS } = require('shared/reminderSchedule');
 const {
   ReminderError,
+  TEMPLATE_ID,
   fail,
   wordingVersion,
   loadReadinessStores,
@@ -289,17 +290,19 @@ async function approveAction({ db, getConfig, now, log, actor, body }) {
     fail(400, 'bad-request', 'settingsVersion: Preview the reminders, then approve.');
   }
   await requireWritable(db);
-  const [config, loaded] = await Promise.all([getConfig(), loadReminderTemplate(db, now)]);
+  const config = await getConfig();
   const nowMs = now();
   if (eventEnded(config, nowMs)) fail(409, 'event-ended', 'The event has ended. Scheduled reminders cannot be turned on.');
-  const version = wordingVersion(loaded.override);
-  if (version !== body.wordingVersion) {
-    fail(409, 'stale-preview', 'The reminder wording changed after the preview. Preview again, then approve.');
-  }
   const timeZone = eventTimeZone(config);
   const ref = db.collection(SCHEDULES).doc(SCHEDULE_ID);
   const approved = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
+    const [snap, template] = await Promise.all([
+      tx.get(ref), tx.get(db.collection('email_templates').doc(TEMPLATE_ID)),
+    ]);
+    const version = wordingVersion(template.data() ?? null);
+    if (version !== body.wordingVersion) {
+      fail(409, 'stale-preview', 'The reminder wording changed after the preview. Preview again, then approve.');
+    }
     const current = normalizeSpeakerSchedule(snap.exists ? snap.data() : null);
     if (settingsVersion(current) !== body.settingsVersion) {
       fail(409, 'stale-preview', 'The schedule settings changed after the preview. Preview again, then approve.');
@@ -319,13 +322,13 @@ async function approveAction({ db, getConfig, now, log, actor, body }) {
       updatedAt: new Date(nowMs),
       updatedBy: actor.email,
     }, { merge: true });
-    return current;
+    return { ...current, version };
   });
   await logAdminAction({
     db, action: 'approveReminderSchedule', docPath: `${SCHEDULES}/${SCHEDULE_ID}`, actor, now, log,
     details: {
       schedule: SCHEDULE_ID,
-      wordingVersion: version,
+      wordingVersion: approved.version,
       offsetsDays: approved.offsetsDays,
       sendTime: approved.sendTime,
       dueAt: approved.dueAt,

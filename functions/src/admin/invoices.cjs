@@ -481,6 +481,9 @@ async function issueInvoice({ db, actor, body, now }) {
     // good, so settings that no longer pass their own checks (a value
     // edited outside the settings page) are refused, not cleaned and used.
     const storedSettings = settingsSnap.exists ? settingsSnap.data() : {};
+    if (body.expectedSettingsRevision !== undefined && body.expectedSettingsRevision !== amountOr0(storedSettings.revision)) {
+      fail(409, 'stale-confirmation', 'The invoice settings changed. Reload the invoice and confirm again.');
+    }
     const settingsCheck = validateInvoiceSettings({ ...validateInvoiceSettings({}).value, ...storedSettings });
     if (!settingsCheck.ok) {
       fail(409, 'conflict', 'The invoice settings do not pass their checks, so the invoice was not issued. Ask an operator to open the invoice settings and save them again.');
@@ -504,6 +507,9 @@ async function issueInvoice({ db, actor, body, now }) {
     }
     const sequence = lastNumber + 1;
     const number = formatInvoiceNumber(settings.prefix, sequence);
+    if (body.expectedNumber !== undefined && body.expectedNumber !== number) {
+      fail(409, 'stale-confirmation', 'The next invoice number changed. Reload the invoice and confirm again.');
+    }
     // Belt and braces: a counter set back by hand would hand out a used
     // number. The query is in the transaction, so it is part of its reads.
     const clash = await tx.get(db.collection(INVOICES).where('sequence', '==', sequence).limit(1));

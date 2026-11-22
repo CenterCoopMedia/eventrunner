@@ -1,5 +1,7 @@
 'use strict';
 
+const { confirmationVersion, requireConfirmation } = require('./confirmation.cjs');
+
 const { parseEventPublicBase } = require('shared/config/publicBase');
 const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
 const { ConsoleError } = require('./http.cjs');
@@ -162,8 +164,9 @@ async function manageEventMount(deps, { body, user }) {
   const result = await db.runTransaction(async (tx) => {
     const get = (doc) => tx.get(doc);
     await requireOperator(db, user, get);
-    const route = (await get(ref)).data();
-    if (body.action === 'get') return route || null;
+    const routeSnap = await get(ref);
+    const route = routeSnap.data();
+    if (body.action === 'get') return route ? { ...route, confirmationVersion: confirmationVersion(routeSnap) } : null;
     if (body.action === 'enroll') {
       const app = requireApplication(await get(applicationRef(db, appId)));
       return enroll(tx, db, { appId, app, ref, route, body, user, at });
@@ -172,6 +175,7 @@ async function manageEventMount(deps, { body, user }) {
       throw new ConsoleError(400, 'confirm-required', 'Choose and confirm a route change.');
     }
     if (!route) throw new ConsoleError(404, 'not-found', 'No event route was enrolled.');
+    requireConfirmation(body.expectedVersion, routeSnap);
     const state = body.action === 'publish' ? 'published' : 'removed';
     let publicTitle;
     if (state === 'published') {

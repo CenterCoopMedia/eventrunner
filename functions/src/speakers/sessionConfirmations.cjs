@@ -315,6 +315,10 @@ function createSendSessionConfirmationHandler({ db, auth, getConfig, sendEmail, 
         if (!sameNamedSlot(target.named, request.expectedNamed)) {
           return refuse(409, 'slot-changed', 'The session’s title, time or room changed. Preview the confirmation again.');
         }
+        if (speaker.email !== speakerNow?.email || speaker.firstName !== speakerNow?.firstName ||
+            speaker.lastName !== speakerNow?.lastName) {
+          return refuse(409, 'speaker-changed', 'The speaker changed. Preview the confirmation again.');
+        }
         if (rendered?.contentHash !== request.expectedContent) {
           return refuse(409, 'wording-changed', 'The email wording changed since the preview. Preview the confirmation again.');
         }

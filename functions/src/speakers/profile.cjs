@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Admin CRUD over the canonical `speakers/{speakerId}` store
  * (spec §4.3, issue #20).
@@ -748,7 +750,7 @@ async function applyUpdateOwnSpeakerProfile({ db, speakerId, uid, isAdmin, paylo
  * @returns {Promise<{ ok: true, speakerId: string, docPath: string, appliedFields: string[] } |
  *                    { ok: false, status: number, code: string, message: string }>}
  */
-async function applyApplySpeakerPendingEdits({ db, bucket, speakerId, actor, now = Date.now, log = console }) {
+async function applyApplySpeakerPendingEdits({ db, bucket, speakerId, actor, now = Date.now, log = console, expectedVersion }) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
@@ -768,6 +770,7 @@ async function applyApplySpeakerPendingEdits({ db, bucket, speakerId, actor, now
       }
       const stored = snap.data();
       const pending = isPlainObject(stored.pendingEdits) ? stored.pendingEdits : {};
+      requireConfirmation(expectedVersion, ref.path, stored);
       if (Object.keys(pending).length === 0) {
         const err = new Error('NO_PENDING_EDITS');
         err.conflict = { status: 400, code: 'bad-request', message: 'speaker: no pending edits to apply' };
@@ -824,7 +827,7 @@ async function applyApplySpeakerPendingEdits({ db, bucket, speakerId, actor, now
  * @returns {Promise<{ ok: true, speakerId: string, docPath: string } |
  *                    { ok: false, status: number, code: string, message: string }>}
  */
-async function applyDiscardSpeakerPendingEdits({ db, speakerId }) {
+async function applyDiscardSpeakerPendingEdits({ db, speakerId, expectedVersion }) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
@@ -840,6 +843,7 @@ async function applyDiscardSpeakerPendingEdits({ db, speakerId }) {
       }
       const stored = snap.data();
       const pending = isPlainObject(stored.pendingEdits) ? stored.pendingEdits : {};
+      requireConfirmation(expectedVersion, ref.path, stored);
       if (Object.keys(pending).length === 0) {
         const err = new Error('NO_PENDING_EDITS');
         err.conflict = { status: 400, code: 'bad-request', message: 'speaker: no pending edits to discard' };
@@ -932,8 +936,10 @@ function createApplySpeakerPendingEditsHandler({ db, bucket, auth, getConfig, no
     try {
       result = await applyApplySpeakerPendingEdits({
         db, bucket, speakerId: req.body?.speakerId, actor, now, log,
+        expectedVersion: req.body?.expectedVersion,
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('applySpeakerPendingEdits failed', err);
       return internal(res, 'The pending changes could not be applied. Keep this page open and contact support for help.');
     }
@@ -960,8 +966,9 @@ function createDiscardSpeakerPendingEditsHandler({ db, auth, getConfig, now = Da
     if (!actor) return;
     let result;
     try {
-      result = await applyDiscardSpeakerPendingEdits({ db, speakerId: req.body?.speakerId });
+      result = await applyDiscardSpeakerPendingEdits({ db, speakerId: req.body?.speakerId, expectedVersion: req.body?.expectedVersion });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('discardSpeakerPendingEdits failed', err);
       return internal(res, 'The pending changes could not be discarded. Keep this page open and contact support for help.');
     }

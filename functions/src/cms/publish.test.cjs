@@ -10,6 +10,7 @@ const {
 } = require('./publish.cjs');
 const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
 const { writeDraft } = require('./store.cjs');
+const { confirmationVersion } = require('../core/confirmation.cjs');
 
 // requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
 // #186 review: it fails closed on an absent document), so every fake this
@@ -81,6 +82,28 @@ test('publish endpoints: 401 no token, 403 non-admin, 405 non-POST', async () =>
 });
 
 // --- cmsPublish -----------------------------------------------------------------
+
+test('publishing a draft requires the confirmed content when a version is supplied', async () => {
+  const path = 'cmsContent_drafts/home__title';
+  const reviewed = { text: 'Reviewed heading', blockType: 'text', visible: true, status: 'dirty' };
+  const changed = { ...reviewed, text: 'Replacement heading' };
+  const db = makeFakeDb({ [path]: changed });
+  const handler = createCmsPublishHandler({ ...deps(db), env: {} });
+  async function publish(data) {
+    const res = fakeRes();
+    await handler(req({ body: {
+      collection: 'cmsContent', docIds: ['home__title'],
+      expectedVersions: { cmsContent: { home__title: confirmationVersion(path, data) } },
+    } }), res);
+    return res;
+  }
+  const stale = await publish(reviewed);
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(db.writes.length, 0);
+  assert.equal((await publish(changed)).statusCode, 200);
+  assert.equal(db.read('cmsContent', 'home__title').text, 'Replacement heading');
+});
 
 test('menu order changes only positions, even if a page editor saves with an older order', async () => {
   const livePage = { label: 'Public page', order: 0, visible: true, revision: 4 };

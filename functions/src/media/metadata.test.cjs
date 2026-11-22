@@ -119,9 +119,9 @@ test('caption and credit updates publish only public text and preserve omitted f
   assert.deepEqual(db.read('media_captions', ASSET_ID), { caption: '', credit: 'Dana Lee' });
 });
 
-test('a failed metadata batch changes neither the library row nor public text', async () => {
+test('a failed metadata commit changes neither the library row nor public text', async () => {
   const db = seeded();
-  db.failAtCommit = 1;
+  db.beforeCommit = () => { throw new Error('injected transaction commit failure'); };
   const res = fakeRes();
   await createMediaUpdateMetadataHandler(deps(db))(post({ assetId: ASSET_ID, credit: 'Dana Lee' }), res);
   assert.equal(res.statusCode, 500);

@@ -55,6 +55,7 @@
  */
 
 const { requireAdmin, listedAdminTier } = require('../core/auth.cjs');
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
@@ -395,7 +396,7 @@ function holdsAdminAccess(bootstrap, emails) {
  *                   { outcome: 'absent' } |
  *                   { outcome: 'refused', refusal: { status: number, code: string, message: string } }>}
  */
-async function removeFromDirectory({ db, uid, signInEmail, actor, now }) {
+async function removeFromDirectory({ db, uid, signInEmail, actor, now, expectedVersion }) {
   const userRef = db.collection(USERS).doc(uid);
   const bootstrapRef = db.collection('config').doc('bootstrap');
 
@@ -403,6 +404,7 @@ async function removeFromDirectory({ db, uid, signInEmail, actor, now }) {
     // Every read first, as Firestore requires.
     const userSnap = await tx.get(userRef);
     if (!userSnap.exists) return { outcome: 'absent' };
+    requireConfirmation(expectedVersion, userRef.path, userSnap.data());
     const bootstrapSnap = await tx.get(bootstrapRef);
     const claims = [];
     for (const store of DIRECTORY_STORES) {
@@ -733,7 +735,7 @@ function createDeleteAttendeeHandler({
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return badRequest(res, 'body: must be a JSON object with uid.');
     }
-    const extra = Object.keys(body).filter((key) => key !== 'uid');
+    const extra = Object.keys(body).filter((key) => key !== 'uid' && key !== 'expectedVersion');
     if (extra.length > 0) {
       return badRequest(res, extra.map((key) => `${String(key).slice(0, 60)}: is not accepted. Send uid only.`).join('; '));
     }
@@ -754,8 +756,9 @@ function createDeleteAttendeeHandler({
 
     let phase1;
     try {
-      phase1 = await removeFromDirectory({ db, uid, signInEmail: signIn.email, actor: verdict, now });
+      phase1 = await removeFromDirectory({ db, uid, signInEmail: signIn.email, actor: verdict, now, expectedVersion: body.expectedVersion });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return refuse(err);
       log.error('deleteAttendee: the account could not be removed', err);
       return internal(res, 'The account could not be deleted. Nothing was removed. Try again.');
     }

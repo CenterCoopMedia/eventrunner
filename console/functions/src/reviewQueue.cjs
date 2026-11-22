@@ -98,6 +98,7 @@ async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
         webAddressName: siteNameOf(app),
         // Sent back with a decision, so a page opened before a change is refused.
         revision: Array.isArray(app.history) ? app.history.length : 0,
+        confirmationVersion: app.confirmationVersion,
         history: readableHistory(app.history, team.members),
         review: readableReview(app.review),
         ...readableProgress(app),

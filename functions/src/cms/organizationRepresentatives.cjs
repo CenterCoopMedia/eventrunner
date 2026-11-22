@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Organization representatives (issue #334): a sponsor or partner edits
  * its own profile, and staff review the edit before it reaches the site.
@@ -376,7 +378,7 @@ async function applyRevoke({ db, uid, actor, now }) {
   });
 }
 
-async function applyApprove({ db, organizationId, overwrite, actor, now }) {
+async function applyApprove({ db, organizationId, overwrite, actor, now, expectedVersion }) {
   const requestRef = db.collection(EDIT_REQUESTS).doc(organizationId);
   try {
     return await db.runTransaction(async (tx) => {
@@ -401,6 +403,7 @@ async function applyApprove({ db, organizationId, overwrite, actor, now }) {
         ? contentFieldsOf(draftSnap.data())
         : liveSnap.exists ? contentFieldsOf(liveSnap.data()) : null;
       if (!current) throw new Refusal(404, 'not-found', `No organization with id "${organizationId}".`);
+      requireConfirmation(expectedVersion, requestRef.path, request, current);
 
       // Only the representative's own fields: a queue written by anything
       // else cannot widen what apply writes.
@@ -457,13 +460,14 @@ async function applyApprove({ db, organizationId, overwrite, actor, now }) {
   }
 }
 
-async function applyDiscard({ db, organizationId, actor, now }) {
+async function applyDiscard({ db, organizationId, actor, now, expectedVersion }) {
   const requestRef = db.collection(EDIT_REQUESTS).doc(organizationId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(requestRef);
     if (!snap.exists) {
       return { ok: false, status: 404, code: 'not-found', message: 'This organization has no edit waiting for review.' };
     }
+    requireConfirmation(expectedVersion, requestRef.path, snap.data());
     tx.delete(requestRef);
     tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
       action: 'discardOrganizationEdit',
@@ -501,12 +505,13 @@ function createOrganizationRepresentativesHandler({ db, auth, getConfig, now = D
           if (!email) return badRequest(res, 'email: enter the address of the account to add');
           result = await applyGrant({ db, auth, organizationId, email, actor, now });
         } else if (action === 'apply') {
-          result = await applyApprove({ db, organizationId, overwrite: body.overwrite === true, actor, now });
+          result = await applyApprove({ db, organizationId, overwrite: body.overwrite === true, actor, now, expectedVersion: body.expectedVersion });
         } else {
-          result = await applyDiscard({ db, organizationId, actor, now });
+          result = await applyDiscard({ db, organizationId, actor, now, expectedVersion: body.expectedVersion });
         }
       }
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error(`organizationRepresentatives ${action} failed`, err);
       return internal(res, 'The change could not be saved. Try again.');
     }

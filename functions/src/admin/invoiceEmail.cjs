@@ -357,7 +357,10 @@ async function sendInvoice({ db, actor, body, now, getConfig, getMailer, log }) 
       fail(409, 'in-progress', 'This invoice is being emailed now. Reload the invoice in a minute to see the result.');
     }
 
-    const { invoice } = sendableInvoice(stored, id);
+    const { invoice, to: currentTo } = sendableInvoice(stored, id);
+    if (currentTo !== to) {
+      fail(409, 'stale-preview', 'The invoice recipient changed after the preview. Preview the email again, then send.');
+    }
     const composed = composeInvoiceEmail({ invoice, to, cc, note, config, stream: channel.stream, now: new Date(nowMs) });
     if (composed.receipt !== body.receipt) {
       fail(409, 'stale-preview', 'The invoice or the email changed after the preview. Preview the email again, then send.');

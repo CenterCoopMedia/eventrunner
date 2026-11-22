@@ -1,5 +1,7 @@
 'use strict';
 
+const { ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Speaker reminders: staff email accepted speakers about what they still
  * owe the event (biography, headshot, session description, materials).
@@ -385,8 +387,8 @@ async function saveTemplateAction({ db, now, log, actor, body }) {
   return { ...template, reminderTokens: tokens };
 }
 
-async function resetTemplateAction({ db, now, log, actor }) {
-  const wording = await resetWording({ db, id: TEMPLATE_ID, actor, now, log });
+async function resetTemplateAction({ db, now, log, actor, body }) {
+  const wording = await resetWording({ db, id: TEMPLATE_ID, actor, now, log, expectedVersion: body.expectedVersion });
   await pauseScheduleOnWordingChange({ db, now, actor, log });
   const { tokens, ...template } = wording;
   return { ...template, reminderTokens: tokens };
@@ -423,7 +425,7 @@ function createSpeakerRemindersHandler({ db, auth, getConfig, sendEmail, now = D
       if (action === 'export') res.set('Cache-Control', 'no-store');
       res.status(200).json(result);
     } catch (err) {
-      if (err instanceof ReminderError || err instanceof WordingError) {
+      if (err instanceof ReminderError || err instanceof WordingError || err instanceof ConfirmationConflict) {
         return sendError(res, err.status, err.code, err.message);
       }
       log.error(`speakerReminders ${action} failed`, err);

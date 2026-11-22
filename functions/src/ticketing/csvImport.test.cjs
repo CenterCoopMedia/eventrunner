@@ -47,6 +47,32 @@ function req({ body = {}, headers = { authorization: 'Bearer tok' }, method = 'P
   return { method, body, headers };
 }
 
+test('a confirmed ticket import refuses a changed target before writing any row', async () => {
+  const db = makeFakeDb();
+  const handler = createTicketingImportCsvHandler({ db, ...makeAuthDeps(), now: () => T0.getTime(), log: QUIET });
+  const body = { mapping: MAPPING, rows: [
+    { Email: 'first@example.test', 'Order ID': 'ticket-1' },
+    { Email: 'second@example.test', 'Order ID': 'ticket-2' },
+  ] };
+  async function call(extra = {}) {
+    const res = makeRes();
+    await handler(req({ body: { ...body, ...extra } }), res);
+    return res;
+  }
+  const original = (await call()).body.confirmationVersion;
+  await db.collection('tickets').doc('ticket-2').set({ provider: 'manual', email: 'changed@example.test', status: 'valid' });
+  const before = db.writes.length;
+  const stale = await call({ dryRun: false, expectedVersion: original });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(db.writes.length, before);
+  const expectedVersion = (await call()).body.confirmationVersion;
+  const accepted = await call({ dryRun: false, expectedVersion });
+  assert.equal(accepted.statusCode, 200);
+  assert.equal(accepted.body.created, 1);
+  assert.equal(accepted.body.updated, 1);
+});
+
 /* ---------------------------------------------------------------- */
 /* mapRow / validateImportRequest                                    */
 /* ---------------------------------------------------------------- */
@@ -160,7 +186,9 @@ test('processImport: classifies create, update, duplicate, and invalid rows', as
   assert.equal(preview.results[2].verdict, 'duplicate');
   assert.equal(preview.results[3].verdict, 'invalid');
   const committed = await processImport({ db, mapping: MAPPING, rows, commitAt: () => T0 });
-  assert.deepEqual(committed, preview);
+  const { confirmationVersion, ...planned } = preview;
+  assert.match(confirmationVersion, /^[a-f0-9]{64}$/);
+  assert.deepEqual(committed, planned);
   assert.deepEqual(db.ids('tickets').sort(), ['ord-existing', 'ord-new']);
   assert.equal(db.read('tickets', 'ord-new').email, 'a@example.com');
   assert.equal(db.read('tickets', 'ord-existing').email, 'b@example.com');

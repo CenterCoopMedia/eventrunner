@@ -1,5 +1,7 @@
 'use strict';
 
+const { confirmationVersion, requireConfirmation } = require('../core/confirmation.cjs');
+
 /**
  * Staff editing of one template's saved wording: the
  * `email_templates/{id}` override (spec §6.1). Read, save, reset and
@@ -102,6 +104,7 @@ async function readWording({ db, id }) {
   }
   return {
     id,
+    confirmationVersion: confirmationVersion(snap.ref.path, data),
     shipped: { subject: template.subject, html: template.html, text: template.text },
     saved,
     savedErrors,
@@ -180,10 +183,15 @@ async function saveWording({ db, id, body, actor, now = Date.now, log = console 
 }
 
 /** Delete the saved wording, so the shipped copy applies again. */
-async function resetWording({ db, id, actor, now = Date.now, log = console }) {
+async function resetWording({ db, id, actor, now = Date.now, log = console, expectedVersion }) {
   const { logAdminAction } = require('../cms/store.cjs');
   await requireWritable(db);
-  await db.collection(TEMPLATES).doc(id).delete();
+  const ref = db.collection(TEMPLATES).doc(id);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    requireConfirmation(expectedVersion, ref.path, snap.data() ?? null);
+    tx.delete(ref);
+  });
   await logAdminAction({ db, action: 'resetEmailTemplate', docPath: `${TEMPLATES}/${id}`, actor, now, log });
   return readWording({ db, id });
 }

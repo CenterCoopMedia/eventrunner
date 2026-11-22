@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation } = require('./confirmation.cjs');
+
 /**
  * The client's status changes (ADR 0007 §3 and §5): withdraw a draft
  * (withdrawApplication, Owners only), and the parts acceptAgreement shares.
@@ -149,8 +151,9 @@ async function withdrawApplication(deps, { body, user }) {
   refuseStatus(first.data.status);
   const at = new Date(now());
   const eventName = await db.runTransaction(async (tx) => {
-    const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
+    const { ref, data, snap } = await readApplication((r) => tx.get(r), db, orgId, appId);
     refuseStatus(data.status);
+    requireConfirmation(body.expectedVersion, snap);
     const held = await heldNames(tx, db, appId);
     releaseNames(tx, db, held);
     tx.update(ref, {

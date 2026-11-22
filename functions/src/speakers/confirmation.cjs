@@ -103,18 +103,18 @@ async function renderConfirmation({ db, config, speaker, named }) {
   });
   // A subject is one line, whatever the session title holds.
   const subject = rendered.subject.replace(/\s+/g, ' ').trim();
-  return { ...rendered, subject, contentHash: contentHashOf({ subject, html: rendered.html, text: rendered.text }) };
+  return { ...rendered, subject, contentHash: contentHashOf({ to: speaker.email, subject, html: rendered.html, text: rendered.text }) };
 }
 
 /**
- * A fingerprint of the exact email: subject, HTML and text. The preview
+ * A fingerprint of the recipient and rendered email. The preview
  * returns it and a send must return it, so a wording change between the two
  * (an operator edit, or another function instance's template cache) is
  * refused rather than sent.
  */
-function contentHashOf({ subject, html, text }) {
+function contentHashOf({ to, subject, html, text }) {
   const { createHash } = require('node:crypto');
-  return createHash('sha256').update(JSON.stringify([subject, html, text])).digest('hex');
+  return createHash('sha256').update(JSON.stringify([to, subject, html, text])).digest('hex');
 }
 
 /**

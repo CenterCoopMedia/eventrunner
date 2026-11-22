@@ -31,7 +31,8 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/errors.cjs');
-const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
+const { confirmationVersion, matchesConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+const { PUBLISHABLE_COLLECTIONS, draftCollectionFor } = require('./blockTypes.cjs');
 const { listDirty, publishDocs, remainingPublishIds, logAdminAction, isValidDocId, isAlreadyExistsError, internals } = require('./store.cjs');
 const { publisherNotificationSecrets, refreshSiteAfterPublish, requestSitePublish, withPublisherNotifier } = require('./publisher.cjs');
 const { runMediaReplacement } = require('../media/replace.cjs');
@@ -49,6 +50,25 @@ function countPlannedChunks(request) {
   return Object.values(request).reduce((total, ids) => (
     total + (Array.isArray(ids) ? Math.ceil(ids.length / internals.DOCS_PER_CHUNK) : 0)
   ), 0);
+}
+
+async function draftVersionsMatch(db, request, versions) {
+  if (!versions || typeof versions !== 'object' || Array.isArray(versions)) return false;
+  const entries = Object.entries(request);
+  if (Object.keys(versions).length !== entries.length) return false;
+  for (const [collection, ids] of entries) {
+    const expected = versions[collection];
+    if (!expected || typeof expected !== 'object' || Array.isArray(expected) ||
+        Object.keys(expected).length !== ids.length || ids.some((id) => !Object.hasOwn(expected, id) ||
+          typeof expected[id] !== 'string' || !/^[a-f0-9]{64}$/.test(expected[id]))) return false;
+    const drafts = db.collection(draftCollectionFor(collection));
+    for (let start = 0; start < ids.length; start += internals.DOCS_PER_CHUNK) {
+      const chunk = ids.slice(start, start + internals.DOCS_PER_CHUNK);
+      const snaps = await db.getAll(...chunk.map((id) => drafts.doc(id)));
+      if (snaps.some((snap, index) => !snap.exists || !matchesConfirmation(expected[chunk[index]], snap.ref.path, snap.data()))) return false;
+    }
+  }
+  return true;
 }
 
 /** Shared admin-POST preamble; sends the response itself on failure. */
@@ -136,7 +156,7 @@ function createCmsPublishHandler({
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
-    const { queueId, requestId, mediaReplacement, menuOrder } = req.body || {};
+    const { queueId, requestId, mediaReplacement, menuOrder, expectedVersion } = req.body || {};
     if (requestId !== undefined) {
       if (queueId !== undefined) return badRequest(res, 'Use queueId alone to resume a publish.');
       if (typeof requestId !== 'string' || requestId.length !== 36 || !REQUEST_ID_PATTERN.test(requestId)) {
@@ -150,7 +170,7 @@ function createCmsPublishHandler({
       }
       return publishMenuOrder({
         db, ids: menuOrder, queueRef: db.collection('cmsPublishQueue').doc(requestId),
-        actor, now, log, res, publish: publishSnapshot,
+        actor, now, log, res, publish: publishSnapshot, expectedVersion,
       });
     }
     const replace = (queueRef, body) => runMediaReplacement({
@@ -164,6 +184,7 @@ function createCmsPublishHandler({
 
     let queueRef;
     let request;
+    let expectedVersions;
     let openingOnly = false;
     if (queueId !== undefined) {
       // Resume: the stored request is authoritative; progress on the row
@@ -192,6 +213,7 @@ function createCmsPublishHandler({
         );
       }
       request = row.request;
+      expectedVersions = row.expectedVersions;
       if (!request || typeof request !== 'object') {
         return badRequest(res, 'That queue row has no stored request to resume.');
       }
@@ -201,6 +223,15 @@ function createCmsPublishHandler({
         const current = await tx.get(queueRef);
         const { status, progress } = current.data() || {};
         if (status === 'running' || status === 'done') return { status };
+        if (expectedVersions !== undefined) {
+          const remaining = Object.fromEntries(Object.entries(request)
+            .map(([collection, ids]) => [collection, remainingPublishIds(ids, progress?.[collection])])
+            .filter(([, ids]) => ids.length));
+          const versions = Object.fromEntries(Object.entries(remaining).map(([collection, ids]) => [
+            collection, Object.fromEntries(ids.map((id) => [id, expectedVersions[collection][id]])),
+          ]));
+          if (!await draftVersionsMatch(db, remaining, versions)) return { status: 'stale' };
+        }
         const cmsSchedule = remainingPublishIds(request.cmsSchedule ?? [], progress?.cmsSchedule);
         const refusal = await structuralRefusal({ db }, { cmsSchedule });
         if (refusal) return { status: 'refused', refusal };
@@ -213,6 +244,10 @@ function createCmsPublishHandler({
         return { status: 'claimed' };
       });
       if (claim.status === 'refused') return badRequest(res, claim.refusal);
+      if (claim.status === 'stale') {
+        const conflict = new ConfirmationConflict();
+        return sendError(res, conflict.status, conflict.code, conflict.message);
+      }
       if (claim.status === 'done') {
         const latest = (await queueRef.get()).data() || {};
         return res.status(200).json({ queueId: queueRef.id, status: 'done', results: latest.progress || {} });
@@ -224,6 +259,11 @@ function createCmsPublishHandler({
       const resolved = await resolveRequest({ db }, req.body);
       if (!resolved.ok) return badRequest(res, resolved.message);
       request = resolved.request;
+      expectedVersions = req.body?.expectedVersions;
+      if (expectedVersions !== undefined && !await draftVersionsMatch(db, request, expectedVersions)) {
+        const conflict = new ConfirmationConflict();
+        return sendError(res, conflict.status, conflict.code, conflict.message);
+      }
       openingOnly = Object.keys(request).length === 0;
       if (openingOnly) {
         // Nothing dirty: no queue row for a no-op. A team that publishes a
@@ -246,6 +286,7 @@ function createCmsPublishHandler({
         await queueRef.create({
           status: openingOnly ? 'done' : 'running',
           request,
+          ...(expectedVersions === undefined ? {} : { expectedVersions }),
           progress: {},
           plannedChunks: countPlannedChunks(request),
           requestedBy: actor.email,
@@ -262,7 +303,7 @@ function createCmsPublishHandler({
     const results = {};
     try {
       for (const [collection, docIds] of Object.entries(request)) {
-        results[collection] = await publishDocs({ db, collection, docIds, actor, now, queueRef });
+        results[collection] = await publishDocs({ db, collection, docIds, actor, now, queueRef, expectedVersions: expectedVersions?.[collection] });
       }
     } catch (err) {
       log.error('cmsPublish failed part-way', err);
@@ -275,6 +316,12 @@ function createCmsPublishHandler({
         log.error('failed to mark publish queue row failed', markErr);
       }
       await logAdminAction({ db, action: 'cms-publish-failed', docPath: queueRef.path, actor, now, log });
+      if (err instanceof ConfirmationConflict) {
+        return res.status(409).json({
+          error: { code: err.code, message: 'Drafts changed during publishing. Check Recent publishes for completed work, then review the remaining drafts.' },
+          queueId: queueRef.id,
+        });
+      }
       // Committed chunks stay committed and recorded on the row; the
       // client resumes with { queueId }.
       return res.status(500).json({
@@ -305,6 +352,11 @@ function createCmsPublishHandler({
 /**
  * @param {{ db, auth, getConfig }} deps
  */
+function queueRow(snap) {
+  const data = snap.data();
+  return { id: snap.id, ...data, confirmationVersion: confirmationVersion(snap.ref.path, data) };
+}
+
 function createGetPublishQueueHandler({ db, auth, getConfig }) {
   return async function cmsGetPublishQueue(req, res) {
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
@@ -317,7 +369,7 @@ function createGetPublishQueueHandler({ db, auth, getConfig }) {
       }
       const snap = await db.collection('cmsPublishQueue').doc(queueId).get();
       if (!snap.exists) return notFound(res, 'No such publish queue row.');
-      return res.status(200).json({ rows: [{ id: snap.id, ...snap.data() }] });
+      return res.status(200).json({ rows: [queueRow(snap)] });
     }
     const pageSize = Number.isInteger(limit) && limit >= 1 && limit <= QUEUE_LIST_MAX
       ? limit
@@ -327,7 +379,7 @@ function createGetPublishQueueHandler({ db, auth, getConfig }) {
       .orderBy('requestedAt', 'desc')
       .limit(pageSize)
       .get();
-    res.status(200).json({ rows: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    res.status(200).json({ rows: snap.docs.map(queueRow) });
   };
 }
 
@@ -347,18 +399,24 @@ function createUpdatePublishStatusHandler({ db, auth, getConfig, now = Date.now,
       return badRequest(res, `status must be one of: ${SETTABLE_STATUSES.join(', ')}.`);
     }
     const ref = db.collection('cmsPublishQueue').doc(queueId);
-    const snap = await ref.get();
-    if (!snap.exists) return notFound(res, 'No such publish queue row.');
-    await ref.set(
-      {
+    const outcome = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return 'missing';
+      if (!matchesConfirmation(req.body?.expectedVersion, ref.path, snap.data())) return 'stale';
+      tx.set(ref, {
         status,
         note: typeof note === 'string' ? note.slice(0, 500) : null,
         statusSetBy: actor.email,
         updatedAt: new Date(now()),
         ...(status === 'done' ? { finishedAt: new Date(now()) } : {}),
-      },
-      { merge: true },
-    );
+      }, { merge: true });
+      return 'updated';
+    });
+    if (outcome === 'missing') return notFound(res, 'No such publish queue row.');
+    if (outcome === 'stale') {
+      const conflict = new ConfirmationConflict();
+      return sendError(res, conflict.status, conflict.code, conflict.message);
+    }
     await logAdminAction({ db, action: 'cms-update-publish-status', docPath: ref.path, actor, now, log });
     res.status(200).json({ queueId, status });
   };

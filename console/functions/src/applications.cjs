@@ -22,6 +22,7 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
+const { confirmationVersion } = require('./confirmation.cjs');
 const { requireMemberOrOperator, toIso, toMillis, validOrgId } = require('./access.cjs');
 const { emptyAnswers, withDefaults } = require('./answers.cjs');
 const { RETRY_STATUSES, buildForClient, readBuild } = require('./buildState.cjs');
@@ -55,7 +56,7 @@ async function readApplication(get, db, orgId, appId) {
   const ref = db.collection(COLLECTION).doc(appId);
   const snap = await get(ref);
   if (!snap.exists || snap.data().orgId !== orgId) throw new ConsoleError(404, 'not-found', NOT_FOUND);
-  return { ref, data: snap.data() };
+  return { ref, data: snap.data(), snap };
 }
 
 /** The caller must be a member. An operator reads, but does not change, a client's answers. */
@@ -191,7 +192,7 @@ function newApplicationData({ orgId, organizationName, timezone, uid, at, carrie
 async function getApplication({ db, connectionsAvailable, consoleTestMode, now = Date.now }, { body, user }) {
   const { orgId, appId } = body;
   const access = await requireMemberOrOperator(db, orgId, user);
-  const { ref, data } = await readApplication((r) => r.get(), db, orgId, appId);
+  const { ref, data, snap } = await readApplication((r) => r.get(), db, orgId, appId);
   const ownersNeeded = Math.max(0, LAUNCH_OWNERS - await countOwners(db, orgId));
   const { open } = await readSignupTerms((r) => r.get(), db);
   const route = data.eventMountConsent ? (await eventMountRef(db, ref.id).get()).data() : null;
@@ -199,7 +200,7 @@ async function getApplication({ db, connectionsAvailable, consoleTestMode, now =
   const publicBase = route?.appliedPublicBase || route?.standalonePublicBase;
   return {
     body: {
-      application: applicationForClient(ref.id, data, {
+      application: { ...applicationForClient(ref.id, data, {
         ...access,
         ownersNeeded,
         signups: { open },
@@ -207,7 +208,7 @@ async function getApplication({ db, connectionsAvailable, consoleTestMode, now =
         build: buildForClient(data, record, now(), { testMode: consoleTestMode }),
         publicBase,
         testMode: consoleTestMode,
-      }),
+      }), confirmationVersion: confirmationVersion(snap) },
     },
   };
 }

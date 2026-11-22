@@ -109,8 +109,8 @@ function mappingError(mapping) {
  * The track and place checks in validateSessionStructure read the config
  * again inside each write, so a settings change mid-import is still caught.
  */
-async function loadContext({ db }) {
-  const snap = await db.collection('config').doc('event').get();
+async function loadContext({ db, get = (ref) => ref.get() }) {
+  const snap = await get(db.collection('config').doc('event'));
   const event = snap.exists ? snap.data() : {};
   const list = (value) => (Array.isArray(value) ? value.filter((entry) => entry && typeof entry === 'object') : []);
   return {
@@ -334,19 +334,22 @@ async function allocateId({ db, tx, input, claimed }) {
 }
 
 /** The merged record through the editor's own seams, in the row's transaction. */
-async function checkSession({ db, tx, docId, fields }) {
+async function checkSession({ db, tx, validationTx, docId, fields }) {
   let checked = fields;
   if (Object.prototype.hasOwnProperty.call(checked, 'speakerIds')) {
     const references = await validateSpeakerReferences({ db, tx, value: checked.speakerIds });
     if (!references.ok) return { ok: false, reasons: references.errors };
     checked = { ...checked, speakerIds: references.speakerIds };
   }
-  const structure = await validateSessionStructure({ db, tx, docId, fields: checked });
+  // Earlier rows can write drafts for this session's parent or children.
+  // Bind the row to the validation outcome while checking the relationships
+  // against current data in the same transaction as the write.
+  const structure = await validateSessionStructure({ db, tx: validationTx, docId, fields: checked });
   if (!structure.ok) return { ok: false, reasons: structure.message.split('; ') };
   return { ok: true, fields: normalizeSessionRecordingUrl(checked) };
 }
 
-async function planRow({ db, tx, input, key, claimed, actor, now }) {
+async function planRow({ db, tx, validationTx = tx, input, key, claimed, actor, now }) {
   const incoming = { ...input.values };
   if (input.speakerTokens) {
     const speakers = await resolveSpeakers({ db, tx, tokens: input.speakerTokens });
@@ -362,10 +365,10 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
     if (!allocated.ok) return { verdict: 'error', label: incoming.title ?? null, reasons: [allocated.reason] };
     const docId = allocated.id;
     if (allocated.matched) {
-      return planUpdate({ db, tx, incoming, key: { docId, values: null }, actor, now, matched: true });
+      return planUpdate({ db, tx, validationTx, incoming, key: { docId, values: null }, actor, now, matched: true });
     }
     const fields = { speakerIds: [], ...incoming };
-    const checked = await checkSession({ db, tx, docId, fields });
+    const checked = await checkSession({ db, tx, validationTx, docId, fields });
     if (!checked.ok) return { verdict: 'error', docId, label: incoming.title ?? null, reasons: checked.reasons };
     return {
       verdict: 'create',
@@ -382,10 +385,10 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
       },
     };
   }
-  return planUpdate({ db, tx, incoming, key, actor, now });
+  return planUpdate({ db, tx, validationTx, incoming, key, actor, now });
 }
 
-async function planUpdate({ db, tx, incoming, key, actor, now, matched = false }) {
+async function planUpdate({ db, tx, validationTx, incoming, key, actor, now, matched = false }) {
   const docId = key.docId;
   const [draftSnap, liveSnap] = await Promise.all([
     tx.get(db.collection(SESSIONS_DRAFTS).doc(docId)),
@@ -406,7 +409,7 @@ async function planUpdate({ db, tx, incoming, key, actor, now, matched = false }
     return { verdict: matched ? 'update' : 'unchanged', matched, docId, label, notes, values: incoming, claims };
   }
 
-  const checked = await checkSession({ db, tx, docId, fields: { ...current, ...patch } });
+  const checked = await checkSession({ db, tx, validationTx, docId, fields: { ...current, ...patch } });
   if (!checked.ok) return { verdict: 'error', docId, label, reasons: checked.reasons };
   return {
     verdict: 'update',

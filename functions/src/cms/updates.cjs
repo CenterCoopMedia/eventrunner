@@ -1,5 +1,7 @@
 'use strict';
 
+const { ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * News/announcement post admin endpoints (spec §4.1 cmsUpdates, §8.4,
  * issue #13).
@@ -236,7 +238,7 @@ function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now,
       // Tombstone and both deletes commit together. A tombstone that lands
       // first can be followed by a save that already read the old docs.
       deleted = await db.runTransaction(async (tx) => {
-        const result = await store.deleteBoth({ db, tx, collection: UPDATES_COLLECTION, docId: id });
+        const result = await store.deleteBoth({ db, tx, collection: UPDATES_COLLECTION, docId: id, expectedVersion: req.body.expectedVersion });
         tx.set(db.collection(UPDATES_DELETED).doc(id), {
           deletedAt: new Date(now()),
           deletedBy: gate.uid,
@@ -244,6 +246,7 @@ function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now,
         return result;
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('cmsDeleteUpdate failed', err);
       return internal(res, 'The update could not be deleted. Keep this page open and contact support for help.');
     }

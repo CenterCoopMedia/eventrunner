@@ -9,6 +9,7 @@ const {
   EVENT_CONFIG,
   FORBIDDEN_COLLECTIONS,
   makeDb,
+  callImport,
   previewAndCommit,
   writtenCollections,
 } = require('./importTestKit.cjs');
@@ -160,16 +161,70 @@ test('a new session is a hidden draft; no live document is written', async () =>
 
 test('speakers link by speaker external ID or by slug; an unknown one is a row error', async () => {
   const db = makeDb(speakerSeed());
-  const { commit } = await previewAndCommit(db, body([
+  const input = body([
     { ...ROW, Speakers: 'SPK-1; grace-hopper' },
     { ...ROW, Ref: 'SES-2', Title: 'Second', Speakers: 'SPK-404' },
-  ]));
+  ]);
+  const preview = await callImport(db, input);
+  assert.equal(preview.body.rows[0].verdict, 'create');
+  const commit = await callImport(db, {
+    ...input, dryRun: false, confirmDigest: preview.body.digest, expectedPlan: preview.body.plan,
+  });
+  assert.equal(commit.statusCode, 200);
   assert.equal(commit.body.rows[0].verdict, 'create');
   assert.deepEqual(db.read('cmsSchedule_drafts', 'verification-at-speed').speakerIds, ['spk-a', 'spk-b']);
   assert.equal(commit.body.rows[1].verdict, 'error');
   assert.deepEqual(commit.body.rows[1].reasons, [
     'speakers: "SPK-404" matches no speaker external ID or slug. Import the speakers first.',
   ]);
+});
+
+test('a confirmed import can update a parent and child in either row order', async () => {
+  const session = {
+    description: ROW.Abstract, dayId: 'day-1', startTime: '09:30', endTime: '10:15',
+    track: 'A', visible: true, revision: 1,
+  };
+  const seed = {
+    'cmsSchedule/workshop': { ...session, title: 'Workshop' },
+    'cmsSchedule/clinic': { ...session, title: 'Clinic', parentId: 'workshop' },
+  };
+  const parent = { Ref: 'parent', Slug: 'workshop', Title: 'Workshop', Location: 'Main hall' };
+  const child = { Ref: 'child', Slug: 'clinic', Title: 'Clinic', Location: 'Room 1' };
+  const mapping = { externalId: 'Ref', title: 'Title', slug: 'Slug', location: 'Location' };
+
+  for (const rows of [[child, parent], [parent, child]]) {
+    const db = makeDb(seed);
+    const input = body(rows, mapping);
+    const preview = await callImport(db, input);
+    assert.deepEqual(preview.body.rows.map((r) => r.verdict), ['update', 'update']);
+    const commit = await callImport(db, {
+      ...input, dryRun: false, confirmDigest: preview.body.digest, expectedPlan: preview.body.plan,
+    });
+    assert.equal(commit.statusCode, 200);
+    assert.deepEqual(commit.body.rows.map((r) => r.verdict), ['update', 'update']);
+    assert.equal(db.read('cmsSchedule_drafts', 'workshop').location, 'Main hall');
+    assert.equal(db.read('cmsSchedule_drafts', 'clinic').location, 'Room 1');
+    assert.equal(db.read('cmsSchedule_drafts', 'clinic').parentId, 'workshop');
+  }
+
+  const db = makeDb(seed);
+  const input = body([parent], mapping);
+  const preview = await callImport(db, input);
+  const runTransaction = db.runTransaction.bind(db);
+  db.runTransaction = async (tx) => {
+    // Inject the change after preflight and before the parent row's write.
+    if (db.ids('admin_logs').length > 0) {
+      await db.collection('cmsSchedule').doc('clinic').update({ dayId: 'day-2' });
+    }
+    return runTransaction(tx);
+  };
+  const stale = await callImport(db, {
+    ...input, dryRun: false, confirmDigest: preview.body.digest, expectedPlan: preview.body.plan,
+  });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(db.read('cmsSchedule_drafts', 'workshop'), undefined);
+  assert.equal(sessionKey(db, 'parent'), undefined);
 });
 
 test('the shared session validator refuses a bad row, and its message reaches the preview', async () => {

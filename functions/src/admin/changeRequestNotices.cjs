@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Change request notices (issue #330): the acknowledgement a requester gets
  * when their request is stored, and the outcome email they get when staff
@@ -310,7 +312,7 @@ function readRetryRequest(body) {
   if (source.confirmUnknown !== undefined && typeof source.confirmUnknown !== 'boolean') {
     return { ok: false, message: 'confirmUnknown: must be true or false.' };
   }
-  return { ok: true, id: source.id, slot: source.slot, confirmUnknown: source.confirmUnknown === true };
+  return { ok: true, id: source.id, slot: source.slot, confirmUnknown: source.confirmUnknown === true, expectedVersion: source.expectedVersion };
 }
 
 /** Check a stored request against a retry. Returns a refusal or the previous record. */
@@ -359,6 +361,7 @@ function createRetryChangeRequestNoticeHandler({ db, auth, getConfig, sendEmail,
         const settings = readNoticeSettings(settingsSnap.exists ? settingsSnap.data() : null);
         const verdict = evaluateRetry(stored, settings, request, now());
         if (verdict.status) return { refusal: verdict };
+        requireConfirmation(request.expectedVersion, ref.path, stored);
         const at = new Date(now());
         const record = queuedRecord({ id: request.id, slot: request.slot, previous: verdict.previous, mode: 'retry', by: gate.email, at });
         tx.update(ref, { notices: { ...stored.notices, [request.slot]: record } });
@@ -366,6 +369,7 @@ function createRetryChangeRequestNoticeHandler({ db, auth, getConfig, sendEmail,
         return { record, to: stored.email, recipientUid: stored.uid };
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('retryChangeRequestNotice failed', err);
       return internal(res, 'The email could not be queued. Try again.');
     }

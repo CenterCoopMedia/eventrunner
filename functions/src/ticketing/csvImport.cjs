@@ -26,11 +26,12 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { confirmationVersion, requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const {
   internals: { TICKETS, isSafeDocId, TICKET_STATUSES },
 } = require('./index.cjs');
-const { ticketForUpdate, upsertTicket, internals: { normalizeTicket } } = require('./sync.cjs');
+const { ticketForUpdate, upsertTicket, writeTicket, internals: { normalizeTicket } } = require('./sync.cjs');
 const { iso } = require('./stripeCommerce.cjs');
 const { normalizeTicketClassId } = require('shared/ticketAccess');
 
@@ -199,7 +200,7 @@ function mapRow({ row, mapping }) {
  * @param {{ db: object, mapping: Record<string,string>, rows: object[], eventId?: string|null, commitAt?: () => Date }} args
  * @returns {Promise<{ results: object[], summary: Record<string, number> }>}
  */
-async function processImport({ db, mapping, rows, eventId = null, commitAt }) {
+async function processImport({ db, mapping, rows, eventId = null, commitAt, tx, expectedVersion }) {
   const seenAt = new Map();
   const results = [];
   const candidates = [];
@@ -224,15 +225,28 @@ async function processImport({ db, mapping, rows, eventId = null, commitAt }) {
     candidates.push({ index, ticket: normalizeTicket(ticket, PROVIDER_NAME, eventId), unmappedCsvFields });
   });
 
-  for (const { index, ticket, unmappedCsvFields } of candidates) {
+  let previewVersion;
+  let snapshots;
+  if (!commitAt || tx) {
+    const refs = candidates.map(({ ticket }) => db.collection(TICKETS).doc(ticket.externalId));
+    const reader = tx ?? db;
+    snapshots = refs.length ? await reader.getAll(...refs) : [];
+    const state = snapshots.map((snap) => snap.data() ?? null);
+    requireConfirmation(expectedVersion, mapping, rows, state);
+    if (!commitAt) previewVersion = confirmationVersion(mapping, rows, state);
+  }
+
+  for (const [candidateIndex, { index, ticket, unmappedCsvFields }] of candidates.entries()) {
     let verdict;
     let effective;
     if (commitAt) {
-      const saved = await upsertTicket({ db, ticket, now: commitAt, unmappedCsvFields });
+      const saved = tx
+        ? writeTicket({ tx, snap: snapshots[candidateIndex], ticket, at: commitAt(), unmappedCsvFields })
+        : await upsertTicket({ db, ticket, now: commitAt, unmappedCsvFields });
       verdict = saved.action === 'updated' ? 'update' : 'create';
       effective = saved.ticket;
     } else {
-      const snap = await db.collection(TICKETS).doc(ticket.externalId).get();
+      const snap = snapshots[candidateIndex];
       verdict = snap.exists ? 'update' : 'create';
       effective = snap.exists ? ticketForUpdate(snap.data(), ticket, unmappedCsvFields) : ticket;
     }
@@ -256,7 +270,7 @@ async function processImport({ db, mapping, rows, eventId = null, commitAt }) {
   const summary = { create: 0, update: 0, duplicate: 0, invalid: 0 };
   for (const row of results) summary[row.verdict] += 1;
 
-  return { results, summary };
+  return { results, summary, ...(previewVersion === undefined ? {} : { confirmationVersion: previewVersion }) };
 }
 
 /** Shared admin-POST preamble, mirroring speakers/invites.cjs's gateAdminPost. */
@@ -285,8 +299,13 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, eventId = null, 
 
     let result;
     try {
-      result = await processImport({ db, mapping, rows, eventId, commitAt: dryRun ? undefined : () => new Date(now()) });
+      const args = { db, mapping, rows, eventId, commitAt: dryRun ? undefined : () => new Date(now()) };
+      const expectedVersion = req.body.expectedVersion;
+      result = !dryRun && expectedVersion !== undefined
+        ? await db.runTransaction((tx) => processImport({ ...args, tx, expectedVersion }))
+        : await processImport(args);
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error(`ticketingImportCsv ${dryRun ? 'preview' : 'commit'} failed`, err);
       return internal(res, dryRun
         ? 'The import could not be checked. Keep this page open and contact support for help.'
@@ -296,6 +315,7 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, eventId = null, 
     if (dryRun) {
       res.status(200).json({
         ok: true, dryRun: true, total: rows.length, summary: result.summary, rows: result.results,
+        confirmationVersion: result.confirmationVersion,
       });
       return;
     }

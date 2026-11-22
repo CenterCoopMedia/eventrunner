@@ -114,15 +114,21 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
     }
     try {
       const { caption, credit } = verdict.patch;
-      const batch = db.batch();
-      batch.update(ref, { ...verdict.patch, updatedAt: at, updatedBy: actor.email });
-      if (caption !== undefined || credit !== undefined) {
-        batch.set(db.collection('media_captions').doc(assetId), {
-          ...(caption !== undefined ? { caption } : {}),
-          ...(credit !== undefined ? { credit } : {}),
-        }, { merge: true });
-      }
-      await batch.commit();
+      const outcome = await db.runTransaction(async (tx) => {
+        const current = await tx.get(ref);
+        if (!current.exists) return 'missing';
+        if (current.data()?.deleting === true) return 'deleting';
+        tx.update(ref, { ...verdict.patch, updatedAt: at, updatedBy: actor.email });
+        if (caption !== undefined || credit !== undefined) {
+          tx.set(db.collection('media_captions').doc(assetId), {
+            ...(caption !== undefined ? { caption } : {}),
+            ...(credit !== undefined ? { credit } : {}),
+          }, { merge: true });
+        }
+        return 'updated';
+      });
+      if (outcome === 'missing') return notFound(res, 'That asset is not in the media library.');
+      if (outcome === 'deleting') return sendError(res, 409, 'asset-deleting', 'This asset is being deleted. Reload the media library.');
     } catch (err) {
       log.error('mediaUpdateMetadata failed', err);
       return internal(res, 'The asset could not be updated. Keep this page open and contact support for help.');

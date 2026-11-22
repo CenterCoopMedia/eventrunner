@@ -27,12 +27,11 @@ function confirmationPublicBase(env) {
   return publicBase;
 }
 
-async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null, actorUid = null, sendEmail, env = process.env, now = () => new Date() }) {
+async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null, actorUid = null, sendEmail, env = process.env, now = () => new Date(), confirmedOrder }) {
   const policy = await checkDemoWrites({ db });
   throwIfDemoPolicyUnavailable(policy);
   if (!policy.ok) return { sent: 0, alreadySent: false, skipped: 'read-only-demo' };
-  const snap = await db.collection('ticket_orders').doc(orderId).get();
-  const order = snap.exists ? snap.data() : null;
+  const order = confirmedOrder ? confirmedOrder.order : (await db.collection('ticket_orders').doc(orderId).get()).data();
   if (!order || order.provider !== 'stripe' || !isOrderFulfilled(order)) {
     return { sent: 0, alreadySent: false, skipped: 'not-confirmed' };
   }
@@ -41,10 +40,12 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (!scopeMatches(order, stripeScope(env))) {
     return { sent: 0, alreadySent: false, skipped: 'not-confirmed' };
   }
-  const refs = (order.ticketIds || []).slice(0, 20).map((id) => db.collection('tickets').doc(id));
-  const snapshots = await Promise.all(refs.map((ref) => ref.get()));
-  const tickets = snapshots.filter((ticket) => ticket.exists && ticket.data().orderId === orderId && ticket.data().status === 'valid')
-    .map((ticket) => ticket.data());
+  let orderTickets = confirmedOrder?.tickets;
+  if (!orderTickets) {
+    const refs = (order.ticketIds || []).slice(0, 20).map((id) => db.collection('tickets').doc(id));
+    orderTickets = (await Promise.all(refs.map((ref) => ref.get()))).map((snap) => snap.data()).filter(Boolean);
+  }
+  const tickets = orderTickets.filter((ticket) => ticket.orderId === orderId && ticket.status === 'valid');
   if (tickets.length === 0) return { sent: 0, alreadySent: false, skipped: 'no-valid-tickets' };
   const publicBase = confirmationPublicBase(env);
   const config = await getConfig();

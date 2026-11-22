@@ -1,5 +1,7 @@
 'use strict';
 
+const { confirmationVersion, matchesConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Session pitch emails (issue #324): the receipt, the acceptance and the
  * decline.
@@ -141,14 +143,15 @@ function settingsFromSnap(snap) {
  * while the record still holds this attempt, so a late finish cannot
  * overwrite a newer retry.
  */
-async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = console, pitchId, slot, record, pitch, settings }) {
+async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = console, pitchId, slot, record, pitch, settings, prepared }) {
   let outcome;
   try {
     if (typeof sendEmail !== 'function' || typeof getConfig !== 'function') {
       throw new Error('Email sending is not configured.');
     }
-    const config = await getConfig();
-    const rendered = renderNotice({ config, settings, templateId: record.templateId, pitch, feedback: record.feedback });
+    const rendered = prepared ?? renderNotice({
+      config: await getConfig(), settings, templateId: record.templateId, pitch, feedback: record.feedback,
+    });
     if (rendered.usedFallback) {
       log.warn(`${record.templateId}: stored wording failed its token checks; sent the shipped wording`, rendered.overrideErrors);
     }
@@ -251,6 +254,7 @@ function readSendRequest(body) {
     preview: source.preview === true,
     confirmUnknown: source.confirmUnknown === true,
     expectedSettingsRevision: settingsRevision,
+    expectedContent: source.expectedContent,
     feedback,
   };
 }
@@ -321,6 +325,7 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
             subject: rendered.subject,
             text: rendered.text,
             settingsRevision,
+            contentHash: confirmationVersion(ref.path, stored.email, rendered.subject, rendered.text, rendered.html),
             mayHaveBeenSent: target.mayHaveBeenSent,
             otherDecisionSent: target.otherDecisionSent,
           },
@@ -333,6 +338,7 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
 
     let claimed;
     try {
+      const config = request.expectedContent !== undefined ? await getConfig() : null;
       claimed = await db.runTransaction(async (tx) => {
         const [snap, settingsSnap, policy] = await Promise.all([
           tx.get(ref), tx.get(settingsRef(db)), checkDemoWrites({ db, transaction: tx }),
@@ -344,6 +350,13 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
         const { settings, revision: settingsRevision } = settingsFromSnap(settingsSnap);
         if (settingsRevision !== request.expectedSettingsRevision) {
           return { refusal: { status: 409, code: 'settings-changed', message: 'An operator changed the email wording. Preview the email again.' } };
+        }
+        let prepared;
+        if (request.expectedContent !== undefined) {
+          prepared = renderNotice({ config, settings, templateId: target.templateId, pitch: stored, feedback: request.feedback });
+          if (!matchesConfirmation(request.expectedContent, ref.path, stored.email, prepared.subject, prepared.text, prepared.html)) {
+            throw new ConfirmationConflict();
+          }
         }
         const at = new Date(now());
         const record = queuedRecord({
@@ -359,9 +372,10 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
           at,
           details: { templateId: target.templateId, attempt: record.attempt, status: pitchStatusOf(stored.status), reviewRevision: target.revision },
         });
-        return { slot: target.slot, record, pitch: { title: stored.title }, settings };
+        return { slot: target.slot, record, pitch: { title: stored.title }, settings, prepared };
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('sendSessionPitchNotice failed', err);
       return internal(res, 'The email could not be queued. Try again.');
     }
@@ -372,7 +386,7 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
 
     const result = await deliverNotice({
       db, sendEmail, getConfig, now, log, pitchId: request.id, slot: claimed.slot,
-      record: claimed.record, pitch: claimed.pitch, settings: claimed.settings,
+      record: claimed.record, pitch: claimed.pitch, settings: claimed.settings, prepared: claimed.prepared,
     });
     if (result.state === 'uncertain') {
       return sendError(res, 502, 'delivery-unknown', 'We do not know if the email went out. Check the Email log before you send it again. The decision is still saved.');

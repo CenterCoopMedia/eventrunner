@@ -1,5 +1,7 @@
 'use strict';
 
+const { requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
+
 /**
  * Speaker delete / unlink and the users.speakerId ↔ speakers.uid pair
  * (spec §4.3 seams #2 and #3, §9 "Speaker delete / unlink", issue #20).
@@ -108,7 +110,7 @@ async function readReferencingSessions({ tx, db, collection, speakerId }) {
  *                     clearedUid: string|null } |
  *                    { ok: false, status: number, code: string, message: string }>}
  */
-async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Date.now }) {
+async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Date.now, expectedVersion }) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
@@ -126,6 +128,7 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
         throw err;
       }
       const speaker = speakerSnap.data();
+      requireConfirmation(expectedVersion, speakerRef.path, speaker);
 
       if (soft) {
         // The soft delete deliberately does NOT touch sessions: the whole
@@ -351,8 +354,10 @@ function createDeleteSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
         soft: soft === true,
         actor,
         now,
+        expectedVersion: req.body?.expectedVersion,
       });
     } catch (err) {
+      if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('deleteSpeaker failed', err);
       return internal(res, 'The speaker could not be deleted. Keep this page open and contact support for help.');
     }
