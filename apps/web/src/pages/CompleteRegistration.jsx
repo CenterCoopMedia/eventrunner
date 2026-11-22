@@ -23,7 +23,6 @@ import { focusFirstError } from '../components/forms/publicForm.jsx';
 import RegistrationQuestionFields from '../components/registration/RegistrationQuestionFields.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { saveRegistrationAnswers } from '../lib/registrationAnswersApi.js';
-import { newSubmissionKey } from '../lib/submissionKey.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import useLoadingStage from '../lib/useLoadingStage.js';
 import { useRegistrationTargets } from '../lib/useRegistrationTargets.js';
@@ -272,7 +271,7 @@ export default function CompleteRegistration() {
       target, submittedForm: form, submittedStep: stepSlug, next: hrefFor(steps[current + 1]),
       request: {
         user, ticketId: target.ticketId, account: target.account, answers: checked.answers, language,
-        formRevision: readRegistrationForm(form).revision, requestId: newSubmissionKey(),
+        formRevision: readRegistrationForm(form).revision, requestId: crypto.randomUUID(),
         expectedAnswerRevision: record ? (record.answerRevision ?? 0) : null,
       },
     });
