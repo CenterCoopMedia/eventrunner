@@ -182,7 +182,7 @@ async function scanUsage({
 }
 
 function scanReplacementUsage({ db, paths, bucket }) {
-  const collections = USAGE_COLLECTIONS.filter((name) => /^cms(Content|Updates|Organizations)(?:_drafts)?$/.test(name));
+  const collections = USAGE_COLLECTIONS.filter((name) => /^cms(Content|Updates|Organizations|Timeline)(?:_drafts)?$/.test(name));
   return scanUsage({
     db, paths, collections,
     findReferences: (doc, docPath, paths) => replacementReferences(doc, docPath, paths, bucket),

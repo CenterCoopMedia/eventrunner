@@ -6,6 +6,7 @@ const { isMediaLibraryPath, storageObjectPath } = require('shared/venue');
 const { MAX_CAPTION_LENGTH, MAX_CREDIT_LENGTH } = require('shared/imageCaption');
 const { badRequest, internal, notFound, sendError } = require('../core/errors.cjs');
 const { contentFieldsOf, isAlreadyExistsError, isValidDocId, logAdminAction, writeConfigVersion, internals } = require('../cms/store.cjs');
+const { TIMELINE_COLLECTION } = require('../cms/timeline.cjs');
 const { scanReplacementUsage } = require('./usage.cjs');
 const { replaceImageFields } = require('./replacementPlacements.cjs');
 const { internals: { isBrandingAsset, referencedByBranding, BRANDING_REFUSAL } } = require('./upload.cjs');
@@ -102,7 +103,8 @@ async function replaceGroup({ db, queueRef, group, key, plan, bucket, targetExis
 }
 
 function needsDescription({ docPath, field }) {
-  return docPath.startsWith('cmsContent') || docPath.startsWith('cmsUpdates') || field === 'venue.map.image';
+  return docPath.startsWith('cmsContent') || docPath.startsWith('cmsUpdates')
+    || docPath.startsWith(TIMELINE_COLLECTION) || field === 'venue.map.image';
 }
 
 async function prepare({ db, bucket, body, actor, res }) {
