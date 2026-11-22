@@ -6,13 +6,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router';
+import { onSnapshot } from 'firebase/firestore';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
-import ContentContext from '../contexts/ContentContext.jsx';
+import ContentContext, { ContentProvider } from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
 import ToastContext from '../contexts/ToastContext.jsx';
 import Schedule from './Schedule.jsx';
 import { formatSessionTimeRange, zonedDateTime } from '../lib/eventTime.js';
+
+vi.mock('@generated/scheduleData.js', () => ({ default: [], speakers: [] }));
 
 // The aggregate counts (issue #165) are steered per test through this
 // holder; the hook module is replaced wholesale, so no listener attaches.
@@ -126,6 +129,7 @@ function renderSchedule({
   profile = { attendeeAccess: false },
   initialEntries = ['/schedule'],
   historyControls = false,
+  runtimeContent = false,
 } = {}) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
@@ -151,7 +155,9 @@ function renderSchedule({
                   getSectionBlocks: () => [],
                 }}
               >
-                <Schedule />
+                {runtimeContent ? (
+                  <ContentProvider pathname="/schedule"><Schedule /></ContentProvider>
+                ) : <Schedule />}
               </ContentContext.Provider>
             </ToastContext.Provider>
           </ProfileContext.Provider>
@@ -338,6 +344,47 @@ describe('SchedulePage', () => {
   it('shows the loading state while runtime content is loading', () => {
     renderSchedule({ loading: true });
     expect(screen.getByText('Loading the schedule…', { selector: '.loading-status__label' })).toBeInTheDocument();
+  });
+
+  it('offers a retry when the public schedule listener stalls after an empty cache snapshot', () => {
+    vi.useFakeTimers();
+    try {
+      const listeners = [];
+      const cachedEmpty = { docs: [], metadata: { fromCache: true } };
+      const confirmedEmpty = { docs: [], metadata: { fromCache: false } };
+      const emptyHeading = { name: 'The schedule isn’t published yet' };
+      vi.mocked(onSnapshot).withImplementation((target, ...args) => {
+        const stop = vi.fn();
+        if (target.ref?.path === 'cmsSchedule') {
+          const next = args.at(-2);
+          listeners.push({ next, stop, options: args[0] });
+          next(cachedEmpty);
+        }
+        return stop;
+      }, () => {
+        renderSchedule({ runtimeContent: true });
+        expect(listeners[0].options).toEqual({ includeMetadataChanges: true });
+        expect(screen.queryByRole('heading', emptyHeading)).toBeNull();
+        act(() => vi.advanceTimersByTime(60_000));
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        expect(listeners).toHaveLength(2);
+        expect(listeners[0].stop).toHaveBeenCalledOnce();
+        act(() => listeners[0].next(confirmedEmpty));
+        expect(screen.queryByRole('heading', emptyHeading)).toBeNull();
+
+        const session = fixtureSessions[1];
+        act(() => listeners[1].next({
+          docs: [{ id: session.id, data: () => session }], metadata: { fromCache: true },
+        }));
+        expect(onScreen().getByText(session.title)).toBeVisible();
+        act(() => listeners[1].next(cachedEmpty));
+        expect(onScreen().getByText(session.title)).toBeVisible();
+        act(() => listeners[1].next(confirmedEmpty));
+        expect(screen.getByRole('heading', emptyHeading)).toBeVisible();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

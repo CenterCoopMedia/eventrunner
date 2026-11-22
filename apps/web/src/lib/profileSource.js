@@ -124,10 +124,12 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
     );
     const publicDirectory = query(collection(db, USERS_PUBLIC), where('profileVisibility', '==', 'public'));
     const emit = (snapshot) => {
-      onNext(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const { docs, metadata } = snapshot;
+      if (docs.length === 0 && metadata?.fromCache) return;
+      onNext(docs.map((d) => ({ id: d.id, ...d.data() })));
     };
 
-    function attach(target, options, onSnapshotNext, onSnapshotError) {
+    function attach(target, onSnapshotNext, onSnapshotError) {
       let active = true;
       const next = (snapshot) => {
         if (active) onSnapshotNext(snapshot);
@@ -137,9 +139,7 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
         active = false;
         onSnapshotError(error);
       };
-      const detach = options
-        ? onSnapshot(target, options, next, fail)
-        : onSnapshot(target, next, fail);
+      const detach = onSnapshot(target, SERVER_CONFIRMATION, next, fail);
       return () => {
         active = false;
         detach();
@@ -148,9 +148,7 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
 
     // The full directory waits for the server (afterServerConfirms).
     const listen = (target, onRefused = null) => subscribeWithRetry(
-      (onError) => onRefused
-        ? attach(target, SERVER_CONFIRMATION, afterServerConfirms(emit), onError)
-        : attach(target, null, emit, onError),
+      (onError) => attach(target, onRefused ? afterServerConfirms(emit) : emit, onError),
       (error) => {
         if (onRefused && error?.code === 'permission-denied') {
           onNext(null);
@@ -169,7 +167,7 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
     return subscribeWithFallback({
       wide: (onRefused) => listen(fullDirectory(), onRefused),
       narrow: () => listen(publicDirectory),
-      probe: (onAllowed, onError) => attach(fullDirectory(limit(1)), SERVER_CONFIRMATION, onAllowed, onError),
+      probe: (onAllowed, onError) => attach(fullDirectory(limit(1)), onAllowed, onError),
     });
   }, onFail);
 }

@@ -12,7 +12,7 @@
 // This is the one seam between ContentProvider and Firebase: tests mock this
 // module instead of the SDK, and the provider stays free of Firestore types.
 import { subscribeToFirebase } from './firebaseLoader.js';
-import { subscribeWithRetry } from './retrySubscription.js';
+import { SERVER_CONFIRMATION, subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
 
 // Static demo build: report local updates and keep other snapshots in charge.
@@ -64,7 +64,8 @@ export function subscribeSpeakersPublic(onNext) {
 
 /**
  * Subscribe to one published cms collection (or its _drafts sibling).
- * Calls onNext(docs) with an array of `{ id, ...data }` on every snapshot.
+ * Calls onNext(docs) with an array of `{ id, ...data }`. An empty public
+ * schedule snapshot needs server confirmation before replacing the overlay.
  * A listener error leaves the committed build-time snapshot (or last-known
  * live values) in charge (fail soft — first paint already rendered from it),
  * then re-attaches a fresh listener after a delay (subscribeWithRetry) so a
@@ -89,17 +90,20 @@ export function subscribeContentCollection(name, readSource, onNext, onConfirmed
     return () => { active = false; };
   }
   return subscribeToFirebase(({ db, collection, onSnapshot, query, where }) => {
+    const publicSchedule = name === 'cmsSchedule' && readSource === 'published';
     const target =
       readSource === 'draft'
         ? collection(db, `${name}_drafts`)
         : query(collection(db, name), where('visible', '==', true));
     const next = (snapshot) => {
-      onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      onConfirmed?.(snapshot.metadata?.fromCache === false);
+      const { docs, metadata } = snapshot;
+      if (publicSchedule && docs.length === 0 && metadata?.fromCache) return;
+      onNext(docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      onConfirmed?.(metadata?.fromCache === false);
     };
     return subscribeWithRetry(
-      (onError) => onConfirmed
-        ? onSnapshot(target, { includeMetadataChanges: true }, next, onError)
+      (onError) => onConfirmed || publicSchedule
+        ? onSnapshot(target, SERVER_CONFIRMATION, next, onError)
         : onSnapshot(target, next, onError),
       (error) => {
         onConfirmed?.(false);

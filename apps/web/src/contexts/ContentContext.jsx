@@ -35,13 +35,9 @@
 //     like every collection above, so an entry published from the admin
 //     appears without a rebuild.
 //
-// `loading` is always false: the snapshot renders synchronously on first
-// paint, and the overlay above is applied fire-and-forget as onSnapshot
-// results arrive — there is never a moment where content is *unknown*, only
-// "snapshot" vs "live" (spec §2.4 fail-soft: no spinner-trap on a
-// rules-denied or slow listener). The field is kept for interface
-// stability with loading-aware consumers (e.g. Schedule's LoadingState
-// branch), which stays defensive dead code by design rather than a bug.
+// `loading` stays false for snapshot-first consumers. The public schedule
+// also exposes whether a live result is pending so an empty build-time
+// snapshot can wait for Firestore before showing an unpublished state.
 import {
   createContext,
   useContext,
@@ -175,7 +171,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
     return () => {
       session.active = false;
       for (const unsubscribe of session.subscriptions.values()) {
-        if (typeof unsubscribe === 'function') unsubscribe();
+        unsubscribe();
       }
     };
   }, [readSource]);
@@ -288,6 +284,8 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       pages,
       updates,
       scheduleData,
+      schedulePending: !IS_DEMO && readSource === 'published' && overlay.cmsSchedule == null,
+      retrySchedule: () => sessionRef.current?.retrySchedule?.(),
       speakers,
       organizationsData,
       timeline,
@@ -316,22 +314,34 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
 
   useEffect(() => {
     const session = sessionRef.current;
-    for (const name of neededCollections) requestedRef.current.add(name);
-    // A source switch rebinds every stream already needed in this session.
-    for (const name of requestedRef.current) {
-      if (session.subscriptions.has(name)) continue;
+    function attach(name) {
+      let active = true;
       const key = name === 'speakers_public' ? 'speakers' : name;
       const onNext = (docs) => {
-        if (session.active) setOverlay((prev) => ({ ...prev, [key]: docs }));
+        if (active && session.active) setOverlay((prev) => ({ ...prev, [key]: docs }));
       };
       const onConfirmed = name === 'cmsPages' && readSource === 'published'
-        ? (confirmed) => { if (session.active) setPublicPagesConfirmed(confirmed); }
+        ? (confirmed) => { if (active && session.active) setPublicPagesConfirmed(confirmed); }
         : undefined;
       const unsubscribe = name === 'speakers_public'
         ? subscribeSpeakersPublic(onNext)
         : subscribeContentCollection(name, readSource, onNext, onConfirmed);
-      session.subscriptions.set(name, unsubscribe);
+      session.subscriptions.set(name, () => {
+        active = false;
+        unsubscribe?.();
+      });
     }
+    for (const name of neededCollections) requestedRef.current.add(name);
+    // A source switch rebinds every stream already needed in this session.
+    for (const name of requestedRef.current) {
+      if (!session.subscriptions.has(name)) attach(name);
+    }
+    session.retrySchedule = () => {
+      const unsubscribe = session.subscriptions.get('cmsSchedule');
+      if (!session.active || !unsubscribe) return;
+      unsubscribe();
+      attach('cmsSchedule');
+    };
     // Route changes only add streams. The source lifecycle owns cleanup.
   }, [readSource, neededCollections]);
 
