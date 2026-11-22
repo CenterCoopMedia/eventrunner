@@ -9,9 +9,9 @@ const { spawnSync } = require('node:child_process');
 const { summarize } = require('./lighthouse-report.cjs');
 
 // Field names follow the recorded Lighthouse 13.6 reports. The independent
-// arithmetic example is median(300, 100, 200) = 200 for each route.
+// arithmetic example is median(300, 100, 500, 150, 200) = 200 for each route.
 function reports() {
-  return ['/', '/#/schedule', '/#/speakers'].flatMap((route) => [300, 100, 200].map((value) => ({
+  return ['/', '/#/schedule', '/#/speakers'].flatMap((route) => [300, 100, 500, 150, 200].map((value) => ({
     requestedUrl: `http://localhost:1234${route}`,
     finalUrl: 'http://localhost:1234/',
     finalDisplayedUrl: `http://localhost:1234${route}`,
@@ -26,12 +26,12 @@ function reports() {
 
 test('groups hash routes separately and takes each metric median', () => {
   assert.deepEqual(summarize(reports()), ['/', '/#/schedule', '/#/speakers'].map((route) => ({
-    route, runs: 3, lcp: 200, tbt: 20, cls: 0.02,
+    route, runs: 5, lcp: 200, tbt: 20, cls: 0.02,
   })));
 });
 
 test('rejects an incomplete collection rather than publishing a partial median', () => {
-  assert.throws(() => summarize(reports().slice(1)), /Expected 3 runs; received 2/);
+  assert.throws(() => summarize(reports().slice(1)), /Expected 5 runs; received 4/);
 });
 
 test('rejects a runtime failure even when a report has numeric audit values', () => {
@@ -42,10 +42,10 @@ test('rejects a runtime failure even when a report has numeric audit values', ()
 
 test('rejects the wrong route or device mode', () => {
   const runs = reports();
-  runs[3].finalDisplayedUrl = 'http://localhost:1234/';
+  runs[5].finalDisplayedUrl = 'http://localhost:1234/';
   assert.throws(() => summarize(runs), /ended on another route/);
-  runs[3].finalDisplayedUrl = runs[3].requestedUrl;
-  runs[3].configSettings.formFactor = 'desktop';
+  runs[5].finalDisplayedUrl = runs[5].requestedUrl;
+  runs[5].configSettings.formFactor = 'desktop';
   assert.throws(() => summarize(runs), /Expected a mobile report/);
 });
 
@@ -68,7 +68,7 @@ test('writes the JSON and Markdown artifacts and appends the job summary', () =>
     });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(fs.readFileSync(path.join(output, 'summary.json'), 'utf8')).length, 3);
-    assert.match(fs.readFileSync(path.join(output, 'summary.md'), 'utf8'), /\/#\/schedule \| 3 \| 200 \| 20\.0 \| 0\.0200/);
+    assert.match(fs.readFileSync(path.join(output, 'summary.md'), 'utf8'), /\/#\/schedule \| 5 \| 200 \| 20\.0 \| 0\.0200/);
     assert.match(fs.readFileSync(jobSummary, 'utf8'), /^Existing job summary\n## Lighthouse mobile demo/);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });

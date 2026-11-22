@@ -1,6 +1,6 @@
 # Lighthouse lab checks
 
-The Lighthouse workflow measures the static demo with mobile settings. It runs three times each on Home, Schedule and Speakers. Each metric uses its own median. Hash routes stay separate in the reports.
+The Lighthouse workflow measures the static demo with simulated mobile throttling. It runs five times each on Home, Schedule and Speakers. Each metric uses its own median. Five readings keep up to two transient spikes from controlling the median, as observed on an unchanged Home build in [#1389](https://github.com/CenterCoopMedia/eventrunner/issues/1389). Hash routes stay separate in the reports.
 
 The workflow runs weekly on Monday at 09:17 UTC, on manual dispatch, on every pull request, and on main pushes that change the web app, shared package, tokens or demo build inputs. On a pull request the job always reports, so it can be a required check. It measures only when those inputs changed; otherwise it passes after the input selection step. Web admin source, web/shared tests and web/shared Markdown are not inputs, so a change confined to `docs/` or `apps/web/src/admin/` does not measure. Superseded runs are cancelled. The workflow has read-only repository access and does not deploy.
 
@@ -19,9 +19,9 @@ node scripts/ci/lighthouse-report.cjs
 npm exec --yes --ignore-scripts --package=@lhci/cli@0.16.1 -- lhci assert --config=scripts/ci/lighthouserc.cjs
 ```
 
-The demo build and reports stay in ignored directories. LHCI starts and stops its temporary static server. It serves compressed assets and selects the local port. The report command requires three valid mobile reports for each configured route; a missing run, failed load, wrong route or missing metric fails the command.
+The demo build and reports stay in ignored directories. LHCI starts and stops its temporary static server. It serves compressed assets and selects the local port. The report command requires five valid mobile reports for each configured route. A missing run, failed load, wrong route or missing metric fails the command.
 
-The assertion command passes on main. Hosted run [44666226082](https://github.com/CenterCoopMedia/eventrunner/actions/runs/44666226082) on Nov. 20, 2026 (main `5d286454`) recorded these medians with the limits below unchanged:
+Hosted run [44666226082](https://github.com/CenterCoopMedia/eventrunner/actions/runs/44666226082) on Nov. 20, 2026 (main `5d286454`) recorded these passing medians before the sample size increased.
 
 | Route | Runs | Median LCP | Median TBT | Median CLS |
 | --- | ---: | ---: | ---: | ---: |
@@ -43,11 +43,11 @@ The [recorded baseline](lighthouse-baseline.json) contains all three values for 
 | Schedule | 3 | 5362 ms | 1787.5 ms | 0.0768 |
 | Speakers | 3 | 4511 ms | 567.0 ms | 0.0010 |
 
-The focused collection took about 126 seconds, including the demo build. The build took 5.9 seconds; individual Lighthouse recorded totals were 7.7–8.8 seconds. Hosted runtime can differ. The workflow uses a 15-minute job limit and one browser stream.
+The baseline's three-run collection took about 126 seconds including the demo build. The build took 5.9 seconds and individual Lighthouse runs took 7.7–8.8 seconds. Hosted runtime can differ. The workflow uses a 15-minute job limit and one browser stream.
 
 ## Read the reports
 
-The job summary contains the median table. The `lighthouse-<run>-<attempt>` workflow artifact keeps all nine HTML/JSON reports, assertion results and the generated Markdown/JSON summaries for 14 days, including failed runs. There is no LHCI server, public upload target or third-party dashboard. Partial failed collections remain available as raw reports, while the summary command rejects an incomplete collection.
+The job summary contains the median table. The `lighthouse-<run>-<attempt>` workflow artifact keeps all 15 HTML/JSON report pairs, assertion results and the generated Markdown/JSON summaries for 14 days, including failed runs. There is no LHCI server, public upload target or third-party dashboard. Partial failed collections remain available as raw reports, while the summary command rejects an incomplete collection.
 
 For a regression, open the artifact's HTML report and inspect the LCP element, network requests and long tasks. Compare the same route and mobile settings. Keep real failed results; do not regenerate a baseline or raise an assertion to hide a regression.
 

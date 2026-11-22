@@ -5,7 +5,8 @@ module.exports = {
     collect: {
       staticDistDir: '.lighthouse-site',
       url: ['http://localhost/', 'http://localhost/#/schedule', 'http://localhost/#/speakers'],
-      numberOfRuns: 3,
+      // The first two samples have spiked on unchanged hosted builds (#1389).
+      numberOfRuns: 5,
       settings: {
         onlyCategories: ['performance'],
         formFactor: 'mobile',
