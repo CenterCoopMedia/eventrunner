@@ -116,7 +116,7 @@ export const rowMetaClass = 'font-admin-data text-admin-xs text-admin-ink-data';
 /** One list row's inner padding, so every galley in the room keeps one rhythm. */
 export const rowClass = 'flex flex-wrap items-center justify-between gap-sm px-md py-sm';
 
-/** A labelled text-ish input. `error` is the server's message, verbatim. */
+/** A labelled input. Help can provide tooltip text and a value-specific warning. */
 export function TextField({
   label,
   value,
@@ -134,14 +134,16 @@ export function TextField({
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const warningId = `${id}-warning`;
-  const describedBy = [hint ? hintId : null, warning ? warningId : null, error ? errorId : null, help && help !== hint ? `${id}-help` : null]
+  const helpText = help?.text ?? help;
+  const fieldWarning = warning || (help?.warningForValue?.(value) ?? warning);
+  const describedBy = [hint ? hintId : null, fieldWarning ? warningId : null, error ? errorId : null, helpText && helpText !== hint ? `${id}-help` : null]
     .filter(Boolean)
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
       <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label><HelpTooltip label={label} id={`${id}-help`} descriptionId={help === hint ? hintId : undefined}>{help}</HelpTooltip></div>
+        </label><HelpTooltip label={label} id={`${id}-help`} descriptionId={helpText === hint ? hintId : undefined}>{helpText}</HelpTooltip></div>
       {hint ? (
         <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
@@ -163,13 +165,13 @@ export function TextField({
           region that is on the page before it: a region added together with
           its text is not announced. A caller that may warn passes a string,
           empty while there is nothing to say; undefined draws no region. */}
-      {warning !== undefined || error ? (
+      {fieldWarning !== undefined || error ? (
         <div className="admin-field__feedback">
-          {warning !== undefined ? (
+          {fieldWarning !== undefined ? (
             <div aria-live="polite">
-              {warning ? (
-                <p id={warningId} className="text-admin-sm font-medium text-admin-state-caution">
-                  {warning}
+              {fieldWarning ? (
+                <p id={warningId} className="wrap-anywhere text-admin-sm font-medium text-admin-state-caution">
+                  {fieldWarning}
                 </p>
               ) : null}
             </div>

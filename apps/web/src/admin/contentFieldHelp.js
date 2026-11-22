@@ -1,6 +1,15 @@
 import { FACT_HINTS, STAT_CONTRACT_HINTS } from './blockTypes.js';
+import { inferredHttpsDestination } from './contentDoc.js';
 import { SPONSOR_PACKAGE_HINTS } from './sponsorPackageHints.js';
 import { DEFAULT_LATEST_UPDATES_COUNT, MAX_LATEST_UPDATES_COUNT } from 'shared/update';
+
+const destinationHelp = {
+  text: 'Enter a web address such as example.org, or a page on this site such as /travel.',
+  warningForValue(value) {
+    const destination = inferredHttpsDestination(value);
+    return destination ? `Saves as ${destination}` : '';
+  },
+};
 
 const FIELD_HINTS = Object.freeze({
   text: { value: 'Write the text attendees should see in this part of the page.' },
@@ -29,7 +38,7 @@ const FIELD_HINTS = Object.freeze({
   },
   cta: {
     label: 'Write the short action phrase shown on the button or link.',
-    url: 'Enter a full web address that starts with https://, or a page on this site such as /travel.',
+    url: destinationHelp,
     external: 'Open this link in a new tab when it leads away from the event site.',
   },
   stat: STAT_CONTRACT_HINTS,
@@ -48,7 +57,7 @@ const FIELD_HINTS = Object.freeze({
   link_group: {
     group: 'Name the group this link belongs under.',
     label: 'Write the text attendees should select to open the link.',
-    url: 'Enter a full web address that starts with https://, or a page on this site such as /travel.',
+    url: destinationHelp,
   },
 });
 

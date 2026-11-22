@@ -65,6 +65,12 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await page.getByRole('radio', { name: 'Button', exact: true }).check();
     await page.getByLabel('Button text', { exact: true }).fill(LABEL);
     const destination = page.getByLabel('Destination', { exact: true });
+    await destination.fill('maps.example.org/directions?q=north');
+    await expect(page.getByText('Saves as https://maps.example.org/directions?q=north', { exact: true })).toBeVisible();
+    await destination.locator('xpath=..').screenshot({
+      path: 'test-results/admin-visual-evidence/block-destination-https.png',
+      animations: 'disabled',
+    });
     await destination.fill('/schedule');
     const warning = page.getByText(WARNING);
     await expect(warning).toBeVisible();

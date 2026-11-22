@@ -65,6 +65,26 @@ describe('valueFieldsOf', () => {
 });
 
 describe('toEditableContent / toContentFields round-trip', () => {
+  it.each([
+    [' Example.ORG/directions.pdf?q=parking#north ', 'https://example.org/directions.pdf?q=parking#north'],
+    ['example.org', 'https://example.org/'],
+    ['/travel#parking', '/travel#parking'],
+    ['#parking', '#parking'],
+    ['mailto:help@example.org', 'mailto:help@example.org'],
+    ['tel:+15550100', 'tel:+15550100'],
+    ['http://example.org', 'http://example.org'],
+    ['https://example.org', 'https://example.org'],
+    ['//example.org/path', '//example.org/path'],
+    ['data:,sample', 'data:,sample'],
+    ['example.org@other.example/path', 'example.org@other.example/path'],
+    ['guide.html#parking', 'guide.html#parking'],
+    ['agenda.PDF?download=1', 'agenda.PDF?download=1'],
+    ['../guide.html', '../guide.html'],
+  ])('serializes a Button destination %s as %s', (url, expected) => {
+    const content = toEditableContent({ blockType: 'cta', url });
+    expect(toContentFields(content).url).toBe(expected);
+  });
+
   it('switches a copied embed to the event venue without retaining the old source', () => {
     const content = toEditableContent({
       blockType: 'map',
