@@ -418,6 +418,18 @@ describe('the Home hero image slot', () => {
 });
 
 describe('content browsing', () => {
+  it('opens the new timeline entry form from Home History', async () => {
+    sources.cmsPages = [{
+      ...HOME_PAGE,
+      sections: [...HOME_PAGE.sections, { id: 'history', label: 'History' }],
+    }];
+    fetch.mockResolvedValue(okResponse());
+    await renderAt('/admin/content/home/history');
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Add a timeline entry' }));
+    expect(await screen.findByRole('heading', { name: 'New entry' })).toBeVisible();
+  });
+
   it('recovers a block once both page revisions confirm it has no section', async () => {
     const sectionStillLive = {
       ...SCHOLARSHIPS_PAGE.sections[0], id: 'still-live', label: 'Still live',

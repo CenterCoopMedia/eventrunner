@@ -66,6 +66,7 @@ test('publish a linked and illustrated timeline on a page other than Home', asyn
     await expect(timelineOption).toHaveAccessibleDescription('Past editions in order, with optional links and images.');
     await timelineOption.check();
     await expect(page.getByRole('main').getByRole('link', { name: 'Timeline', exact: true })).toHaveAttribute('href', '/admin/timeline');
+    await expect(page.getByRole('link', { name: 'Add a timeline entry', exact: true })).toHaveAttribute('href', '/admin/timeline/new/entry');
     await page.getByRole('button', { name: 'Save and publish', exact: true }).click({ timeout: 5_000 });
     await expect(page.getByText('Published.', { exact: true }).first()).toBeVisible();
     const blocks = await db.collection('cmsContent').where('section', '==', section).get();

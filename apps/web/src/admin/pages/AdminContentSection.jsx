@@ -76,6 +76,7 @@ export default function AdminContentSection() {
   const serverBlocks = byStoredOrder(contentRows.filter((row) => row.current?.section === sectionId));
   const homeHeroSection = pageId === 'home' && sectionId === 'hero';
   const homeFooterSection = pageId === 'home' && sectionId === 'footer';
+  const homeHistorySection = pageId === 'home' && sectionId === 'history';
   const hasHeroImage = serverBlocks.some((row) => row.current?.blockType === 'image');
   const draft = useDraftOrder(serverBlocks);
   const blocks = draft.rows;
@@ -281,6 +282,9 @@ export default function AdminContentSection() {
             <Link to="../.." relative="path" className={linkButtonClass}>
               Back to content
             </Link>
+            {homeHistorySection ? (
+              <Link to="/admin/timeline/new/entry" className={secondaryButtonClass}>Add a timeline entry</Link>
+            ) : null}
             {addBlockButton}
           </>
         }
