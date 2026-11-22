@@ -22,8 +22,16 @@ import { snapshotViewport } from './lib/snapshotViewport.js';
 import { publicRoutes } from './routes.jsx';
 import { preloadPublicTools } from './components/Layout.jsx';
 import { ADMIN_SPECIMEN_PATH, loadAdminSpecimenPage } from './pages/specimen/specimenRoute.js';
+import { LIVE_RELOAD_PARAM } from './lib/savedPublicBuild.js';
 
 canonicalizeEventHome();
+if (!IS_DEMO) {
+  const url = new URL(location.href);
+  if (url.searchParams.get(LIVE_RELOAD_PARAM) === '1') {
+    url.searchParams.delete(LIVE_RELOAD_PARAM);
+    history.replaceState(history.state, '', url);
+  }
+}
 
 // Recent warnings and errors ride along with a "Report a problem" report.
 startRecentMessages();

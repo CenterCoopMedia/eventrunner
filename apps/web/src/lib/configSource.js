@@ -7,6 +7,7 @@
 // free of Firestore types.
 import { subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
+import { recordPublicRead, readSavedPublicBuild } from './savedPublicBuild.js';
 
 /**
  * Subscribe to one config/{docId} document. Calls onNext(data) on every
@@ -29,10 +30,13 @@ import { subscribeWithRetry } from './retrySubscription.js';
 export function subscribeConfigDoc(docId, onNext, onStatus) {
   return subscribeToFirebase(({ db, doc, onSnapshot }) => {
     const next = (snapshot) => {
+      const fromCache = snapshot.metadata?.fromCache;
       if (snapshot.exists()) {
-        onNext(snapshot.data());
-        onStatus?.(snapshot.metadata?.fromCache === false ? 'confirmed' : 'cached');
+        if (fromCache !== true || !readSavedPublicBuild()) onNext(snapshot.data());
+        recordPublicRead(`config/${docId}`, fromCache === false ? 'server' : 'cache');
+        onStatus?.(fromCache === false ? 'confirmed' : 'cached');
       } else {
+        recordPublicRead(`config/${docId}`, 'cache');
         onStatus?.('gone');
       }
     };
@@ -43,6 +47,7 @@ export function subscribeConfigDoc(docId, onNext, onStatus) {
           ? onSnapshot(ref, { includeMetadataChanges: true }, next, onError)
           : onSnapshot(ref, next, onError),
       (error) => {
+        recordPublicRead(`config/${docId}`, 'interrupted');
         onStatus?.('gone');
         // Fail soft: the generated snapshot (or last-known overlay) keeps
         // rendering. The SDK has already torn this listener down, so

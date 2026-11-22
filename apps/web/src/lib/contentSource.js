@@ -14,6 +14,7 @@
 import { subscribeToFirebase } from './firebaseLoader.js';
 import { SERVER_CONFIRMATION, subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
+import { recordPublicRead, readSavedPublicBuild } from './savedPublicBuild.js';
 
 // Static demo build: report local updates and keep other snapshots in charge.
 //
@@ -24,7 +25,7 @@ import { IS_DEMO } from './demoMode.js';
 // cache — a successful, empty result that would blank the schedule, the
 // speaker directory, and every CMS block the demo exists to show. Not
 // attaching leaves the snapshot-backed slots null. Updates use local demo
-// data because that collection has no generated snapshot.
+// data from the demo fixture.
 const NO_OVERLAY = () => {};
 
 /**
@@ -45,17 +46,20 @@ const NO_OVERLAY = () => {};
  */
 export function subscribeSpeakersPublic(onNext) {
   if (IS_DEMO) return NO_OVERLAY;
+  const saved = Boolean(readSavedPublicBuild());
   return subscribeToFirebase(({ db, collection, onSnapshot }) => {
+    const next = (snapshot) => {
+      if (saved) recordPublicRead('speakers_public', snapshot.metadata?.fromCache === false ? 'server' : 'cache');
+      if (saved && snapshot.metadata?.fromCache === true) return;
+      onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    };
+    const target = collection(db, 'speakers_public');
     return subscribeWithRetry(
-      (onError) =>
-        onSnapshot(
-          collection(db, 'speakers_public'),
-          (snapshot) => {
-            onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-          },
-          onError,
-        ),
+      (onError) => saved
+        ? onSnapshot(target, { includeMetadataChanges: true }, next, onError)
+        : onSnapshot(target, next, onError),
       (error) => {
+        if (saved) recordPublicRead('speakers_public', 'interrupted');
         console.warn('speakers_public subscription failed; keeping snapshot values and retrying.', error);
       },
     );
@@ -89,6 +93,7 @@ export function subscribeContentCollection(name, readSource, onNext, onConfirmed
     });
     return () => { active = false; };
   }
+  const saved = readSource === 'published' && Boolean(readSavedPublicBuild());
   return subscribeToFirebase(({ db, collection, onSnapshot, query, where }) => {
     const publicSchedule = name === 'cmsSchedule' && readSource === 'published';
     const target =
@@ -96,16 +101,18 @@ export function subscribeContentCollection(name, readSource, onNext, onConfirmed
         ? collection(db, `${name}_drafts`)
         : query(collection(db, name), where('visible', '==', true));
     const next = (snapshot) => {
-      const { docs, metadata } = snapshot;
-      if (publicSchedule && docs.length === 0 && metadata?.fromCache) return;
-      onNext(docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      onConfirmed?.(metadata?.fromCache === false);
+      const fromCache = snapshot.metadata?.fromCache;
+      if (saved) recordPublicRead(name, fromCache === false ? 'server' : 'cache');
+      if (publicSchedule && snapshot.docs.length === 0 && fromCache) return;
+      if (!saved || fromCache !== true) onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      onConfirmed?.(fromCache === false);
     };
     return subscribeWithRetry(
-      (onError) => onConfirmed || publicSchedule
+      (onError) => onConfirmed || saved || publicSchedule
         ? onSnapshot(target, SERVER_CONFIRMATION, next, onError)
         : onSnapshot(target, next, onError),
       (error) => {
+        if (saved) recordPublicRead(name, 'interrupted');
         onConfirmed?.(false);
         // Fail soft: the generated snapshot (or last-known live values) keeps
         // rendering. The SDK has already torn this listener down, so

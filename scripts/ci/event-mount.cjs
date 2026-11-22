@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { buildPlan } = require('../publish-site.cjs');
 const { buildWebManifest } = require('../lib/site-manifest.cjs');
+const { MAX_BYTES, OFFLINE_INPUTS_FILE } = require('../lib/offline-public.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const origin = 'https://events.example.org';
@@ -14,6 +15,7 @@ const origin = 'https://events.example.org';
 function verifyBuild(dist, base, manifest) {
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
   const chunks = JSON.parse(fs.readFileSync(path.join(dist, '.vite/manifest.json'), 'utf8'));
+  const offline = JSON.parse(fs.readFileSync(path.join(dist, OFFLINE_INPUTS_FILE), 'utf8'));
   const entry = chunks['index.html'];
   assert.ok(html.includes(`<link rel="modulepreload" crossorigin href="${base}${entry.file}" data-app-entry>`),
     'entry module preload must use the asset base');
@@ -41,6 +43,23 @@ function verifyBuild(dist, base, manifest) {
     return code.includes(`./${relative}`) || code.includes(`${base}${lazy.file}`);
   }), 'schedule import must resolve within the built event');
 
+  assert.equal(offline.base, base);
+  assert.ok(offline.routes.includes('/') && offline.routes.includes('/schedule'));
+  assert.ok(offline.files.includes(lazy.file), 'offline set must contain the schedule group');
+  for (const source of ['src/pages/MySchedule.jsx', 'src/pages/UpdateDetail.jsx', 'src/components/SavedPublicNotice.jsx']) {
+    assert.ok(offline.files.includes(chunks[source]?.file), `offline set must contain ${source}`);
+  }
+  const sdk = Object.values(chunks).find(({ file }) => /^assets\/firebase-sdk-/.test(file));
+  assert.ok(sdk && offline.files.includes(sdk.file), 'offline My schedule needs the shared Firebase runtime');
+  for (const source of ['src/admin/AdminApp.jsx', 'src/pages/Tickets.jsx', 'src/pages/SharedSchedule.jsx']) {
+    assert.ok(!offline.files.includes(chunks[source]?.file), `offline set must exclude ${source}`);
+  }
+  const offlineBytes = offline.files.reduce((total, file) => {
+    const served = file === 'app-shell.html' ? 'index.html' : file;
+    return total + fs.statSync(path.join(dist, served)).size;
+  }, 0);
+  assert.ok(offlineBytes <= MAX_BYTES, `public copy has ${offlineBytes} decoded bytes at ${base}`);
+
   const manifestUrl = `${origin}${base}manifest.webmanifest`;
   for (const field of ['scope', 'start_url']) {
     assert.equal(new URL(manifest[field], manifestUrl).href, `${origin}${base}`);
@@ -52,7 +71,7 @@ function verifyBuild(dist, base, manifest) {
     assert.ok(icon.pathname.startsWith(`${base}branding/`));
     assert.ok(fs.existsSync(path.join(dist, icon.pathname.slice(base.length))));
   }
-  console.log(`Verified web entry, branding, lazy schedule and manifest at ${base}`);
+  console.log(`Verified web entry, branding and ${offlineBytes}-byte public offline set at ${base}`);
 }
 
 function build({ command, args, env }, dist) {

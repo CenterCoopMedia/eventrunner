@@ -16,7 +16,7 @@
     "target": "site",
     "public": "apps/web/dist",
     "predeploy": ["node \"$PROJECT_DIR/scripts/prepare-hosting-shell.cjs\" \"$RESOURCE_DIR\""],
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "offline-public-build.json"],
     "rewrites": [
       {
         "source": "/updates/**",
@@ -138,6 +138,14 @@
       },
       {
         "source": "/version.json",
+        "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+      },
+      {
+        "source": "/sw.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+      },
+      {
+        "source": "/offline-policy.json",
         "headers": [{ "key": "Cache-Control", "value": "no-store" }]
       },
       {

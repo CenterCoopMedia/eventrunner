@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { prepareHostingShell } = require('./prepare-hosting-shell.cjs');
+const { OFFLINE_INPUTS_FILE } = require('./lib/offline-public.cjs');
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'firebase.json'), 'utf8'));
 
@@ -83,4 +84,27 @@ test('hashed files stay for a year, and nothing else is immutable', () => {
   assert.deepEqual(cacheRules.filter(([, value]) => value.includes('immutable')).map(([source]) => source), ['/assets/**']);
   assert.ok(cacheRules.some(([source, value]) => source === '/assets/**' && value.includes('max-age=31536000')));
   assert.ok(cacheRules.some(([source]) => source === '/fonts/**'));
+});
+
+test('the public offline worker and kill switch always revalidate from Hosting', () => {
+  for (const source of ['/sw.js', '/offline-policy.json']) {
+    const rule = config.hosting.headers.find((candidate) => candidate.source === source);
+    assert.equal(rule?.headers.find(({ key }) => key === 'Cache-Control')?.value, 'no-store');
+  }
+});
+
+test('Hosting builds the worker and disable endpoint from an artifact without hidden files', (t) => {
+  const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'event-offline-artifact-'));
+  t.after(() => fs.rmSync(dist, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dist, 'index.html'), '<html><head></head><body></body></html>');
+  fs.writeFileSync(path.join(dist, 'offline-public-build.json'), JSON.stringify({
+    project: 'offline-fixture', base: '/', routes: ['/'], generatedAt: null, files: ['app-shell.html'],
+  }));
+  assert.ok(fs.readdirSync(dist).every((file) => !file.startsWith('.')));
+  prepareHostingShell(dist);
+  assert.match(fs.readFileSync(path.join(dist, 'sw.js'), 'utf8'), /^const BUILD = /);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dist, 'offline-policy.json'), 'utf8')), {
+    enabled: false, routes: ['/'],
+  });
+  assert.ok(config.hosting.ignore.includes(OFFLINE_INPUTS_FILE));
 });

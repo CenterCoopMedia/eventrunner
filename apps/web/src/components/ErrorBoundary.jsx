@@ -6,6 +6,7 @@ import { chunkRecoveryFailureMessage, isChunkLoadError, isChunkReloadPending, re
 import { isClientErrorReportingEnabled, reportClientError } from '../lib/errorReporting.js';
 import { primaryActionClass } from './controlClasses.js';
 import { IS_DEMO } from '../lib/demoMode.js';
+import { readSavedPublicBuild, reloadPublicPageFromNetwork } from '../lib/savedPublicBuild.js';
 import './ErrorBoundary.css';
 
 class RenderErrorBoundary extends Component {
@@ -52,6 +53,7 @@ class RenderErrorBoundary extends Component {
     const admin = appearance === 'admin';
     const inline = appearance === 'inline';
     const Heading = inline ? 'strong' : 'h1';
+    const savedChunk = this.state.chunk && readSavedPublicBuild();
     const explanation = this.state.chunk
       ? 'A page file did not load. Check your connection and reload.'
       : description || 'Reload the page to try again.';
@@ -63,8 +65,10 @@ class RenderErrorBoundary extends Component {
         <p className="error-boundary__description">
           {explanation}
         </p>
-        <button type="button" onClick={this.reload} className={`error-boundary__reload ${admin ? '' : primaryActionClass}`}>
-          Reload the page
+        {savedChunk && <a href={import.meta.env.BASE_URL} className={primaryActionClass}>Open saved home</a>}
+        <button type="button" onClick={savedChunk ? reloadPublicPageFromNetwork : this.reload}
+          className={`error-boundary__reload ${admin ? '' : primaryActionClass}`}>
+          {savedChunk ? 'Reload after connecting' : 'Reload the page'}
         </button>
       </div>
     );

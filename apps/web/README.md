@@ -186,6 +186,24 @@ Vite reads from there instead when that env var is set. Never hand-edit the
 committed snapshot from a client deployment. The public historical demo is
 curated in `scripts/lib/demo-event.cjs`; no private client data belongs here.
 
+## Saved public pages
+
+Hosting preparation emits a worker for the event base. Its input list comes
+from the published routes and the web build's public chunks. The worker
+downloads one file at a time and checks every file against the build before
+making the copy available. A failed download leaves the previous copy available.
+
+The deployment emits `offline-policy.json` with `enabled: false` until the
+offline acceptance checks are complete. Serve this file and `sw.js` with
+`Cache-Control: no-store` at the event base, including when disabling an
+installed worker. An offline device applies a disable after it can reach
+the policy again.
+
+The saved notice gives the device save time and the snapshot generation time.
+Public server reads confirm each dataset separately. A ready update applies
+when the reader chooses to reload. Account, admin, registration and ticket
+navigation always use the network. The worker stores only public build assets.
+
 ## Demo mode (`VITE_DEMO_MODE=1`)
 
 `node scripts/build-demo.cjs` (`npm run build:demo`) produces the public

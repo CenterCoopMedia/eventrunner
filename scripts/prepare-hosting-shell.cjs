@@ -2,6 +2,7 @@
 
 const { renameSync, statSync } = require('node:fs');
 const path = require('node:path');
+const { writeOfflinePublic } = require('./lib/offline-public.cjs');
 
 function prepareHostingShell(directory) {
   if (!directory) throw new Error('Hosting resource directory is required.');
@@ -14,6 +15,8 @@ function prepareHostingShell(directory) {
   } catch (error) {
     if (error.code !== 'ENOENT' || !statSync(shell, { throwIfNoEntry: false })?.isFile()) throw error;
   }
+  const bytes = writeOfflinePublic(directory);
+  if (bytes !== undefined) console.log(`Public offline assets: ${bytes} decoded bytes`);
 }
 
 if (require.main === module) prepareHostingShell(process.argv[2]);

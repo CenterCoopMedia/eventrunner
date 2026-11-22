@@ -13,6 +13,7 @@
 // failure is left for ErrorBoundary to show as a retry panel instead.
 
 import { eventStorageKey } from './eventBrowserState.js';
+import { readSavedPublicBuild } from './savedPublicBuild.js';
 
 export const RELOAD_FLAG = eventStorageKey('eventrunner:chunk-reload');
 
@@ -118,7 +119,7 @@ export function chunkRecoveryFailureMessage(error) {
  * @returns {boolean} true when a reload was started
  */
 export function reloadOnce({ storage = safeStorage(), reload } = {}) {
-  if (hasReloaded(storage)) return false;
+  if (readSavedPublicBuild() || hasReloaded(storage)) return false;
   const attempt = currentBuildId() || '1';
   try {
     storage.setItem(RELOAD_FLAG, attempt);

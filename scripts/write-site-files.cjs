@@ -218,6 +218,7 @@ async function readGeneratedSnapshot({ generatedDir, importModule = importGenera
     blocks: Object.values(siteContent ?? {}),
     updates: updatesMod.updatesData,
     snapshotGeneratedAt: updatesMod.snapshotGeneratedAt,
+    comingSoon: eventConfigMod.launch?.comingSoon === true,
   };
 }
 
