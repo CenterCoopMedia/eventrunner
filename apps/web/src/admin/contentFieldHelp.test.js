@@ -7,7 +7,8 @@ describe('content field tooltip coverage', () => {
   it('gives every editable field of every block type nonempty help', () => {
     for (const type of BLOCK_TYPE_IDS) {
       for (const field of valueFieldsOf(type)) {
-        expect(contentFieldHelp(type, field.id), `${type}.${field.id}`).toEqual(expect.stringMatching(/\S/));
+        const help = contentFieldHelp(type, field.id);
+        expect(help?.text ?? help, `${type}.${field.id}`).toEqual(expect.stringMatching(/\S/));
       }
     }
   });

@@ -9,7 +9,7 @@
 import { blockTypeFor, blockTypeLabel } from './blockTypes.js';
 import { blockSearchText } from '../lib/blockSearchText.js';
 import { hasRichTextContent } from 'shared/richText';
-import { googleMapsEmbedUrl } from 'shared/urlSafety';
+import { googleMapsEmbedUrl, safeUrlHref } from 'shared/urlSafety';
 import { DEFAULT_LATEST_UPDATES_COUNT, MAX_LATEST_UPDATES_COUNT, validLatestUpdatesCount } from 'shared/update';
 
 /**
@@ -29,6 +29,18 @@ export const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
 /** Mirror functions/src/cms/blockTypes.cjs gallery limits (pinned by contentDoc.test.js). */
 export const GALLERY_MAX_IMAGES = 24;
 export const GALLERY_MAX_ALT_LENGTH = 500;
+
+const BARE_DOMAIN = /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+([a-z]{2,63}|xn--[a-z\d-]{1,59})(?:[/?#]|$)/i;
+const RELATIVE_FILE_EXTENSION = /^(?:html?|pdf|ics|csv|docx?|xlsx?|pptx?|txt|png|jpe?g|webp|gif|svg)$/i;
+
+/** Return the HTTPS destination the editor will save for a bare domain. */
+export function inferredHttpsDestination(value) {
+  if (typeof value !== 'string') return '';
+  const address = value.trim();
+  const suffix = BARE_DOMAIN.exec(address)?.[1];
+  if (!suffix || RELATIVE_FILE_EXTENSION.test(suffix) || /[\\\p{Cc}]/u.test(address)) return '';
+  return safeUrlHref(`https://${address}`);
+}
 
 /**
  * A block type's EDITABLE value fields — everything the registry declares
@@ -154,6 +166,8 @@ export function toContentFields(content) {
       fields[field.id] = Number.isFinite(n) ? n : raw;
     } else if (field.id === 'captionMode' || field.id === 'captionAlign') {
       fields[field.id] = raw || DELETE_FIELD_SENTINEL;
+    } else if (field.id === 'url' && (content.blockType === 'cta' || content.blockType === 'link_group')) {
+      fields[field.id] = inferredHttpsDestination(raw) || (raw ?? '');
     } else {
       fields[field.id] = raw ?? '';
     }

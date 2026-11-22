@@ -273,6 +273,30 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(urlInput).toHaveValue('https://example.org/resources');
   });
 
+  it.each([
+    ['Button', 'cta', 'Button text'],
+    ['Link', 'link_group', 'Link text'],
+  ])('previews and saves an HTTPS destination for a bare domain in a %s block', async (name, blockType, label) => {
+    pagesLive = [{ ...HOME_PAGE, sections: [{ ...HOME_PAGE.sections[0], id: 'resources', allowedBlocks: [blockType] }] }];
+    await renderAt('/admin/content/home/resources/_new');
+    await chooseBlockType(name);
+    fireEvent.change(screen.getByLabelText(label), { target: { value: 'Get directions' } });
+    if (blockType === 'link_group') fireEvent.change(screen.getByLabelText('Group'), { target: { value: 'Getting here' } });
+
+    const input = screen.getByLabelText('Destination');
+    const address = 'maps.example.org/directions?q=north#parking';
+    fireEvent.change(input, { target: { value: address } });
+    expect(input).toHaveValue(address);
+    const warning = screen.getByText(`Saves as https://${address}`);
+    expect(warning.closest('[aria-live="polite"]')).toBeInTheDocument();
+    expect(input.getAttribute('aria-describedby').split(' ')).toContain(warning.id);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. It is not public until you publish.');
+    const save = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
+    expect(JSON.parse(save[1].body).fields).toMatchObject({ blockType, url: `https://${address}` });
+  });
+
   // Launch rehearsal: "Explore the program → /schedule" saved with the
   // schedule off and no word from the editor (admin-09b-cta-saved.png).
   it('warns when a cta leads to a section that is off, and still saves it', async () => {
