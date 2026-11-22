@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const sharp = require('sharp');
 const {
   MIB, PUBLIC_SCREENSHOT_MIB, SIGNED_IN_SCREENSHOT_MIB, ScreenshotError,
-  freshScreenshotAuth, readScreenshots, renderScreenshots,
+  freshScreenshotAuth, readScreenshots, renderScreenshots, screenshotWireBytes,
 } = require('./screenshots.cjs');
 
 const pixels = (width, height) => sharp({ create: { width, height, channels: 3, background: 'white' } });
@@ -41,6 +41,18 @@ test('refuses oversized and malformed input, spoofed bytes, corrupt images and e
   for (const invalid of [Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), png.subarray(0, 24), tooManyPixels]) {
     await assert.rejects(() => renderScreenshots(read(invalid), sharp, 4_000_000), ScreenshotError);
   }
+});
+
+test('signed-in screenshots allow 5 MiB per image within a 6 MiB submission', () => {
+  const encode = (size) => Buffer.alloc(size).toString('base64');
+  const screenshots = [encode(5 * MIB), encode(MIB - 1), encode(1)];
+  assert.deepEqual(
+    readScreenshots(screenshots, SIGNED_IN_SCREENSHOT_MIB).map(({ bytes }) => bytes.length),
+    [5 * MIB, MIB - 1, 1],
+  );
+  assert.ok(screenshotWireBytes(SIGNED_IN_SCREENSHOT_MIB) >= Buffer.byteLength(JSON.stringify({ screenshots })));
+  assert.throws(() => readScreenshots([encode(5 * MIB + 1)], SIGNED_IN_SCREENSHOT_MIB), /5 MiB each/);
+  assert.throws(() => readScreenshots([screenshots[0], encode(MIB + 1)], SIGNED_IN_SCREENSHOT_MIB), /6 MiB in total/);
 });
 
 test('an image read requires a freshly issued, unrevoked ID token', async () => {
