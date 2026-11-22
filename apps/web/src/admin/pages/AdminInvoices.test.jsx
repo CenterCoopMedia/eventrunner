@@ -272,7 +272,11 @@ describe('the invoice editor', () => {
   });
 
   it('returns to the loaded draft after its source invoice fails to load', async () => {
-    const draft = { ...STORED, duplicatedFrom: { invoiceId: ISSUED.id, number: ISSUED.number } };
+    const draft = {
+      ...STORED,
+      id: 'inv_abcdef0123456789abcd',
+      duplicatedFrom: { invoiceId: ISSUED.id, number: ISSUED.number },
+    };
     answers.get = ({ invoiceId }) => invoiceId === draft.id
       ? response({ invoice: draft })
       : response({ error: { code: 'unavailable', message: 'The invoice is temporarily unavailable.' } }, 503);
