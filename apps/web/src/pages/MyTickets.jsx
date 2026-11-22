@@ -5,6 +5,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import TicketDocuments from '../components/TicketDocuments.jsx';
 import LoadingState from '../components/LoadingState.jsx';
+import { takeMyTicketsRead, useInitialMyTicketsRead } from '../components/MyTicketsRoute.jsx';
 import { secondaryActionClass } from '../components/controlClasses.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
@@ -15,6 +16,7 @@ export default function MyTickets({ routeAttempt }) {
   const { user, loading } = useAuth();
   const { eventConfig } = useEventConfig();
   const demo = isReadOnlyDemo(eventConfig);
+  const initialRead = useInitialMyTicketsRead();
   const [loaded, setLoaded] = useState(null);
   const [failure, setFailure] = useState(null);
   const [refresh, setRefresh] = useState(0);
@@ -31,20 +33,20 @@ export default function MyTickets({ routeAttempt }) {
   }, [routeAttempt, routePending]);
 
   useEffect(() => {
-    if (demo || !user?.emailVerified) return undefined;
-    const controller = new AbortController();
+    if (demo || loading || !user?.emailVerified) return undefined;
+    const { controller, result } = takeMyTicketsRead(initialRead, user);
     requestController.current = controller;
     paging.current = false;
     busyRef.current = true;
     setBusy(true);
     setFailure(null);
-    ticketingRequest('ticketingMyTickets', { user, body: {}, signal: controller.signal }).then((result) => {
-      if (!controller.signal.aborted) setLoaded({ uid: user.uid, tickets: result.tickets, nextCursor: result.nextCursor });
+    result.then((page) => {
+      if (!controller.signal.aborted) setLoaded({ uid: user.uid, tickets: page.tickets, nextCursor: page.nextCursor });
     }).catch((err) => {
       if (!controller.signal.aborted) setFailure({ uid: user.uid, message: err.message });
     }).finally(() => { if (!controller.signal.aborted) { busyRef.current = false; setBusy(false); } });
     return () => requestController.current?.abort();
-  }, [user, demo, refresh]);
+  }, [user, demo, loading, refresh, initialRead]);
 
   async function loadMore(retrying = false) {
     if ((busyRef.current && !retrying) || !user?.emailVerified || loaded?.uid !== user.uid || !loaded.nextCursor) return;
