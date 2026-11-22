@@ -28,6 +28,7 @@ export default function PitchCallSettings({ settings, call, timeZone }) {
   const [deadlineMode, setDeadlineMode] = useState(deadlineModeOf(settings));
   const deadlineModeId = useId();
   const [deadlineProblem, setDeadlineProblem] = useState(null);
+  const [deadlineKey, setDeadlineKey] = useState(0);
   const [showDeadlineError, setShowDeadlineError] = useState(false);
   const [refused, setRefused] = useState(0);
   const [savedElsewhere, setSavedElsewhere] = useState(false);
@@ -43,10 +44,17 @@ export default function PitchCallSettings({ settings, call, timeZone }) {
   const formRef = useRef(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   useEffect(() => { if (refused) focusFirstError(formRef.current); }, [refused]);
-  function load(next) {
+  function load(next, replaceDraft = true) {
     const nextFormUrl = readPitchFormUrl(next.externalFormUrl);
     setBaseline(next); setEnabled(next.enabled === true); setClosesAt(next.closesAt || ''); setDeadlineMode(deadlineModeOf(next));
     setIntake(nextFormUrl ? 'external' : 'native'); setFormUrl(nextFormUrl || ''); setFormUrlError(''); setSavedElsewhere(false);
+    if (!replaceDraft) return;
+    setDeadlineProblem(null);
+    setShowDeadlineError(false);
+    setDeadlineKey((key) => key + 1);
+    setRefused(0);
+    setError(null);
+    setResult('');
   }
   // The panel is not keyed on the saved values: a remount on this panel's own
   // save dropped "Call settings saved." and the focus with it (#476). A
@@ -58,7 +66,8 @@ export default function PitchCallSettings({ settings, call, timeZone }) {
   const formNow = { enabled, closesAt: effectiveClosesAt, externalFormUrl: intake === 'external' ? formUrl.trim() : null };
   useEffect(() => {
     if (sameCallSettings(settings, baseline)) return;
-    if (sameCallSettings(formNow, settings) || sameCallSettings(formNow, baseline)) load(settings);
+    const matchesDraft = sameCallSettings(formNow, settings);
+    if (matchesDraft || sameCallSettings(formNow, baseline)) load(settings, !matchesDraft);
     else { setBaseline(settings); setSavedElsewhere(true); }
   }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps -- runs only when the saved settings change
   async function save(e) {
@@ -96,7 +105,7 @@ export default function PitchCallSettings({ settings, call, timeZone }) {
           <Radio tone="admin" name={`${deadlineModeId}-mode`} value="open" checked={deadlineMode === 'open'} onChange={() => setDeadlineMode('open')} label="Open until I close it" aria-describedby={deadlineMode === 'open' ? `${deadlineModeId}-open-hint` : undefined} />
           {deadlineMode === 'open' ? <p id={`${deadlineModeId}-open-hint`} className={`${fieldHintClass} text-pretty`}>Turn off “Accept session pitches” to close the call.</p> : null}
         </fieldset>
-        {deadlineMode === 'date' ? <EventDateTimeField label="Deadline" value={closesAt} timeZone={timeZone} onChange={(value) => setClosesAt(value || '')} onProblemChange={setDeadlineProblem} required showError={showDeadlineError} summaryPrefix="Intake closes" emptySummary="No deadline is set. Enter one, or choose “Open until I close it”." hint="Intake closes at this date and time." /> : null}
+        {deadlineMode === 'date' ? <EventDateTimeField key={deadlineKey} label="Deadline" value={closesAt} timeZone={timeZone} onChange={(value) => setClosesAt(value || '')} onProblemChange={setDeadlineProblem} required showError={showDeadlineError} summaryPrefix="Intake closes" emptySummary="No deadline is set. Enter one, or choose “Open until I close it”." hint="Intake closes at this date and time." /> : null}
         <SelectField label="Where people pitch" value={intake} onChange={setIntake} options={intakeOptions} hint="With an external form, the site links to it. Use Import pitches to bring the form responses into the queue as CSV." />
         {intake === 'external' ? <TextField name="externalFormUrl" label="External form address" type="url" value={formUrl} onChange={(v) => { setFormUrl(v); setFormUrlError(''); }} required maxLength={2048} error={formUrlError} hint="Use the form’s public https:// share link." /> : null}
       </fieldset>

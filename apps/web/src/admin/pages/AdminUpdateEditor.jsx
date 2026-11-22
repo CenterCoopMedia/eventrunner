@@ -106,6 +106,8 @@ export default function AdminUpdateEditor({ mode }) {
   const row = mode === 'edit' ? findRow(updateId) : null;
 
   const [form, setForm] = useState(blankUpdateForm);
+  // A date can have a part missing even when its control value is empty.
+  const [dateIncomplete, setDateIncomplete] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
@@ -128,6 +130,7 @@ export default function AdminUpdateEditor({ mode }) {
   // from it and saved would replace the unpublished draft with the live
   // values.
   const [adoptedId, setAdoptedId] = useState(null);
+  const awaitingCreatedRow = adoptedId === null && createdId === updateId;
   const errorRef = useRef(null);
   const formRef = useRef(null);
 
@@ -138,9 +141,16 @@ export default function AdminUpdateEditor({ mode }) {
     // A create keeps the text the operator just saved. Filling from the
     // listener would replace it. Adoption still happens, so a later delete
     // closes this form the same way it closes any other loaded update.
-    if (createdId === updateId) return;
+    if (awaitingCreatedRow) return;
     setForm(toUpdateForm(row, timeZone));
-  }, [mode, ready, row, updateId, adoptedId, createdId, timeZone]);
+    setDateIncomplete(false);
+    setAttempted(false);
+    setFocusRequest(0);
+    setError(null);
+    setErrorTitle(undefined);
+    setStatus('');
+    setFeedbackSnapshot(null);
+  }, [mode, ready, row, updateId, adoptedId, awaitingCreatedRow, timeZone]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -152,10 +162,6 @@ export default function AdminUpdateEditor({ mode }) {
     if (focusRequest > 0) focusFirstError(formRef.current);
   }, [focusRequest]);
 
-  // Whether the date control holds a date with a part missing. The input
-  // event keeps it current as the operator types; a save reads the control
-  // itself as well, so a state no event reported cannot slip through.
-  const [dateIncomplete, setDateIncomplete] = useState(false);
   const localErrors = useMemo(() => validateUpdateForm(form, { dateIncomplete }), [form, dateIncomplete]);
   const serverErrors = useMemo(() => {
     const map = new Map();
@@ -250,7 +256,7 @@ export default function AdminUpdateEditor({ mode }) {
     );
   }
 
-  if (mode === 'edit' && adoptedId !== updateId && createdId !== updateId) {
+  if (mode === 'edit' && adoptedId !== updateId && !awaitingCreatedRow) {
     if (ready && !row) {
       return (
         <AdminEmptyState

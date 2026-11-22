@@ -313,6 +313,20 @@ describe('AdminReminderSchedules', () => {
     expect(callMock).toHaveBeenLastCalledWith('reminderSchedules', { action: 'get', schedule: 'speakers' });
   });
 
+  it('clears validation from replaced speaker reminder settings after a reload', async () => {
+    route({ speakers: [state({ state: 'on' }), { refreshError: 'Readback failed.' }, state()] });
+    renderPage();
+    fireEvent.change(await screen.findByLabelText('Reminder 1, days before'), { target: { value: '7' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0]);
+    await screen.findAllByText('Each number of days may appear once.');
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Scheduled speaker reminders' }));
+    await waitFor(() => expect(screen.getByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are off.'));
+    expect(screen.getByLabelText('Reminder 1, days before')).toHaveValue(14);
+    expect(screen.queryAllByText('Each number of days may appear once.')).toHaveLength(0);
+    expect(callsFor('speakers').map(([, { action }]) => action)).toEqual(['get', 'disable', 'get']);
+  });
+
   it('states a server refusal in the result', async () => {
     route({ speakers: [state(), PREVIEW, new Error('The reminder wording changed after the preview. Preview again, then approve.')] });
     renderPage();

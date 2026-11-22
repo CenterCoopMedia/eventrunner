@@ -248,8 +248,6 @@ export default function AdminInvoiceEditor({ mode }) {
         action: 'saveDraft', invoiceId, expectedRevision: revision, invoice: draft,
       });
       applyInvoice(result);
-      setAttempted(false);
-      setIssueConfirm(null);
       const message = 'Draft saved. It has no number until it is issued.';
       setStatus(message);
       // The status line is the record and it announces; the toast repeats
@@ -268,9 +266,9 @@ export default function AdminInvoiceEditor({ mode }) {
   }
 
   async function reload() {
-    setError(null);
-    setErrorTitle(undefined);
-    setLoadedId(null);
+    if (busy) return;
+    setBusy('reload');
+    setStatus('');
     try {
       const result = await call('invoiceAdmin', { action: 'get', invoiceId });
       applyInvoice(result);
@@ -281,7 +279,9 @@ export default function AdminInvoiceEditor({ mode }) {
       // The draft now opens at its own address, as an edit.
       if (mode === 'create') navigate(`${INVOICES_ROOT}/${encodeURIComponent(invoiceId)}`, { replace: true });
     } catch (err) {
-      setError(plannerError(err));
+      setStatus(`${plannerError(err).message} Your edits are still here.`);
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -293,6 +293,13 @@ export default function AdminInvoiceEditor({ mode }) {
     setForm(filled);
     setSaved(formSnapshot(filled));
     setRevision(result.invoice.revision);
+    setAttempted(false);
+    setFocusRequest(0);
+    setRowFocus(null);
+    clearError();
+    setStatus('');
+    setPrefillStatus('');
+    setIssueConfirm(null);
     setCanVoid(result.canVoid === true);
     setCanReopen(result.canReopen === true);
     setCardPayments(result.cardPayments ?? null);
@@ -311,10 +318,11 @@ export default function AdminInvoiceEditor({ mode }) {
       setIssueConfirm({ unsaved: true, nextNumber: null });
       return;
     }
-    setIssueConfirm({ unsaved: false, nextNumber: null });
+    const confirmation = { unsaved: false, nextNumber: null };
+    setIssueConfirm(confirmation);
     try {
       const settings = await call('invoiceAdmin', { action: 'settings' });
-      setIssueConfirm((current) => (current && !current.unsaved ? { ...current, nextNumber: settings.nextNumber } : current));
+      setIssueConfirm((current) => (current === confirmation ? { ...current, nextNumber: settings.nextNumber } : current));
     } catch {
       // The preview is a courtesy; the server assigns the number at issue.
     }
@@ -601,8 +609,8 @@ export default function AdminInvoiceEditor({ mode }) {
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {error?.code === 'conflict' ? (
         <div>
-          <button type="button" className={secondaryButtonClass} onClick={reload}>
-            Reload the saved invoice
+          <button type="button" className={secondaryButtonClass} disabled={busy !== null} onClick={reload}>
+            <BusyLabel busy={busy === 'reload'} pending="Loading the saved invoice…">Reload the saved invoice</BusyLabel>
           </button>
         </div>
       ) : null}

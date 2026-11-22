@@ -172,6 +172,28 @@ describe('AdminSessionPitches deadline', () => {
     expect(screen.getByLabelText('Accept session pitches')).not.toBeChecked();
   });
 
+  it('clears errors from discarded call settings when loading the saved settings', async () => {
+    call.mockRejectedValueOnce(new Error('The session pitch call could not be saved.'));
+    open();
+    fireEvent.change(dateField(), { target: { value: '2027-01-20' } });
+    fireEvent.click(saveButton());
+    await screen.findByText('The session pitch call could not be saved.');
+
+    fireEvent.change(timeField(), { target: { value: '' } });
+    fireEvent.click(saveButton());
+    expect(await screen.findByText('Enter a time.')).toBeInTheDocument();
+    act(() => pushCall({ enabled: false, closesAt: '2027-03-01T17:00:00.000Z', externalFormUrl: null }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Load saved settings' }));
+    expect(screen.queryByText('The session pitch call could not be saved.')).toBeNull();
+    expect(screen.queryByText('Enter a time.')).toBeNull();
+    expect(timeField()).toHaveValue('12:00');
+    fireEvent.click(saveButton());
+    await screen.findByText('Call settings saved.');
+    expect(call).toHaveBeenLastCalledWith('updatePitchCall', {
+      enabled: false, closesAt: '2027-03-01T17:00:00.000Z', externalFormUrl: null,
+    });
+  });
+
   it('reads a saved call with no deadline as "Open until I close it"', () => {
     pitchCall = { enabled: true, closesAt: null, externalFormUrl: null };
     open();
@@ -179,6 +201,16 @@ describe('AdminSessionPitches deadline', () => {
     expect(screen.getByRole('radio', { name: 'At a set date and time' })).not.toBeChecked();
     expect(screen.queryByLabelText('Deadline Date')).toBeNull();
     expect(screen.getByText('Turn off “Accept session pitches” to close the call.')).toBeInTheDocument();
+  });
+
+  it('clears a save error when a newer set of pitch options replaces the clean form', async () => {
+    call.mockRejectedValueOnce(new Error('The pitch options could not be saved.'));
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Save pitch form options' }));
+    await screen.findByText('The pitch options could not be saved.');
+    act(() => pushCall({ ...pitchCall, formOptions: { formats: ['Field demonstration'] } }));
+    expect(await screen.findByText('Field demonstration')).toBeInTheDocument();
+    expect(screen.queryByText('The pitch options could not be saved.')).toBeNull();
   });
 
   it('saves "Open until I close it" as a null deadline without asking for a date', async () => {

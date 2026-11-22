@@ -115,14 +115,26 @@ describe('AdminRegistrationForm', () => {
 
   it('stops a save when someone else saved first, and keeps the edits until the current version is loaded', async () => {
     await renderPage();
+    fireEvent.change(preview().getByLabelText('Organization (required)'), { target: { value: 'Example News' } });
+    fireEvent.click(preview().getByRole('button', { name: 'Check answers' }));
+    expect(preview().getByText('These answers pass. An attendee could continue.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ask: Job title' }));
     await act(async () => { pushForm({ ...SAVED, revision: 3 }); });
     expect(screen.getByText(/Someone saved the registration form after you opened it/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Ask: Job title' })).toBeChecked();
+    expect(preview().getByLabelText('Organization (required)')).toHaveValue('Example News');
     fireEvent.click(screen.getByRole('button', { name: 'Load the current version' }));
-    expect(screen.queryByText(/Someone saved the registration form after you opened it/)).toBeNull();
+    await screen.findByText('Current version loaded.');
     expect(screen.getByRole('checkbox', { name: 'Ask: Job title' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(preview().getByLabelText('Organization (required)')).toHaveValue('');
+    expect(preview().queryByText('These answers pass. An attendee could continue.')).toBeNull();
+    callMock.mockResolvedValue({ revision: 4 });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ask: Job title' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Registration form saved.');
+    expect(callMock).toHaveBeenCalledWith('updateRegistrationForm', expect.objectContaining({ expectedRevision: 3 }));
   });
 
   it('never saves the form when Enter is pressed in a preview answer', async () => {
