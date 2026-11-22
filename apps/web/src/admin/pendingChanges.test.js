@@ -238,6 +238,11 @@ describe('mergeRuns', () => {
 });
 
 describe('summarizeAll', () => {
+  it.each(['kept', 'retry'])('reports an original file with status %s as unfinished', (status) => {
+    const message = 'The original could not be deleted.';
+    expect(summarizeAll({ failed: [], deletion: { status, message } })).toEqual({ ok: false, message });
+  });
+
   it('says so when nothing was waiting', () => {
     expect(summarizeAll({ queueId: null, status: 'done', results: {} })).toEqual({
       ok: true, message: 'Nothing was waiting to be published.',
