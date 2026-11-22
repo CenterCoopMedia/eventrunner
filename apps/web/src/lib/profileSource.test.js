@@ -170,7 +170,9 @@ describe('subscribeDirectory', () => {
         { limit: 1 },
       ]);
       expect(onFail).not.toHaveBeenCalled();
-      listeners[1].next({ docs: publicRows });
+      listeners[1].next({ docs: [], metadata: { fromCache: true } });
+      expect(onNext).toHaveBeenCalledTimes(2);
+      listeners[1].next({ docs: publicRows, metadata: { fromCache: true } });
       expect(onNext).toHaveBeenLastCalledWith([{ id: 'u2', profileVisibility: 'public' }]);
 
       listeners[2].errorCb(denied);
@@ -228,7 +230,7 @@ describe('subscribeDirectory', () => {
 
   it('reports a refused public directory as unavailable', () => {
     let onError;
-    onSnapshotMock.mockImplementation((_target, _next, errorCb) => {
+    onSnapshotMock.mockImplementation((_target, _options, _next, errorCb) => {
       onError = errorCb;
       return vi.fn();
     });

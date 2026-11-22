@@ -115,7 +115,7 @@ function dayClass(isActive) {
 export default function Schedule() {
   const { language, text } = usePublicLanguage();
   const { eventConfig, features, theme } = useEventConfig();
-  const { scheduleData, speakers, loading, getSectionBlocks, getPage } = useContent();
+  const { scheduleData, schedulePending, retrySchedule, speakers, loading, getSectionBlocks, getPage } = useContent();
   const page = getPage?.('schedule');
   const { bookmarkedIds } = useMyBookmarks();
   // The public aggregate counts (issue #165): the figure beside each
@@ -467,9 +467,10 @@ export default function Schedule() {
         </div>
       </header>
 
-      {loading ? (
+      {loading || (schedulePending && !hasAnySession) ? (
         <div className="mt-lg">
-          <LoadingState shape="schedule" label={text('Loading the schedule…', 'Cargando el programa…')} />
+          <LoadingState shape="schedule" label={text('Loading the schedule…', 'Cargando el programa…')}
+            recover onRetry={retrySchedule} />
         </div>
       ) : !hasAnySession || !activeDay ? (
         <div className="mt-lg">

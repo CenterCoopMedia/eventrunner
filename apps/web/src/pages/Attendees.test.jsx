@@ -5,6 +5,7 @@ import { fireEvent } from '@testing-library/react';
 import { act, render, screen, within } from '@testing-library/react';
 import { flushSync } from 'react-dom';
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router';
+import { onSnapshot } from 'firebase/firestore';
 
 let features;
 let badgesConfig;
@@ -87,6 +88,39 @@ describe('Attendees', () => {
   it('asks for the full directory once the viewer has attendee access', () => {
     renderPage();
     expect(subscribeDirectoryMock.mock.calls[0][0]).toEqual({ includeAttendeesOnly: true });
+  });
+
+  it('offers a retry when the public directory listener stalls after an empty cache snapshot', async () => {
+    const { subscribeDirectory } = await vi.importActual('../lib/profileSource.js');
+    profileValue = { ...profileValue, attendeeAccess: false };
+    subscribeDirectoryMock.mockImplementation(subscribeDirectory);
+    vi.useFakeTimers();
+    try {
+      const listeners = [];
+      const emptyHeading = { name: 'No attendee profiles yet' };
+      vi.mocked(onSnapshot).withImplementation((target, ...args) => {
+        const stop = vi.fn();
+        if (target.ref?.path === 'users_public') {
+          const next = args.at(-2);
+          listeners.push({ next, stop, options: args[0] });
+          next({ docs: [], metadata: { fromCache: true } });
+        }
+        return stop;
+      }, () => {
+        renderPage();
+        expect(listeners[0].options).toEqual({ includeMetadataChanges: true });
+        expect(screen.queryByRole('heading', emptyHeading)).toBeNull();
+        act(() => vi.advanceTimersByTime(60_000));
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        expect(listeners).toHaveLength(2);
+        expect(listeners[0].stop).toHaveBeenCalledOnce();
+        expect(screen.queryByRole('heading', emptyHeading)).toBeNull();
+        act(() => listeners[1].next({ docs: [], metadata: { fromCache: false } }));
+        expect(screen.getByRole('heading', emptyHeading)).toBeVisible();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('tells a pending attendee what they are seeing and why', () => {
