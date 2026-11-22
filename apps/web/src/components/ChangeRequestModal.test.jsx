@@ -92,6 +92,22 @@ describe('ChangeRequestModal', () => {
     expect(screen.getByLabelText('Page (optional)')).toHaveAttribute('maxLength', '200');
   });
 
+  it('accepts a 5 MiB screenshot and keeps the selection when an addition exceeds the total', () => {
+    renderModal();
+    const input = screen.getByLabelText('Screenshots (optional)');
+    const image = (name, mib) => new File([new Uint8Array(mib * 1024 * 1024)], name, { type: 'image/png' });
+    const select = (...files) => fireEvent.change(input, { target: { files } });
+
+    expect(input).toHaveAccessibleDescription(/5 MiB each.*6 MiB total/);
+    select(image('page.png', 5), image('detail.png', 1));
+    expect(screen.getByText('2 of 3 screenshots selected.')).toBeInTheDocument();
+
+    select(image('extra.png', 1));
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose screenshots up to 6 MiB in total.');
+    expect(screen.queryByText('extra.png')).toBeNull();
+    expect(screen.getByText('2 of 3 screenshots selected.')).toBeInTheDocument();
+  });
+
   it('marks an empty message on the field, moves focus there, and sends nothing', () => {
     vi.useFakeTimers();
     try {

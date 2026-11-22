@@ -1,11 +1,12 @@
 import { useId, useRef, useState } from 'react';
-import { MAX_SCREENSHOTS, MIB } from './browser.mjs';
+import { MAX_SCREENSHOTS, MIB, screenshotTotalMib } from '../screenshotPolicy.mjs';
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp';
 
 export function useScreenshotFiles(mib) {
   const nextId = useRef(0);
   const [selection, setSelection] = useState({ files: [], error: '' });
+  const totalMib = screenshotTotalMib(mib);
 
   function add(files) {
     const additions = Array.from(files, (file) => ({ id: nextId.current++, file }));
@@ -13,10 +14,14 @@ export function useScreenshotFiles(mib) {
     setSelection(({ files: current }) => {
       const eligible = additions.filter(({ file }) => file.size > 0 && file.size <= mib * MIB);
       const combined = [...current, ...eligible];
+      const files = combined.slice(0, MAX_SCREENSHOTS);
+      if (files.reduce((total, { file }) => total + file.size, 0) > totalMib * MIB) {
+        return { files: current, error: `Choose screenshots up to ${totalMib} MiB in total.` };
+      }
       const error = eligible.length !== additions.length
         ? `Choose images up to ${mib} MiB each. Empty files cannot be attached.`
         : combined.length > MAX_SCREENSHOTS ? 'Choose up to 3 screenshots.' : '';
-      return { files: combined.slice(0, MAX_SCREENSHOTS), error };
+      return { files, error };
     });
   }
 
@@ -31,7 +36,7 @@ export function useScreenshotFiles(mib) {
   }
 
   return {
-    ...selection, mib, add, onPaste,
+    ...selection, mib, totalMib, add, onPaste,
     remove: (id) => setSelection(({ files }) => ({ files: files.filter((entry) => entry.id !== id), error: '' })),
     reset: () => setSelection({ files: [], error: '' }),
   };
@@ -40,7 +45,7 @@ export function useScreenshotFiles(mib) {
 export default function ScreenshotField({ selection, disabled, className, legendClass, inputClass, buttonClass }) {
   const id = useId();
   const input = useRef(null);
-  const { files, error, mib, add, remove } = selection;
+  const { files, error, mib, totalMib, add, remove } = selection;
   return (
     <fieldset className={className} disabled={disabled}
       onDragOver={(event) => {
@@ -55,7 +60,10 @@ export default function ScreenshotField({ selection, disabled, className, legend
       }}
     >
       <legend className={legendClass}><label htmlFor={id}>Screenshots (optional)</label></legend>
-      <p id={`${id}-help`}>Choose, paste, or drop up to 3 PNG, JPEG, or WebP images here. Up to {mib} MiB each.</p>
+      <p id={`${id}-help`}>
+        Choose, paste, or drop up to 3 PNG, JPEG, or WebP images here. Up to {mib} MiB each.
+        {totalMib < mib * MAX_SCREENSHOTS ? ` Up to ${totalMib} MiB total.` : ''}
+      </p>
       <input
         ref={input}
         id={id}

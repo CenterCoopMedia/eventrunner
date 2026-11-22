@@ -1,7 +1,7 @@
 'use strict';
 
 const { createHash } = require('node:crypto');
-const { MAX_SCREENSHOTS, MIB, PUBLIC_SCREENSHOT_MIB, SIGNED_IN_SCREENSHOT_MIB } = require('./screenshotPolicy.mjs');
+const { MAX_SCREENSHOTS, MIB, PUBLIC_SCREENSHOT_MIB, SIGNED_IN_SCREENSHOT_MIB, screenshotTotalMib } = require('./screenshotPolicy.mjs');
 const SCREENSHOT_COLLECTION = 'request_screenshots';
 const SCREENSHOT_TOKEN_AGE_MS = 5 * 60 * 1000;
 const SCREENSHOT_ID_RE = /^[a-z0-9_-]{8,128}$/i;
@@ -20,7 +20,9 @@ function screenshotBodyBytes(value) {
 }
 
 function screenshotWireBytes(mib) {
-  return MAX_SCREENSHOTS * (Math.ceil(mib * MIB / 3) * 4 + 3) + 32;
+  const total = screenshotTotalMib(mib) * MIB;
+  // Each image is padded to its own base64 group and is a JSON string.
+  return Math.ceil(total / 3) * 4 + (MAX_SCREENSHOTS - 1) * 4 + MAX_SCREENSHOTS * 3 + 32;
 }
 
 /** Bound input before decoding and record a stable identity for form retries. */
@@ -30,6 +32,8 @@ function readScreenshots(values, mib) {
     throw new ScreenshotError('Choose up to 3 screenshots.');
   }
   const max = mib * MIB;
+  const totalMib = screenshotTotalMib(mib);
+  let remaining = totalMib * MIB;
   return values.map((value) => {
     if (typeof value !== 'string' || value.length > Math.ceil(max / 3) * 4 ||
         value.length % 4 !== 0 || !BASE64_RE.test(value)) {
@@ -38,6 +42,10 @@ function readScreenshots(values, mib) {
     const bytes = Buffer.from(value, 'base64');
     if (bytes.length > max || bytes.toString('base64') !== value) {
       throw new ScreenshotError(`Choose PNG, JPEG, or WebP images up to ${mib} MiB each.`);
+    }
+    remaining -= bytes.length;
+    if (remaining < 0) {
+      throw new ScreenshotError(`Choose screenshots up to ${totalMib} MiB in total.`);
     }
     return { bytes, digest: createHash('sha256').update(bytes).digest('hex') };
   });
