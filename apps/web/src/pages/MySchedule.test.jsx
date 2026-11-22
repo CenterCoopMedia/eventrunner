@@ -9,10 +9,12 @@ import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
+import { englishLanguage, LanguageContext } from '../contexts/PublicLanguageContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import MySchedule from './MySchedule.jsx';
 import DeferredPage from '../components/DeferredPage.jsx';
 import { getDeviceBookmarks, removeDeviceBookmarks, setDeviceBookmarked } from '../lib/deviceBookmarks.js';
+import * as schedulePdf from '../lib/schedulePdf.js';
 
 const useMyBookmarksMock = vi.fn();
 vi.mock('../hooks/useMyBookmarks.js', () => ({
@@ -118,6 +120,7 @@ function myScheduleElement({
   auth = { user: { uid: 'u1' }, loading: false },
   profile = { attendeeAccess: true },
   eventConfig = fixtureConfig,
+  language = englishLanguage,
   route = <MySchedule />,
   initialEntries,
 } = {}) {
@@ -140,7 +143,7 @@ function myScheduleElement({
                   getBlock: () => null,
                 }}
               >
-                {route}
+                <LanguageContext.Provider value={language}>{route}</LanguageContext.Provider>
               </ContentContext.Provider>
             </ToastProvider>
           </ProfileContext.Provider>
@@ -213,6 +216,31 @@ describe('MySchedule', () => {
   it('waits for bookmarks before allowing a file download', () => {
     renderMySchedule({ bookmarksLoading: true, features: { schedule: true, sessionBookmarks: true, icsExport: true } });
     expect(screen.getByRole('button', { name: 'Download my schedule (.ics)' })).toBeDisabled();
+  });
+
+  it('offers schedule downloads and PDF retry feedback in Spanish', async () => {
+    const download = vi.spyOn(schedulePdf, 'downloadMySchedulePdf')
+      .mockRejectedValueOnce(new Error('The server is unavailable.'));
+    const user = { uid: 'u1' };
+    try {
+      renderMySchedule({
+        auth: { user, loading: false },
+        language: { ...englishLanguage, language: 'es', text: (_en, es) => es },
+        features: { schedule: true, sessionBookmarks: true, schedulePdf: true, icsExport: true },
+        bookmarkedIds: new Set(['fx-early']),
+      });
+      expect(screen.getByRole('link', { name: 'Programa completo' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Descargar mi programa (.ics)' })).toBeEnabled();
+      const pdf = screen.getByRole('button', { name: 'Descargar mi programa (PDF)' });
+      fireEvent.click(pdf);
+      expect(download).toHaveBeenCalledWith(expect.objectContaining({ user, language: 'es' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'No se pudo descargar tu programa en PDF. Vuelve a intentarlo.',
+      );
+      expect(pdf).toBeEnabled();
+    } finally {
+      download.mockRestore();
+    }
   });
 
   it('shows a signed-out reader’s browser saves without private account controls', () => {

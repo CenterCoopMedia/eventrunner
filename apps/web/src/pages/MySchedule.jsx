@@ -185,7 +185,7 @@ export default function MySchedule({ routeAttempt }) {
         </div>
         <div className="flex flex-wrap items-center gap-xs">
           <Link to="/schedule" className={quietActionClass}>
-            Full schedule
+            {text('Full schedule', 'Programa completo')}
           </Link>
           {features.icsExport ? (
             <button
@@ -194,7 +194,7 @@ export default function MySchedule({ routeAttempt }) {
               onClick={() => downloadIcs(icsFileName('my-schedule'), buildIcsCalendar(eventConfig, mySessions))}
               className={quietActionClass}
             >
-              Download my schedule (.ics)
+              {text('Download my schedule (.ics)', 'Descargar mi programa (.ics)')}
             </button>
           ) : null}
           {/* The personal PDF (issue #171): the server reads the caller's
@@ -207,12 +207,12 @@ export default function MySchedule({ routeAttempt }) {
               disabled={pdfState.status === 'loading'}
               className={quietActionClass}
             >
-              Download my schedule (PDF)
+              {text('Download my schedule (PDF)', 'Descargar mi programa (PDF)')}
             </button>
           ) : null}
           {pdfState.status === 'error' ? (
             <p role="alert" className="basis-full font-data text-caption text-danger">
-              {pdfState.message}
+              {text(pdfState.message, 'No se pudo descargar tu programa en PDF. Vuelve a intentarlo.')}
             </p>
           ) : null}
         </div>
