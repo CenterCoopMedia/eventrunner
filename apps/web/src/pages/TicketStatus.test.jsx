@@ -140,6 +140,22 @@ describe('authoritative order status and attendee confirmation', () => {
     await waitFor(() => expect(ticketingRequest).toHaveBeenCalledWith('ticketingCheckout', expect.objectContaining({ user: state.auth.user, body: { orderId: ORDER.orderId, resume: true } })));
     expect(JSON.parse(sessionStorage.getItem('eventrunner.ticket-checkout.owner-a')).orderId).toBe(ORDER.orderId);
   });
+  it('offers a return after a same-tab checkout status read finds no order and storage is empty', async () => {
+    const requestId = 'request-synthetic';
+    ticketingRequest.mockRejectedValue(Object.assign(new Error('Order not found.'), { status: 404 }));
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: '/tickets/status',
+        search: `?requestId=${requestId}`,
+        state: { checkoutRequestId: requestId, checkoutUid: state.auth.user.uid },
+      }]}>
+        <TicketStatus />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('button', { name: 'Return to ticket selection' })).toBeVisible();
+    expect(ticketingRequest.mock.calls.map(([name, { query }]) => [name, query]))
+      .toEqual([['ticketingOrderStatus', { requestId }]]);
+  });
 });
 
 describe('recipient ticket page', () => {

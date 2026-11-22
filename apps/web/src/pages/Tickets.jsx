@@ -692,6 +692,9 @@ export default function Tickets() {
     // A promo checkout spends a code check before looking for a matching
     // order. Use the status read first so recovery never repeats that check.
     const checkOrderOnly = checkoutUnknown && Boolean(requestRef.current?.promoCode);
+    // The status page needs this tab's saved request to offer a way back
+    // to ticket selection when the server has no order for it.
+    const openStatusInNewTab = checkoutUnknown && !checkOrderOnly;
     const showCheckoutBusy = busy && !checkoutStalled;
     return <>
       {!attempt && requestError ? <p ref={errorRef} tabIndex={-1} role="alert" className="text-danger">{requestError}</p> : null}
@@ -710,8 +713,9 @@ export default function Tickets() {
               </button>
             ) : null}
             <Link to={`/tickets/status?${attempt.orderId ? `orderId=${encodeURIComponent(attempt.orderId)}` : `requestId=${encodeURIComponent(attempt.requestId)}`}`}
-              target={checkoutUnknown ? '_blank' : undefined} rel={checkoutUnknown ? 'noopener' : undefined} className={secondaryActionClass}>
-              {checkoutUnknown ? 'Check my order (opens in a new tab)' : 'View order status'}
+              state={checkOrderOnly ? { checkoutRequestId: attempt.requestId, checkoutUid: user.uid } : undefined}
+              target={openStatusInNewTab ? '_blank' : undefined} rel={openStatusInNewTab ? 'noopener' : undefined} className={secondaryActionClass}>
+              {openStatusInNewTab ? 'Check my order (opens in a new tab)' : checkOrderOnly ? 'Check my order' : 'View order status'}
             </Link>
           </div>
         </section>

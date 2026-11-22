@@ -898,7 +898,9 @@ describe('promo codes on the review step', () => {
       act(() => vi.advanceTimersByTime(15_000));
       expect(screen.getByText(/We don’t know whether the promo code applies/)).toBeVisible();
       expect(screen.getByLabelText('Promo code')).toHaveValue('EARLY');
-      expect(screen.getByRole('link', { name: /Check my order/ })).toHaveAttribute('href', '/tickets/status');
+      const orderHelp = screen.getByRole('link', { name: 'How to find an earlier order (opens in a new tab)' });
+      expect(orderHelp).toHaveAttribute('href', '/tickets/status');
+      expect(orderHelp).toHaveAttribute('target', '_blank');
       expect(screen.queryByRole('button', { name: 'Apply code' })).toBeNull();
       fireEvent.keyDown(screen.getByLabelText('Promo code'), { key: 'Enter' });
       fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
@@ -928,7 +930,12 @@ describe('promo codes on the review step', () => {
       act(() => vi.advanceTimersByTime(15_000));
       expect(screen.getByText(/We don’t know whether checkout was completed/)).toBeVisible();
       expect(screen.queryByRole('button', { name: 'Resume existing checkout' })).toBeNull();
-      expect(screen.getByRole('link', { name: /Check my order/ })).toHaveAttribute('href', `/tickets/status?requestId=${checkoutCalls()[0][1].body.requestId}`);
+      const orderPath = `/tickets/status?requestId=${checkoutCalls()[0][1].body.requestId}`;
+      const orderStatus = screen.getByRole('link', { name: 'Check my order' });
+      expect(orderStatus).toHaveAttribute('href', orderPath);
+      expect(orderStatus).not.toHaveAttribute('target');
+      fireEvent.click(orderStatus);
+      expect(screen.getByText(`Location: ${orderPath}`)).toBeVisible();
       expect(checkoutCalls()).toHaveLength(1);
     } finally {
       vi.useRealTimers();

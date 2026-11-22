@@ -256,7 +256,7 @@ export default function CompleteRegistration() {
           && JSON.stringify(checked.answers) === JSON.stringify(attempt.answers)) {
         acceptSaved(attempt, checked.answers);
       } else {
-        setCheckNotice('The saved answers don’t match these entries yet. You can check again.');
+        setCheckNotice('The saved answers don’t match these entries yet. You can check again. If they still differ, contact the organizers before submitting another form.');
       }
     } catch {
       if (checkRef.current === read) setCheckNotice('The saved answers could not be checked. You can check again.');
@@ -336,7 +336,7 @@ export default function CompleteRegistration() {
                 <button type="button" className={secondaryActionClass} onClick={checkSavedAnswers}>Check saved answers</button>
               )}
               {saveUnknown.target.ticketId ? (
-                <Link to="/tickets/status" target="_blank" rel="noopener" className={secondaryActionClass}>Check my order (opens in a new tab)</Link>
+                <Link to="/tickets/mine" target="_blank" rel="noopener" className={secondaryActionClass}>View your tickets (opens in a new tab)</Link>
               ) : null}
             </div>
           ) : null}

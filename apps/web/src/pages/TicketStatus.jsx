@@ -1,6 +1,6 @@
 import { ORDER_COMPLETE_STATUSES } from 'shared/ticketCommerce';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -26,6 +26,7 @@ export default function TicketStatus() {
   const { user, loading: authLoading } = useAuth();
   const { eventConfig } = useEventConfig();
   const [search] = useSearchParams();
+  const { state } = useLocation();
   const navigate = useNavigate();
   const [loaded, setLoaded] = useState(null);
   const [failure, setFailure] = useState(null);
@@ -40,6 +41,9 @@ export default function TicketStatus() {
   const stored = readCheckoutAttempt(user?.uid);
   const orderId = search.get('orderId') || (!search.get('requestId') && stored?.orderId) || null;
   const requestId = orderId ? null : search.get('requestId') || stored?.requestId || null;
+  const isCheckoutRequest = requestId && (stored
+    ? stored.requestId === requestId
+    : state?.checkoutRequestId === requestId && state?.checkoutUid === user?.uid);
   const key = `${user?.uid}:${orderId || requestId}`;
   const order = loaded?.key === key ? loaded.order : null;
   const error = failure?.key === key ? failure.error : null;
@@ -125,7 +129,7 @@ export default function TicketStatus() {
   return (
     <article className="ticket-print-page min-w-0 space-y-lg text-body text-text-primary">
       {heading}
-      {error ? <div className="space-y-sm no-print"><p role="alert" className="text-danger">{error.message}</p><button type="button" className={secondaryActionClass} onClick={() => setRefresh((value) => value + 1)}>Retry order status</button>{error.status === 404 && requestId && stored?.requestId === requestId ? <><p>No order is recorded for this saved request. If another tab is still submitting it, let that request finish before choosing tickets again.</p><button type="button" className={secondaryActionClass} onClick={startAnother}>Return to ticket selection</button></> : null}</div> : null}
+      {error ? <div className="space-y-sm no-print"><p role="alert" className="text-danger">{error.message}</p><button type="button" className={secondaryActionClass} onClick={() => setRefresh((value) => value + 1)}>Retry order status</button>{error.status === 404 && isCheckoutRequest ? <><p>No order is recorded for this saved request. If you recently submitted it, let the original request finish and check again before choosing tickets.</p><button type="button" className={secondaryActionClass} onClick={startAnother}>Return to ticket selection</button></> : null}</div> : null}
       {stalled || (!order && !error) ? <LoadingStateView label="Loading your order…" rows={0}
         stage={stage} clock={clock} recover recoveryMessage="We don’t know your order status yet."
         retryLabel="Check again" onRetry={checkAgain} /> : null}

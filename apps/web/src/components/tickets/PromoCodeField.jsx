@@ -29,7 +29,7 @@ export default function PromoCodeField({ code, applied, error, busy, unknown, on
           <p role="status">We don’t know whether the promo code applies. The code check doesn’t place an order.</p>
           <div className="flex flex-wrap gap-sm">
             <button type="button" className={secondaryActionClass} onClick={onContinueWithoutPromo}>Continue without a promo code</button>
-            <Link to="/tickets/status" target="_blank" rel="noopener" className={secondaryActionClass}>Check my order (opens in a new tab)</Link>
+            <Link to="/tickets/status" target="_blank" rel="noopener" className={secondaryActionClass}>How to find an earlier order (opens in a new tab)</Link>
           </div>
         </div>
       ) : (
