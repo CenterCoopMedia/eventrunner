@@ -329,9 +329,11 @@ function requestDigest({ type, mapping, rows }) {
  *   loadContext({ db })    read once per request (event config, say)
  *   mapRow({ row, mapping, context })
  *                          { ok: true, externalId, input } or { ok: false, reasons }
- *   planRow({ db, tx, input, key, claimed, context, actor, now, newId })
+ *   planRow({ db, tx, validationTx, input, key, claimed, context, actor, now, newId })
  *                          reads only; returns the verdict and, for a write,
  *                          `write(tx)` that applies it after the reads
+ *                          `validationTx` checks dependencies in the same
+ *                          transaction without fingerprinting their content
  *
  * @returns {Promise<{ results: object[], summary: Record<string, number> }>}
  */
@@ -387,10 +389,12 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
         const keySnap = await reader.get(keyRef);
         const key = keySnap.exists ? keySnap.data() : null;
         const planned = await importer.planRow({
-          db, tx: reader, input: mapped.input, key, claimed, context, actor, now, newId,
+          db, tx: reader, validationTx: tx, input: mapped.input, key, claimed, context, actor, now, newId,
         });
         if (trackVersions) {
-          const version = confirmationVersion(context, Object.fromEntries(reads), planned.verdict, planned.values);
+          const version = confirmationVersion(
+            context, Object.fromEntries(reads), planned.verdict, planned.values, planned.reasons,
+          );
           if (expectedPlan !== undefined && expectedPlan[index] !== version) throw new ConfirmationConflict();
           plan[index] = version;
         }

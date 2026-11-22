@@ -179,6 +179,54 @@ test('speakers link by speaker external ID or by slug; an unknown one is a row e
   ]);
 });
 
+test('a confirmed import can update a parent and child in either row order', async () => {
+  const session = {
+    description: ROW.Abstract, dayId: 'day-1', startTime: '09:30', endTime: '10:15',
+    track: 'A', visible: true, revision: 1,
+  };
+  const seed = {
+    'cmsSchedule/workshop': { ...session, title: 'Workshop' },
+    'cmsSchedule/clinic': { ...session, title: 'Clinic', parentId: 'workshop' },
+  };
+  const parent = { Ref: 'parent', Slug: 'workshop', Title: 'Workshop', Location: 'Main hall' };
+  const child = { Ref: 'child', Slug: 'clinic', Title: 'Clinic', Location: 'Room 1' };
+  const mapping = { externalId: 'Ref', title: 'Title', slug: 'Slug', location: 'Location' };
+
+  for (const rows of [[child, parent], [parent, child]]) {
+    const db = makeDb(seed);
+    const input = body(rows, mapping);
+    const preview = await callImport(db, input);
+    assert.deepEqual(preview.body.rows.map((r) => r.verdict), ['update', 'update']);
+    const commit = await callImport(db, {
+      ...input, dryRun: false, confirmDigest: preview.body.digest, expectedPlan: preview.body.plan,
+    });
+    assert.equal(commit.statusCode, 200);
+    assert.deepEqual(commit.body.rows.map((r) => r.verdict), ['update', 'update']);
+    assert.equal(db.read('cmsSchedule_drafts', 'workshop').location, 'Main hall');
+    assert.equal(db.read('cmsSchedule_drafts', 'clinic').location, 'Room 1');
+    assert.equal(db.read('cmsSchedule_drafts', 'clinic').parentId, 'workshop');
+  }
+
+  const db = makeDb(seed);
+  const input = body([parent], mapping);
+  const preview = await callImport(db, input);
+  const runTransaction = db.runTransaction.bind(db);
+  db.runTransaction = async (tx) => {
+    // Inject the change after preflight and before the parent row's write.
+    if (db.ids('admin_logs').length > 0) {
+      await db.collection('cmsSchedule').doc('clinic').update({ dayId: 'day-2' });
+    }
+    return runTransaction(tx);
+  };
+  const stale = await callImport(db, {
+    ...input, dryRun: false, confirmDigest: preview.body.digest, expectedPlan: preview.body.plan,
+  });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'stale-confirmation');
+  assert.equal(db.read('cmsSchedule_drafts', 'workshop'), undefined);
+  assert.equal(sessionKey(db, 'parent'), undefined);
+});
+
 test('the shared session validator refuses a bad row, and its message reaches the preview', async () => {
   const db = makeDb();
   const { preview } = await previewAndCommit(db, body([{ ...ROW, Start: '11:00', End: '10:00', Abstract: '' }]));
