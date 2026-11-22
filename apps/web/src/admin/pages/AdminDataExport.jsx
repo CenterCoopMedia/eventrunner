@@ -23,6 +23,7 @@ import HelpTooltip from '../components/HelpTooltip.jsx';
 // second press.
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
+import { lateWords, useBusyLate } from '../../components/BusyLabel.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { saveTextFile } from '../downloadFile.js';
@@ -98,6 +99,17 @@ function countOf(n, [one, many]) {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`;
 }
 
+function ExportStatus({ busy, pending, result }) {
+  const late = useBusyLate(busy);
+  if (busy) {
+    return <SaveStatus message={late ? `${lateWords(pending)} Keep this page open for the download.` : pending} />;
+  }
+  if (!result) return null;
+  return result.tone === 'ok'
+    ? <SaveStatus message={result.message} />
+    : <Notice tone={result.tone} message={result.message} />;
+}
+
 function SpreadsheetRow({ sheet, busy, result, onExport }) {
   const descriptionId = `export-${sheet.dataset}-description`;
   return (
@@ -120,9 +132,9 @@ function SpreadsheetRow({ sheet, busy, result, onExport }) {
           aria-disabled={busy ? 'true' : undefined}
         />
       </div>
-      {result ? (
+      {busy || result ? (
         <div className="px-md pb-sm">
-          {result.tone === 'ok' ? <SaveStatus message={result.message} /> : <Notice tone="error" message={result.message} />}
+          <ExportStatus busy={busy} pending={`Preparing the ${sheet.label.toLowerCase()} spreadsheet…`} result={result} />
         </div>
       ) : null}
     </li>
@@ -280,10 +292,7 @@ export default function AdminDataExport() {
                 aria-busy={packageBusy ? 'true' : undefined}
                 aria-disabled={packageBusy ? 'true' : undefined}
               />
-              {packageResult?.tone === 'ok' ? <SaveStatus message={packageResult.message} /> : null}
-              {packageResult && packageResult.tone !== 'ok' ? (
-                <Notice tone={packageResult.tone} message={packageResult.message} />
-              ) : null}
+              <ExportStatus busy={packageBusy} pending="Preparing the event data package…" result={packageResult} />
             </div>
           </div>
         </Panel>

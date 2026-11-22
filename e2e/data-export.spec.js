@@ -135,14 +135,34 @@ test.describe.serial('event data export', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await signIn(page, STAFF_EMAIL);
+    await page.clock.install();
     await page.goto('/admin/data-export');
     await expect(page.getByRole('heading', { level: 1, name: 'Data export' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Export ticket orders' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Event data package' })).toHaveCount(0);
 
+    let releaseExport;
+    const pendingExport = new Promise((resolve) => { releaseExport = resolve; });
+    await page.route('**/exportEventData', async (route) => {
+      if (route.request().method() === 'POST') await pendingExport;
+      await route.continue();
+    });
+    const exportButton = page.getByRole('button', { name: 'Export sessions' });
+    const exportRow = exportButton.locator('xpath=ancestor::li[1]');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export sessions' }).click(),
+      (async () => {
+        try {
+          await exportButton.press('Enter');
+          await expect(exportRow.getByRole('status')).toHaveText('Preparing the sessions spreadsheet…');
+          await page.clock.fastForward(10_000);
+          await expect(exportRow.getByRole('status')).toHaveText('Still preparing the sessions spreadsheet… Keep this page open for the download.');
+          await expect(exportButton).toBeFocused();
+          await exportRow.screenshot({ path: 'test-results/admin-visual-evidence/data-export-slow.png', animations: 'disabled' });
+        } finally {
+          releaseExport();
+        }
+      })(),
     ]);
     expect(download.suggestedFilename()).toMatch(/^sessions-\d{4}-\d{2}-\d{2}\.csv$/);
     const text = fs.readFileSync(await download.path(), 'utf8');
