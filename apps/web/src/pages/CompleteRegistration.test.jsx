@@ -47,6 +47,10 @@ function apiError(code, message) {
   return Object.assign(new Error(message), { code });
 }
 
+function receipt({ ticketId, answers, formRevision, expectedAnswerRevision }) {
+  return { ticketId, answers, formRevision, answerRevision: (expectedAnswerRevision ?? 0) + 1 };
+}
+
 function renderAt(path = '/registration') {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -65,7 +69,7 @@ beforeEach(() => {
   tickets = TICKETS;
   for (const key of Object.keys(records)) delete records[key];
   saveMock.mockReset();
-  saveMock.mockImplementation(({ ticketId, answers, formRevision }) => Promise.resolve({ ticketId, answers, formRevision }));
+  saveMock.mockImplementation(async (request) => receipt(request));
 });
 
 describe('CompleteRegistration', () => {
@@ -109,7 +113,7 @@ describe('CompleteRegistration', () => {
     expect(screen.getByRole('link', { name: /your tickets/i })).toHaveAttribute('href', '/tickets/mine');
   });
 
-  it('retains answers and offers a read-only check when a save stays pending', async () => {
+  it('retains answers and lets the original save finish after its deadline', async () => {
     let finish;
     saveMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     renderAt('/registration/answers-1');
@@ -124,7 +128,7 @@ describe('CompleteRegistration', () => {
       expect(screen.getByText(/We don’t know whether your answers were saved/)).toBeVisible();
       expect(organization).toHaveValue('Acme');
       expect(screen.getByLabelText('Yes')).toBeChecked();
-      expect(screen.getByRole('button', { name: 'Check saved answers' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Try saving again' })).toBeVisible();
       const ticketsLink = screen.getByRole('link', { name: 'View your tickets (opens in a new tab)' });
       expect(ticketsLink).toHaveAttribute('target', '_blank');
       expect(ticketsLink).toHaveAttribute('href', '/tickets/mine');
@@ -134,11 +138,39 @@ describe('CompleteRegistration', () => {
     } finally {
       vi.useRealTimers();
     }
-    await act(async () => finish({ answers: { organization: 'Acme', photoConsent: true }, formRevision: 2 }));
+    await act(async () => finish(receipt(saveMock.mock.calls[0][0])));
     expect(screen.getByRole('heading', { name: 'Ticket: Student for Bo Lee' })).toBeVisible();
   });
 
-  it('keeps the account answers when the save response lacks its receipt', async () => {
+  it('replays the same pending write and ignores a late reply from the first send', async () => {
+    let finishFirst;
+    let finishRetry;
+    saveMock
+      .mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finishRetry = resolve; }));
+    renderAt('/registration/answers-1');
+    const organization = await screen.findByLabelText('Organization (required)');
+    fireEvent.change(organization, { target: { value: 'Acme' } });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: /Next: Ticket: Student/ }));
+      act(() => vi.advanceTimersByTime(15_000));
+      fireEvent.click(screen.getByRole('button', { name: 'Try saving again' }));
+      const [original, replay] = saveMock.mock.calls.map(([request]) => request);
+      expect(original).toMatchObject({ ticketId: 't1', expectedAnswerRevision: null, requestId: expect.any(String), answers: { organization: 'Acme' } });
+      expect(replay).toEqual(original);
+      expect(screen.getByText('Saving your answers…')).toBeVisible();
+      await act(async () => finishFirst(receipt(original)));
+      expect(organization).toHaveValue('Acme');
+      expect(screen.getByText('Saving your answers…')).toBeVisible();
+      await act(async () => finishRetry(receipt(replay)));
+      expect(screen.getByRole('heading', { name: 'Ticket: Student for Bo Lee' })).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('replays an account save when the response lacks its receipt', async () => {
     provider = 'none';
     saveMock.mockResolvedValueOnce({});
     renderAt('/registration/answers-1');
@@ -148,17 +180,31 @@ describe('CompleteRegistration', () => {
     expect(await screen.findByText(/We don’t know whether your answers were saved/)).toBeVisible();
     expect(organization).toHaveValue('Acme');
     expect(screen.queryByRole('link', { name: 'View your tickets (opens in a new tab)' })).toBeNull();
-    records['account-u1'] = { answers: { organization: 'Earlier entry' }, formRevision: 2 };
-    fireEvent.click(screen.getByRole('button', { name: 'Check saved answers' }));
-    expect(await screen.findByText(/The saved answers don’t match these entries yet/)).toBeVisible();
-    expect(organization).toHaveValue('Acme');
     fireEvent.submit(organization.closest('form'));
     expect(saveMock).toHaveBeenCalledTimes(1);
-    records['account-u1'] = { answers: { organization: 'Acme' }, formRevision: 2 };
-    fireEvent.click(screen.getByRole('button', { name: 'Check saved answers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try saving again' }));
     expect(await screen.findByRole('heading', { name: 'Review' })).toBeVisible();
     expect(screen.getByText('Acme')).toBeVisible();
-    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(saveMock).toHaveBeenCalledTimes(2);
+    expect(saveMock.mock.calls[1]).toEqual(saveMock.mock.calls[0]);
+  });
+
+  it('keeps the visitor’s entries when the replay is refused because the saved answers changed', async () => {
+    provider = 'none';
+    records['account-u1'] = { answers: { organization: 'Earlier entry' }, formRevision: 2, answerRevision: 3 };
+    saveMock
+      .mockRejectedValueOnce(apiError('network', 'The connection dropped.'))
+      .mockRejectedValueOnce(apiError('answers-changed', 'Your saved answers changed. Reload the page to review them before saving again.'));
+    renderAt('/registration/answers-1');
+    const organization = await screen.findByLabelText('Organization (required)');
+    fireEvent.change(organization, { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Try saving again' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your saved answers changed.');
+    expect(organization).toHaveValue('Acme');
+    expect(saveMock).toHaveBeenLastCalledWith(expect.objectContaining({ expectedAnswerRevision: 3 }));
+    expect(saveMock.mock.calls[1]).toEqual(saveMock.mock.calls[0]);
+    expect(screen.queryByRole('heading', { name: 'Review' })).toBeNull();
   });
 
   it('has one step per valid ticket, checks before saving, then saves and moves on', async () => {
@@ -236,7 +282,7 @@ describe('CompleteRegistration', () => {
   it('keeps reading a saved answer with its own question after the form changes', async () => {
     currentForm = { standard: {}, custom: [{ id: 'q_guest', kind: 'yes_no', label: 'Bringing a guest?', help: '', choices: [], required: true }], revision: 2 };
     saveMock
-      .mockImplementationOnce(({ ticketId, answers, formRevision }) => Promise.resolve({ ticketId, answers, formRevision }))
+      .mockImplementationOnce(async (request) => receipt(request))
       .mockRejectedValueOnce(apiError('form-changed', 'The questions changed.'));
     renderAt();
     fireEvent.click(await screen.findByLabelText('Yes'));

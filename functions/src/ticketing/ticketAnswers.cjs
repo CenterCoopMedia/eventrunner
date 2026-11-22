@@ -24,6 +24,7 @@
  * page follows; without it the answer is stored as "attendees only".
  */
 
+const { createHash } = require('node:crypto');
 const { BOOTSTRAP_UNAVAILABLE, BootstrapUnavailableError, loadBootstrap, resolveAdminTier, verifyAuthToken } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId, logAdminAction } = require('../cms/store.cjs');
@@ -37,11 +38,16 @@ const ANSWERS = 'ticket_answers';
 const HOLDS = 'ticket_answer_holds';
 const CLOSED_PHASES = Object.freeze(['registration_closed', 'in_progress', 'ended', 'archived']);
 const MAX_BODY_BYTES = 32 * 1024;
+const CLOSED_MESSAGE = 'Registration has closed, so these answers can no longer be changed. Contact the organizers.';
 
 function refuse(status, code, message) {
   const err = new Error(code);
   err.conflict = { status, code, message };
   throw err;
+}
+
+function refuseChangedAnswers() {
+  refuse(409, 'answers-changed', 'Your saved answers changed. Reload the page to review them before saving again.');
 }
 
 async function callerOf({ auth, db, getConfig }, req) {
@@ -95,9 +101,23 @@ function accountTarget(caller) {
 }
 
 /** Check the answers against the current form and store them for `target`. One body for both kinds of record. */
-function saveAnswers({ db, config, caller, at, target, answers, formRevision, language }) {
+function saveAnswers({ db, config, caller, at, target, answers, formRevision, language, closed, request, expectedAnswerRevision }) {
+  const answersRef = db.collection(ANSWERS).doc(target.recordId);
+  const formRef = db.collection('config').doc('registration_form');
   return db.runTransaction(async (tx) => {
-    const [owner, formSnap] = await Promise.all([target.load(tx), tx.get(db.collection('config').doc('registration_form'))]);
+    const [owner, previousSnap, formSnap] = await Promise.all([target.load(tx), tx.get(answersRef), tx.get(formRef)]);
+    const previous = previousSnap.data();
+    // A missing record and an existing record from before versioned saves
+    // have distinct baselines. Unkeyed saves also advance the revision.
+    const revision = previousSnap.exists ? (previous?.answerRevision ?? 0) : null;
+    if (request && previous?.answerRequest?.id === request.id) {
+      if (previous.uid !== owner.uid || previous.ticketId !== owner.fields.ticketId || previous.answerRequest.hash !== request.hash) {
+        refuseChangedAnswers();
+      }
+      return { answers: previous.answers, answerRevision: revision, replay: true };
+    }
+    if (closed) refuse(409, 'registration-closed', CLOSED_MESSAGE);
+    if ((request && revision !== expectedAnswerRevision) || revision === Number.MAX_SAFE_INTEGER) refuseChangedAnswers();
     const form = readRegistrationForm(formSnap.exists ? formSnap.data() : null);
     if (form.revision !== formRevision) refuse(409, 'form-changed', 'The registration questions changed. Reload the page to see the current questions; your answers are still on the page.');
     const checked = checkAnswers(answers, form);
@@ -106,8 +126,10 @@ function saveAnswers({ db, config, caller, at, target, answers, formRevision, la
     const userRef = db.collection('users').doc(owner.uid);
     const user = (await tx.get(userRef)).data();
     const recordedLocale = user?.registrationLanguage ?? (user ? locale : null);
-    tx.set(db.collection(ANSWERS).doc(target.recordId), {
-      ...owner.fields, uid: owner.uid, answers: checked.answers, formRevision,
+    const answerRevision = (revision ?? 0) + 1;
+    tx.set(answersRef, {
+      ...owner.fields, uid: owner.uid, answers: checked.answers, formRevision, answerRevision,
+      ...(request ? { answerRequest: request } : {}),
       // The questions as the attendee saw them, so a later change to the
       // form never misreads these answers.
       questions: answeredQuestions(form, checked.answers),
@@ -121,7 +143,7 @@ function saveAnswers({ db, config, caller, at, target, answers, formRevision, la
     }
     if (user && locale && !user.registrationLanguage) profile.registrationLanguage = locale;
     if (Object.keys(profile).length > 0) tx.set(userRef, { ...profile, updatedAt: at }, { merge: true });
-    return { answers: checked.answers };
+    return { answers: checked.answers, answerRevision };
   });
 }
 
@@ -129,11 +151,16 @@ function createSaveTicketAnswersHandler({ db, auth, getConfig, providerName = nu
   return async function saveTicketAnswers(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     if (Buffer.byteLength(JSON.stringify(req.body ?? {})) > MAX_BODY_BYTES) return sendError(res, 413, 'payload-too-large', 'The answers are too long.');
-    const { ticketId, answers, formRevision, account, lang } = req.body || {};
+    const { ticketId, answers, formRevision, account, lang, requestId, expectedAnswerRevision } = req.body || {};
     const forAccount = account === true;
     if (forAccount && ticketId !== undefined) return badRequest(res, 'Send either ticketId or account, not both.');
     if (!forAccount && !isValidDocId(ticketId)) return badRequest(res, 'ticketId: required');
     if (!Number.isSafeInteger(formRevision) || formRevision < 0) return badRequest(res, 'formRevision: the form revision you answered is required.');
+    const keyed = requestId !== undefined || expectedAnswerRevision !== undefined;
+    if (keyed && (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(requestId)
+      || (expectedAnswerRevision !== null && (!Number.isSafeInteger(expectedAnswerRevision) || expectedAnswerRevision < 0)))) {
+      return badRequest(res, 'requestId and expectedAnswerRevision: both are required for a replayable save.');
+    }
     // With tickets on sale, answers belong to a ticket so each attendee on a
     // group order answers for themselves.
     if (forAccount && providerName !== 'none') {
@@ -146,23 +173,27 @@ function createSaveTicketAnswersHandler({ db, auth, getConfig, providerName = nu
     // The account form always answers for the caller's own account, so a
     // staff member there is an attendee like any other, closing time included.
     // Staff are exempt only when they correct an attendee's ticket answers.
-    if ((forAccount || !caller.staff) && CLOSED_PHASES.includes(getEventPhase(config?.event, at))) {
-      return sendError(res, 409, 'registration-closed', 'Registration has closed, so these answers can no longer be changed. Contact the organizers.');
-    }
+    const closed = (forAccount || !caller.staff) && CLOSED_PHASES.includes(getEventPhase(config?.event, at));
+    if (closed && !keyed) return sendError(res, 409, 'registration-closed', CLOSED_MESSAGE);
     const target = forAccount ? accountTarget(caller) : ticketTarget(db, caller, ticketId);
+    const request = keyed ? {
+      id: requestId,
+      hash: createHash('sha256').update(JSON.stringify([caller.uid, expectedAnswerRevision, formRevision, answers, lang])).digest('hex'),
+    } : null;
     let saved;
     try {
-      saved = await saveAnswers({ db, config, caller, at, target, answers, formRevision, language: lang });
+      saved = await saveAnswers({ db, config, caller, at, target, answers, formRevision, language: lang, closed, request, expectedAnswerRevision });
     } catch (err) {
       if (err?.conflict) return sendError(res, err.conflict.status, err.conflict.code, err.conflict.message);
       log.error('saveTicketAnswers failed', err);
       return internal(res, 'Your answers could not be saved. They are still on the page; try again.');
     }
-    if (caller.staff && !forAccount) {
+    if (caller.staff && !forAccount && !saved.replay) {
       await logAdminAction({ db, action: 'saveTicketAnswers', docPath: `${ANSWERS}/${ticketId}`, actor: { uid: caller.uid, email: caller.email }, now, log });
     }
-    if (forAccount) return res.status(200).json({ account: true, ticketId: null, answers: saved.answers, formRevision });
-    return res.status(200).json({ ticketId, answers: saved.answers, formRevision });
+    const result = { answers: saved.answers, formRevision, ...(keyed ? { answerRevision: saved.answerRevision } : {}) };
+    if (forAccount) return res.status(200).json({ account: true, ticketId: null, ...result });
+    return res.status(200).json({ ticketId, ...result });
   };
 }
 

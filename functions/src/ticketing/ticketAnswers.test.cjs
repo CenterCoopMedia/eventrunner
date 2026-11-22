@@ -52,6 +52,47 @@ test('the ticket holder saves checked answers privately, and the directory answe
   assert.equal(db.read('users', 'ada').profileVisibility, 'private');
 });
 
+test('a replay returns the original receipt without writing, even after the form changes and registration closes', async () => {
+  const db = world();
+  const request = { ticketId: 't-1', formRevision: 4, answers: ANSWERS, expectedAnswerRevision: null, requestId: 'first-save' };
+  const first = await save(db, 'ada', request);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.answerRevision, 1);
+  await db.collection('config').doc('registration_form').update({ revision: 5 });
+  await db.collection('users').doc('ada').update({ profileVisibility: 'attendees_only' });
+  const writes = db.writes.length;
+
+  const replay = await save(db, 'ada', request, { event: CLOSED_EVENT });
+  assert.equal(replay.statusCode, 200);
+  assert.deepEqual(replay.body, first.body);
+  const reused = await save(db, 'ada', { ...request, answers: { ...ANSWERS, organization: 'Different' } });
+  assert.equal(reused.statusCode, 409);
+  assert.equal(reused.body.error.code, 'answers-changed');
+  assert.equal((await save(db, 'bo', request)).statusCode, 403);
+  assert.equal(db.writes.length, writes);
+  assert.equal(db.read('users', 'ada').profileVisibility, 'attendees_only');
+});
+
+test('neither an old replay nor a different stale request can overwrite a newer save', async () => {
+  const db = world();
+  const first = { ticketId: 't-1', formRevision: 4, answers: ANSWERS, expectedAnswerRevision: null, requestId: 'first-save' };
+  const stale = { ...first, requestId: 'stale-save' };
+  assert.equal((await save(db, 'ada', first)).statusCode, 200);
+  const newer = { ticketId: 't-1', formRevision: 4, answers: { ...ANSWERS, organization: 'New answer', directoryListing: 'attendees_only' } };
+  assert.equal((await save(db, 'staff', newer)).statusCode, 200);
+  const writes = db.writes.length;
+
+  for (const request of [first, stale]) {
+    const res = await save(db, 'ada', request);
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.error.code, 'answers-changed');
+  }
+  assert.equal(db.writes.length, writes);
+  assert.equal(db.read('ticket_answers', 't-1').answers.organization, 'New answer');
+  assert.equal(db.read('ticket_answers', 't-1').answerRevision, 2);
+  assert.equal(db.read('users', 'ada').profileVisibility, 'attendees_only');
+});
+
 test('a public directory answer needs the public profiles feature, as the profile page does', async () => {
   const db = world();
   await save(db, 'ada', { ticketId: 't-1', formRevision: 4, answers: { ...ANSWERS, directoryListing: 'public' } });
@@ -159,6 +200,19 @@ test('a refund or cancellation marks the answers, and a ticket made valid again 
 
 // Events with no ticketing provider: the attendee answers for their account.
 const NONE = { providerName: 'none' };
+
+test('versioned account saves distinguish a missing record from an existing unversioned record', async () => {
+  const db = world({ 'ticket_answers/account-ada': { account: true, uid: 'ada', answers: { organization: 'Existing' } } });
+  const request = { account: true, formRevision: 4, answers: ANSWERS, expectedAnswerRevision: null, requestId: 'account-save' };
+  const stale = await save(db, 'ada', request, NONE);
+  assert.equal(stale.body.error.code, 'answers-changed');
+  assert.equal(db.read('ticket_answers', 'account-ada').answers.organization, 'Existing');
+  const current = { ...request, expectedAnswerRevision: 0 };
+  const res = await save(db, 'ada', current, NONE);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.answerRevision, 1);
+  assert.deepEqual((await save(db, 'ada', current, NONE)).body, res.body);
+});
 
 test('with no ticketing provider, the attendee answers for their account', async () => {
   const db = world();
