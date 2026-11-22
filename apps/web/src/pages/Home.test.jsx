@@ -83,6 +83,10 @@ describe('Latest updates on Home', () => {
     const view = render(<Home />);
     await waitFor(() => expect(subscribeContentCollection).toHaveBeenCalledWith('cmsUpdates', 'published', expect.any(Function)));
     expect(screen.queryByRole('heading', { name: 'News' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'All updates' })).toBeNull();
+
+    act(() => receiveUpdates([{ id: 'hidden', title: 'Hidden post', visible: false }]));
+    expect(screen.queryByRole('link', { name: 'All updates' })).toBeNull();
 
     act(() => receiveUpdates([
       { id: 'a', title: 'Old pinned', visible: true, pinned: true, publishAt: '2026-01-01' },
@@ -92,18 +96,21 @@ describe('Latest updates on Home', () => {
       { id: 'e', title: 'Hidden post', visible: false, publishAt: '2026-05-01' },
     ]));
     expect(await screen.findByRole('heading', { name: 'From the organizers' })).toBeVisible();
-    const links = within(screen.getByRole('region', { name: 'News' })).getAllByRole('link');
+    const news = within(screen.getByRole('region', { name: 'News' }));
+    const links = within(news.getByRole('list')).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual(['Newest', 'Second', 'Third']);
     expect(links[0]).toHaveAttribute('href', '/updates/d');
+    expect(news.getByRole('link', { name: 'All updates' })).toHaveAttribute('href', '/updates');
 
     sectionBlocks.news = [{ blockType: 'latest_updates', count: 1 }];
     view.rerender(<MemoryRouter><Home /></MemoryRouter>);
-    expect(within(screen.getByRole('region', { name: 'News' })).getAllByRole('link')).toHaveLength(1);
+    expect(within(news.getByRole('list')).getAllByRole('link')).toHaveLength(1);
     expect(screen.queryByRole('heading', { name: 'From the organizers' })).toBeNull();
 
     features.updates = false;
     view.rerender(<MemoryRouter><Home /></MemoryRouter>);
     expect(screen.queryByRole('heading', { name: 'News' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'All updates' })).toBeNull();
     expect(unsubscribeUpdates).toHaveBeenCalledOnce();
   });
 });

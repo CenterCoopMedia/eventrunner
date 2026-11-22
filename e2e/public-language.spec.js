@@ -172,6 +172,35 @@ test('the hosted phone and desktop reader marks mixed language and retains keybo
   await expect(page).toHaveURL(/topic=data&lang=es#section-language-links$/);
 });
 
+test('Latest updates links to the full list in the reader’s language', async ({ page }) => {
+  const db = adminDb();
+  const before = await features.get();
+  const block = db.doc('cmsContent/language-links__latest');
+  const update = db.doc('cmsUpdates/language-test-update');
+  fixtureRefs.push(block, update);
+  await db.batch()
+    .set(features, { updates: true }, { merge: true })
+    .set(block, { section: 'language-links', field: 'latest', blockType: 'latest_updates', order: 7, count: 1, visible: true })
+    .set(update, { title: 'Program announcement', body: 'The program is ready.', visible: true })
+    .commit();
+  try {
+    await mkdir(evidence, { recursive: true });
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${route}?lang=es`);
+      const link = page.getByRole('link', { name: 'Todas las novedades', exact: true });
+      await expect(link).toHaveAttribute('href', '/updates?lang=es');
+      await link.focus();
+      await link.locator('xpath=../..').screenshot({ path: path.join(evidence, `latest-updates-${width}.png`) });
+      await link.press('Enter');
+      await expect(page).toHaveURL(/\/updates\?lang=es$/);
+      await expect(page.getByRole('main').getByRole('link', { name: 'Program announcement' })).toBeVisible();
+    }
+  } finally {
+    await db.batch().delete(block).delete(update).set(features, before.data()).commit();
+  }
+});
+
 test('sign-in validation remains readable and returns focus to submit', settingsTag, async ({ page, checkReflow }) => {
   await page.goto('/signin?lang=es');
   await expect(page.getByRole('heading', { name: 'Iniciar sesión', level: 1 })).toBeVisible();
