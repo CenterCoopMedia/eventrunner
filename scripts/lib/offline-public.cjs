@@ -4,7 +4,8 @@ const { createHash } = require('node:crypto');
 const { readFileSync, statSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 
-const INPUTS = '.vite/offline-public.json';
+// The web build crosses a GitHub artifact boundary before Hosting predeploy.
+const OFFLINE_INPUTS_FILE = 'offline-public-build.json';
 const SHELL = 'app-shell.html';
 const MAX_BYTES = 2_097_152;
 const PUBLIC_FILE = /^(?:app-shell\.html|manifest\.webmanifest|branding\/favicon\.svg|fonts\/[\w-]+\.woff2|assets\/[\w.-]+\.(?:js|css))$/;
@@ -14,7 +15,7 @@ function sha256(contents) {
 }
 
 function writeOfflinePublic(directory) {
-  const inputs = path.join(directory, INPUTS);
+  const inputs = path.join(directory, OFFLINE_INPUTS_FILE);
   if (!statSync(inputs, { throwIfNoEntry: false })?.isFile()) return;
   const { project, base, routes, generatedAt, files } = JSON.parse(readFileSync(inputs, 'utf8'));
   const assets = files.map((file) => {
@@ -33,4 +34,4 @@ function writeOfflinePublic(directory) {
   return bytes;
 }
 
-module.exports = { writeOfflinePublic, MAX_BYTES };
+module.exports = { writeOfflinePublic, MAX_BYTES, OFFLINE_INPUTS_FILE };

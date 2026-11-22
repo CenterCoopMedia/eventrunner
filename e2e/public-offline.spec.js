@@ -12,11 +12,10 @@ function revision(directory, label) {
   const script = `assets/program-${label}.js`;
   const shell = '<!doctype html><html><head><title>Public program</title></head>'
     + `<body><p>Program ${label}</p><output></output><script src="${mount}${script}"></script></body></html>`;
-  mkdirSync(path.join(directory, '.vite'), { recursive: true });
   mkdirSync(path.join(directory, 'assets'), { recursive: true });
   writeFileSync(path.join(directory, 'app-shell.html'), shell);
   writeFileSync(path.join(directory, script), `document.querySelector('output').textContent = 'Chunk ${label}';`);
-  writeFileSync(path.join(directory, '.vite/offline-public.json'), JSON.stringify({
+  writeFileSync(path.join(directory, offlinePublic.OFFLINE_INPUTS_FILE), JSON.stringify({
     project: 'offline-browser-fixture', base: mount, routes: ['/', '/schedule'],
     generatedAt: generation, files: ['app-shell.html', script],
   }));

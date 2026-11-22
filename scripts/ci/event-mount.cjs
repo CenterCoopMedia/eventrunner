@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { buildPlan } = require('../publish-site.cjs');
 const { buildWebManifest } = require('../lib/site-manifest.cjs');
-const { MAX_BYTES } = require('../lib/offline-public.cjs');
+const { MAX_BYTES, OFFLINE_INPUTS_FILE } = require('../lib/offline-public.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const origin = 'https://events.example.org';
@@ -15,7 +15,7 @@ const origin = 'https://events.example.org';
 function verifyBuild(dist, base, manifest) {
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
   const chunks = JSON.parse(fs.readFileSync(path.join(dist, '.vite/manifest.json'), 'utf8'));
-  const offline = JSON.parse(fs.readFileSync(path.join(dist, '.vite/offline-public.json'), 'utf8'));
+  const offline = JSON.parse(fs.readFileSync(path.join(dist, OFFLINE_INPUTS_FILE), 'utf8'));
   const entry = chunks['index.html'];
   assert.ok(html.includes(`<link rel="modulepreload" crossorigin href="${base}${entry.file}" data-app-entry>`),
     'entry module preload must use the asset base');

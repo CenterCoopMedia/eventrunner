@@ -28,6 +28,7 @@ export function offlineBundle({ root, generatedDir, project }) {
         if (!project || !bundle['index.html']) return;
         const { readGeneratedSnapshot } = require('../../scripts/write-site-files.cjs');
         const { collectPublicRoutes } = require('../../scripts/lib/site-manifest.cjs');
+        const { OFFLINE_INPUTS_FILE } = require('../../scripts/lib/offline-public.cjs');
         const snapshot = await readGeneratedSnapshot({ generatedDir });
         const routes = snapshot.comingSoon ? [] : collectPublicRoutes(snapshot)
           .map((route) => route.path)
@@ -57,7 +58,7 @@ export function offlineBundle({ root, generatedDir, project }) {
         for (const tag of criticalFontTags(css)) files.add(tag.attrs.href.slice(1));
         this.emitFile({
           type: 'asset',
-          fileName: '.vite/offline-public.json',
+          fileName: OFFLINE_INPUTS_FILE,
           source: JSON.stringify({ project, base, routes: [...new Set(routes)].sort(),
             generatedAt: snapshot.snapshotGeneratedAt, files: [...files].sort() }),
         });
