@@ -140,7 +140,7 @@ export default function AdminInvoiceEditor({ mode }) {
         setLoadedId(params.invoiceId);
       });
     request.catch((err) => {
-      if (active) setLoadError(err);
+      if (active) setLoadError({ loadKey, error: err });
     });
     return () => {
       active = false;
@@ -515,15 +515,15 @@ export default function AdminInvoiceEditor({ mode }) {
     }
   }
 
-  if (loadError) {
-    return loadError.status === 404 ? (
+  if (loadError?.loadKey === loadKey) {
+    return loadError.error.status === 404 ? (
       <AdminEmptyState
         title="No such invoice"
         description="That invoice does not exist. It may have been deleted."
         action={<Link to={INVOICES_ROOT} className={secondaryButtonClass}>Go to invoices</Link>}
       />
     ) : (
-      <ServerErrorSummary error={loadError} title="The invoice could not be loaded" />
+      <ServerErrorSummary error={loadError.error} title="The invoice could not be loaded" />
     );
   }
   // A create that has saved holds its own id until the address catches up.

@@ -4,7 +4,7 @@
 // off the wire the page would send.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 
 const adminSubscriptions = new Map();
 const adminRows = new Map();
@@ -55,8 +55,11 @@ function response(body, status = 200) {
 }
 
 let currentPath = null;
+let goBack;
 function LocationProbe() {
+  const navigate = useNavigate();
   currentPath = useLocation().pathname;
+  goBack = () => navigate(-1);
   return null;
 }
 
@@ -266,6 +269,31 @@ describe('the invoice editor', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('The invoice changed since you opened it.');
     expect(invoiceCalls().find((body) => body.action === 'saveDraft').expectedRevision).toBe(3);
     expect(screen.getByRole('button', { name: 'Reload the saved invoice' })).toBeInTheDocument();
+  });
+
+  it('returns to the loaded draft after its source invoice fails to load', async () => {
+    const draft = { ...STORED, duplicatedFrom: { invoiceId: ISSUED.id, number: ISSUED.number } };
+    answers.get = ({ invoiceId }) => invoiceId === draft.id
+      ? response({ invoice: draft })
+      : response({ error: { code: 'unavailable', message: 'The invoice is temporarily unavailable.' } }, 503);
+    answers.saveDraft = ({ invoice }) => response({ invoice: { ...draft, notes: invoice.notes } });
+    await renderAt(`/admin/invoices/${draft.id}`);
+
+    fireEvent.click(await screen.findByRole('link', { name: ISSUED.number, exact: true }, { timeout: 5000 }));
+    await screen.findByText('The invoice could not be loaded');
+    expect(currentPath).toBe(`/admin/invoices/${ISSUED.id}`);
+
+    await act(async () => goBack());
+    expect(currentPath).toBe(`/admin/invoices/${draft.id}`);
+    expect(screen.queryByText('The invoice could not be loaded')).not.toBeInTheDocument();
+    expect(invoiceCalls().filter(({ action }) => action === 'get').map(({ invoiceId }) => invoiceId))
+      .toEqual([draft.id, ISSUED.id]);
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Ready for review.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toMatchObject({
+      action: 'saveDraft', invoiceId: draft.id, expectedRevision: draft.revision,
+      invoice: { notes: 'Ready for review.' },
+    }));
   });
 
   it('recovers a new draft the server already saved when a retry meets a conflict', async () => {
