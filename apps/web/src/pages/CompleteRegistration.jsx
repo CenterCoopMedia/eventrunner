@@ -140,7 +140,9 @@ export default function CompleteRegistration() {
       />
     );
   }
-  if (data.status === 'loading') return <div className="mt-lg"><LoadingState label="Loading your registration…" /></div>;
+  if (data.status === 'loading') return (
+    <div className="mt-lg"><LoadingState label="Loading your registration…" phase={data.form === undefined} recover onRetry={data.retry} /></div>
+  );
   if (!form || !activeQuestions(form).length) return <NothingToAnswer />;
 
   const { targets, saved } = data;

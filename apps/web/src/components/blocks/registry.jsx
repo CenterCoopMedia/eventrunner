@@ -3,10 +3,12 @@
 // id; the parity test in registry.test.jsx imports the backend registry and
 // asserts the two sets match exactly, so adding a block type is a two-file
 // change that cannot silently ship half-done.
-import { lazy, Suspense } from 'react';
+import { createContext, lazy, Suspense, useContext } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { mapBlockFields, mapVenueFields } from './mapBlockFields.js';
 import { galleryImages, galleryLayout } from './galleryBlockFields.js';
+import { reloadPage } from '../../lib/pageReload.js';
+import LoadingState from '../LoadingState.jsx';
 import TextBlock from './TextBlock.jsx';
 import RichTextBlock from './RichTextBlock.jsx';
 import ImageBlock from './ImageBlock.jsx';
@@ -17,6 +19,7 @@ import ListItemBlock from './ListItemBlock.jsx';
 import UnknownBlock from './UnknownBlock.jsx';
 
 export const loadLatestUpdatesBlock = () => import('./LatestUpdatesBlock.jsx');
+export const BlockRecoveryContext = createContext(false);
 
 export const BLOCK_RENDERERS = Object.freeze({
   // Keep the Home hero, information cards and opening copy ready for first
@@ -115,8 +118,12 @@ export function rendererFor(blockType) {
 /** Render a block or a run of blocks of its type through the registry. */
 export default function BlockRenderer({ block, run }) {
   const Renderer = rendererFor(block?.blockType);
+  const recover = useContext(BlockRecoveryContext);
+  const placeholder = block ? <BlockPlaceholder block={block} /> : null;
   return (
-    <Suspense fallback={block ? <BlockPlaceholder block={block} /> : null}>
+    <Suspense fallback={recover && placeholder ? (
+      <LoadingState recover onRetry={reloadPage} phase={Renderer} placeholder={placeholder} />
+    ) : placeholder}>
       <Renderer block={block} run={run} />
     </Suspense>
   );

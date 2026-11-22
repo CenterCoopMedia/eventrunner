@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import DeferredPage from '../components/DeferredPage.jsx';
 import MyTickets from './MyTickets.jsx';
@@ -46,6 +46,24 @@ function tree({ Page, path, sharedWait }) {
   );
 }
 
+it('announces only the error when refreshing a loaded ticket list fails', async () => {
+  const page = CASES[0];
+  render(tree(page));
+  act(() => vi.advanceTimersByTime(1000));
+  await act(async () => finish(page.result));
+  expect(screen.getByRole('status')).toHaveTextContent(page.completion);
+
+  let failRefresh;
+  state.tickets.mockReturnValueOnce(new Promise((_, reject) => { failRefresh = reject; }));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh tickets' }));
+  act(() => vi.advanceTimersByTime(1000));
+  await act(async () => failRefresh(new Error('Could not refresh tickets.')));
+
+  expect(screen.getByRole('alert')).toHaveTextContent('Could not refresh tickets.');
+  expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  expect(screen.getByText(page.ready, { exact: true })).toBeInTheDocument();
+});
+
 describe.each(CASES)('$name loading feedback', (page) => {
   it('names the wait, escalates outside the busy content and removes the indicator when the read resolves', async () => {
     render(tree(page));
@@ -62,7 +80,12 @@ describe.each(CASES)('$name loading feedback', (page) => {
     act(() => vi.advanceTimersByTime(9000));
     expect(status.textContent).toBe('This is taking longer than usual. We’re still waiting for a response.');
     act(() => vi.advanceTimersByTime(50000));
-    expect(status.textContent).toBe('We haven’t received a result after a minute. You can keep waiting.');
+    if (page.name === 'tickets') {
+      expect(status).toHaveTextContent('This is taking longer than a minute.');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+    } else {
+      expect(status.textContent).toBe('We haven’t received a result after a minute. You can keep waiting.');
+    }
     expect(state.tickets.mock.calls.length + state.changes.mock.calls.length).toBe(1);
 
     await act(async () => finish(page.result));
@@ -96,9 +119,10 @@ describe.each(CASES)('$name loading feedback', (page) => {
       expect(data).toBeEmptyDOMElement();
       expect(data.closest('.loading-state').querySelector('.loading-status__detail')).toHaveTextContent('This is taking longer than usual.');
       act(() => vi.advanceTimersByTime(29_999));
-      expect(data).not.toHaveTextContent('We haven’t received a result after a minute.');
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
       act(() => vi.advanceTimersByTime(1));
-      expect(data).toHaveTextContent('We haven’t received a result after a minute.');
+      expect(data).toHaveTextContent('This is taking longer than a minute.');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
     }
     await act(async () => finish(page.result));
     if (page.completion) expect(data).toHaveTextContent(page.sharedWait ? page.completion : '');

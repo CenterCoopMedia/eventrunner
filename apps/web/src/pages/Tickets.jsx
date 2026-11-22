@@ -109,6 +109,7 @@ export default function Tickets() {
   const [catalog, setCatalog] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [loadVersion, setLoadVersion] = useState(0);
+  const [formRead, setFormRead] = useState(0);
   const [quantities, setQuantities] = useState({});
   const [attendees, setAttendees] = useState({});
   const [acceptedCatalogRevision, setAcceptedCatalogRevision] = useState(null);
@@ -162,7 +163,7 @@ export default function Tickets() {
   }, [demo, loadVersion]);
 
   // A form that cannot be read asks nothing, so it never blocks a purchase.
-  useEffect(() => (demo ? undefined : subscribeRegistrationForm(setLiveForm, () => setLiveForm((current) => (current === undefined ? null : current)))), [demo]);
+  useEffect(() => (demo ? undefined : subscribeRegistrationForm(setLiveForm, () => setLiveForm((current) => (current === undefined ? null : current)))), [demo, formRead]);
 
   useEffect(() => {
     if (pinnedForm === undefined && liveForm !== undefined) setPinnedForm(liveForm);
@@ -375,6 +376,7 @@ export default function Tickets() {
 
   const heading = <h1 className="font-heading text-h1 font-semibold text-text-primary">Get tickets</h1>;
   const retryCatalog = () => setLoadVersion((value) => value + 1);
+  const retryForm = () => setFormRead((value) => value + 1);
   if (demo) return (
     <article className="space-y-md">
       {heading}
@@ -386,6 +388,7 @@ export default function Tickets() {
   const stripeCatalog = !loadError && catalog?.provider === 'stripe';
   const catalogPending = !loadError && !catalog;
   const canShowPurchase = stripeCatalog && catalog.salesEnabled && !authLoading && user?.emailVerified && !attempt;
+  const formPending = canShowPurchase && (form === undefined || formStale);
   const visible = STEPS.filter((step) => step.slug !== 'questions' || asksQuestions);
   const { index: current, unknown } = resolveStep(visible, stepSlug, 0);
   let waitLabel;
@@ -674,7 +677,8 @@ export default function Tickets() {
         label={waitLabel}
         completion={loadError ? '' : canShowPurchase ? 'The ticket registration form is ready.' : 'Ticket information is ready.'}
         rows={0}
-        onRetry={catalogPending ? retryCatalog : undefined}
+        recover
+        onRetry={catalogPending ? retryCatalog : formPending ? retryForm : undefined}
       />
       <div role="region" aria-label="Ticket information" aria-busy={Boolean(waitLabel)} className={stripeCatalog ? 'space-y-lg' : 'space-y-md'}>
         {loadError ? (

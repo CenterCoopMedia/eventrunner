@@ -22,7 +22,7 @@ function beginWait(active, shared, phase, inheritNavigation) {
  * remove the loader (or set active=false) as soon as it finishes.
  * A new phase starts a local clock while the live region stays mounted.
  */
-export default function useLoadingStage({ active = true, routeAttempt, phase } = {}) {
+export default function useLoadingStage({ active = true, routeAttempt, phase, report = true } = {}) {
   const shared = !routeAttempt?.settled && routeAttempt?.clock;
   const [wait, setWait] = useState(() => beginWait(active, shared, phase, true));
   if (wait.active !== active || wait.shared !== shared || wait.phase !== phase) {
@@ -42,10 +42,10 @@ export default function useLoadingStage({ active = true, routeAttempt, phase } =
   }, [active, clock]);
 
   useEffect(() => {
-    if (!active || !['slow', 'prolonged'].includes(stage) || clock.reported) return;
+    if (!active || !report || !['slow', 'prolonged'].includes(stage) || clock.reported) return;
     clock.reported = true;
     reportHeldUp(clock.boot);
-  }, [active, stage, clock]);
+  }, [active, report, stage, clock]);
 
   function restart() {
     if (shared) routeAttempt.clock = createLoadingClock();

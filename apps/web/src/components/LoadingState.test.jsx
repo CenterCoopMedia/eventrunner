@@ -83,6 +83,26 @@ describe('LoadingState', () => {
     expect(screen.getByRole('status')).toHaveTextContent('You can keep waiting.');
   });
 
+  it('keeps a reserved block silent until recovery without taking the visible figure', () => {
+    const heldUp = vi.fn();
+    globalThis.addEventListener('eventrunner:held-up', heldUp);
+    try {
+      const { container } = render(<LoadingState placeholder={<div data-testid="reserved-block" />} recover onRetry={() => {}} />);
+      advance(10_000);
+      expect(screen.getByTestId('reserved-block')).toBeInTheDocument();
+      expect(container.querySelector('.held-figure')).toBeNull();
+      expect(heldUp).not.toHaveBeenCalled();
+
+      advance(50_000);
+      expect(screen.queryByTestId('reserved-block')).toBeNull();
+      expect(screen.getByRole('status')).toHaveTextContent('This is taking longer than a minute.');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+      expect(heldUp).not.toHaveBeenCalled();
+    } finally {
+      globalThis.removeEventListener('eventrunner:held-up', heldUp);
+    }
+  });
+
   it('clears every scheduled update when content replaces the loader', () => {
     const { rerender, container } = render(<LoadingState label="Loading the schedule…" />);
     expect(vi.getTimerCount()).toBe(3);
