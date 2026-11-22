@@ -40,6 +40,7 @@ import { subscribeDirectory } from '../lib/profileSource.js';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import { collectOrganizations, directorySearchText, matchesDirectoryFilters } from '../lib/directoryView.js';
+import { eventStorageKey } from '../lib/eventBrowserState.js';
 import AttendeeFeed from '../components/AttendeeFeed.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
@@ -112,6 +113,36 @@ export function groupByLetter(sorted) {
 export function visibleDirectorySnapshot(snapshot, directoryKey) {
   if (snapshot.key !== directoryKey) return { profiles: null, failed: false };
   return { profiles: snapshot.profiles, failed: snapshot.failed };
+}
+
+const directoryFilterKey = eventStorageKey('eventrunner.directoryFilters');
+
+function readDirectoryFilters(scope) {
+  if (scope !== null) {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(directoryFilterKey));
+      if (stored?.scope === scope && typeof stored.query === 'string' &&
+          Array.isArray(stored.organizations) && stored.organizations.every((value) => typeof value === 'string')) {
+        return stored;
+      }
+    } catch { /* A blocked or invalid storage entry leaves the controls usable. */ }
+  }
+  return { scope, query: '', organizations: [] };
+}
+
+function useDirectoryFilters(scope) {
+  const [filters, setFilters] = useState(() => readDirectoryFilters(scope));
+  if (filters.scope !== scope) setFilters(readDirectoryFilters(scope));
+
+  function updateFilters(changes) {
+    const next = { ...filters, ...changes };
+    setFilters(next);
+    try {
+      if (scope !== null) sessionStorage.setItem(directoryFilterKey, JSON.stringify(next));
+    } catch { /* Keep the edit in memory when browser storage is unavailable. */ }
+  }
+
+  return [filters, updateFilters];
 }
 
 const homeLink = (
@@ -279,15 +310,21 @@ export default function Attendees() {
     [profiles],
   );
 
-  // The narrowing controls (issue #174): a query over name, organization,
-  // and role, and a filter by organization. Local state — the directory is
-  // a lookup, not a view somebody shares, unlike the schedule's URL state.
-  const [query, setQuery] = useState('');
+  // Tab storage keeps lookup terms off the URL and scopes them to the viewer's access.
+  const filterScope = directoryOpen ? JSON.stringify([uid ?? null, attendeeAccess]) : null;
+  const [filters, updateFilters] = useDirectoryFilters(filterScope);
+  const { query } = filters;
   // Only the text can lag. Every render filters its current authorized
   // snapshot, including removals, using that render's committed query.
-  const resultQuery = useDeferredValue(query).trim();
-  const [organizations, setOrganizations] = useState([]);
+  const queryForScope = useMemo(() => ({ scope: filterScope, query }), [filterScope, query]);
+  const deferredQuery = useDeferredValue(queryForScope);
+  const resultQuery = (deferredQuery.scope === filterScope ? deferredQuery.query : query).trim();
   const organizationOptions = useMemo(() => collectOrganizations(sorted), [sorted]);
+  // A saved selection may refer to a group that has since disappeared.
+  const organizations = useMemo(
+    () => filters.organizations.filter((value) => organizationOptions.some((option) => option.value === value)),
+    [filters.organizations, organizationOptions],
+  );
   // The folded search text, rebuilt only when the directory changes — not
   // per keystroke.
   const searchIndex = useMemo(() => {
@@ -387,7 +424,7 @@ export default function Attendees() {
                 <SearchField
                   label="Search the directory"
                   value={query}
-                  onChange={setQuery}
+                  onChange={(nextQuery) => updateFilters({ query: nextQuery, organizations })}
                   status={
                     resultQuery
                       ? `${filtered.length} ${filtered.length === 1 ? 'attendee matches' : 'attendees match'} “${resultQuery}”`
@@ -402,7 +439,7 @@ export default function Attendees() {
                     legend="Organization"
                     options={organizationOptions}
                     selected={organizations}
-                    onChange={setOrganizations}
+                    onChange={(nextOrganizations) => updateFilters({ organizations: nextOrganizations })}
                     clearLabel="Clear organization filter"
                   />
                 </div>
