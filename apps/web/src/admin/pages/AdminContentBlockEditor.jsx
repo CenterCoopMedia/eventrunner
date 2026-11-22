@@ -769,7 +769,8 @@ export default function AdminContentBlockEditor({ mode }) {
     <Panel help="Write the content attendees should see in this block." key="value" title="Content" className="admin-content-value">
       {content.blockType === 'timeline' ? (
         <p className="text-admin-sm text-admin-ink-secondary">
-          This block shows published entries from <Link to="/admin/timeline" className="underline">Timeline</Link>.
+          This block shows published entries from <Link to="/admin/timeline" className="underline">Timeline</Link>.{' '}
+          <Link to="/admin/timeline/new/entry" className="underline">Add a timeline entry</Link>
         </p>
       ) : null}
       <BlockValueFields
