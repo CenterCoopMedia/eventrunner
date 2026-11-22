@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { isCanonicalPagePath } from 'shared/routing';
 import { criticalFontTags } from './criticalFonts.js';
+import { isNetworkOnlyPath } from './src/lib/offlineRoutes.js';
 
 const PUBLIC_MODULES = new Set([
   'Schedule.jsx', 'MySchedule.jsx', 'SessionDetail.jsx', 'Speakers.jsx', 'SpeakerDetail.jsx',
@@ -10,10 +11,8 @@ const PUBLIC_MODULES = new Set([
   'PublicLanguageRuntime.jsx', 'LanguageChoice.jsx', 'FooterPageLinks.jsx', 'TimelineDetails.jsx',
   'LatestUpdatesBlock.jsx', 'MapBlock.jsx', 'QuoteBlock.jsx', 'FaqItemBlock.jsx', 'LinkGroupBlock.jsx',
   'SponsorPackageBlock.jsx', 'GalleryBlock.jsx', 'TimelineBlock.jsx', 'CaptionedImageFigure.jsx',
-  'SavedPublicNotice.jsx', 'busyControlFigures.js', 'leaflet-src.js',
+  'SavedPublicNotice.jsx', 'FeedbackModal.jsx', 'busyControlFigures.js', 'leaflet-src.js',
 ]);
-
-const NETWORK_ONLY = /^\/(?:admin|ticket|tickets|profile|speaker|attendees|schedule\/(?:mine|user)|pitch|registration|signin|unsubscribe|dashboard|low-bandwidth|specimen)(?:\/|$)/;
 
 export function offlineBundle({ root, generatedDir, project }) {
   const require = createRequire(path.join(root, 'vite.config.js'));
@@ -31,7 +30,7 @@ export function offlineBundle({ root, generatedDir, project }) {
         const snapshot = await readGeneratedSnapshot({ generatedDir });
         const routes = snapshot.comingSoon ? [] : collectPublicRoutes(snapshot)
           .map((route) => route.path)
-          .filter((route) => isCanonicalPagePath(route) && !NETWORK_ONLY.test(route));
+          .filter((route) => isCanonicalPagePath(route) && !isNetworkOnlyPath(route));
         const files = new Set(['app-shell.html', 'branding/favicon.svg', 'manifest.webmanifest']);
         const addChunk = (file) => {
           if (files.has(file)) return;

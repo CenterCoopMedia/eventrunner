@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { quietActionClass } from './controlClasses.js';
 import { publicSubscriptionsForRoute } from '../lib/publicSubscriptions.js';
-import { hasStalePublicReads, readSavedPublicBuild } from '../lib/savedPublicBuild.js';
+import { clearPublicReads, hasStalePublicReads, readSavedPublicBuild } from '../lib/savedPublicBuild.js';
 
 const TYPES = {
   document: 'public-offline-document',
@@ -116,8 +116,16 @@ export default function SavedPublicNotice() {
 
   useEffect(() => {
     if (!savedId) return undefined;
+    const offline = () => {
+      clearPublicReads();
+      setTick((tick) => tick + 1);
+    };
     const timer = setInterval(() => setTick((tick) => tick + 1), 1000);
-    return () => clearInterval(timer);
+    globalThis.addEventListener('offline', offline);
+    return () => {
+      clearInterval(timer);
+      globalThis.removeEventListener('offline', offline);
+    };
   }, [savedId]);
 
   useEffect(() => () => reloadTimer.current?.(), []);
@@ -143,14 +151,22 @@ export default function SavedPublicNotice() {
   function useUpdate() {
     reloadTimer.current?.();
     const oldController = service.controller;
+    const channel = new MessageChannel();
+    let keepRoute;
     const cleanup = () => {
       clearTimeout(timeout);
       service.removeEventListener('controllerchange', reload);
+      channel.port1.close();
     };
     const reload = () => {
-      if (service.controller === oldController) return;
+      if (service.controller === oldController || typeof keepRoute !== 'boolean') return;
       cleanup();
-      location.reload();
+      if (keepRoute) location.reload();
+      else location.assign(base);
+    };
+    channel.port1.onmessage = ({ data }) => {
+      keepRoute = data?.keepRoute;
+      reload();
     };
     const timeout = setTimeout(() => {
       cleanup();
@@ -158,7 +174,7 @@ export default function SavedPublicNotice() {
     }, 10_000);
     reloadTimer.current = cleanup;
     service.addEventListener('controllerchange', reload);
-    waiting.postMessage({ type: TYPES.update });
+    waiting.postMessage({ type: TYPES.update }, [channel.port2]);
   }
 
   if (!saved && !(allowed && (waiting || saveData))) return null;

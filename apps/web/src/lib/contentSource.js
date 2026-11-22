@@ -14,7 +14,7 @@
 import { subscribeToFirebase } from './firebaseLoader.js';
 import { SERVER_CONFIRMATION, subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
-import { confirmPublicRead, readSavedPublicBuild } from './savedPublicBuild.js';
+import { recordPublicRead, readSavedPublicBuild } from './savedPublicBuild.js';
 
 // Static demo build: report local updates and keep other snapshots in charge.
 //
@@ -49,8 +49,8 @@ export function subscribeSpeakersPublic(onNext) {
   const saved = Boolean(readSavedPublicBuild());
   return subscribeToFirebase(({ db, collection, onSnapshot }) => {
     const next = (snapshot) => {
+      if (saved) recordPublicRead('speakers_public', snapshot.metadata?.fromCache === false ? 'server' : 'cache');
       if (saved && snapshot.metadata?.fromCache === true) return;
-      if (saved && snapshot.metadata?.fromCache === false) confirmPublicRead('speakers_public');
       onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     };
     const target = collection(db, 'speakers_public');
@@ -59,6 +59,7 @@ export function subscribeSpeakersPublic(onNext) {
         ? onSnapshot(target, { includeMetadataChanges: true }, next, onError)
         : onSnapshot(target, next, onError),
       (error) => {
+        if (saved) recordPublicRead('speakers_public', 'interrupted');
         console.warn('speakers_public subscription failed; keeping snapshot values and retrying.', error);
       },
     );
@@ -101,9 +102,9 @@ export function subscribeContentCollection(name, readSource, onNext, onConfirmed
         : query(collection(db, name), where('visible', '==', true));
     const next = (snapshot) => {
       const fromCache = snapshot.metadata?.fromCache;
+      if (saved) recordPublicRead(name, fromCache === false ? 'server' : 'cache');
       if (publicSchedule && snapshot.docs.length === 0 && fromCache) return;
       if (!saved || fromCache !== true) onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      if (saved && fromCache === false) confirmPublicRead(name);
       onConfirmed?.(fromCache === false);
     };
     return subscribeWithRetry(
@@ -111,6 +112,7 @@ export function subscribeContentCollection(name, readSource, onNext, onConfirmed
         ? onSnapshot(target, SERVER_CONFIRMATION, next, onError)
         : onSnapshot(target, next, onError),
       (error) => {
+        if (saved) recordPublicRead(name, 'interrupted');
         onConfirmed?.(false);
         // Fail soft: the generated snapshot (or last-known live values) keeps
         // rendering. The SDK has already torn this listener down, so

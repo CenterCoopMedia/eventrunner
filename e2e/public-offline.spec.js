@@ -92,8 +92,11 @@ test('a failed service-worker install leaves the saved shell usable until an exp
     await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.ready;
       const controlled = new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
-      registration.waiting.postMessage({ type: 'public-offline-use-update' });
-      await controlled;
+      const channel = new MessageChannel();
+      const reply = new Promise((resolve) => { channel.port1.onmessage = ({ data }) => resolve(data.keepRoute); });
+      registration.waiting.postMessage({ type: 'public-offline-use-update' }, [channel.port2]);
+      const [keepRoute] = await Promise.all([reply, controlled]);
+      if (!keepRoute) throw new Error('The new build should keep its public schedule route.');
     });
     await context.setOffline(true);
     await page.reload();

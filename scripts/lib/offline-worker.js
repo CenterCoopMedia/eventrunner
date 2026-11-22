@@ -66,7 +66,7 @@ function savedShell(text, headers, savedAt) {
 }
 
 async function install() {
-  if (scope.pathname !== BUILD.base || !routes.size || BUILD.bytes > BUILD.maxBytes) {
+  if (scope.pathname !== BUILD.base || !routes.has('/') || BUILD.bytes > BUILD.maxBytes) {
     throw new Error('Public offline build is outside its scope or size limit');
   }
   if (!await readPolicy()) throw new Error('Public offline copies are disabled');
@@ -192,7 +192,10 @@ self.addEventListener('message', (event) => {
     downloadApproved = true;
     approveDownload?.();
   }
-  if (event.data?.type === 'public-offline-use-update') event.waitUntil(self.skipWaiting());
+  if (event.data?.type === 'public-offline-use-update') {
+    event.ports[0]?.postMessage({ keepRoute: publicNavigation(new URL(event.source.url)) });
+    event.waitUntil(self.skipWaiting());
+  }
   if (event.data?.type === 'public-offline-document') {
     const { id } = event.data;
     clientBuilds.set(event.source.id, /^[a-f0-9]{64}$/.test(id) ? id : null);

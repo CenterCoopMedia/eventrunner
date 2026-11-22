@@ -15,13 +15,24 @@ export function reloadPublicPageFromNetwork() {
 
 const confirmations = new Map();
 
-export function confirmPublicRead(dataset) {
-  if (readSavedPublicBuild()) confirmations.set(dataset, Date.now());
+export function recordPublicRead(dataset, status) {
+  if (!readSavedPublicBuild()) return;
+  if (status === 'server') confirmations.set(dataset, { at: Date.now(), current: true });
+  else if (status === 'cache') confirmations.delete(dataset);
+  else if (status === 'interrupted' && confirmations.has(dataset)) {
+    confirmations.set(dataset, { ...confirmations.get(dataset), current: false });
+  }
+}
+
+export function clearPublicReads() {
+  confirmations.clear();
 }
 
 export function hasStalePublicReads(datasets, now = Date.now()) {
   return datasets.some((dataset) => {
-    const time = confirmations.get(dataset);
-    return !Number.isFinite(time) || time > now || now - time >= 300_000;
+    const { at, current } = confirmations.get(dataset) ?? {};
+    // A server-backed listener remains current until it reports a cached
+    // result or loses its subscription. Age applies to a last-known read.
+    return !Number.isFinite(at) || at > now || (!current && now - at >= 300_000);
   });
 }

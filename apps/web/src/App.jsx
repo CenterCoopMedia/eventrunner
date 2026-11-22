@@ -22,6 +22,9 @@ import { adminRoute, publicRoutes, prefetchRoutes } from './routes.jsx';
 import { installDeferredRoutePrefetch } from './lib/deferredRoutePrefetch.js';
 import { IS_DEMO } from './lib/demoMode.js';
 import FieldVitals from './components/FieldVitals.jsx';
+import { primaryActionClass } from './components/controlClasses.js';
+import { needsNetworkDocument } from './lib/offlineRoutes.js';
+import { readSavedPublicBuild } from './lib/savedPublicBuild.js';
 
 export function AppRoutes() {
   const { pathname } = useLocation();
@@ -74,8 +77,24 @@ function ContentGate({ children }) {
   );
 }
 
+function NetworkOnlySavedRoute() {
+  useEffect(() => {
+    if (navigator.onLine) location.replace(location.href);
+  }, []);
+  return (
+    <main className="stage py-xl">
+      <h1 className="font-heading text-h2">This page needs a connection</h1>
+      <a href={location.href} className={primaryActionClass}>Open this page online</a>{' '}
+      <a href={import.meta.env.BASE_URL} className={primaryActionClass}>Open saved home</a>
+    </main>
+  );
+}
+
 export default function App() {
-  const { pathname, search } = useLocation();
+  const { pathname, search, key } = useLocation();
+  if (readSavedPublicBuild() && needsNetworkDocument(pathname, search)) {
+    return <NetworkOnlySavedRoute key={key} />;
+  }
   return (
     <EventConfigProvider pathname={pathname} search={search}>
       <AuthProvider>

@@ -66,7 +66,7 @@ function worker({ id, caches, failFile, enabled = () => true, open = [], savedAt
     let response;
     const pending = [];
     handlers.get(type)({
-      ...fields, waitUntil: (promise) => pending.push(promise), respondWith: (promise) => { response = promise; },
+      ports: [], ...fields, waitUntil: (promise) => pending.push(promise), respondWith: (promise) => { response = promise; },
     });
     return { response, done: Promise.all(pending) };
   }
@@ -112,6 +112,12 @@ test('an interrupted update leaves the active shell and its chunks, and activati
     source: originalTab, data: { type: 'public-offline-document', id: oldId },
   }).done;
   assert.match(await (await complete.request(old.chunk, 'cors').response).text(), /'a'/);
+  const replies = [];
+  await complete.event('message', {
+    source: { ...originalTab, url: `${base}schedule/mine` }, data: { type: 'public-offline-use-update' },
+    ports: [{ postMessage: ({ keepRoute }) => replies.push(keepRoute) }],
+  }).done;
+  assert.deepEqual(replies, [false], 'an update on a network-only route must reload the saved home');
   open.splice(0, 1, { id: 'reloaded-tab', url: `${base}schedule` });
   await complete.event('message', {
     source: open[0], data: { type: 'public-offline-document', id: nextId },
