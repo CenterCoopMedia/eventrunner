@@ -17,6 +17,9 @@ export default function RunRow({ row, timeZone, busyKey, controlProps, notice, r
   const summary = runSummary(row);
   const key = `resume:${row.id}`;
   const failed = row.status === 'failed';
+  const deletion = row.mediaReplacement?.deletion;
+  const finishDeletion = row.status === 'done' && (deletion?.status === 'removing'
+    || (deletion?.status === 'waiting-for-site' && ['done', 'failed'].includes(row.publisher?.status)));
   const when = formatPublishedAt(toMillis(row.requestedAt), timeZone);
   return (
     <li className="flex flex-col gap-2xs border-b-admin-hairline border-admin-rule-hairline py-sm last:border-b-0" data-run={row.id}>
@@ -27,6 +30,12 @@ export default function RunRow({ row, timeZone, busyKey, controlProps, notice, r
       <p className={`break-all ${rowMetaClass}`}>
         {[typeof row.requestedBy === 'string' ? versionAuthor(row.requestedBy) : null, when].filter(Boolean).join(' · ')}
       </p>
+      {deletion?.message ? <p className="text-admin-sm text-admin-ink">{deletion.message}</p> : null}
+      {finishDeletion ? (
+        <button type="button" {...controlProps(key, `${secondaryButtonClass} self-start`)}>
+          {busyKey === key ? 'Checking…' : 'Check and delete original'}
+        </button>
+      ) : null}
       {failed ? (
         <div className="flex flex-col items-start gap-2xs">
           {row.mediaReplacement ? (

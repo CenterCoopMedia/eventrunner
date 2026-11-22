@@ -125,6 +125,7 @@ export default function AssetModal({
   const busy = Boolean(action);
   const [confirming, setConfirming] = useState(false);
   const [replacing, setReplacing] = useState(false);
+  const [originalDeleted, setOriginalDeleted] = useState(false);
   const replaceTrigger = useRef(null);
   const usageHeading = useRef(null);
   const locked = !operator && (isBrandingAsset(asset) || referencedByBranding(references));
@@ -203,11 +204,11 @@ export default function AssetModal({
   return (
     <ModalShell title={asset.title || asset.filename || 'Asset'} onClose={onClose} busy={busy} returnFocusRef={returnFocusRef}>
       <div className="grid gap-md sm:grid-cols-2">
-        <AssetImage
+        {!originalDeleted ? <AssetImage
           path={asset.path}
           alt={asset.alt ?? ''}
           className="max-h-64 w-full rounded-admin border-admin-hairline border-admin-rule-hairline object-contain"
-        />
+        /> : null}
         <dl className="text-admin-sm text-admin-ink">
           <dt className="font-semibold">File name</dt>
           <dd className={`mb-2xs break-all ${rowMetaClass}`}>{asset.filename || asset.path?.split('/').pop()}</dd>
@@ -218,7 +219,7 @@ export default function AssetModal({
         </dl>
       </div>
 
-      {locked ? <p className="mt-md text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p> : (
+      {originalDeleted ? null : locked ? <p className="mt-md text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p> : (
         <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
           <TextAreaField help="Describe what the image shows for people who cannot see it." label="Image description"  value={alt} onChange={(value) => { setAlt(value); setStatus(''); }} rows={2} disabled={busy} />
           <TextField help="Give this file a name staff can recognize in the media library." label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} disabled={busy} />
@@ -238,9 +239,9 @@ export default function AssetModal({
 
       <section className="mt-md border-admin-rule-hairline border-t-admin-hairline pt-sm">
         <div className="flex items-center gap-2xs"><h3 ref={usageHeading} tabIndex={-1} className="text-admin-lg font-bold text-admin-ink">Where this is used</h3><HelpTooltip label="Where this is used">Check which content currently uses this image before changing it.</HelpTooltip></div>
-        <div className="mt-2xs">
+        {!originalDeleted ? <div className="mt-2xs">
           <UsageList references={references} error={usageError} onRetry={() => setScanAttempt((attempt) => attempt + 1)} />
-        </div>
+        </div> : null}
         {replacing ? (
           <AssetReplacement
             asset={asset}
@@ -248,8 +249,12 @@ export default function AssetModal({
             replace={replace}
             renderPicker={renderReplacementPicker}
             onBusy={(value) => { pending.current = value; setAction(value ? 'replace' : ''); }}
-            onChanged={() => setScanAttempt((attempt) => attempt + 1)}
+            onChanged={(outcome) => {
+              if (outcome.deletion?.status === 'deleted') setOriginalDeleted(true);
+              else setScanAttempt((attempt) => attempt + 1);
+            }}
             onClose={() => {
+              if (originalDeleted) return onClose();
               setReplacing(false);
               requestAnimationFrame(() => (replaceTrigger.current ?? usageHeading.current)?.focus());
             }}
@@ -266,7 +271,7 @@ export default function AssetModal({
             it is. */}
         <div className="mt-sm flex flex-wrap gap-xs">
           {deleteError ? <Notice tone="error" message={deleteError} /> : null}
-          {locked ? null : confirming || (references?.length ?? 0) > 0 ? (
+          {locked || replacing ? null : confirming || (references?.length ?? 0) > 0 ? (
             <DestructiveConfirm
               trigger="Delete this file anyway"
               triggerIcon="delete"

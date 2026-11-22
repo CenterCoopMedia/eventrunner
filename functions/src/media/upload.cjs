@@ -377,6 +377,14 @@ function createMediaUploadHandler({
   };
 }
 
+async function removeMediaFile({ db, bucket, ref, path, batch = db.batch() }) {
+  // A half-finished delete can resume after Storage has removed the object.
+  if (path) await bucket.file(path).delete({ ignoreNotFound: true });
+  batch.delete(ref);
+  batch.delete(db.collection('media_captions').doc(ref.id));
+  await batch.commit();
+}
+
 /**
  * `mediaDelete`: remove an asset and its object.
  *
@@ -461,15 +469,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
           if (reserved !== true) tx.update(ref, { deleting: true });
         });
       }
-      if (path) {
-        // ignoreNotFound: an object already gone (a half-finished earlier
-        // delete) must not strand its row in the library forever.
-        await bucket.file(path).delete({ ignoreNotFound: true });
-      }
-      const batch = db.batch();
-      batch.delete(ref);
-      batch.delete(db.collection('media_captions').doc(assetId));
-      await batch.commit();
+      await removeMediaFile({ db, bucket, ref, path });
     } catch (err) {
       if (err instanceof ConfirmationConflict) return sendError(res, err.status, err.code, err.message);
       log.error('mediaDelete failed', err);
@@ -798,6 +798,7 @@ module.exports = {
   createSpeakerPhotoUploadHandler,
   createSpeakerPhotoDeleteHandler,
   storeAsset,
+  removeMediaFile,
   storeSpeakerPhoto,
   get handlers() {
     return buildHandlers();

@@ -138,7 +138,7 @@ export function summarizeAll(response) {
     const failures = response.failed.length;
     return failures > 0
       ? { ok: false, message: `${failures} ${failures === 1 ? 'image placement needs' : 'image placements need'} attention. Open Media to review.` }
-      : { ok: true, message: 'Image replacement complete.' };
+      : { ok: true, message: response.deletion?.message || 'Image replacement complete.' };
   }
   const results = response?.results && typeof response.results === 'object' ? response.results : {};
   const collections = Object.keys(results);

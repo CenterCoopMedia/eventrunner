@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AssetModal from './AssetModal.jsx';
 import UploadModal from './UploadModal.jsx';
+import { subscribeAdminDoc } from '../../adminSource.js';
+
+vi.mock('../../adminSource.js', async (importOriginal) => ({
+  ...await importOriginal(),
+  subscribeAdminDoc: vi.fn(),
+}));
 
 const asset = {
   id: 'file-1', path: 'cms-images/file-1/venue.png', filename: 'venue.png',
@@ -89,15 +95,52 @@ describe('media action feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Choose new arrival photo' }));
     await screen.findByText(/Published · url/);
     expect(screen.getByText(/Draft · url/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Also delete the original file' })).not.toBeChecked();
     expect(replace).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Keep the current description' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm replacement' }));
     expect(await screen.findByText('Draft could not be saved.')).toBeInTheDocument();
     const [id, input] = replace.mock.calls[0];
-    expect(input).toMatchObject({ assetId: asset.id, replacementId: replacement.id, keepDescription: true, references });
+    expect(input).toMatchObject({ assetId: asset.id, replacementId: replacement.id, keepDescription: true, deleteOriginal: false, references });
     fireEvent.click(screen.getByRole('button', { name: 'Retry replacement' }));
     expect(await screen.findByText('2 places changed.')).toBeInTheDocument();
     expect(replace).toHaveBeenNthCalledWith(2, id, input);
+  });
+
+  it('requires a separate permanent deletion confirmation after the editor opts in', async () => {
+    const place = { docPath: 'cmsContent/hero__image', field: 'url' };
+    const scanUsage = vi.fn().mockResolvedValue({ [asset.path]: [place] });
+    const outcome = { queueId: 'receipt', status: 'done', changed: [place], failed: [] };
+    const replace = vi.fn().mockResolvedValue({
+      ...outcome, deletion: { status: 'waiting-for-site', message: 'The original stays while the site updates.' },
+    });
+    let onReceipt;
+    subscribeAdminDoc.mockImplementation((path, onNext) => {
+      expect(path).toBe('cmsPublishQueue/receipt');
+      onReceipt = onNext;
+      return vi.fn();
+    });
+    const replacement = { id: 'file-2', path: 'cms-images/file-2/new.png', title: 'New venue photo' };
+    render(<AssetModal asset={asset} operator onClose={vi.fn()} scanUsage={scanUsage} updateMetadata={vi.fn()}
+      remove={vi.fn()} replace={replace} renderReplacementPicker={({ onSelect }) => (
+        <button type="button" onClick={() => onSelect(replacement)}>Choose new venue photo</button>
+      )} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Replace this image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose new venue photo' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Also delete the original file' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review permanent deletion' }));
+    expect(screen.getByText(/Deleting the original cannot be undone/)).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replace and delete original' }));
+    await screen.findByText('The original stays while the site updates.');
+    expect(replace).toHaveBeenCalledOnce();
+    await act(async () => onReceipt({ mediaReplacement: { deletion: { status: 'deleted', message: 'The original file was deleted.' } } }));
+    expect(await screen.findByText('The original file was deleted.')).toBeInTheDocument();
+    expect(replace).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ deleteOriginal: true }));
+    expect(replace).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Delete this file anyway' })).not.toBeInTheDocument();
   });
 
   it('keeps upload inputs and dismissal consistent during a delayed upload', async () => {

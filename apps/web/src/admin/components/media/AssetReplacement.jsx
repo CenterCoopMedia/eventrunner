@@ -3,8 +3,9 @@ import { AdminLoadingState } from '../adminChrome.jsx';
 import { useEffect, useRef, useState } from 'react';
 import AssetImage from '../../../components/media/AssetImage.jsx';
 import BusyLabel from '../../../components/BusyLabel.jsx';
-import { CheckboxField, Notice, SaveStatus, primaryButtonClass, secondaryButtonClass } from '../formControls.jsx';
+import { CheckboxField, DestructiveConfirm, Notice, SaveStatus, primaryButtonClass, secondaryButtonClass } from '../formControls.jsx';
 import { mediaErrorMessage } from './mediaErrors.js';
+import { subscribeAdminDoc } from '../../adminSource.js';
 
 const REPLACEMENT_ERRORS = {
   'usage-changed': 'The places using this image changed. Review the updated list and confirm again.',
@@ -37,6 +38,7 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
   const [places, setPlaces] = useState(null);
   const [checkCount, setCheckCount] = useState(0);
   const [keepDescription, setKeepDescription] = useState(false);
+  const [deleteOriginal, setDeleteOriginal] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -58,6 +60,7 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
     request.current = null;
     setResult(null);
     setPlaces(null);
+    setDeleteOriginal(false);
     setError(null);
     setCheckCount((count) => count + 1);
   }
@@ -71,10 +74,10 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
     setError(null);
     try {
       const outcome = await replace(id, {
-        assetId: asset.id, replacementId: replacement.id, keepDescription, references: places,
+        assetId: asset.id, replacementId: replacement.id, keepDescription, deleteOriginal, references: places,
       });
       setResult(outcome);
-      onChanged();
+      onChanged(outcome);
     } catch (err) {
       if (err.code === 'usage-changed' && Array.isArray(err.usage)) {
         request.current = null;
@@ -89,7 +92,20 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
     }
   }
 
+  useEffect(() => {
+    if (!result?.queueId || result.deletion?.status !== 'waiting-for-site') return undefined;
+    return subscribeAdminDoc(`cmsPublishQueue/${result.queueId}`, (row) => {
+      const deletion = row?.mediaReplacement?.deletion;
+      if (!['deleted', 'kept'].includes(deletion?.status)) return;
+      const outcome = { ...result, deletion };
+      setResult(outcome);
+      onChanged(outcome);
+    });
+  }, [onChanged, result]);
+
   const confirmed = Boolean(request.current);
+  const canSubmit = replacement && places?.length > 0 && (!result || result.status === 'failed');
+  const showDestructiveConfirm = canSubmit && deleteOriginal && (!confirmed || (busy && !result));
   return (
     <div className="mt-sm space-y-sm rounded-admin border-admin-hairline border-admin-rule-control bg-admin-ground-proof p-sm">
       <h4 className="text-admin-base font-bold text-admin-ink">Replace this image</h4>
@@ -115,7 +131,7 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
       {places?.length === 0 ? <p>No image placements currently use this file.</p> : null}
       {!result && places?.length > 0 ? (
         <>
-          <p>{places.length} {places.length === 1 ? 'place will change' : 'places will change'}. The previous image stays in the library.</p>
+          <p>{places.length} {places.length === 1 ? 'place will change' : 'places will change'}.</p>
           <Places places={places} usageLocation={usageLocation} />
           {replacement && !keepDescription ? (
             <p className="text-admin-sm text-admin-ink-secondary">
@@ -126,6 +142,8 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
           ) : null}
           <CheckboxField label="Keep the current description" checked={keepDescription} onChange={setKeepDescription}
             help="Keep the alt text, caption, and credit at each place. Clear the checkbox to use the replacement image’s description." disabled={busy || confirmed} />
+          <CheckboxField label="Also delete the original file" checked={deleteOriginal} onChange={setDeleteOriginal}
+            hint="The original stays in the library if this is unchecked or if it is still in use." disabled={busy || confirmed} />
         </>
       ) : null}
       {result?.changed?.length > 0 ? (
@@ -140,10 +158,29 @@ export default function AssetReplacement({ asset, scanUsage, replace, renderPick
           <Places places={result.failed} usageLocation={usageLocation} />
         </>
       ) : null}
+      {result?.deletion?.status === 'deleted' ? <SaveStatus message={result.deletion.message} /> : null}
+      {result?.deletion && result.deletion.status !== 'deleted' ? <Notice tone="caution" message={result.deletion.message} /> : null}
+      {showDestructiveConfirm ? (
+        <DestructiveConfirm
+          trigger="Review permanent deletion"
+          title="Replace the image and delete the original"
+          consequence="The original file is deleted only after its uses have moved to the replacement."
+          permanence="Deleting the original cannot be undone."
+          confirmLabel="Replace and delete original"
+          onConfirm={confirm}
+          busy={busy}
+          busyLabel="Replacing the image…"
+        />
+      ) : null}
       <div className="flex flex-wrap gap-xs">
-        {replacement && places?.length > 0 && (!result || result.status === 'failed') ? (
+        {canSubmit && !showDestructiveConfirm ? (
           <button type="button" className={primaryButtonClass} onClick={confirm} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
             <BusyLabel busy={busy} pending="Replacing the image…">{confirmed ? 'Retry replacement' : 'Confirm replacement'}</BusyLabel>
+          </button>
+        ) : null}
+        {result?.deletion?.status === 'retry' ? (
+          <button type="button" className={primaryButtonClass} onClick={confirm} disabled={busy}>
+            <BusyLabel busy={busy} pending="Checking the original file…">Check and delete original</BusyLabel>
           </button>
         ) : null}
         {result?.status === 'done' && result.failed?.length > 0 ? <button type="button" className={secondaryButtonClass} disabled={busy} onClick={reviewRemaining}>Review remaining uses</button> : null}
