@@ -296,6 +296,8 @@ test('the promo preview prices add-ons, so the card minimum sees the same total 
     return res;
   };
   assert.equal((await preview([{ ticketTypeId: 'general', quantity: 1 }])).body.error.code, 'amount-too-small');
+  // A null add-on list is an empty one, as checkout treats it, not a server error.
+  assert.equal((await preview([{ ticketTypeId: 'general', quantity: 1, addOns: null }])).body.error.code, 'amount-too-small');
   const res = await preview([{ ticketTypeId: 'general', quantity: 1, addOns: [{ id: 'reception', quantity: 1 }] }]);
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.equal(res.body.totalAmount, 1525);
