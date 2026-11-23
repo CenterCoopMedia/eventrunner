@@ -91,12 +91,14 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   const dashboardUrl = safeStripeDashboardUrl(data?.stripeDashboardUrl);
   const refunds = order?.refunds || data?.refunds || [];
   const selectedRefund = refunds.find((refund) => refund.id === refundId);
-  // A ticket being removed takes its add-ons with it, so its own picks are not sent.
+  // A ticket losing admission takes its add-ons with it, so its own picks are not sent.
+  // A refund that keeps every ticket valid removes no ticket, so all picks are sent.
+  const removedTicketIds = confirm !== 'cancel' && preserveAdmission ? [] : selected;
   const addOnPicks = selectedAddOns.map((key) => {
     const [ticketId, addOnId] = key.split('/');
     const ticket = tickets.find((candidate) => (candidate.externalId || candidate.id) === ticketId);
     return { ticketId, addOnId, ticket, addOn: ticket?.addOns?.find((candidate) => candidate.id === addOnId) };
-  }).filter((pick) => pick.addOn && !selected.includes(pick.ticketId));
+  }).filter((pick) => pick.addOn && !removedTicketIds.includes(pick.ticketId));
   const addOnRequest = addOnPicks.length ? { addOns: addOnPicks.map(({ ticketId, addOnId }) => ({ ticketId, addOnId })) } : {};
   const clearSelection = () => { setSelected([]); setSelectedAddOns([]); };
 
@@ -235,7 +237,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
               <td className={cellClass}><StatusBadge tone={ticket.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
               <td className={cellClass}>{ticket.addOns?.length ? <ul className="space-y-3xs">{ticket.addOns.map((addOn) => {
                 const key = `${id}/${addOn.id}`;
-                return <li key={addOn.id}>{addOn.status !== 'refunded' && !selected.includes(id) ? <Checkbox data-help-skip="The label names the add-on selected for a refund or cancellation." tone="admin" label={addOnLabel(addOn)} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selectedAddOns.includes(key)} onChange={(event) => {
+                return <li key={addOn.id}>{addOn.status !== 'refunded' && !removedTicketIds.includes(id) ? <Checkbox data-help-skip="The label names the add-on selected for a refund or cancellation." tone="admin" label={addOnLabel(addOn)} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selectedAddOns.includes(key)} onChange={(event) => {
                   if (busyRef.current || requiresOperator) return;
                   setSelectedAddOns((previous) => event.target.checked ? [...previous, key] : previous.filter((selectedKey) => selectedKey !== key));
                 }} /> : addOnLabel(addOn)}</li>;
