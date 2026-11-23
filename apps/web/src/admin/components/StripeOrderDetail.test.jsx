@@ -323,3 +323,22 @@ describe('releasing the seats of an order that needs review', () => {
     expect(screen.queryByRole('button', { name: 'Release the held seats' })).not.toBeInTheDocument();
   });
 });
+
+describe('ticket add-ons', () => {
+  it('cancels a selected add-on while its ticket keeps admission', async () => {
+    const ticket = { ...UNUSED_TICKET, addOns: [{ id: 'reception', name: 'Evening reception', status: 'valid' }] };
+    const other = { ...UNUSED_TICKET, externalId: 'seat-other', firstName: 'Other', addOns: [{ id: 'reception', name: 'Evening reception', status: 'refunded' }] };
+    const { call } = await cancellationSetup({ isOperator: true, initialTickets: [ticket, other] });
+    expect(screen.getByText('Evening reception (Refunded)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Evening reception' }));
+    expect(screen.getByRole('status')).toHaveTextContent('1 add-ons selected');
+    reviewCancellation();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('These add-ons will be removed. Their tickets keep admission.')).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Reason for this action'), { target: { value: 'Reception cancelled on request.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel 1 add-ons' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({
+      action: 'cancelTickets', ticketIds: [], addOns: [{ ticketId: 'seat-unused', addOnId: 'reception' }],
+    })));
+  });
+});

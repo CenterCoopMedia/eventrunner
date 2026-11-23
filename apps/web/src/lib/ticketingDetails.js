@@ -118,3 +118,13 @@ export const paymentStatusLabel = (status) => label(PAYMENT_LABELS, status);
 export const refundStateLabel = (status) => label(REFUND_STATE_LABELS, status);
 export const refundLabel = (status) => label(REFUND_LABELS, status);
 export const disputeStatusLabel = (status) => label(DISPUTE_LABELS, status);
+
+/** "Evening reception", or "Evening reception (Refunded)" when it is no longer usable. */
+export function addOnLabel(addOn) {
+  return addOn.status === 'valid' ? addOn.name : `${addOn.name} (${ticketStatusLabel(addOn.status)})`;
+}
+
+/** A ticket's add-ons as one line of text, or an empty string. */
+export function addOnsText(addOns) {
+  return (addOns || []).map(addOnLabel).join(', ');
+}

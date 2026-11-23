@@ -1,6 +1,7 @@
 import { plannerMessage } from '../plannerErrors.js';
 import { useRef, useState } from 'react';
-import { formatTicketTime } from '../../lib/ticketingDetails.js';
+import { addOnLabel, formatTicketTime } from '../../lib/ticketingDetails.js';
+import { StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, primaryButtonClass, secondaryButtonClass, TextAreaField, TextField } from './formControls.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
 
@@ -47,6 +48,10 @@ export default function StripeCheckInPanel({ call, isOperator, timezone, onChang
       {result.ticket ? <div className="space-y-xs">
         <p className="wrap-anywhere text-admin-base font-bold">{result.ticket.firstName} {result.ticket.lastName} · {result.ticket.ticketClass}</p>
         <p className="wrap-anywhere font-admin-data text-admin-sm">{result.ticket.externalId || result.ticket.id}</p>
+        {result.ticket.addOns?.length ? <div className="flex flex-wrap items-center gap-xs">
+          <span className="text-admin-sm font-semibold">Add-ons</span>
+          <ul className="flex flex-wrap gap-xs">{result.ticket.addOns.map((addOn) => <li key={addOn.id}><StatusBadge tone={addOn.status === 'valid' ? 'ok' : 'caution'}>{addOnLabel(addOn)}</StatusBadge></li>)}</ul>
+        </div> : null}
         {result.ticket.checkedInAt ? <p className="font-admin-data text-admin-sm">Checked in {formatTicketTime(result.ticket.checkedInAt, timezone)}.</p> : null}
         {isOperator && result.ticket.checkedInAt ? <button type="button" className={secondaryButtonClass} onClick={() => { setCorrection({ ...result.ticket }); setReason(''); setError(''); }}>Undo check-in</button> : null}
       </div> : null}
