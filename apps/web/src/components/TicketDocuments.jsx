@@ -1,6 +1,6 @@
 import { PublicLink as Link } from './PublicLink.jsx';
 import { secondaryActionClass } from './controlClasses.js';
-import { formatTicketTime, ticketStatusLabel } from '../lib/ticketingDetails.js';
+import { addOnsText, formatTicketTime, ticketStatusLabel } from '../lib/ticketingDetails.js';
 
 /** The printed credential is an opaque admission ID. It contains no embedded personal data. */
 export default function TicketDocuments({ tickets, eventName, timezone }) {
@@ -20,6 +20,7 @@ export default function TicketDocuments({ tickets, eventName, timezone }) {
             <dl className="grid min-w-0 gap-sm sm:grid-cols-2">
               <div><dt className="font-semibold">Attendee</dt><dd className="wrap-anywhere">{[ticket.firstName, ticket.lastName].filter(Boolean).join(' ') || 'Not provided'}</dd></div>
               <div><dt className="font-semibold">Ticket code</dt><dd className="wrap-anywhere font-data text-body">{id}</dd></div>
+              {ticket.addOns?.length ? <div><dt className="font-semibold">Add-ons</dt><dd className="wrap-anywhere">{addOnsText(ticket.addOns)}</dd></div> : null}
             </dl>
             {ticket.status !== 'valid' ? <p className="font-semibold">This ticket does not currently grant admission.</p> : null}
             {ticket.checkedInAt ? <p>Checked in {formatTicketTime(ticket.checkedInAt, timezone)}.</p> : null}
