@@ -95,7 +95,8 @@ function answerErrorsOf(message, lines, form) {
 /** The add-ons a seat chose that its ticket type still offers, as the checkout request sends them. */
 function chosenAddOns(attendee, typeId, offered) {
   return offered.filter((addOn) => addOn.ticketTypeIds.includes(typeId) && attendee.addOns?.[addOn.id]?.selected)
-    .map((addOn) => ({ addOn, acknowledged: attendee.addOns[addOn.id].acknowledged === true }));
+    // A confirmation holds the statement the buyer saw. A changed statement needs a new one.
+    .map((addOn) => ({ addOn, acknowledged: Boolean(addOn.acknowledgement) && attendee.addOns[addOn.id].acknowledged === addOn.acknowledgement }));
 }
 
 const fullName = (attendee) => [attendee.firstName, attendee.lastName].map((part) => (part || '').trim()).filter(Boolean).join(' ');
@@ -658,8 +659,8 @@ export default function Tickets() {
                             {addOn.description ? <p className="wrap-anywhere text-caption text-text-secondary">{addOn.description}</p> : null}
                             {soldOut ? <p className="text-caption">Sold out</p> : Number.isInteger(addOn.remaining) ? <p className="text-caption">{addOn.remaining} {addOn.remaining === 1 ? 'place' : 'places'} left</p> : null}
                             {choice.selected && addOn.acknowledgement ? (
-                              <Checkbox label={addOn.acknowledgement} checked={choice.acknowledged === true} error={errors[`${key}.addOns.${addOn.id}.acknowledged`]}
-                                onChange={(event) => updateAddOn(type.id, index, addOn.id, { acknowledged: event.target.checked })} />
+                              <Checkbox label={addOn.acknowledgement} checked={Boolean(addOn.acknowledgement) && choice.acknowledged === addOn.acknowledgement} error={errors[`${key}.addOns.${addOn.id}.acknowledged`]}
+                                onChange={(event) => updateAddOn(type.id, index, addOn.id, { acknowledged: event.target.checked ? addOn.acknowledgement : false })} />
                             ) : null}
                           </div>
                         );

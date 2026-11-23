@@ -1000,6 +1000,36 @@ describe('promo codes on the review step', () => {
     expect(JSON.stringify(body)).not.toContain('1500');
   });
 
+  it('asks again for an acknowledgement after the organizer changes its statement', async () => {
+    const reception = { id: 'reception', name: 'Evening reception', description: '', unitAmount: 1500,
+      acknowledgement: 'I am 21 or older.', ticketTypeIds: ['general'], remaining: null, available: true };
+    const changed = { ...CATALOG, catalogRevision: 2, addOns: [{ ...reception, acknowledgement: 'I am 21 or older and will show ID.' }] };
+    let catalogCalls = 0;
+    ticketingRequest.mockImplementation(async (name, { body } = {}) => {
+      if (name === 'ticketingCatalog') { catalogCalls += 1; return catalogCalls === 1 ? { ...CATALOG, addOns: [reception] } : changed; }
+      if (body.catalogRevision === 1) throw new TicketingRequestError('catalog-changed', 'Ticket prices or terms have changed. Review the updated catalog before continuing.', 409);
+      return { orderId: 'order-synthetic', status: 'pending', paymentStatus: 'pending', checkoutUrl: null };
+    });
+    mount();
+    await choose(1);
+    next('Attendees');
+    nameAttendees(1);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Add Evening reception — $15.00' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I am 21 or older.' }));
+    next('Review');
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $40.00' }));
+    const statement = await screen.findByRole('checkbox', { name: 'I am 21 or older and will show ID.' });
+    expect(statement).not.toBeChecked();
+    expect(checkoutCalls()).toHaveLength(1);
+    fireEvent.click(statement);
+    next('Review');
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $40.00' }));
+    await waitFor(() => expect(checkoutCalls()).toHaveLength(2));
+    expect(checkoutCalls()[1][1].body.lines[0].attendees[0].addOns).toEqual([{ id: 'reception', acknowledged: true }]);
+  });
+
   it('prices chosen add-ons in the promo preview and charges the preview total', async () => {
     const reception = { id: 'reception', name: 'Evening reception', description: '', unitAmount: 1500,
       acknowledgement: '', ticketTypeIds: ['general'], remaining: null, available: true };
