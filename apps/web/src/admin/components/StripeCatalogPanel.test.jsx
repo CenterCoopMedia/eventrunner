@@ -104,3 +104,24 @@ describe('catalog save reconciliation', () => {
     expect(screen.getByRole('button', { name: 'Save ticket settings' })).toHaveAttribute('aria-disabled', 'false');
   });
 });
+
+describe('catalog add-ons', () => {
+  it('saves an add-on with its price in minor units, capacity, acknowledgement and ticket types', async () => {
+    const call = vi.fn(async (_name, body) => ({ catalog: { ...body.catalog, revision: 2 }, mode: 'test' }));
+    render(<CatalogSurface call={call} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add add-on' }));
+    fireEvent.change(screen.getByLabelText('Add-on name'), { target: { value: 'Evening reception' } });
+    fireEvent.change(screen.getByLabelText('Add-on price (USD)'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('Add-on capacity'), { target: { value: '80' } });
+    fireEvent.change(screen.getByLabelText('Add-on description'), { target: { value: 'Two drinks and appetizers.' } });
+    fireEvent.change(screen.getByLabelText('Required acknowledgement'), { target: { value: 'I am 21 or older.' } });
+    expect(screen.getByRole('checkbox', { name: 'General admission' })).toBeChecked();
+    fireEvent.click(screen.getByRole('switch', { name: 'Add-on is on sale' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({ action: 'saveCatalog' })));
+    const [addOn] = call.mock.calls.at(-1)[1].catalog.addOns;
+    expect(addOn).toMatchObject({ name: 'Evening reception', unitAmount: 1500, capacity: 80, description: 'Two drinks and appetizers.',
+      acknowledgement: 'I am 21 or older.', ticketTypeIds: ['general'], active: true });
+    expect(await screen.findByText('To stop selling this add-on, turn it off. Orders keep the add-ons they were sold with.')).toBeInTheDocument();
+  });
+});

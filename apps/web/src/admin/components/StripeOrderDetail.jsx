@@ -4,7 +4,7 @@ import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import ExternalLink from '../../components/ExternalLink.jsx';
 import { Checkbox } from '../../components/forms/Choice.jsx';
-import { formatTicketMoney, formatTicketTime, newTicketingRequestId, safeStripeDashboardUrl, disputeStatusLabel, paymentStatusLabel, refundLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingDetails.js';
+import { addOnLabel, formatTicketMoney, formatTicketTime, newTicketingRequestId, safeStripeDashboardUrl, disputeStatusLabel, paymentStatusLabel, refundLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingDetails.js';
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, secondaryButtonClass, dangerButtonClass, linkButtonClass, TextAreaField, TextField, SelectField } from './formControls.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
@@ -67,6 +67,8 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [selected, setSelected] = useState([]);
+  // Add-ons to remove while their tickets keep admission, as `${ticketId}/${addOnId}`.
+  const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [confirm, setConfirm] = useState(null);
   const [reason, setReason] = useState('');
   const [edit, setEdit] = useState(null);
@@ -89,6 +91,16 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   const dashboardUrl = safeStripeDashboardUrl(data?.stripeDashboardUrl);
   const refunds = order?.refunds || data?.refunds || [];
   const selectedRefund = refunds.find((refund) => refund.id === refundId);
+  // A ticket losing admission takes its add-ons with it, so its own picks are not sent.
+  // A refund that keeps every ticket valid removes no ticket, so all picks are sent.
+  const removedTicketIds = confirm !== 'cancel' && preserveAdmission ? [] : selected;
+  const addOnPicks = selectedAddOns.map((key) => {
+    const [ticketId, addOnId] = key.split('/');
+    const ticket = tickets.find((candidate) => (candidate.externalId || candidate.id) === ticketId);
+    return { ticketId, addOnId, ticket, addOn: ticket?.addOns?.find((candidate) => candidate.id === addOnId) };
+  }).filter((pick) => pick.addOn && !removedTicketIds.includes(pick.ticketId));
+  const addOnRequest = addOnPicks.length ? { addOns: addOnPicks.map(({ ticketId, addOnId }) => ({ ticketId, addOnId })) } : {};
+  const clearSelection = () => { setSelected([]); setSelectedAddOns([]); };
 
   async function run(body, message) {
     if (busyRef.current) return;
@@ -110,7 +122,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       setConfirm(null);
       setEdit(null);
       setReason('');
-      setSelected([]);
+      clearSelection();
       onChanged();
     } catch (err) {
       if (resend) {
@@ -125,21 +137,24 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   function closeConfirmation() { setConfirm(null); setEdit(null); setReason(''); setError(''); }
   async function reviewCancellation() {
     if (busyRef.current) return;
-    if (!selected.length) { setError('Select the tickets you want to cancel.'); return; }
+    if (!selected.length && !addOnPicks.length) { setError('Select the tickets or add-ons you want to cancel.'); return; }
     setReason(''); setError(''); setNotice(null);
     if (isOperator) { setConfirm('cancel'); return; }
     busyRef.current = true;
     setBusy(true);
     try {
       const current = await call('ticketingCommerceAdmin', { action: 'order', orderId });
-      const eligibleIds = selected.filter((id) => current.tickets?.some((ticket) => (ticket.externalId || ticket.id) === id && !ticket.checkedInAt));
+      const open = (id) => current.tickets?.some((ticket) => (ticket.externalId || ticket.id) === id && !ticket.checkedInAt);
+      const eligibleIds = selected.filter(open);
+      const eligibleAddOns = selectedAddOns.filter((key) => open(key.split('/')[0]));
       setData(current);
       setSelected(eligibleIds);
-      if (!eligibleIds.length) {
+      setSelectedAddOns(eligibleAddOns);
+      if (!eligibleIds.length && !eligibleAddOns.length) {
         setError('The selected tickets are already checked in or no longer available. An operator must review their cancellation.');
         return;
       }
-      if (eligibleIds.length !== selected.length) setNotice({ tone: 'caution', message: 'Checked-in or unavailable tickets were removed from the selection. An operator must cancel checked-in tickets.' });
+      if (eligibleIds.length !== selected.length || eligibleAddOns.length !== selectedAddOns.length) setNotice({ tone: 'caution', message: 'Checked-in or unavailable tickets were removed from the selection. An operator must cancel checked-in tickets.' });
       setConfirm('cancel');
     } catch (err) { setError(plannerMessage(err.message)); }
     finally { busyRef.current = false; setBusy(false); }
@@ -147,16 +162,16 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   function performConfirmed() {
     if (!reason.trim()) { setError('Enter a reason for this change.'); return; }
     if (confirm === 'cancel') {
-      if (!selected.length || selectedTickets.length !== selected.length || (!isOperator && selectedTickets.some((ticket) => ticket.checkedInAt))) {
+      if ((!selected.length && !addOnPicks.length) || selectedTickets.length !== selected.length || (!isOperator && [...selectedTickets, ...addOnPicks.map((pick) => pick.ticket)].some((ticket) => ticket.checkedInAt))) {
         setConfirm(null);
         setError('The ticket selection changed. Review the current tickets before cancelling.');
         return;
       }
-      run({ action: 'cancelTickets', orderId, ticketIds: selected, reason: reason.trim(), confirmed: true }, 'Selected tickets cancelled. No money was refunded and no seats were restocked.');
+      run({ action: 'cancelTickets', orderId, ticketIds: selected, ...addOnRequest, reason: reason.trim(), confirmed: true }, `${!addOnPicks.length ? 'Selected tickets' : selected.length ? 'Selected tickets and add-ons' : 'Selected add-ons'} cancelled. No money was refunded and no seats were restocked.`);
     } else if (confirm === 'refund') {
       if (!selectedRefund) { setError('Choose the refund being allocated.'); return; }
       if (!preserveAdmission && !selected.length) { setError('Select affected tickets or choose to keep every ticket valid.'); return; }
-      run({ action: 'allocateRefund', orderId, refundId, ticketIds: preserveAdmission ? [] : selected, preserveAdmission, reason: reason.trim(), confirmed: true }, preserveAdmission ? 'Refund allocation recorded. Admission remains valid.' : 'Refund allocated to the selected tickets. Their admission has been removed.');
+      run({ action: 'allocateRefund', orderId, refundId, ticketIds: preserveAdmission ? [] : selected, ...addOnRequest, preserveAdmission, reason: reason.trim(), confirmed: true }, preserveAdmission ? 'Refund allocation recorded. Admission remains valid.' : 'Refund allocated to the selected tickets. Their admission has been removed.');
     } else if (confirm === 'release') {
       run({ action: 'releaseHold', orderId, reason: reason.trim(), confirmed: true }, 'Seats released. They are on sale again, and the buyer can place a new order.');
     } else if (confirm === 'edit') {
@@ -165,6 +180,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
     }
   }
 
+  const addOnSummary = addOnPicks.length ? <><p>These add-ons will be removed. Their tickets keep admission.</p><ul className="space-y-xs">{addOnPicks.map((pick) => <li key={`${pick.ticketId}/${pick.addOnId}`} className="wrap-anywhere"><span className="font-semibold">{pick.addOn.name}</span> — {pick.ticket.firstName} {pick.ticket.lastName}</li>)}</ul></> : null;
   const selectedSummary = <ul className="space-y-xs">{selectedTickets.map((ticket) => <li key={ticket.externalId || ticket.id} className="wrap-anywhere"><span className="font-semibold">{ticket.firstName} {ticket.lastName}</span> — <span className="font-admin-data">{ticket.email || 'No email'}</span>{ticket.checkedInAt ? ' — already checked in' : ''}</li>)}</ul>;
   return <Panel help="Review the purchaser, payment and tickets in this order." title="Order details" actions={<AdminIconControl label="Close order details" icon="close" className={secondaryButtonClass} onClick={onClose} />}>
     <div className="flex items-center gap-2xs"><h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{order?.purchaserEmail || order?.purchaser?.email || 'Order'}</h3><HelpTooltip label={order?.purchaserEmail || order?.purchaser?.email || "Order"}>Review the purchaser and payment details for this order.</HelpTooltip></div>
@@ -176,6 +192,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         <div><dt className="text-admin-base font-semibold">Purchaser</dt><dd className="wrap-anywhere font-admin-data text-admin-sm">{order.purchaserEmail || order.purchaser?.email}</dd></div>
         <div><dt className="text-admin-base font-semibold">Payment</dt><dd><StatusBadge>{paymentStatusLabel(order.paymentStatus)}</StatusBadge></dd></div>
         <div><dt className="text-admin-base font-semibold">Original total</dt><dd className="font-admin-data text-admin-sm">{formatTicketMoney(order.totalAmount, order.currency)}</dd></div>
+        {order.addOnLines?.length ? <div><dt className="text-admin-base font-semibold">Add-ons</dt><dd className="font-admin-data text-admin-sm"><ul>{order.addOnLines.map((line) => <li key={line.addOnId}>{line.quantity} × {line.name}: {formatTicketMoney(line.lineAmount, order.currency)}</li>)}</ul></dd></div> : null}
         {order.promo ? <div><dt className="text-admin-base font-semibold">Promo code</dt><dd className="font-admin-data text-admin-sm">{order.promo.code}: {formatTicketMoney(order.promo.discountAmount, order.currency)} off</dd></div> : null}
         <div><dt className="text-admin-base font-semibold">Refund state</dt><dd>{refundStateLabel(order.refundStatus || 'none')}</dd></div>
         <div><dt className="text-admin-base font-semibold">Refunded amount</dt><dd className="font-admin-data text-admin-sm">{formatTicketMoney(order.refundedAmount || 0, order.currency)}</dd></div>
@@ -200,12 +217,12 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       <section className="space-y-sm" aria-label="Order admission tickets">
         <div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold">Individual tickets</h3><HelpTooltip label="Individual tickets">Review each attendee’s admission and make ticket changes from here.</HelpTooltip></div>
         <div className="flex flex-wrap items-center gap-sm">
-          <p role="status" className="text-admin-sm">{selected.length ? `${selected.length} tickets selected` : 'No tickets selected'}</p>
-          <button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => setSelected([])}>Clear selection</button>
-          <button type="button" className={dangerButtonClass} aria-busy={busy} aria-disabled={!selected.length || busy} onClick={reviewCancellation}>Review ticket cancellation</button>
+          <p role="status" className="text-admin-sm">{selected.length || addOnPicks.length ? [selected.length ? `${selected.length} tickets selected` : '', addOnPicks.length ? `${addOnPicks.length} add-ons selected` : ''].filter(Boolean).join(', ') : 'No tickets selected'}</p>
+          <button type="button" className={secondaryButtonClass} disabled={busy} onClick={clearSelection}>Clear selection</button>
+          <button type="button" className={dangerButtonClass} aria-busy={busy} aria-disabled={(!selected.length && !addOnPicks.length) || busy} onClick={reviewCancellation}>Review ticket cancellation</button>
         </div>
         {!isOperator && tickets.some((ticket) => ticket.checkedInAt) ? <p id={cancellationHelpId} className="text-admin-sm text-admin-ink-secondary">An operator must cancel a checked-in ticket.</p> : null}
-        {tickets.length ? <TicketingTable label="Individual tickets on this order"><thead><tr>{['Select', 'Attendee', 'Email', 'Admission', 'Claim', 'Check-in', 'Correction'].map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
+        {tickets.length ? <TicketingTable label="Individual tickets on this order"><thead><tr>{['Select', 'Attendee', 'Email', 'Admission', 'Add-ons', 'Claim', 'Check-in', 'Correction'].map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
           <tbody>{tickets.map((ticket) => {
             const id = ticket.externalId || ticket.id;
             const requiresOperator = !isOperator && Boolean(ticket.checkedInAt);
@@ -218,6 +235,13 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
               <td className={cellClass}>{ticket.firstName} {ticket.lastName}</td>
               <td className={dataCellClass}>{ticket.email}</td>
               <td className={cellClass}><StatusBadge tone={ticket.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
+              <td className={cellClass}>{ticket.addOns?.length ? <ul className="space-y-3xs">{ticket.addOns.map((addOn) => {
+                const key = `${id}/${addOn.id}`;
+                return <li key={addOn.id}>{addOn.status !== 'refunded' && !removedTicketIds.includes(id) ? <Checkbox data-help-skip="The label names the add-on selected for a refund or cancellation." tone="admin" label={addOnLabel(addOn)} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selectedAddOns.includes(key)} onChange={(event) => {
+                  if (busyRef.current || requiresOperator) return;
+                  setSelectedAddOns((previous) => event.target.checked ? [...previous, key] : previous.filter((selectedKey) => selectedKey !== key));
+                }} /> : addOnLabel(addOn)}</li>;
+              })}</ul> : 'None'}</td>
               <td className={cellClass}>{ticket.claimedByUid ? 'Claimed' : 'Unclaimed'}</td>
               <td className={cellClass}>{ticket.checkedInAt ? 'Checked in' : 'Not checked in'}</td>
               <td className={cellClass}><AdminIconControl label="Correct attendee" icon="edit" className={linkButtonClass} onClick={() => { setEdit({ ticketId: id, firstName: ticket.firstName || '', lastName: ticket.lastName || '', email: ticket.email || '', claimed: Boolean(ticket.claimedByUid), checkedIn: Boolean(ticket.checkedInAt) }); setReason(''); setError(''); setConfirm('edit'); }} /></td>
@@ -228,7 +252,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         <div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold">Refund history</h3><HelpTooltip label="Refund history">Review amounts returned to the purchaser and the tickets affected.</HelpTooltip></div>
         <ul className="space-y-xs">{refunds.map((refund) => <li key={refund.id} className="wrap-anywhere border-b-admin-hairline border-admin-rule-hairline pb-xs">{formatTicketMoney(refund.amount, refund.currency || order.currency)} — {refundLabel(refund.status)} — {formatTicketTime(refund.createdAt, timezone)}{refund.failureReason ? ` — ${refund.failureReason}` : ''}</li>)}</ul>
         {isOperator ? <>
-          <p className="text-admin-sm text-admin-ink-secondary">An amount-only partial refund does not identify which attendee loses admission. Record the organizer’s decision using the ticket selection above, or explicitly retain every ticket.</p>
+          <p className="text-admin-sm text-admin-ink-secondary">An amount-only partial refund does not identify which attendee loses admission. Record the organizer’s decision using the ticket selection above, or explicitly retain every ticket. For a refund of add-ons only, select the add-ons above and keep every ticket valid.</p>
           <SelectField label="Refund to allocate" value={refundId} onChange={setRefundId} options={[{ value: '', label: 'Choose a refund' }, ...refunds.map((refund) => ({ value: refund.id, label: `${formatTicketMoney(refund.amount, refund.currency || order.currency)} · ${formatTicketTime(refund.createdAt, timezone)} · ${refundLabel(refund.status)}` }))]} />
           <Checkbox tone="admin" label="Keep every ticket valid" checked={preserveAdmission} onChange={(event) => setPreserveAdmission(event.target.checked)} />
           <button type="button" className={secondaryButtonClass} onClick={() => {
@@ -243,7 +267,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{AUDIT_LABELS[String(entry.action).replace(/^ticketing\./, '')] || 'Order updated'}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorEmail || 'Staff'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">{entry.ticketIds.length} tickets affected</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
       </section>
     </div> : null}
-    {confirm ? <TicketingConfirmation title={confirm === 'cancel' ? 'Cancel the selected admission tickets?' : confirm === 'refund' ? 'Record this refund’s admission consequences?' : confirm === 'release' ? 'Release this order’s held seats?' : 'Correct attendee details'} confirmLabel={confirm === 'cancel' ? `Cancel ${selected.length} admission tickets` : confirm === 'refund' ? preserveAdmission ? 'Record refund with admission retained' : `Remove admission from ${selected.length} tickets` : confirm === 'release' ? 'Release the held seats' : 'Save attendee correction'} busyLabel={confirm === 'cancel' ? 'Cancelling the tickets…' : confirm === 'refund' ? 'Recording the refund…' : confirm === 'release' ? 'Releasing the seats…' : 'Saving the attendee correction…'} destructive={confirm === 'cancel' || confirm === 'release' || (confirm === 'refund' && !preserveAdmission)} error={error} busy={busy} onClose={closeConfirmation} onConfirm={performConfirmed}>
+    {confirm ? <TicketingConfirmation title={confirm === 'cancel' ? 'Cancel the selected admission tickets?' : confirm === 'refund' ? 'Record this refund’s admission consequences?' : confirm === 'release' ? 'Release this order’s held seats?' : 'Correct attendee details'} confirmLabel={confirm === 'cancel' ? (selected.length ? `Cancel ${selected.length} admission tickets` : `Cancel ${addOnPicks.length} add-ons`) : confirm === 'refund' ? preserveAdmission ? 'Record refund with admission retained' : `Remove admission from ${selected.length} tickets` : confirm === 'release' ? 'Release the held seats' : 'Save attendee correction'} busyLabel={confirm === 'cancel' ? 'Cancelling the tickets…' : confirm === 'refund' ? 'Recording the refund…' : confirm === 'release' ? 'Releasing the seats…' : 'Saving the attendee correction…'} destructive={confirm === 'cancel' || confirm === 'release' || (confirm === 'refund' && !preserveAdmission)} error={error} busy={busy} onClose={closeConfirmation} onConfirm={performConfirmed}>
       {confirm === 'release' ? <>
         <p>Check in Stripe that this buyer has not paid. The seats go back on sale, the promo code gets its uses back, and the buyer can place a new order.</p>
         <p>If a payment arrives later, the order is marked for review so you can refund it.</p>
@@ -256,7 +280,8 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         {confirm === 'cancel' && notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
         <p className="wrap-anywhere">Original payment: {formatTicketMoney(order?.totalAmount, order?.currency)}.</p>
         {confirm === 'refund' ? <p>Refund: {formatTicketMoney(selectedRefund?.amount, selectedRefund?.currency || order?.currency)} — {refundLabel(selectedRefund?.status)}.</p> : null}
-        {preserveAdmission && confirm === 'refund' ? <p>All ticket admission stays as it is. This records an amount-only payment adjustment.</p> : <>{selectedSummary}<p>These tickets will lose admission, including any that have already been checked in. Sold seats will not be returned to capacity.</p></>}
+        {preserveAdmission && confirm === 'refund' ? <p>All ticket admission stays as it is. This records an amount-only payment adjustment.</p> : selected.length ? <>{selectedSummary}<p>These tickets will lose admission, including any that have already been checked in. Sold seats will not be returned to capacity.</p></> : null}
+        {addOnSummary}
         <p>No refund payment is created by this action.</p>
       </>}
       <TextAreaField help="Explain this ticket change for staff reviewing the order history." label="Reason for this action" value={reason} onChange={setReason} required maxLength={500} />

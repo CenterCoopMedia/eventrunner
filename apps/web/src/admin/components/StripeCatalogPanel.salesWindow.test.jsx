@@ -105,7 +105,7 @@ describe('catalog sales windows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' }));
     await screen.findByText('Catalog saved. Existing orders keep the prices they were issued with.');
     expect(call).toHaveBeenLastCalledWith('ticketingCommerceAdmin', {
-      action: 'saveCatalog', expectedRevision: 2, catalog: { ...CATALOG, revision: 2 },
+      action: 'saveCatalog', expectedRevision: 2, catalog: { ...CATALOG, addOns: [], revision: 2 },
     });
   });
 

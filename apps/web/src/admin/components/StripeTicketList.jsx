@@ -1,7 +1,7 @@
 import { plannerMessage } from '../plannerErrors.js';
 import { ORDER_STATUSES, PAYMENT_STATUSES, REFUND_STATUSES, TICKET_STATUSES } from 'shared/ticketCommerce';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatTicketMoney, formatTicketTime, orderStatusLabel, paymentStatusLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingDetails.js';
+import { addOnsText, formatTicketMoney, formatTicketTime, orderStatusLabel, paymentStatusLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingDetails.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, secondaryButtonClass, SelectField, TextField, linkButtonClass } from './formControls.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from './CreateAccountFromTicket.jsx';
@@ -85,7 +85,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
     {rows?.length === 0 ? <AdminEmptyState title={`No ${label.toLowerCase()} found`} description="Adjust the filters to find another record." /> : rows?.length ? <>
       <p role="status" className="mb-xs text-admin-sm text-admin-ink-secondary">Showing {rows.length} {isOrders ? 'orders' : 'tickets'}{cursor ? '; more are available' : ''}.</p>
       <TicketingTable label={label}>
-        <thead><tr>{(isOrders ? ['Order', 'Purchaser', 'Payment', 'Refund', 'Total', 'Created'] : ['Ticket code', 'Attendee', 'Email', 'Type', 'Admission', 'Claim', 'Check-in', 'Order']).map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
+        <thead><tr>{(isOrders ? ['Order', 'Purchaser', 'Payment', 'Refund', 'Total', 'Created'] : ['Ticket code', 'Attendee', 'Email', 'Type', 'Add-ons', 'Admission', 'Claim', 'Check-in', 'Order']).map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
         <tbody>{rows.map((row) => <tr key={row.orderId && isOrders ? row.orderId : row.externalId || row.id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
           {isOrders ? <>
             <td className={dataCellClass}><button type="button" className={linkButtonClass} aria-label={`View order ${row.orderId || row.id} for ${row.purchaserEmail || row.purchaser?.email || 'purchaser'}`} onClick={() => onOpenOrder(row.orderId || row.id)}>View order</button></td>
@@ -99,6 +99,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
             <td className={cellClass}>{[row.firstName, row.lastName].filter(Boolean).join(' ') || 'Not provided'}</td>
             <td className={dataCellClass}>{row.email}</td>
             <td className={cellClass}>{row.ticketClass}</td>
+            <td className={cellClass}>{addOnsText(row.addOns) || 'None'}</td>
             <td className={cellClass}><StatusBadge tone={row.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(row.status)}</StatusBadge></td>
             <td className={cellClass}><div className="flex flex-wrap items-center gap-xs">{row.claimedByUid ? 'Claimed' : 'Unclaimed'}{canCreateAccountFromTicket(row) ? <CreateAccountFromTicket call={call} ticket={row} ticketId={row.externalId || row.id} onDone={onAccountDone} /> : null}</div></td>
             <td className={cellClass}>{row.checkedInAt ? 'Checked in' : 'Not checked in'}</td>

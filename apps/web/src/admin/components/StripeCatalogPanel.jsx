@@ -13,17 +13,26 @@ function emptyCatalog() {
   return { schemaVersion: 1, revision: 0, published: false, salesPaused: true, currency: 'usd', capacity: 100, maxPerOrder: 10,
     refundPolicy: '', taxTreatment: 'not_collected', commercialTermsConfirmed: false, salesStartAt: null, salesEndAt: null,
     ticketTypes: [{ id: 'general', name: 'General admission', description: '', unitAmount: 0, capacity: 100, active: true,
-      visibility: 'public', minPerOrder: 1, maxPerOrder: 10, salesStartAt: null, salesEndAt: null }] };
+      visibility: 'public', minPerOrder: 1, maxPerOrder: 10, salesStartAt: null, salesEndAt: null }], addOns: [] };
 }
 
+const MAX_ADD_ONS = 10;
+// Add-on prices share the price inputs with ticket types under their own keys.
+const addOnKey = (id) => `addon:${id}`;
+
 function priceInputsFor(catalog) {
-  return Object.fromEntries(catalog.ticketTypes.map((type) => [type.id, String(type.unitAmount / (10 ** currencyDigits(catalog.currency)))]));
+  const scale = 10 ** currencyDigits(catalog.currency);
+  return Object.fromEntries([
+    ...catalog.ticketTypes.map((type) => [type.id, String(type.unitAmount / scale)]),
+    ...(catalog.addOns || []).map((addOn) => [addOnKey(addOn.id), String(addOn.unitAmount / scale)]),
+  ]);
 }
 
 // The editor state a saved catalog loads as. A draft equal to its baseline
 // holds no unsaved edits.
 function editorState(catalog) {
   const draft = structuredClone(catalog || emptyCatalog());
+  draft.addOns ||= [];
   return { draft, priceInputs: priceInputsFor(draft) };
 }
 
@@ -54,6 +63,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   useEffect(() => { if (notice?.tone === 'error') errorRef.current?.focus(); }, [notice]);
   const changed = (key, value) => setDraft((previous) => ({ ...previous, [key]: value }));
   const updateType = (index, key, value) => setDraft((previous) => ({ ...previous, ticketTypes: previous.ticketTypes.map((type, current) => current === index ? { ...type, [key]: value } : type) }));
+  const updateAddOn = (index, key, value) => setDraft((previous) => ({ ...previous, addOns: previous.addOns.map((addOn, current) => current === index ? { ...addOn, [key]: value } : addOn) }));
   const quantity = (value) => value === '' ? '' : Number(value);
   const revisionChanged = baseRevision !== (data.catalog?.revision || 0);
   // A sales time field holding a half-entered or unsettled time is an unsaved
@@ -115,8 +125,16 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
       return;
     }
     const scale = 10 ** currencyDigits(draft.currency);
-    const catalog = { ...draft, currency: draft.currency.toLowerCase(), ticketTypes: draft.ticketTypes.map((type) => ({ ...type, unitAmount: Math.round(Number(priceInputs[type.id]) * scale) })) };
-    const invalidPrices = Object.fromEntries(draft.ticketTypes.filter((type) => !/^\d+(\.\d+)?$/.test(priceInputs[type.id] || '') || (priceInputs[type.id].split('.')[1]?.length || 0) > currencyDigits(draft.currency) || !Number.isSafeInteger(catalog.ticketTypes.find((candidate) => candidate.id === type.id)?.unitAmount)).map((type) => [type.id, `Enter a non-negative price with no more than ${currencyDigits(draft.currency)} decimal places.`]));
+    const catalog = {
+      ...draft, currency: draft.currency.toLowerCase(),
+      ticketTypes: draft.ticketTypes.map((type) => ({ ...type, unitAmount: Math.round(Number(priceInputs[type.id]) * scale) })),
+      addOns: draft.addOns.map((addOn) => ({ ...addOn, capacity: addOn.capacity === '' ? null : addOn.capacity, unitAmount: Math.round(Number(priceInputs[addOnKey(addOn.id)]) * scale) })),
+    };
+    const amounts = Object.fromEntries([
+      ...catalog.ticketTypes.map((type) => [type.id, type.unitAmount]),
+      ...catalog.addOns.map((addOn) => [addOnKey(addOn.id), addOn.unitAmount]),
+    ]);
+    const invalidPrices = Object.fromEntries(Object.keys(amounts).filter((key) => !/^\d+(\.\d+)?$/.test(priceInputs[key] || '') || (priceInputs[key].split('.')[1]?.length || 0) > currencyDigits(draft.currency) || !Number.isSafeInteger(amounts[key])).map((key) => [key, `Enter a non-negative price with no more than ${currencyDigits(draft.currency)} decimal places.`]));
     setPriceErrors(invalidPrices);
     const timesHeld = Object.values(timeProblems).some(Boolean);
     if (timesHeld) setShowTimeErrors(true);
@@ -173,7 +191,11 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
             </div>
             <TextAreaField label="Ticket description" value={type.description} maxLength={1000} onChange={(value) => updateType(index, 'description', value)} />
             <PlannerSwitch label="Ticket type is active" checked={type.active} onChange={(value) => updateType(index, 'active', value)} />
-            {!data.catalog?.ticketTypes?.some((saved) => saved.id === type.id) ? <AdminIconControl label={`Remove ${type.name || 'ticket type'}`} icon="remove" className={dangerButtonClass} onClick={() => changed('ticketTypes', draft.ticketTypes.filter((_, current) => current !== index))} /> : <p className="text-admin-sm text-admin-ink-secondary">To retire this type, make it inactive. Historical orders retain its identity and price.</p>}
+            {!data.catalog?.ticketTypes?.some((saved) => saved.id === type.id) ? <AdminIconControl label={`Remove ${type.name || 'ticket type'}`} icon="remove" className={dangerButtonClass} onClick={() => setDraft((previous) => ({
+              ...previous,
+              ticketTypes: previous.ticketTypes.filter((_, current) => current !== index),
+              addOns: previous.addOns.map((addOn) => ({ ...addOn, ticketTypeIds: addOn.ticketTypeIds.filter((id) => id !== type.id) })),
+            }))} /> : <p className="text-admin-sm text-admin-ink-secondary">To retire this type, make it inactive. Historical orders retain its identity and price.</p>}
           </fieldset>)}
           <button type="button" className={secondaryButtonClass} aria-disabled={draft.ticketTypes.length >= 20} onClick={() => {
             if (draft.ticketTypes.length >= 20) return;
@@ -181,6 +203,32 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
             changed('ticketTypes', [...draft.ticketTypes, { id, name: '', description: '', unitAmount: 0, capacity: draft.capacity, active: false, visibility: 'hidden', minPerOrder: 1, maxPerOrder: draft.maxPerOrder, salesStartAt: null, salesEndAt: null }]);
             setPriceInputs((previous) => ({ ...previous, [id]: '0' }));
           }}>{draft.ticketTypes.length >= 20 ? '20 ticket types maximum' : 'Add ticket type'}</button>
+        </div>
+        <div className="space-y-md">
+          <h3 className="text-admin-lg font-bold">Add-ons</h3>
+          <p className="text-admin-sm text-admin-ink-secondary">An add-on is an optional extra, such as a reception, that a buyer adds to a ticket. It is not admission and does not use event capacity. A free ticket with a paid add-on charges only the add-on.</p>
+          {draft.addOns.map((addOn, index) => <fieldset key={addOn.id} className="min-w-0 space-y-sm rounded-admin-panel border-admin-hairline border-admin-rule-hairline p-md">
+            <legend className="px-xs text-admin-base font-bold">{addOn.name || `Add-on ${index + 1}`}</legend>
+            <div className="planner-fields grid gap-md sm:grid-cols-2">
+              <TextField label="Add-on name" value={addOn.name} maxLength={120} onChange={(value) => updateAddOn(index, 'name', value)} />
+              <TextField label={`Add-on price (${draft.currency.toUpperCase()})`} type="text" inputMode="decimal" value={priceInputs[addOnKey(addOn.id)] ?? '0'} error={priceErrors[addOnKey(addOn.id)]} hint={`Charged for each ticket that adds it. Current preview: ${formatTicketMoney(Math.round(Number(priceInputs[addOnKey(addOn.id)]) * (10 ** currencyDigits(draft.currency))), draft.currency)}`} onChange={(value) => setPriceInputs((previous) => ({ ...previous, [addOnKey(addOn.id)]: value }))} />
+              <TextField label="Add-on capacity" type="number" inputMode="numeric" min="1" max="1000000" step="1" value={addOn.capacity ?? ''} hint="Leave empty for no limit." onChange={(value) => updateAddOn(index, 'capacity', value === '' ? null : Number(value))} />
+            </div>
+            <TextAreaField label="Add-on description" value={addOn.description} maxLength={1000} hint="Buyers see this under the add-on name." onChange={(value) => updateAddOn(index, 'description', value)} />
+            <TextField label="Required acknowledgement" value={addOn.acknowledgement} maxLength={300} hint="Optional. Buyers must check this statement to add it, for example: I am 21 or older." onChange={(value) => updateAddOn(index, 'acknowledgement', value)} />
+            <fieldset className="space-y-xs">
+              <legend className="text-admin-base font-semibold">Offered with</legend>
+              {draft.ticketTypes.map((type) => <Checkbox key={type.id} tone="admin" label={type.name || type.id} checked={addOn.ticketTypeIds.includes(type.id)} onChange={(event) => updateAddOn(index, 'ticketTypeIds', event.target.checked ? [...addOn.ticketTypeIds, type.id] : addOn.ticketTypeIds.filter((id) => id !== type.id))} />)}
+            </fieldset>
+            <PlannerSwitch label="Add-on is on sale" checked={addOn.active} onChange={(value) => updateAddOn(index, 'active', value)} />
+            {!data.catalog?.addOns?.some((saved) => saved.id === addOn.id) ? <AdminIconControl label={`Remove ${addOn.name || 'add-on'}`} icon="remove" className={dangerButtonClass} onClick={() => changed('addOns', draft.addOns.filter((_, current) => current !== index))} /> : <p className="text-admin-sm text-admin-ink-secondary">To stop selling this add-on, turn it off. Orders keep the add-ons they were sold with.</p>}
+          </fieldset>)}
+          <button type="button" className={secondaryButtonClass} aria-disabled={draft.addOns.length >= MAX_ADD_ONS} onClick={() => {
+            if (draft.addOns.length >= MAX_ADD_ONS) return;
+            const id = `addon-${crypto.randomUUID()}`;
+            changed('addOns', [...draft.addOns, { id, name: '', description: '', unitAmount: 0, capacity: null, active: false, acknowledgement: '', ticketTypeIds: draft.ticketTypes.map((type) => type.id) }]);
+            setPriceInputs((previous) => ({ ...previous, [addOnKey(id)]: '0' }));
+          }}>{draft.addOns.length >= MAX_ADD_ONS ? `${MAX_ADD_ONS} add-ons maximum` : 'Add add-on'}</button>
         </div>
         {notice ? <div ref={errorRef} tabIndex={-1}><Notice tone={notice.tone} message={notice.message} /></div> : null}
         <button type="submit" className={primaryButtonClass} aria-label={busy && !reloading ? 'Saving catalog…' : 'Save ticket settings'} aria-busy={busy && !reloading} aria-disabled={busy || recoveryRequired || revisionChanged}>{busy && !reloading ? 'Saving catalog…' : 'Save'}</button>

@@ -323,3 +323,62 @@ describe('releasing the seats of an order that needs review', () => {
     expect(screen.queryByRole('button', { name: 'Release the held seats' })).not.toBeInTheDocument();
   });
 });
+
+describe('ticket add-ons', () => {
+  it('cancels a selected add-on while its ticket keeps admission', async () => {
+    const ticket = { ...UNUSED_TICKET, addOns: [{ id: 'reception', name: 'Evening reception', status: 'valid' }] };
+    const other = { ...UNUSED_TICKET, externalId: 'seat-other', firstName: 'Other', addOns: [{ id: 'reception', name: 'Evening reception', status: 'refunded' }] };
+    const { call } = await cancellationSetup({ isOperator: true, initialTickets: [ticket, other] });
+    expect(screen.getByText('Evening reception (Refunded)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Evening reception' }));
+    expect(screen.getByRole('status')).toHaveTextContent('1 add-ons selected');
+    reviewCancellation();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('These add-ons will be removed. Their tickets keep admission.')).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Reason for this action'), { target: { value: 'Reception cancelled on request.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel 1 add-ons' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({
+      action: 'cancelTickets', ticketIds: [], addOns: [{ ticketId: 'seat-unused', addOnId: 'reception' }],
+    })));
+    expect(await screen.findByText('Selected add-ons cancelled. No money was refunded and no seats were restocked.')).toBeInTheDocument();
+  });
+
+  it('keeps a selected ticket\'s add-on in a refund that keeps every ticket valid', async () => {
+    const ticket = { ...UNUSED_TICKET, addOns: [{ id: 'reception', name: 'Evening reception', status: 'valid' }] };
+    const detail = { ...DETAIL, order: { ...DETAIL.order, refundStatus: 'partial' }, tickets: [ticket],
+      refunds: [{ id: 're_1', amount: 1500, currency: 'usd', status: 'succeeded', createdAt: '2026-01-03T12:00:00Z' }] };
+    const call = vi.fn(async () => detail);
+    render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Evening reception' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Unused Attendee/ }));
+    fireEvent.change(screen.getByLabelText('Refund to allocate'), { target: { value: 're_1' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep every ticket valid' }));
+    expect(screen.getByRole('checkbox', { name: 'Evening reception' })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Review refund allocation' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Reason for this action'), { target: { value: 'Reception refunded.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Record refund with admission retained' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({
+      action: 'allocateRefund', ticketIds: [], preserveAdmission: true, addOns: [{ ticketId: 'seat-unused', addOnId: 'reception' }],
+    })));
+  });
+
+  it('allocates a later refund to an add-on that was already cancelled', async () => {
+    const ticket = { ...UNUSED_TICKET, addOns: [{ id: 'reception', name: 'Evening reception', status: 'cancelled' }] };
+    const detail = { ...DETAIL, order: { ...DETAIL.order, refundStatus: 'partial' }, tickets: [ticket],
+      refunds: [{ id: 're_1', amount: 1500, currency: 'usd', status: 'succeeded', createdAt: '2026-01-03T12:00:00Z' }] };
+    const call = vi.fn(async () => detail);
+    render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Evening reception (Cancelled)' }));
+    fireEvent.change(screen.getByLabelText('Refund to allocate'), { target: { value: 're_1' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep every ticket valid' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review refund allocation' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Reason for this action'), { target: { value: 'Reception refunded after cancellation.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Record refund with admission retained' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({
+      action: 'allocateRefund', refundId: 're_1', ticketIds: [], preserveAdmission: true,
+      addOns: [{ ticketId: 'seat-unused', addOnId: 'reception' }],
+    })));
+  });
+});
