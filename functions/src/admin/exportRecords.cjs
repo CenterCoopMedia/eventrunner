@@ -415,8 +415,9 @@ function admissionRecord(id, data) {
     provider: text(source.provider),
     ticketTypeId: textOrNull(source.ticketTypeId),
     ticketClass: text(source.ticketClass),
+    // An add-on is usable only while its ticket is valid.
     addOns: (Array.isArray(source.addOns) ? source.addOns : []).map((addOn) => ({
-      id: text(addOn?.id), name: text(addOn?.name), status: text(addOn?.status),
+      id: text(addOn?.id), name: text(addOn?.name), status: source.status === 'valid' ? text(addOn?.status) : text(source.status),
     })),
     firstName: text(source.firstName),
     lastName: text(source.lastName),

@@ -457,7 +457,9 @@ offer it. A save keeps every add-on that is held or sold and enough capacity for
 turns an add-on off instead of removing it.
 
 **Request.** Each attendee in a checkout request may carry `addOns: [{ id, acknowledged }]`. The
-key joins the request fingerprint only when it is not empty. The request never carries a price.
+key joins the request fingerprint only when it is not empty. The request never carries a price. The promo preview takes
+add-on counts per ticket line, `addOns: [{ id, quantity }]`, and prices them the same way, so its
+card minimum check sees the checkout total.
 
 **Price.** The reservation prices add-ons from the catalog inside its transaction. A chosen
 add-on must be active and offered for its seat's ticket type. An add-on with acknowledgement
@@ -476,7 +478,7 @@ metadata. Reconciliation matches every ticket and add-on line by kind, amount an
 **Admission records.** Each seat keeps the add-ons it was sold with, including the
 acknowledgement text the buyer accepted. Each ticket carries `addOns: [{ id, name, status }]`.
 An add-on is usable only while its ticket is valid: cancelling or refunding a ticket removes its
-add-ons. A refund allocation or a cancellation can also name add-ons, `[{ ticketId, addOnId }]`,
+add-ons, and every reader reports such an add-on with the ticket status. A refund allocation or a cancellation can also name add-ons, `[{ ticketId, addOnId }]`,
 to mark them refunded or cancelled while the ticket keeps admission. An add-on-only refund uses
 the keep-admission decision. Reconciliation keeps these organizer decisions. Cancelled and
 refunded add-ons do not restock capacity, like tickets.

@@ -9,6 +9,8 @@ const { priceSelections, checkoutRequestFor } = require('./stripeCommerce.cjs');
 const { reconcileStripeOrder } = require('./stripeReconcile.cjs');
 const { createTicketingCommerceAdminHandler, createTicketingCheckInHandler } = require('./commerceAdmin.cjs');
 const { sendOrderConfirmations } = require('./commerceEmail.cjs');
+const { createTicketingPromoPreviewHandler } = require('./promoPreview.cjs');
+const { admissionRecord } = require('../admin/exportRecords.cjs');
 const { START, PERSON, setup, checkout, request, response } = require('./commerceTestKit.cjs');
 
 const ACK = 'I am 21 or older.';
@@ -233,6 +235,8 @@ test('an add-on refund keeps admission, and cancelling a ticket cancels its add-
   res = await adminCall(env, { action: 'cancelTickets', orderId, ticketIds: [second], reason: 'Cannot attend.', confirmed: true }, 'staff');
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.tickets.find((ticket) => ticket.id === second).addOns, [{ id: 'reception', name: 'Evening reception', status: 'cancelled' }]);
+  assert.deepEqual(admissionRecord(second, env.db.read('tickets', second)).addOns, [{ id: 'reception', name: 'Evening reception', status: 'cancelled' }],
+    'the admission export applies the ticket status too');
 
   // Check-in shows the remaining ticket's add-ons to staff at the door.
   const checkIn = createTicketingCheckInHandler({
@@ -281,4 +285,20 @@ test('confirmation emails list the add-ons for the buyer and each attendee', asy
   assert.match(text('ticket.order_confirmation', 'ada@example.com'), /Tickets: 2\nAdd-ons: 1 × Evening reception\nTotal:/);
   assert.match(text('ticket.attendee_confirmation', 'ada@example.com'), /Add-ons: 1 × Evening reception\./);
   assert.doesNotMatch(text('ticket.attendee_confirmation', 'ben@example.com'), /Add-ons/);
+});
+
+test('the promo preview prices add-ons, so the card minimum sees the same total as checkout', async () => {
+  const env = addOnSetup({ acknowledgement: '' }, { catalogPatch: { ticketTypes: [{ ...TYPES[0], unitAmount: 100 }, TYPES[1]] },
+    seed: { 'ticket_promo_codes/MOST': { code: 'MOST', kind: 'percent', value: 75, ticketTypeIds: [], maxUses: null, maxPerOrder: null, startsAt: null, endsAt: null, active: true, used: 0 } } });
+  const preview = async (lines) => {
+    const res = response();
+    await createTicketingPromoPreviewHandler(env.deps)({ method: 'POST', headers: { authorization: 'Bearer ada' }, body: { code: 'most', catalogRevision: 1, lines } }, res);
+    return res;
+  };
+  assert.equal((await preview([{ ticketTypeId: 'general', quantity: 1 }])).body.error.code, 'amount-too-small');
+  const res = await preview([{ ticketTypeId: 'general', quantity: 1, addOns: [{ id: 'reception', quantity: 1 }] }]);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(res.body.totalAmount, 1525);
+  assert.deepEqual(res.body.addOnLines, [{ addOnId: 'reception', name: 'Evening reception', quantity: 1, unitAmount: 1500, lineAmount: 1500 }]);
+  assert.equal((await preview([{ ticketTypeId: 'general', quantity: 1, addOns: [{ id: 'reception', quantity: 2 }] }])).statusCode, 400);
 });

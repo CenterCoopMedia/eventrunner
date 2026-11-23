@@ -9,7 +9,7 @@ const { sendError } = require('../core/errors.cjs');
 const { confirmationVersion, requireConfirmation, ConfirmationConflict } = require('../core/confirmation.cjs');
 const { internals: { safeDocId, TICKETS } } = require('./index.cjs');
 const { listPromoCodes, savePromoCode, deletePromoCode, promoRef, releasedPromoUse } = require('./promoCodes.cjs');
-const { ORDERS, CATALOG, CONNECTION, INVENTORY, CommerceError, normalizeInventory, inventoryTransitionPatch } = require('./stripeCommerce.cjs');
+const { ORDERS, CATALOG, CONNECTION, INVENTORY, CommerceError, normalizeInventory, inventoryTransitionPatch, addOnViews } = require('./stripeCommerce.cjs');
 const { internals: { scopeMatches } } = require('./providers/stripe.cjs');
 
 const AUDIT = 'admin_logs';
@@ -20,7 +20,9 @@ const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets', 'promoCod
 // Promo codes are staff-editable (ADR 0008 §6); they live in promoCodes.cjs.
 const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile', 'savePromoCode', 'deletePromoCode']);
 const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
-const { isOrderFulfilled, normalizePromoCode } = require('shared/ticketCommerce');
+const { isOrderFulfilled, normalizePromoCode, MAX_ORDER_SEATS, MAX_ADD_ONS } = require('shared/ticketCommerce');
+// Every add-on of a full order: each seat with every add-on.
+const MAX_ADD_ON_PICKS = MAX_ORDER_SEATS * MAX_ADD_ONS;
 
 // An organizer check answers with its own status, 5xx included. A 5xx
 // CommerceError from the checkout or inventory code gets the generic answer.
@@ -65,18 +67,12 @@ function audit(tx, ref, { action, actor, now, orderId = null, ticketIds = [], re
     uid: actor.uid, actorUid: actor.uid, at: now(), orderId, ticketIds, reason, details,
   });
 }
-/** An add-on is usable only while its ticket is: a cancelled or refunded ticket carries its add-ons with it. */
-function ticketAddOnViews(ticket) {
-  return (ticket.addOns || []).map(({ id, name, status }) => ({
-    id, name, status: ticket.status === 'valid' ? status : ticket.status,
-  }));
-}
 function publicTicket(ticket, id) {
   return {
     id, externalId: id, orderId: ticket.orderId, ticketTypeId: ticket.ticketTypeId || null,
     ticketClass: ticket.ticketClass || '', email: ticket.email || '',
     firstName: ticket.firstName || '', lastName: ticket.lastName || '', status: ticket.status,
-    addOns: ticketAddOnViews(ticket),
+    addOns: addOnViews(ticket),
     claimedByUid: ticket.claimedByUid || null, checkedInAt: iso(ticket.checkedInAt),
     createdAt: iso(ticket.createdAt), updatedAt: iso(ticket.updatedAt),
   };
@@ -332,7 +328,7 @@ async function correctAttendee({ db, provider, actor, body, now }) {
 /** Add-ons to remove while their tickets keep admission: `[{ ticketId, addOnId }]`. */
 function selectedAddOns(body) {
   if (body.addOns === undefined) return [];
-  if (!Array.isArray(body.addOns) || body.addOns.length > 20) fail(400, 'bad-request', 'Select at most 20 add-ons.');
+  if (!Array.isArray(body.addOns) || body.addOns.length > MAX_ADD_ON_PICKS) fail(400, 'bad-request', `Select at most ${MAX_ADD_ON_PICKS} add-ons.`);
   const picks = body.addOns.map((pick) => ({ ticketId: idOf(pick?.ticketId, 'Ticket'), addOnId: idOf(pick?.addOnId, 'Add-on') }));
   if (new Set(picks.map((pick) => `${pick.ticketId}/${pick.addOnId}`)).size !== picks.length) fail(400, 'bad-request', 'Select each add-on only once.');
   return picks;

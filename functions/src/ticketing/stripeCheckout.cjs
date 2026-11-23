@@ -17,7 +17,7 @@ const {
   CATALOG, CONNECTION, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, priceSelections, makeSeats, ticketsForFreeOrder,
-  configuredPublicBase, checkoutRequestFor, millis, iso,
+  configuredPublicBase, checkoutRequestFor, addOnViews, millis, iso,
 } = require('./stripeCommerce.cjs');
 
 const ATTEMPT_LEASE_MS = 30 * 1000;
@@ -610,7 +610,7 @@ async function readPurchaserOrder({ db, provider, actor, orderId, requestId, now
       externalId: data.externalId, ticketClass: data.ticketClass,
       email: data.email, firstName: data.firstName, lastName: data.lastName,
       status: data.status, claimedByMe: data.claimedByUid === actor.uid,
-      ...(data.addOns?.length ? { addOns: data.addOns.map(({ id, name, status }) => ({ id, name, status })) } : {}),
+      ...(data.addOns?.length ? { addOns: addOnViews(data) } : {}),
     };
   });
   return {

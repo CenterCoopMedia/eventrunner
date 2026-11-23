@@ -271,6 +271,16 @@ function seatAddOns(choices, priced, catalog) {
   });
 }
 
+/**
+ * A ticket's add-ons as readers show them. An add-on is usable only while its
+ * ticket is: a cancelled or refunded ticket carries its add-ons with it.
+ */
+function addOnViews(ticket) {
+  return (ticket.addOns || []).map(({ id, name, status }) => ({
+    id, name, status: ticket.status === 'valid' ? status : ticket.status,
+  }));
+}
+
 /** A ticket's add-ons, keeping a status an organizer already changed. */
 function ticketAddOns(seat, existing) {
   return (seat.addOns || []).map(({ id, name }) => ({
@@ -380,5 +390,5 @@ module.exports = {
   CATALOG, CONNECTION, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, inventoryTransitionPatch, transitionOrderInventory,
-  priceSelections, makeSeats, ticketAddOns, ticketsForFreeOrder, configuredPublicBase, checkoutRequestFor, millis, iso,
+  priceSelections, makeSeats, ticketAddOns, addOnViews, ticketsForFreeOrder, configuredPublicBase, checkoutRequestFor, millis, iso,
 };
