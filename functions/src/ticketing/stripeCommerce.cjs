@@ -77,23 +77,32 @@ function count(value) {
   return value;
 }
 
+function counters(input) {
+  const result = {};
+  for (const [id, value] of Object.entries(input || {})) {
+    if (!value || typeof value !== 'object' || ['constructor', 'prototype', '__proto__'].includes(id)) {
+      throw new CommerceError('inventory-invalid', 'Ticket inventory needs organizer review.', 503);
+    }
+    result[id] = { held: count(value.held), sold: count(value.sold) };
+  }
+  return result;
+}
+
+/** Add-on counters live under `addOns`, apart from event and ticket type seats. */
 function normalizeInventory(input, eventId) {
   if (!input) return { eventId, held: 0, sold: 0, types: {} };
   if (input.eventId && input.eventId !== eventId) {
     throw new CommerceError('inventory-event-mismatch', 'Ticket inventory needs organizer review.', 503);
   }
-  const types = {};
-  for (const [id, value] of Object.entries(input.types || {})) {
-    if (!value || typeof value !== 'object' || ['constructor', 'prototype', '__proto__'].includes(id)) {
-      throw new CommerceError('inventory-invalid', 'Ticket inventory needs organizer review.', 503);
-    }
-    types[id] = { held: count(value.held), sold: count(value.sold) };
-  }
-  return { eventId, held: count(input.held), sold: count(input.sold), types };
+  const addOns = counters(input.addOns);
+  return {
+    eventId, held: count(input.held), sold: count(input.sold), types: counters(input.types),
+    ...(Object.keys(addOns).length ? { addOns } : {}),
+  };
 }
 
 /** Reservations and completed sales share one event counter, so types cannot oversell it. */
-function reserveInventory({ inventory, catalog, lines, eventId, state = 'held' }) {
+function reserveInventory({ inventory, catalog, lines, addOnLines = [], eventId, state = 'held' }) {
   const next = normalizeInventory(inventory, eventId);
   const quantity = lines.reduce((sum, line) => sum + line.quantity, 0);
   if (next.held + next.sold + quantity > catalog.capacity) {
@@ -106,6 +115,15 @@ function reserveInventory({ inventory, catalog, lines, eventId, state = 'held' }
       throw new CommerceError('sold-out', `There are not enough ${type.name} tickets remaining.`);
     }
     next.types[type.id] = { ...current, [state]: current[state] + line.quantity };
+  }
+  for (const line of addOnLines) {
+    const addOn = catalog.addOns.find((entry) => entry.id === line.addOnId);
+    next.addOns ||= {};
+    const current = Object.hasOwn(next.addOns, addOn.id) ? next.addOns[addOn.id] : { held: 0, sold: 0 };
+    if (addOn.capacity !== null && current.held + current.sold + line.quantity > addOn.capacity) {
+      throw new CommerceError('sold-out', `There are not enough ${addOn.name} places remaining.`);
+    }
+    next.addOns[addOn.id] = { ...current, [state]: current[state] + line.quantity };
   }
   next[state] += quantity;
   return next;
@@ -131,6 +149,12 @@ function inventoryTransitionPatch({ order, inventory, to }) {
     if (!type) throw new CommerceError('inventory-invalid', 'Ticket inventory needs organizer review.', 503);
     type.held = count(type.held - line.quantity);
     if (to === 'sold') type.sold += line.quantity;
+  }
+  for (const line of order.addOnLines || []) {
+    const addOn = next.addOns?.[line.addOnId];
+    if (!addOn) throw new CommerceError('inventory-invalid', 'Ticket inventory needs organizer review.', 503);
+    addOn.held = count(addOn.held - line.quantity);
+    if (to === 'sold') addOn.sold += line.quantity;
   }
   return { orderPatch: { inventoryState: to }, inventory: next };
 }
@@ -180,6 +204,7 @@ function priceSelections({ catalog, request, at, comp = false, promo = null }) {
       ...(comp ? { originalUnitAmount: type.unitAmount } : {}),
     };
   });
+  const addOnLines = priceAddOns({ catalog, request, comp });
   let promoSummary = null;
   if (!comp && request.promoCode) {
     const applied = applyPromoCode({ promo, lines, at });
@@ -192,24 +217,86 @@ function priceSelections({ catalog, request, at, comp = false, promo = null }) {
   }
   const seats = lines.reduce((sum, line) => sum + line.quantity, 0);
   if (seats > catalog.maxPerOrder) throw new CommerceError('quantity-out-of-range', 'This order exceeds the ticket quantity limit.', 400);
-  const totalAmount = lines.reduce((sum, line) => sum + line.lineAmount, 0);
+  // Promo codes discount tickets only; add-ons keep their catalog price.
+  const totalAmount = [...lines, ...addOnLines].reduce((sum, line) => sum + line.lineAmount, 0);
   if (!Number.isSafeInteger(totalAmount) || totalAmount > MAX_AMOUNT) {
     throw new CommerceError('amount-out-of-range', 'This order exceeds the payment amount limit.', 400);
   }
   if (totalAmount > 0 && totalAmount < CURRENCY_MINIMUMS[catalog.currency]) {
     throw new CommerceError('amount-too-small', 'This order is below the minimum card payment amount.', 400);
   }
-  return { lines, subtotalAmount: totalAmount, totalAmount, ...(promoSummary ? { promo: promoSummary } : {}) };
+  return {
+    lines, ...(addOnLines.length ? { addOnLines } : {}),
+    subtotalAmount: totalAmount, totalAmount, ...(promoSummary ? { promo: promoSummary } : {}),
+  };
 }
 
-function makeSeats(orderId, lines, request) {
-  return lines.flatMap((line, lineIndex) => request.lines[lineIndex].attendees.map((person, seatIndex) => ({
+/**
+ * One line per chosen add-on, in catalog order, priced from the catalog.
+ * Each choice must be offered for its seat's ticket type, and an add-on with
+ * acknowledgement text needs the buyer's acknowledgement for every seat.
+ */
+function priceAddOns({ catalog, request, comp }) {
+  const quantities = new Map();
+  for (const selection of request.lines) {
+    for (const person of selection.attendees || []) {
+      for (const choice of person.addOns || []) {
+        const addOn = catalog.addOns.find((entry) => entry.id === choice.id);
+        if (!addOn || !addOn.active || !addOn.ticketTypeIds.includes(selection.ticketTypeId)) {
+          throw new CommerceError('add-on-unavailable', 'A selected add-on is unavailable for its ticket.');
+        }
+        if (addOn.acknowledgement && choice.acknowledged !== true) {
+          throw new CommerceError('add-on-acknowledgement-required', `Confirm the ${addOn.name} terms for each attendee who adds it.`, 400);
+        }
+        quantities.set(addOn.id, (quantities.get(addOn.id) || 0) + 1);
+      }
+    }
+  }
+  return catalog.addOns.filter((addOn) => quantities.has(addOn.id)).map((addOn) => {
+    const unitAmount = comp ? 0 : addOn.unitAmount;
+    const quantity = quantities.get(addOn.id);
+    return { addOnId: addOn.id, name: addOn.name, quantity, unitAmount, lineAmount: unitAmount * quantity };
+  });
+}
+
+/** The add-ons a seat carries, as sold: name, price and the acknowledgement the buyer accepted. */
+function seatAddOns(choices, priced, catalog) {
+  return choices.map(({ id }) => {
+    const addOn = catalog.addOns.find((entry) => entry.id === id);
+    const line = priced.addOnLines.find((entry) => entry.addOnId === id);
+    return {
+      id, name: addOn.name, unitAmount: line.unitAmount,
+      ...(addOn.acknowledgement ? { acknowledgement: addOn.acknowledgement } : {}),
+    };
+  });
+}
+
+/**
+ * A ticket's add-ons as readers show them. An add-on is usable only while its
+ * ticket is: a cancelled or refunded ticket carries its add-ons with it.
+ */
+function addOnViews(ticket) {
+  return (ticket.addOns || []).map(({ id, name, status }) => ({
+    id, name, status: ticket.status === 'valid' ? status : ticket.status,
+  }));
+}
+
+/** A ticket's add-ons, keeping a status an organizer already changed. */
+function ticketAddOns(seat, existing) {
+  return (seat.addOns || []).map(({ id, name }) => ({
+    id, name, status: existing?.addOns?.find((entry) => entry.id === id)?.status || 'valid',
+  }));
+}
+
+function makeSeats(orderId, lines, request, { catalog, priced } = {}) {
+  return lines.flatMap((line, lineIndex) => request.lines[lineIndex].attendees.map(({ addOns, ...person }, seatIndex) => ({
     externalId: `${orderId}_${lineIndex}_${seatIndex}`,
     ticketTypeId: line.ticketTypeId,
     ticketClass: line.name,
     lineIndex,
     seatIndex,
     ...person,
+    ...(addOns?.length ? { addOns: seatAddOns(addOns, priced, catalog) } : {}),
   })));
 }
 
@@ -231,6 +318,7 @@ function ticketsForFreeOrder(order, at = new Date()) {
     claimedByUid: null,
     claimedAt: null,
     claimPromptSentAt: null,
+    ...(seat.addOns?.length ? { addOns: ticketAddOns(seat) } : {}),
     createdAt: at,
     updatedAt: at,
   }));
@@ -245,6 +333,18 @@ function configuredPublicBase(config, env = process.env) {
   } catch {
     throw new CommerceError('ticketing-unavailable', 'Ticket sales are not configured.', 503);
   }
+}
+
+function lineItem(order, line, metadata) {
+  return {
+    price_data: {
+      currency: order.currency,
+      product_data: { name: line.name, metadata },
+      unit_amount: line.unitAmount,
+      ...(order.taxTreatment === 'inclusive' ? { tax_behavior: 'inclusive' } : {}),
+    },
+    quantity: line.quantity,
+  };
 }
 
 function checkoutRequestFor(order, publicBase) {
@@ -263,15 +363,10 @@ function checkoutRequestFor(order, publicBase) {
     allow_promotion_codes: false,
     client_reference_id: order.id,
     customer_email: order.purchaserEmail,
-    line_items: order.lines.map((line) => ({
-      price_data: {
-        currency: order.currency,
-        product_data: { name: line.name, metadata: { eventRunnerTicketTypeId: line.ticketTypeId } },
-        unit_amount: line.unitAmount,
-        ...(order.taxTreatment === 'inclusive' ? { tax_behavior: 'inclusive' } : {}),
-      },
-      quantity: line.quantity,
-    })),
+    line_items: [
+      ...order.lines.map((line) => lineItem(order, line, { eventRunnerTicketTypeId: line.ticketTypeId })),
+      ...(order.addOnLines || []).map((line) => lineItem(order, line, { eventRunnerAddOnId: line.addOnId })),
+    ],
     metadata,
     payment_intent_data: { metadata: { ...metadata } },
     expires_at: Math.floor(Date.parse(order.expiresAt) / 1000),
@@ -295,5 +390,5 @@ module.exports = {
   CATALOG, CONNECTION, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, inventoryTransitionPatch, transitionOrderInventory,
-  priceSelections, makeSeats, ticketsForFreeOrder, configuredPublicBase, checkoutRequestFor, millis, iso,
+  priceSelections, makeSeats, ticketAddOns, addOnViews, ticketsForFreeOrder, configuredPublicBase, checkoutRequestFor, millis, iso,
 };

@@ -6,6 +6,7 @@ const { isEmailAddress } = require('./email.cjs');
 const { LANGUAGES } = require('./languageUrls.cjs');
 
 const MAX_TICKET_TYPES = 20;
+const MAX_ADD_ONS = 10;
 const MAX_ORDER_SEATS = 20;
 const MAX_CAPACITY = 1000000;
 const MAX_AMOUNT = 99999999;
@@ -81,6 +82,7 @@ function validateTicketCatalog(input) {
     salesStartAt: isoTime(input.salesStartAt),
     salesEndAt: isoTime(input.salesEndAt),
     ticketTypes: [],
+    addOns: [],
   };
   if (input.schemaVersion !== undefined && input.schemaVersion !== 1) problem('schemaVersion', 'Unsupported catalog version.');
   if (!integer(value.revision, 0, Number.MAX_SAFE_INTEGER)) problem('revision', 'Revision must be a nonnegative integer.');
@@ -140,7 +142,66 @@ function validateTicketCatalog(input) {
       value.ticketTypes.push(type);
     }
   }
+  validateAddOns(input.addOns, value, problem);
   return { ok: issues.length === 0, value: issues.length ? null : value, issues };
+}
+
+/**
+ * Optional extras a buyer adds to one ticket, such as a reception. An add-on
+ * is not admission: it rides on a seat of a ticket type that offers it, has
+ * its own price and optional capacity, and does not use event capacity.
+ */
+function validateAddOns(input, value, problem) {
+  if (input === undefined || input === null) return;
+  if (!Array.isArray(input) || input.length > MAX_ADD_ONS) {
+    problem('addOns', `Provide at most ${MAX_ADD_ONS} add-ons.`);
+    return;
+  }
+  const typeIds = new Set(value.ticketTypes.map((type) => type.id));
+  const seen = new Set();
+  for (const [i, source] of input.entries()) {
+    const path = `addOns.${i}.`;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+      problem(`addOns.${i}`, 'An add-on must be an object.');
+      continue;
+    }
+    const addOn = {
+      id: source.id,
+      name: text(source.name, 120, true),
+      description: text(source.description, 1000),
+      unitAmount: source.unitAmount,
+      capacity: source.capacity ?? null,
+      active: source.active ?? true,
+      acknowledgement: text(source.acknowledgement, 300),
+      ticketTypeIds: Array.isArray(source.ticketTypeIds) ? [...new Set(source.ticketTypeIds)] : null,
+    };
+    if (!isTicketTypeId(addOn.id) || seen.has(addOn.id)) problem(`${path}id`, 'Use a unique lowercase ID with letters, numbers, hyphens, or underscores.');
+    seen.add(addOn.id);
+    if (!addOn.name) problem(`${path}name`, 'An add-on name of at most 120 characters is required.');
+    if (addOn.description === null) problem(`${path}description`, 'Use text of at most 1,000 characters.');
+    if (!integer(addOn.unitAmount, 0, MAX_AMOUNT)) problem(`${path}unitAmount`, 'Use an integer price in minor currency units; zero is free.');
+    if (addOn.capacity !== null && !integer(addOn.capacity, 1, MAX_CAPACITY)) problem(`${path}capacity`, 'Use a positive capacity, or none for no limit.');
+    if (typeof addOn.active !== 'boolean') problem(`${path}active`, 'Use true or false.');
+    if (addOn.acknowledgement === null) problem(`${path}acknowledgement`, 'Use text of at most 300 characters.');
+    if (!addOn.ticketTypeIds || addOn.ticketTypeIds.length < 1 || addOn.ticketTypeIds.some((id) => !typeIds.has(id))) {
+      problem(`${path}ticketTypeIds`, 'Choose at least one ticket type from this catalog.');
+    }
+    value.addOns.push(addOn);
+  }
+}
+
+/** A buyer's add-on choices for one seat: `[{ id, acknowledged }]`, or null when malformed. */
+function normalizeAddOnChoices(input) {
+  if (!Array.isArray(input) || input.length > MAX_ADD_ONS) return null;
+  const choices = [];
+  for (const choice of input) {
+    if (!choice || typeof choice !== 'object' || Array.isArray(choice)
+        || Object.keys(choice).some((key) => !['id', 'acknowledged'].includes(key))
+        || !isTicketTypeId(choice.id) || choices.some((seen) => seen.id === choice.id)
+        || (choice.acknowledged !== undefined && typeof choice.acknowledged !== 'boolean')) return null;
+    choices.push({ id: choice.id, acknowledged: choice.acknowledged === true });
+  }
+  return choices.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function normalizeAttendee(input) {
@@ -199,6 +260,9 @@ function validateCheckoutRequest(input) {
     for (const [seatIndex, source] of line.attendees.entries()) {
       const hasAnswers = source && typeof source === 'object' && Object.hasOwn(source, 'answers');
       const answers = hasAnswers ? source.answers : undefined;
+      const hasAddOns = source && typeof source === 'object' && Object.hasOwn(source, 'addOns');
+      const addOns = hasAddOns ? normalizeAddOnChoices(source.addOns) : null;
+      if (hasAddOns && !addOns) return issue('Choose each add-on once from the listed add-ons.');
       if (hasAnswers) {
         const path = `lines.${lineIndex}.attendees.${seatIndex}.answers`;
         if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
@@ -210,15 +274,20 @@ function validateCheckoutRequest(input) {
         }
       }
       let identity = source;
-      if (hasAnswers) {
+      if (hasAnswers || hasAddOns) {
         identity = { ...source };
         delete identity.answers;
+        delete identity.addOns;
       }
       const person = normalizeAttendee(identity);
       if (!person) return issue('Every ticket needs a valid attendee name and email.');
       // Answers are kept as given; the server checks them against the form.
-      // No key without answers, so existing request fingerprints do not change.
-      attendees.push(hasAnswers ? { ...person, answers } : person);
+      // No key without answers or add-ons, so existing request fingerprints do not change.
+      attendees.push({
+        ...person,
+        ...(hasAnswers ? { answers } : {}),
+        ...(addOns?.length ? { addOns } : {}),
+      });
     }
     seatCount += line.quantity;
     seen.add(line.ticketTypeId);
@@ -278,8 +347,8 @@ function isOrderFulfilled(order) {
 module.exports = {
   TICKET_STATUSES, TICKET_TERMINAL_STATUSES, ORDER_STATUSES, ORDER_COMPLETE_STATUSES,
   PAYMENT_STATUSES, INVENTORY_STATES, REFUND_STATUSES, isOrderFulfilled,
-  MAX_TICKET_TYPES, MAX_ORDER_SEATS, MAX_CAPACITY, MAX_AMOUNT, MAX_ANSWERS_BYTES,
+  MAX_TICKET_TYPES, MAX_ADD_ONS, MAX_ORDER_SEATS, MAX_CAPACITY, MAX_AMOUNT, MAX_ANSWERS_BYTES,
   CURRENCY_EXPONENTS, CURRENCY_MINIMUMS, TAX_TREATMENTS,
   isTicketTypeId, isCommerceRequestId, isCommerceOrderId, normalizeAttendee, normalizePromoCode,
-  validateTicketCatalog, validateCheckoutRequest, isSalesWindowOpen,
+  normalizeAddOnChoices, validateTicketCatalog, validateCheckoutRequest, isSalesWindowOpen,
 };

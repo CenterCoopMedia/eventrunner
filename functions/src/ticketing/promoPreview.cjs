@@ -6,7 +6,7 @@
  * the reservation checks the code again. Each check spends one of the
  * account's code checks (promoCodes.cjs), which checkout shares.
  */
-const { MAX_ORDER_SEATS, MAX_TICKET_TYPES, isTicketTypeId, normalizePromoCode } = require('shared/ticketCommerce');
+const { MAX_ADD_ONS, MAX_ORDER_SEATS, MAX_TICKET_TYPES, isTicketTypeId, normalizePromoCode } = require('shared/ticketCommerce');
 const { PROMO_ERRORS } = require('shared/promoCodes');
 const { methodNotAllowed } = require('../core/errors.cjs');
 const { CATALOG, CURRENT, CommerceError, providerScope, priceSelections } = require('./stripeCommerce.cjs');
@@ -19,13 +19,25 @@ function readCart(body) {
   const lines = body?.lines;
   if (!Array.isArray(lines) || lines.length < 1 || lines.length > MAX_TICKET_TYPES) throw bad();
   const seen = new Set();
+  const choices = [];
   for (const line of lines) {
     if (!line || !isTicketTypeId(line.ticketTypeId) || seen.has(line.ticketTypeId)
         || !Number.isSafeInteger(line.quantity) || line.quantity < 1 || line.quantity > MAX_ORDER_SEATS) throw bad();
     seen.add(line.ticketTypeId);
+    const addOns = line.addOns ?? [];
+    if (!Array.isArray(addOns) || addOns.length > MAX_ADD_ONS || new Set(addOns.map((addOn) => addOn?.id)).size !== addOns.length
+        || addOns.some((addOn) => !isTicketTypeId(addOn?.id) || !Number.isSafeInteger(addOn.quantity) || addOn.quantity < 1 || addOn.quantity > line.quantity)) throw bad();
+    choices.push(addOns);
   }
   if (!Number.isSafeInteger(body.catalogRevision)) throw bad();
-  return lines.map(({ ticketTypeId, quantity }) => ({ ticketTypeId, quantity }));
+  // Add-on counts become seats that chose them, so the preview prices the same
+  // total as checkout and checks the same card minimum.
+  return lines.map(({ ticketTypeId, quantity }, index) => ({
+    ticketTypeId, quantity,
+    attendees: Array.from({ length: quantity }, (_, seat) => ({
+      addOns: choices[index].filter((addOn) => seat < addOn.quantity).map(({ id }) => ({ id, acknowledged: true })),
+    })),
+  }));
 }
 
 async function previewPromoCode({ db, provider, actor, body, now = () => new Date() }) {
@@ -51,6 +63,7 @@ async function previewPromoCode({ db, provider, actor, body, now = () => new Dat
     lines: priced.lines.map(({ ticketTypeId, name, quantity, unitAmount, lineAmount, listUnitAmount }) => ({
       ticketTypeId, name, quantity, unitAmount, lineAmount, ...(listUnitAmount !== undefined ? { listUnitAmount } : {}),
     })),
+    ...(priced.addOnLines ? { addOnLines: priced.addOnLines } : {}),
     subtotalAmount: priced.subtotalAmount, totalAmount: priced.totalAmount, discountAmount: priced.promo.discountAmount,
   };
 }

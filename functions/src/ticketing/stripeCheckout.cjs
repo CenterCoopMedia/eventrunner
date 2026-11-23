@@ -17,7 +17,7 @@ const {
   CATALOG, CONNECTION, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, priceSelections, makeSeats, ticketsForFreeOrder,
-  configuredPublicBase, checkoutRequestFor, millis, iso,
+  configuredPublicBase, checkoutRequestFor, addOnViews, millis, iso,
 } = require('./stripeCommerce.cjs');
 
 const ATTEMPT_LEASE_MS = 30 * 1000;
@@ -131,7 +131,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
     eventName: typeof config?.event?.name === 'string' ? config.event.name : '',
     refundPolicy: '', taxTreatment: null, taxAmount: 0, feeAmount: 0,
     salesStartAt: null, salesEndAt: null,
-    maxPerOrder: 0, ticketTypes: [], closedReason: 'Ticket sales are not configured.',
+    maxPerOrder: 0, ticketTypes: [], addOns: [], closedReason: 'Ticket sales are not configured.',
   };
   let scope;
   try { scope = providerScope(provider); } catch { return closed; }
@@ -162,6 +162,16 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
       salesStartAt: type.salesStartAt, salesEndAt: type.salesEndAt,
     };
   });
+  const offered = new Set(ticketTypes.map((type) => type.id));
+  const addOns = catalog.addOns.filter((addOn) => addOn.active).map((addOn) => {
+    const counts = inventory.addOns?.[addOn.id] || { held: 0, sold: 0 };
+    const remaining = addOn.capacity === null ? null : Math.max(0, addOn.capacity - counts.held - counts.sold);
+    return {
+      id: addOn.id, name: addOn.name, description: addOn.description, unitAmount: addOn.unitAmount,
+      acknowledgement: addOn.acknowledgement, ticketTypeIds: addOn.ticketTypeIds.filter((typeId) => offered.has(typeId)),
+      remaining, available: salesEnabled && (addOn.unitAmount === 0 || paidConfigured) && remaining !== 0,
+    };
+  }).filter((addOn) => addOn.ticketTypeIds.length);
   const anyAvailable = salesEnabled && ticketTypes.some((type) => type.available);
   return {
     ...closed, salesEnabled: anyAvailable, catalogRevision: catalog.revision, currency: catalog.currency,
@@ -169,7 +179,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
     eventName: typeof event.name === 'string' ? event.name : closed.eventName,
     refundPolicy: catalog.refundPolicy, taxTreatment: catalog.taxTreatment,
     salesStartAt: catalog.salesStartAt, salesEndAt: catalog.salesEndAt,
-    maxPerOrder: catalog.maxPerOrder, ticketTypes,
+    maxPerOrder: catalog.maxPerOrder, ticketTypes, addOns,
     closedReason: anyAvailable ? null : (catalog.salesPaused ? 'Ticket sales are paused.' : eventRemaining === 0 ? 'This event is sold out.' : 'Ticket sales are currently closed.'),
   };
 }
@@ -274,7 +284,7 @@ async function reserveCommerceOrder({
     if (paid) requirePaymentCredentials(provider, connectionSnap.data()?.ended === true);
     const publicBase = paid ? configuredPublicBase(config, env) : null;
     // makeSeats copies each attendee as given; keep only the checked answers.
-    const seats = makeSeats(id, priced.lines, request).map(({ answers: _given, ...seat }) => {
+    const seats = makeSeats(id, priced.lines, request, { catalog, priced }).map(({ answers: _given, ...seat }) => {
       const answers = seatAnswers?.[seat.lineIndex]?.[seat.seatIndex];
       return answers ? { ...seat, answers } : seat;
     });
@@ -334,7 +344,8 @@ async function reserveCommerceOrder({
       } : {}),
     };
     const inventory = reserveInventory({
-      inventory: inventorySnap.data(), catalog, lines: order.lines, eventId: scope.eventId, state: order.inventoryState,
+      inventory: inventorySnap.data(), catalog, lines: order.lines, addOnLines: order.addOnLines,
+      eventId: scope.eventId, state: order.inventoryState,
     });
     const attempt = {
       id: attemptId, orderId: id, purchaserUid: actor.uid, ...scope,
@@ -599,6 +610,7 @@ async function readPurchaserOrder({ db, provider, actor, orderId, requestId, now
       externalId: data.externalId, ticketClass: data.ticketClass,
       email: data.email, firstName: data.firstName, lastName: data.lastName,
       status: data.status, claimedByMe: data.claimedByUid === actor.uid,
+      ...(data.addOns?.length ? { addOns: addOnViews(data) } : {}),
     };
   });
   return {
@@ -610,6 +622,9 @@ async function readPurchaserOrder({ db, provider, actor, orderId, requestId, now
     lines: order.lines.map(({ ticketTypeId, name, quantity, unitAmount, lineAmount, listUnitAmount }) => ({
       ticketTypeId, name, quantity, unitAmount, lineAmount, ...(listUnitAmount !== undefined ? { listUnitAmount } : {}),
     })),
+    ...(order.addOnLines ? {
+      addOnLines: order.addOnLines.map(({ addOnId, name, quantity, unitAmount, lineAmount }) => ({ addOnId, name, quantity, unitAmount, lineAmount })),
+    } : {}),
     ...(order.promo ? { promo: { code: order.promo.code, discountAmount: order.promo.discountAmount } } : {}),
     tickets, updatedAt: iso(order.updatedAt), checkedAt: now().toISOString(),
   };
