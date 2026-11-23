@@ -235,7 +235,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
               <td className={cellClass}><StatusBadge tone={ticket.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
               <td className={cellClass}>{ticket.addOns?.length ? <ul className="space-y-3xs">{ticket.addOns.map((addOn) => {
                 const key = `${id}/${addOn.id}`;
-                return <li key={addOn.id}>{addOn.status === 'valid' && !selected.includes(id) ? <Checkbox data-help-skip="The label names the add-on selected for a refund or cancellation." tone="admin" label={addOn.name} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selectedAddOns.includes(key)} onChange={(event) => {
+                return <li key={addOn.id}>{addOn.status !== 'refunded' && !selected.includes(id) ? <Checkbox data-help-skip="The label names the add-on selected for a refund or cancellation." tone="admin" label={addOnLabel(addOn)} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selectedAddOns.includes(key)} onChange={(event) => {
                   if (busyRef.current || requiresOperator) return;
                   setSelectedAddOns((previous) => event.target.checked ? [...previous, key] : previous.filter((selectedKey) => selectedKey !== key));
                 }} /> : addOnLabel(addOn)}</li>;
