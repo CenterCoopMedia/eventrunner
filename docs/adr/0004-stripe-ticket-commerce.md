@@ -4,7 +4,8 @@
 **Status:** Proposed for review with the implementation of [epic #483](https://github.com/CenterCoopMedia/eventrunner/issues/483). Merge accepts this extension; merchant setup and live sales require a separate launch decision.  
 **Extends:** [ADR 0001](0001-event-platform-v1.md), ticketing sections only.  
 **Amended:** 2026-10-20, for a card pay link on an issued sponsor invoice ([#519](https://github.com/CenterCoopMedia/eventrunner/issues/519)). See [the amendment](#amendment-2026-10-20-invoice-pay-links).  
-**Amended:** 2026-11-04, for Event Runner promo codes ([ADR 0008](0008-registration-and-pitch-steppers.md) §6). See [the amendment](#amendment-2026-11-04-promo-codes).
+**Amended:** 2026-11-04, for Event Runner promo codes ([ADR 0008](0008-registration-and-pitch-steppers.md) §6). See [the amendment](#amendment-2026-11-04-promo-codes).  
+**Amended:** 2026-11-23, for ticket add-ons ([#1412](https://github.com/CenterCoopMedia/eventrunner/issues/1412)). See [the amendment](#amendment-2026-11-23-ticket-add-ons).
 
 ## Decision and boundaries
 
@@ -442,6 +443,46 @@ failed guess count. Without the shared budget, checkout would answer guesses wit
 **Request.** The checkout request gains an optional `promoCode`. It joins the request
 fingerprint only when present, so the same request ID with a different code is a different
 order and old fingerprints do not change.
+
+## Amendment 2026-11-23: ticket add-ons
+
+An organizer can offer an optional extra with chosen ticket types, such as a reception. An
+add-on is not admission. It rides on one seat, so a buyer cannot buy it without a ticket, and
+it grants no event access by itself.
+
+**Catalog.** `ticket_catalog/current` gains `addOns`, at most 10, each with `id`, `name`,
+`description`, `unitAmount`, `capacity` (a positive integer or `null` for no limit), `active`,
+`acknowledgement` (text of at most 300 characters, or empty) and `ticketTypeIds`, the types that
+offer it. A save keeps every add-on that is held or sold and enough capacity for it; an organizer
+turns an add-on off instead of removing it.
+
+**Request.** Each attendee in a checkout request may carry `addOns: [{ id, acknowledged }]`. The
+key joins the request fingerprint only when it is not empty. The request never carries a price.
+
+**Price.** The reservation prices add-ons from the catalog inside its transaction. A chosen
+add-on must be active and offered for its seat's ticket type. An add-on with acknowledgement
+text needs `acknowledged: true` for every seat that chooses it. The order gains `addOnLines`, one
+line per add-on in catalog order, and the total is tickets plus add-ons. Promo codes discount
+tickets only. A comp prices its add-ons at zero. A free ticket with a paid add-on is a paid
+order: Checkout receives the free ticket line at zero and the add-on line at its price, and the
+free-ticket guards still apply to the free seat.
+
+**Capacity.** `ticket_inventory/current` counts add-ons under `addOns.<id>`, apart from event and
+ticket type seats. Holds, sales and expiry releases move add-on counters with the order.
+
+**Reconciliation.** Each add-on line in Checkout carries `eventRunnerAddOnId` in its product
+metadata. Reconciliation matches every ticket and add-on line by kind, amount and quantity.
+
+**Admission records.** Each seat keeps the add-ons it was sold with, including the
+acknowledgement text the buyer accepted. Each ticket carries `addOns: [{ id, name, status }]`.
+An add-on is usable only while its ticket is valid: cancelling or refunding a ticket removes its
+add-ons. A refund allocation or a cancellation can also name add-ons, `[{ ticketId, addOnId }]`,
+to mark them refunded or cancelled while the ticket keeps admission. An add-on-only refund uses
+the keep-admission decision. Reconciliation keeps these organizer decisions. Cancelled and
+refunded add-ons do not restock capacity, like tickets.
+
+**Display.** The order, the confirmation emails, the organizer ticket views, check-in and the
+order and admission exports list the add-ons.
 
 ## Stripe references
 

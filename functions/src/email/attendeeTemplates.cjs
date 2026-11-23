@@ -56,13 +56,13 @@ const SPANISH = {
     subject: 'Tu pedido de entradas para {{event_name}}',
     html: [
       '<p>Tu pedido para {{event_name}} está confirmado.</p>',
-      '<p>Pedido: {{order_reference}}<br>Entradas: {{ticket_count}}<br>Total: {{total_amount}}</p>',
+      '<p>Pedido: {{order_reference}}<br>Entradas: {{ticket_count}}{{#if add_ons}}<br>Extras: {{add_ons}}{{/if}}<br>Total: {{total_amount}}</p>',
       '<p><a href="{{cta_url}}">Consulta el pedido y tus entradas</a></p>',
       '<p>Cada asistente debe iniciar sesión con el correo asociado a su entrada para reclamarla. Si hubo un pago, Stripe envía el recibo por separado.</p>',
     ],
     text: [
       'Tu pedido para {{event_name}} está confirmado.', '', 'Pedido: {{order_reference}}',
-      'Entradas: {{ticket_count}}', 'Total: {{total_amount}}', '', 'Consulta el pedido y tus entradas: {{cta_url}}', '',
+      'Entradas: {{ticket_count}}{{#if add_ons}}\nExtras: {{add_ons}}{{/if}}', 'Total: {{total_amount}}', '', 'Consulta el pedido y tus entradas: {{cta_url}}', '',
       'Cada asistente debe iniciar sesión con el correo asociado a su entrada para reclamarla. Si hubo un pago, Stripe envía el recibo por separado.',
     ],
   }),
@@ -70,13 +70,13 @@ const SPANISH = {
     subject: 'Tienes una entrada para {{event_name}}',
     html: [
       '<p>Hola{{#if first_name}}, {{first_name}}{{/if}}:</p>',
-      '<p>Entradas para {{event_name}} asignadas a este correo: {{ticket_count}}.</p>',
+      '<p>Entradas para {{event_name}} asignadas a este correo: {{ticket_count}}.{{#if add_ons}} Extras: {{add_ons}}.{{/if}}</p>',
       '<p><a href="{{cta_url}}">Inicia sesión y reclama tu entrada</a></p>',
       '<p>Referencia del pedido: {{order_reference}}. Usa este correo para iniciar sesión. La referencia por sí sola no da acceso a tu entrada.</p>',
       '<p>Después de reclamarla, abre Mis entradas para ver o imprimir tu entrada.</p>',
     ],
     text: [
-      'Hola{{#if first_name}}, {{first_name}}{{/if}}:', '', 'Entradas para {{event_name}} asignadas a este correo: {{ticket_count}}.', '',
+      'Hola{{#if first_name}}, {{first_name}}{{/if}}:', '', 'Entradas para {{event_name}} asignadas a este correo: {{ticket_count}}.{{#if add_ons}} Extras: {{add_ons}}.{{/if}}', '',
       'Inicia sesión y reclama tu entrada: {{cta_url}}', '', 'Referencia del pedido: {{order_reference}}.',
       'Usa este correo para iniciar sesión. La referencia por sí sola no da acceso a tu entrada.',
       'Después de reclamarla, abre Mis entradas para ver o imprimir tu entrada.',

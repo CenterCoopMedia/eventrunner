@@ -19,6 +19,11 @@ function receiptAmount(order, language = 'en') {
   return format.format(order.totalAmount / (10 ** exponent));
 }
 
+/** "2 × Reception" per add-on line; empty when the order has none. */
+function addOnSummary(lines) {
+  return (lines || []).map((line) => `${line.quantity} × ${line.name}`).join(', ');
+}
+
 function confirmationPublicBase(env) {
   const { publicBase } = eventPublicAddress(env.EVENT_PUBLIC_URL, env);
   if (!publicBase) {
@@ -61,7 +66,7 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (order.purchaserEmail) {
     recipients.push({
       to: order.purchaserEmail, templateId: 'ticket.order_confirmation', language: purchaserLanguage,
-      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order, purchaserLanguage), cta_url: joinEventPath(publicBase, `/tickets/status?orderId=${encodeURIComponent(orderId)}`) },
+      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order, purchaserLanguage), add_ons: addOnSummary(order.addOnLines), cta_url: joinEventPath(publicBase, `/tickets/status?orderId=${encodeURIComponent(orderId)}`) },
     });
   }
   const attendees = new Map();
@@ -71,8 +76,11 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
     if (ticket.claimedByUid) continue;
     const email = ticket.email?.trim().toLowerCase();
     if (!email) continue;
-    const existing = attendees.get(email) || { firstName: ticket.firstName || '', count: 0 };
+    const existing = attendees.get(email) || { firstName: ticket.firstName || '', count: 0, addOns: new Map() };
     existing.count += 1;
+    for (const addOn of ticket.addOns || []) {
+      if (addOn.status === 'valid') existing.addOns.set(addOn.name, (existing.addOns.get(addOn.name) || 0) + 1);
+    }
     attendees.set(email, existing);
   }
   const assigned = [...attendees.keys()].filter((email) => email !== purchaserEmail);
@@ -88,7 +96,10 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
     const language = email === purchaserEmail ? purchaserLanguage : attendeeLanguage(accountsByEmail.get(email), event);
     recipients.push({
       to: email, templateId: 'ticket.attendee_confirmation', language,
-      tokens: { first_name: attendee.firstName, order_reference: orderId, ticket_count: String(attendee.count), cta_url: joinEventPath(publicBase, `/ticket/claim?order=${encodeURIComponent(orderId)}`) },
+      tokens: {
+        first_name: attendee.firstName, order_reference: orderId, ticket_count: String(attendee.count),
+        add_ons: addOnSummary([...attendee.addOns].map(([name, quantity]) => ({ name, quantity }))), cta_url: joinEventPath(publicBase, `/ticket/claim?order=${encodeURIComponent(orderId)}`),
+      },
     });
   }
   let sent = 0;
@@ -149,4 +160,4 @@ function buildHandlers() {
   };
 }
 
-module.exports = { sendOrderConfirmations, get handlers() { return buildHandlers(); }, internals: { receiptAmount } };
+module.exports = { sendOrderConfirmations, get handlers() { return buildHandlers(); }, internals: { receiptAmount, addOnSummary } };

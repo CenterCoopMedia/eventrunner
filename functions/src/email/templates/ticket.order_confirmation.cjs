@@ -6,18 +6,18 @@ const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
 module.exports = {
   id: 'ticket.order_confirmation',
   subject: 'Your ticket order for {{event_name}}',
-  tokens: [...GLOBAL_TOKEN_NAMES, 'order_reference', 'ticket_count', 'total_amount', 'cta_url'],
+  tokens: [...GLOBAL_TOKEN_NAMES, 'order_reference', 'ticket_count', 'add_ons', 'total_amount', 'cta_url'],
   requiredTokens: ['order_reference', 'ticket_count', 'total_amount', 'cta_url'],
   storeRendered: false,
   html: wrap([
     '<p>Your order for {{event_name}} is confirmed.</p>',
-    '<p>Order: {{order_reference}}<br>Tickets: {{ticket_count}}<br>Total: {{total_amount}}</p>',
+    '<p>Order: {{order_reference}}<br>Tickets: {{ticket_count}}{{#if add_ons}}<br>Add-ons: {{add_ons}}{{/if}}<br>Total: {{total_amount}}</p>',
     '<p><a href="{{cta_url}}">View your order and ticket information</a></p>',
     '<p>Each attendee needs to sign in with the email assigned to their ticket and claim it. Your payment receipt, when applicable, comes separately from Stripe.</p>',
   ].join('\n')),
   text: [
     'Your order for {{event_name}} is confirmed.', '',
-    'Order: {{order_reference}}', 'Tickets: {{ticket_count}}', 'Total: {{total_amount}}', '',
+    'Order: {{order_reference}}', 'Tickets: {{ticket_count}}{{#if add_ons}}\nAdd-ons: {{add_ons}}{{/if}}', 'Total: {{total_amount}}', '',
     'View your order and ticket information: {{cta_url}}', '',
     'Each attendee needs to sign in with the email assigned to their ticket and claim it. Your payment receipt, when applicable, comes separately from Stripe.',
     '', TEXT_FOOTER,

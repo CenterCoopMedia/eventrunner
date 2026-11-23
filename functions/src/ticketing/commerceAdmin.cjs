@@ -65,11 +65,18 @@ function audit(tx, ref, { action, actor, now, orderId = null, ticketIds = [], re
     uid: actor.uid, actorUid: actor.uid, at: now(), orderId, ticketIds, reason, details,
   });
 }
+/** An add-on is usable only while its ticket is: a cancelled or refunded ticket carries its add-ons with it. */
+function ticketAddOnViews(ticket) {
+  return (ticket.addOns || []).map(({ id, name, status }) => ({
+    id, name, status: ticket.status === 'valid' ? status : ticket.status,
+  }));
+}
 function publicTicket(ticket, id) {
   return {
     id, externalId: id, orderId: ticket.orderId, ticketTypeId: ticket.ticketTypeId || null,
     ticketClass: ticket.ticketClass || '', email: ticket.email || '',
     firstName: ticket.firstName || '', lastName: ticket.lastName || '', status: ticket.status,
+    addOns: ticketAddOnViews(ticket),
     claimedByUid: ticket.claimedByUid || null, checkedInAt: iso(ticket.checkedInAt),
     createdAt: iso(ticket.createdAt), updatedAt: iso(ticket.updatedAt),
   };
@@ -88,7 +95,7 @@ function publicOrder(order) {
       createdAt: iso(refund.createdAt), failureReason: refund.failureReason || null,
     })),
     refundAllocations: order.refundAllocations || {}, refundAllocationDecisions: order.refundAllocationDecisions || {},
-    lines: order.lines || [], source: order.source || 'checkout', inventoryState: order.inventoryState,
+    lines: order.lines || [], addOnLines: order.addOnLines || [], source: order.source || 'checkout', inventoryState: order.inventoryState,
     stripeAccountId: order.stripeAccountId, livemode: order.livemode,
     createdAt: iso(order.createdAt), updatedAt: iso(order.updatedAt),
     reconciliationException: order.reconciliationException ? {
@@ -170,6 +177,12 @@ async function saveCatalog({ db, provider, actor, body, now }) {
       const type = next.ticketTypes.find((candidate) => candidate.id === id);
       if ((used.held || 0) + (used.sold || 0) > 0 && (!type || type.capacity < used.held + used.sold)) {
         fail(409, 'conflict', 'Keep ticket types and enough capacity for every held and sold seat.');
+      }
+    }
+    for (const [id, used] of Object.entries(inventory.addOns || {})) {
+      const addOn = next.addOns.find((candidate) => candidate.id === id);
+      if (used.held + used.sold > 0 && (!addOn || (addOn.capacity !== null && addOn.capacity < used.held + used.sold))) {
+        fail(409, 'conflict', 'Keep add-ons and enough add-on capacity for every held and sold add-on. Turn an add-on off instead of removing it.');
       }
     }
     tx.set(ref, { ...next, revision: body.expectedRevision + 1, updatedAt: now(), updatedBy: actor.uid });
@@ -316,6 +329,15 @@ async function correctAttendee({ db, provider, actor, body, now }) {
   return readOrderDetail({ db, provider, orderId });
 }
 
+/** Add-ons to remove while their tickets keep admission: `[{ ticketId, addOnId }]`. */
+function selectedAddOns(body) {
+  if (body.addOns === undefined) return [];
+  if (!Array.isArray(body.addOns) || body.addOns.length > 20) fail(400, 'bad-request', 'Select at most 20 add-ons.');
+  const picks = body.addOns.map((pick) => ({ ticketId: idOf(pick?.ticketId, 'Ticket'), addOnId: idOf(pick?.addOnId, 'Add-on') }));
+  if (new Set(picks.map((pick) => `${pick.ticketId}/${pick.addOnId}`)).size !== picks.length) fail(400, 'bad-request', 'Select each add-on only once.');
+  return picks;
+}
+
 function selectedTickets(body, allowEmpty = false) {
   if (!Array.isArray(body.ticketIds) || body.ticketIds.length > 20 || (!allowEmpty && body.ticketIds.length === 0)) {
     fail(400, 'bad-request', 'Select between 1 and 20 tickets.');
@@ -330,8 +352,11 @@ async function changeAdmission({ db, provider, actor, body, now, allocate = fals
   const orderId = idOf(body.orderId, 'Order');
   const reason = reasonOf(body);
   const preserve = allocate && body.preserveAdmission === true;
-  const ids = selectedTickets(body, preserve);
+  const addOnPicks = selectedAddOns(body);
+  const ids = selectedTickets(body, preserve || addOnPicks.length > 0);
   if (preserve && ids.length !== 0) fail(400, 'bad-request', 'Choose either keeping admission or selecting tickets to remove.');
+  if (addOnPicks.some((pick) => ids.includes(pick.ticketId))) fail(400, 'bad-request', 'A removed ticket already removes its add-ons.');
+  if (allocate && !preserve && ids.length === 0) fail(400, 'bad-request', 'A refund for add-ons only keeps admission. Choose keeping admission.');
   const refundId = allocate ? idOf(body.refundId, 'Refund') : null;
   const logRef = auditRef(db);
   await db.runTransaction(async (tx) => {
@@ -339,12 +364,20 @@ async function changeAdmission({ db, provider, actor, body, now, allocate = fals
     const orderRef = db.collection(ORDERS).doc(orderId);
     const order = requireOrder(await tx.get(orderRef), provider);
     if (order.inventoryState !== 'sold') fail(409, 'conflict', 'Only completed orders have admission tickets to change.');
-    if (ids.some((id) => !order.ticketIds?.includes(id))) fail(404, 'not-found', 'A selected ticket does not belong to this order.');
+    const addOnTicketIds = [...new Set(addOnPicks.map((pick) => pick.ticketId))];
+    if ([...ids, ...addOnTicketIds].some((id) => !order.ticketIds?.includes(id))) fail(404, 'not-found', 'A selected ticket does not belong to this order.');
     const refs = ids.map((id) => db.collection(TICKETS).doc(id));
-    const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
-    if (snaps.some((snap) => !snap.exists || snap.data().orderId !== orderId)) fail(404, 'not-found', 'A selected ticket could not be found.');
+    const addOnRefs = addOnTicketIds.map((id) => db.collection(TICKETS).doc(id));
+    const [snaps, addOnSnaps] = await Promise.all([
+      Promise.all(refs.map((ref) => tx.get(ref))), Promise.all(addOnRefs.map((ref) => tx.get(ref))),
+    ]);
+    if ([...snaps, ...addOnSnaps].some((snap) => !snap.exists || snap.data().orderId !== orderId)) fail(404, 'not-found', 'A selected ticket could not be found.');
+    for (const pick of addOnPicks) {
+      const ticket = addOnSnaps[addOnTicketIds.indexOf(pick.ticketId)].data();
+      if (!(ticket.addOns || []).some((addOn) => addOn.id === pick.addOnId)) fail(404, 'not-found', 'A selected add-on is not on its ticket.');
+    }
     await confirmOrder({ db, tx, order, body });
-    if (snaps.some((snap) => snap.data().checkedInAt) && actor.tier !== 'operator') fail(403, 'forbidden', 'An operator must change admission for a checked-in ticket.');
+    if ([...snaps, ...addOnSnaps].some((snap) => snap.data().checkedInAt) && actor.tier !== 'operator') fail(403, 'forbidden', 'An operator must change admission for a checked-in ticket.');
     let patch = { updatedAt: now() };
     if (allocate) {
       const refund = (order.refunds || []).find((candidate) => candidate.id === refundId);
@@ -358,7 +391,9 @@ async function changeAdmission({ db, provider, actor, body, now, allocate = fals
       patch = {
         ...patch,
         refundAllocations: { ...order.refundAllocations, [refundId]: ids },
-        refundAllocationDecisions: { ...order.refundAllocationDecisions, [refundId]: { preserveAdmission: preserve, actorUid: actor.uid, at: now(), reason } },
+        refundAllocationDecisions: { ...order.refundAllocationDecisions, [refundId]: {
+          preserveAdmission: preserve, actorUid: actor.uid, at: now(), reason, ...(addOnPicks.length ? { addOns: addOnPicks } : {}),
+        } },
       };
       const stillUnallocated = (order.refunds || []).some((refund) => refund.status === 'succeeded' &&
         !Object.prototype.hasOwnProperty.call(patch.refundAllocations, refund.id));
@@ -372,8 +407,19 @@ async function changeAdmission({ db, provider, actor, body, now, allocate = fals
         cancelledByUid: actor.uid, cancellationReason: reason, updatedAt: now(),
       });
     });
+    addOnSnaps.forEach((snap, index) => {
+      const removed = new Set(addOnPicks.filter((pick) => pick.ticketId === addOnTicketIds[index]).map((pick) => pick.addOnId));
+      tx.update(addOnRefs[index], {
+        addOns: snap.data().addOns.map((addOn) => (removed.has(addOn.id) && addOn.status !== 'refunded'
+          ? { ...addOn, status: allocate ? 'refunded' : 'cancelled' } : addOn)),
+        updatedAt: now(),
+      });
+    });
     tx.update(orderRef, patch);
-    audit(tx, logRef, { action: allocate ? 'refund-allocated' : 'tickets-cancelled', actor, now, orderId, ticketIds: ids, reason, details: allocate ? { refundId, preserveAdmission: preserve } : {} });
+    audit(tx, logRef, {
+      action: allocate ? 'refund-allocated' : 'tickets-cancelled', actor, now, orderId, ticketIds: ids, reason,
+      details: { ...(allocate ? { refundId, preserveAdmission: preserve } : {}), ...(addOnPicks.length ? { addOns: addOnPicks } : {}) },
+    });
   });
   return readOrderDetail({ db, provider, orderId });
 }

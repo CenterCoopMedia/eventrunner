@@ -9,7 +9,7 @@ const { randomUUID } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { internals: { scopeMatches, metadataMatches, objectId, safeId } } = require('./providers/stripe.cjs');
 const { promoRef, releasedPromoUse } = require('./promoCodes.cjs');
-const { ORDERS, INVENTORY, CURRENT, inventoryTransitionPatch, millis } = require('./stripeCommerce.cjs');
+const { ORDERS, INVENTORY, CURRENT, inventoryTransitionPatch, ticketAddOns, millis } = require('./stripeCommerce.cjs');
 const { internals: { TICKETS } } = require('./index.cjs');
 
 const LEASE_MS = 5 * 60_000;
@@ -44,12 +44,15 @@ function validateFinancialState(order, state, provider) {
   requireMatch(Array.isArray(session.payment_method_types) && session.payment_method_types.length === 1 &&
     session.payment_method_types[0] === 'card', 'unsupported-payment-method',
   'This order used a payment method outside the configured card-only policy.');
-  requireMatch(Array.isArray(order.lines) && order.lines.length > 0 &&
-    Array.isArray(lineItems) && lineItems.length === order.lines.length);
-  const remaining = [...order.lines];
+  const addOnLines = order.addOnLines || [];
+  requireMatch(Array.isArray(order.lines) && order.lines.length > 0 && Array.isArray(addOnLines) &&
+    Array.isArray(lineItems) && lineItems.length === order.lines.length + addOnLines.length);
+  const remaining = [...order.lines, ...addOnLines];
   for (const item of lineItems) {
-    const typeId = item.price?.product?.metadata?.eventRunnerTicketTypeId;
-    const index = remaining.findIndex((line) => line.ticketTypeId === typeId &&
+    const metadata = item.price?.product?.metadata || {};
+    const index = remaining.findIndex((line) => (line.addOnId
+      ? line.addOnId === metadata.eventRunnerAddOnId && metadata.eventRunnerTicketTypeId === undefined
+      : line.ticketTypeId === metadata.eventRunnerTicketTypeId && metadata.eventRunnerAddOnId === undefined) &&
       line.quantity === item.quantity && line.unitAmount === item.price?.unit_amount &&
       line.lineAmount === item.amount_subtotal && line.lineAmount === item.amount_total &&
       item.currency === order.currency && item.price?.currency === order.currency && !item.price?.recurring &&
@@ -282,6 +285,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
           status: admissionStatus(current, patch, seat.externalId, existing),
           claimedByUid: existing?.claimedByUid ?? null, claimedAt: existing?.claimedAt ?? null,
           claimPromptSentAt: existing?.claimPromptSentAt ?? null,
+          ...(seat.addOns?.length ? { addOns: ticketAddOns(seat, existing) } : {}),
           purchasedAt: existing?.purchasedAt || new Date(millis(current.createdAt) || at.getTime()).toISOString(),
           createdAt: existing?.createdAt || at, updatedAt: at,
         };

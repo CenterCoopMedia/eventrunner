@@ -345,6 +345,13 @@ function orderRecord(id, data) {
       listUnitAmount: numberOrNull(line?.listUnitAmount) ?? numberOrNull(line?.unitAmount),
       lineAmount: numberOrNull(line?.lineAmount),
     })),
+    addOnLines: (Array.isArray(source.addOnLines) ? source.addOnLines : []).map((line) => ({
+      addOnId: text(line?.addOnId),
+      name: text(line?.name),
+      quantity: numberOrNull(line?.quantity) ?? 0,
+      unitAmount: numberOrNull(line?.unitAmount),
+      lineAmount: numberOrNull(line?.lineAmount),
+    })),
     ticketIds: textList(source.ticketIds),
     compReason: textOrNull(source.compReason),
     createdAt: toIso(source.createdAt),
@@ -408,6 +415,9 @@ function admissionRecord(id, data) {
     provider: text(source.provider),
     ticketTypeId: textOrNull(source.ticketTypeId),
     ticketClass: text(source.ticketClass),
+    addOns: (Array.isArray(source.addOns) ? source.addOns : []).map((addOn) => ({
+      id: text(addOn?.id), name: text(addOn?.name), status: text(addOn?.status),
+    })),
     firstName: text(source.firstName),
     lastName: text(source.lastName),
     email: text(source.email),
