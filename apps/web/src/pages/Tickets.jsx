@@ -63,7 +63,7 @@ const hasErrors = (found) => Object.keys(found).length > 0;
 // Definite refusals: no order was created, so the saved attempt goes.
 // A refused promo code is refused before any order exists (ADR 0004 amendment 2026-11-04).
 const PROMO_CODES_REFUSED = ['promo-invalid', 'promo-not-applicable', 'promo-order-limit', 'promo-exhausted'];
-const NO_ORDER_CODES = ['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited', ...PROMO_CODES_REFUSED];
+const NO_ORDER_CODES = ['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited', 'add-on-unavailable', 'add-on-acknowledgement-required', ...PROMO_CODES_REFUSED];
 // Refusals about the chosen tickets send the buyer back to choose again.
 const BACK_TO_SELECTION_CODES = ['quantity-out-of-range', 'sold-out', 'ticket-unavailable'];
 
@@ -90,6 +90,12 @@ function answerErrorsOf(message, lines, form) {
     errors[`${line.ticketTypeId}.${match[2]}.answers.${match[3]}`] = match[4];
   }
   return hasErrors(errors) ? errors : null;
+}
+
+/** The add-ons a seat chose that its ticket type still offers, as the checkout request sends them. */
+function chosenAddOns(attendee, typeId, offered) {
+  return offered.filter((addOn) => addOn.ticketTypeIds.includes(typeId) && attendee.addOns?.[addOn.id]?.selected)
+    .map((addOn) => ({ addOn, acknowledged: attendee.addOns[addOn.id].acknowledged === true }));
 }
 
 const fullName = (attendee) => [attendee.firstName, attendee.lastName].map((part) => (part || '').trim()).filter(Boolean).join(' ');
@@ -241,11 +247,25 @@ export default function Tickets() {
     attendees: Array.from({ length: Number(quantities[type.id]) }, (_, index) => attendees[type.id]?.[index] || {}),
   }));
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const total = lines.reduce((sum, line) => sum + line.quantity * types.find((type) => type.id === line.ticketTypeId).unitAmount, 0);
+  const ticketTotal = lines.reduce((sum, line) => sum + line.quantity * types.find((type) => type.id === line.ticketTypeId).unitAmount, 0);
+  const offeredAddOns = catalog?.addOns || [];
+  // Add-on lines in catalog order, for the review and the total. The server prices them again.
+  const addOnLines = offeredAddOns.map((addOn) => ({
+    addOn, quantity: lines.reduce((sum, line) => sum + line.attendees.filter((attendee) => chosenAddOns(attendee, line.ticketTypeId, [addOn]).length).length, 0),
+  })).filter((line) => line.quantity > 0);
+  const addOnTotal = addOnLines.reduce((sum, line) => sum + line.quantity * line.addOn.unitAmount, 0);
+  const total = ticketTotal + addOnTotal;
   // A code priced one cart. Another cart or catalog drops it without an effect.
-  const cart = lines.map(({ ticketTypeId, quantity }) => ({ ticketTypeId, quantity }));
+  // Each line carries its add-on counts so the preview prices the same total as checkout.
+  const cart = lines.map(({ ticketTypeId, quantity, attendees: lineAttendees }) => {
+    const addOns = offeredAddOns.map((addOn) => ({
+      id: addOn.id, quantity: lineAttendees.filter((attendee) => chosenAddOns(attendee, ticketTypeId, [addOn]).length).length,
+    })).filter((addOn) => addOn.quantity > 0);
+    return addOns.length ? { ticketTypeId, quantity, addOns } : { ticketTypeId, quantity };
+  });
   const cartKey = JSON.stringify([catalog?.catalogRevision, cart]);
   const applied = promo?.owner === promoOwner && promo?.cartKey === cartKey ? promo.preview : null;
+  // The preview prices tickets and add-ons; a code discounts tickets only.
   const payable = applied ? applied.totalAmount : total;
   const attempt = saved && user && saved.uid === user.uid ? saved.attempt : null;
   // Every attendee in order, numbered across ticket types.
@@ -266,6 +286,20 @@ export default function Tickets() {
       const next = [...(previous[typeId] || [])];
       next[index] = { ...next[index], [key]: value };
       return { ...previous, [typeId]: next };
+    });
+  }
+
+  function updateAddOn(typeId, index, id, change) {
+    setAttendees((previous) => {
+      const next = [...(previous[typeId] || [])];
+      const current = next[index] || {};
+      next[index] = { ...current, addOns: { ...current.addOns, [id]: { ...current.addOns?.[id], ...change } } };
+      return { ...previous, [typeId]: next };
+    });
+    setErrors((previous) => {
+      const prefix = `${typeId}.${index}.addOns.${id}`;
+      const next = Object.fromEntries(Object.entries(previous).filter(([key]) => key !== prefix && key !== `${prefix}.acknowledged`));
+      return Object.keys(next).length === Object.keys(previous).length ? previous : next;
     });
   }
 
@@ -303,6 +337,15 @@ export default function Tickets() {
       for (const { key, attendee } of seats) {
         if (!attendee.firstName?.trim()) found[`${key}.firstName`] = 'Enter the attendee’s first name.';
         if (!EMAIL_RE.test(attendee.email?.trim() || '')) found[`${key}.email`] = 'Enter the attendee’s email address.';
+      }
+      const taken = {};
+      for (const { key, type, attendee } of seats) {
+        for (const { addOn, acknowledged } of chosenAddOns(attendee, type.id, offeredAddOns)) {
+          taken[addOn.id] = (taken[addOn.id] || 0) + 1;
+          if (!addOn.available) found[`${key}.addOns.${addOn.id}`] = `${addOn.name} is no longer available. Clear it to continue.`;
+          else if (Number.isInteger(addOn.remaining) && taken[addOn.id] > addOn.remaining) found[`${key}.addOns.${addOn.id}`] = `Only ${addOn.remaining} ${addOn.name} ${addOn.remaining === 1 ? 'place remains' : 'places remain'}.`;
+          else if (addOn.acknowledgement && !acknowledged) found[`${key}.addOns.${addOn.id}.acknowledged`] = `Confirm this statement to add ${addOn.name}.`;
+        }
       }
     } else if (slug === 'questions' && asksQuestions) {
       for (const { key, attendee } of seats) {
@@ -530,7 +573,11 @@ export default function Tickets() {
         ...(answered ? { formRevision: readRegistrationForm(form).revision } : {}),
         ...(applied ? { promoCode: applied.code } : {}),
         lines: lines.map((line) => ({ ...line, attendees: line.attendees.map((attendee) => {
-          const sent = { firstName: attendee.firstName.trim(), lastName: (attendee.lastName || '').trim(), email: attendee.email.trim() };
+          const chosen = chosenAddOns(attendee, line.ticketTypeId, offeredAddOns);
+          const sent = {
+            firstName: attendee.firstName.trim(), lastName: (attendee.lastName || '').trim(), email: attendee.email.trim(),
+            ...(chosen.length ? { addOns: chosen.map(({ addOn, acknowledged }) => ({ id: addOn.id, acknowledged })) } : {}),
+          };
           return answered ? { ...sent, answers: answersOf(attendee) } : sent;
         }) })),
       };
@@ -600,6 +647,23 @@ export default function Tickets() {
                         <TextField label="Last name" hint="Optional for attendees who use one name." value={attendee.lastName || ''} autoComplete="family-name" maxLength={100} error={errors[`${key}.lastName`]} onChange={(value) => updateAttendee(type.id, index, 'lastName', value)} />
                       </div>
                       <TextField label="Attendee email" type="email" inputMode="email" autoComplete="email" maxLength={254} required value={attendee.email || ''} error={errors[`${key}.email`]} onChange={(value) => updateAttendee(type.id, index, 'email', value)} />
+                      {offeredAddOns.filter((addOn) => addOn.ticketTypeIds.includes(type.id)).map((addOn) => {
+                        const choice = attendee.addOns?.[addOn.id] || {};
+                        const soldOut = !addOn.available && !choice.selected;
+                        return (
+                          <div key={addOn.id} className="min-w-0 space-y-xs border-t-hairline border-rule-hairline pt-sm">
+                            <Checkbox label={`Add ${addOn.name} — ${formatTicketMoney(addOn.unitAmount, catalog.currency)}`} checked={choice.selected === true} disabled={soldOut}
+                              error={choice.selected ? errors[`${key}.addOns.${addOn.id}`] : undefined}
+                              onChange={(event) => updateAddOn(type.id, index, addOn.id, { selected: event.target.checked, ...(event.target.checked ? {} : { acknowledged: false }) })} />
+                            {addOn.description ? <p className="wrap-anywhere text-caption text-text-secondary">{addOn.description}</p> : null}
+                            {soldOut ? <p className="text-caption">Sold out</p> : Number.isInteger(addOn.remaining) ? <p className="text-caption">{addOn.remaining} {addOn.remaining === 1 ? 'place' : 'places'} left</p> : null}
+                            {choice.selected && addOn.acknowledgement ? (
+                              <Checkbox label={addOn.acknowledgement} checked={choice.acknowledged === true} error={errors[`${key}.addOns.${addOn.id}.acknowledged`]}
+                                onChange={(event) => updateAddOn(type.id, index, addOn.id, { acknowledged: event.target.checked })} />
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </fieldset>
                   ))}
                 </div>
@@ -628,6 +692,10 @@ export default function Tickets() {
                       <dt>{types.find((type) => type.id === line.ticketTypeId).name} × {line.quantity}</dt>
                       <dd className="font-data tabular-nums">{formatTicketMoney(types.find((type) => type.id === line.ticketTypeId).unitAmount * line.quantity, catalog.currency)}</dd>
                     </div>)}
+                    {addOnLines.map(({ addOn, quantity }) => <div key={`addon-${addOn.id}`} className="flex flex-wrap justify-between gap-sm">
+                      <dt>{addOn.name} × {quantity}</dt>
+                      <dd className="font-data tabular-nums">{formatTicketMoney(addOn.unitAmount * quantity, catalog.currency)}</dd>
+                    </div>)}
                     {applied ? <div className="flex flex-wrap justify-between gap-sm">
                       <dt>Promo code {applied.code}</dt><dd className="font-data tabular-nums">−{formatTicketMoney(applied.discountAmount, catalog.currency)}</dd>
                     </div> : null}
@@ -645,10 +713,11 @@ export default function Tickets() {
                   <p className="text-caption text-text-secondary">{catalog.taxTreatment === 'inclusive' ? 'Any applicable tax is included in these prices.' : 'The organizer has configured this event not to collect tax.'} The organizer pays processing fees; no additional fees are added to your total.</p>
                   <h3 className="font-heading text-h3 font-semibold">Attendees</h3>
                   <ul className="space-y-sm">
-                    {seats.map(({ key, label, attendee }) => (
+                    {seats.map(({ key, label, attendee, type }) => (
                       <li key={key} className="min-w-0 space-y-2xs border-hairline border-rule-hairline p-sm">
                         <p className="font-medium">{label}</p>
                         <p className="wrap-anywhere text-caption text-text-secondary">{(attendee.email || '').trim()}</p>
+                        {chosenAddOns(attendee, type.id, offeredAddOns).length ? <p className="text-caption">Add-ons: {chosenAddOns(attendee, type.id, offeredAddOns).map(({ addOn }) => addOn.name).join(', ')}</p> : null}
                         {questions.length ? (
                           <dl className="space-y-2xs">
                             {questions.map((question) => (

@@ -975,4 +975,51 @@ describe('promo codes on the review step', () => {
     // A refused code is refused before any order, so no saved checkout is kept.
     expect(readCheckoutAttempt('purchaser-a')).toBeNull();
   });
+
+  it('adds a reception with its acknowledgement for one attendee and sends only the choice', async () => {
+    const reception = { id: 'reception', name: 'Evening reception', description: 'Two drinks and appetizers.', unitAmount: 1500,
+      acknowledgement: 'I am 21 or older.', ticketTypeIds: ['general'], remaining: 5, available: true };
+    ticketingRequest.mockImplementation(async (name) => name === 'ticketingCatalog' ? { ...CATALOG, addOns: [reception] } : { orderId: 'order-synthetic', status: 'pending', paymentStatus: 'pending', checkoutUrl: null });
+    mount();
+    await choose(1);
+    next('Attendees');
+    nameAttendees(1);
+    expect(screen.getByText('Two drinks and appetizers.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Add Evening reception — $15.00' }));
+    next('Review');
+    expect(await screen.findByText('Confirm this statement to add Evening reception.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I am 21 or older.' }));
+    next('Review');
+    expect(await screen.findByText('Evening reception × 1')).toBeInTheDocument();
+    expect(screen.getByText('Add-ons: Evening reception')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $40.00' }));
+    await waitFor(() => expect(checkoutCalls()).toHaveLength(1));
+    const [, { body }] = checkoutCalls()[0];
+    expect(body.lines[0].attendees[0].addOns).toEqual([{ id: 'reception', acknowledged: true }]);
+    expect(JSON.stringify(body)).not.toContain('1500');
+  });
+
+  it('prices chosen add-ons in the promo preview and charges the preview total', async () => {
+    const reception = { id: 'reception', name: 'Evening reception', description: '', unitAmount: 1500,
+      acknowledgement: '', ticketTypeIds: ['general'], remaining: null, available: true };
+    ticketingRequest.mockImplementation(async (name) => {
+      if (name === 'ticketingCatalog') return { ...CATALOG, addOns: [reception] };
+      if (name === 'ticketingPromoPreview') return { ...PREVIEW, subtotalAmount: 2000, totalAmount: 3500, discountAmount: 500,
+        lines: [{ ticketTypeId: 'general', name: 'General admission', quantity: 1, unitAmount: 2000, lineAmount: 2000, listUnitAmount: 2500 }],
+        addOnLines: [{ addOnId: 'reception', name: 'Evening reception', quantity: 1, unitAmount: 1500, lineAmount: 1500 }] };
+      return { orderId: 'order-synthetic', status: 'pending', paymentStatus: 'pending', checkoutUrl: null };
+    });
+    mount();
+    await choose(1);
+    next('Attendees');
+    nameAttendees(1);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Add Evening reception — $15.00' }));
+    next('Review');
+    await screen.findByText('Evening reception × 1');
+    await apply('EARLY');
+    await screen.findByText('Promo code EARLY');
+    expect(previewCalls()[0][1].body.lines).toEqual([{ ticketTypeId: 'general', quantity: 1, addOns: [{ id: 'reception', quantity: 1 }] }]);
+    expect(screen.getByRole('button', { name: 'Continue to Stripe — $35.00' })).toBeInTheDocument();
+  });
 });
