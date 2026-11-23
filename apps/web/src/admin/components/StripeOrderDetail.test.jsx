@@ -340,6 +340,7 @@ describe('ticket add-ons', () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({
       action: 'cancelTickets', ticketIds: [], addOns: [{ ticketId: 'seat-unused', addOnId: 'reception' }],
     })));
+    expect(await screen.findByText('Selected add-ons cancelled. No money was refunded and no seats were restocked.')).toBeInTheDocument();
   });
 
   it('keeps a selected ticket\'s add-on in a refund that keeps every ticket valid', async () => {

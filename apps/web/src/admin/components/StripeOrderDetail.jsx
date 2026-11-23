@@ -167,7 +167,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         setError('The ticket selection changed. Review the current tickets before cancelling.');
         return;
       }
-      run({ action: 'cancelTickets', orderId, ticketIds: selected, ...addOnRequest, reason: reason.trim(), confirmed: true }, 'Selected tickets and add-ons cancelled. No money was refunded and no seats were restocked.');
+      run({ action: 'cancelTickets', orderId, ticketIds: selected, ...addOnRequest, reason: reason.trim(), confirmed: true }, `${!addOnPicks.length ? 'Selected tickets' : selected.length ? 'Selected tickets and add-ons' : 'Selected add-ons'} cancelled. No money was refunded and no seats were restocked.`);
     } else if (confirm === 'refund') {
       if (!selectedRefund) { setError('Choose the refund being allocated.'); return; }
       if (!preserveAdmission && !selected.length) { setError('Select affected tickets or choose to keep every ticket valid.'); return; }
