@@ -55,6 +55,10 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
   });
 
   test('the header and home lead offer tickets only once a catalog is published', async ({ page }) => {
+    const headerAction = page.getByRole('banner').getByRole('link', { name: 'Get tickets' });
+    const leadAction = page.getByRole('region')
+      .filter({ has: page.getByRole('heading', { level: 1 }) })
+      .getByRole('link', { name: 'Get tickets' });
     // The shape the public catalog read answers before staff publish a catalog.
     const UNPUBLISHED = { provider: 'stripe', mode: 'test', salesEnabled: false, catalogRevision: null, currency: null, ticketTypes: [], closedReason: 'Ticket sales are not configured.' };
     let response = UNPUBLISHED;
@@ -70,10 +74,11 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     // Paused sales keep the action, so a visitor can read when sales open.
     response = { ...PUBLIC, salesEnabled: false, closedReason: 'Ticket sales are paused.' };
     await page.reload();
-    await expect(page.getByRole('link', { name: 'Get tickets' }).first()).toBeVisible();
+    await expect(headerAction).toBeVisible();
+    await expect(leadAction).toBeVisible();
     for (const link of await page.getByRole('link', { name: 'Get tickets' }).all()) await expect(link).toHaveAttribute('href', '/tickets');
     await screenshot(page, 'stripe-action-after-catalog', page.locator('header').first());
-    await page.getByRole('link', { name: 'Get tickets' }).first().click();
+    await headerAction.click();
     await expect(page.getByRole('heading', { name: 'Ticket sales are closed' })).toBeVisible();
     await expect(page.getByText('Ticket sales are paused.')).toBeVisible();
   });
